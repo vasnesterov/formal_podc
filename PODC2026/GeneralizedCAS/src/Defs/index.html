@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="light dark">
+    <link rel="icon" href="data:,">
+    <title>GeneralizedCAS: Defs.lean · Formal PODC</title><base href="../../../.././"><link rel="stylesheet" href="static/lean/verso-vars.css">
+    <link rel="stylesheet" href="static/lean/highlighting.css">
+    <link rel="stylesheet" href="static/lean/tippy-border.css">
+    <link rel="stylesheet" href="static/style.css">
+    <script defer="defer" src="static/site.js"></script>
+    </head>
+  <body>
+    <header class="site-header">
+      <div class="wrap">
+        <a class="brand" href=".">Formal PODC</a><nav class="top">
+          <a href=".">Search</a><a href="about/">About</a><a href="https://github.com/vasnesterov/formal_podc">GitHub</a></nav>
+        </div>
+      </header>
+    <main class="wrap"><article><nav class="breadcrumbs" aria-label="Breadcrumb">
+          <a href=".">Search</a><span class="sep">›</span><a href="PODC2026/">PODC 2026</a><span class="sep">›</span><a href="PODC2026/GeneralizedCAS/">GeneralizedCAS</a><span class="sep">›</span><a href="PODC2026/GeneralizedCAS/src/">Lean source</a><span class="sep">›</span><span aria-current="page">Defs</span></nav>
+        <h1>
+          <code>Defs.lean</code></h1>
+        <div class="paper-links">
+          <p>
+            Source of <a href="PODC2026/GeneralizedCAS/">Generalized CAS and a space-efficient universal construction — PODC 2026</a> · <a href="https://github.com/vasnesterov/formal_podc/blob/main/Papers/PODC2026/GeneralizedCAS/Defs.lean">GitHub</a> · hover over a name for its type and documentation</p>
+          </div>
+        <div class="lean-code lean-src">
+          <code class="hl lean block" data-lean-context="Defs"><span id="L1"><span class="kw">import</span> Mathlib</span>
+<span id="L2"><span class="kw">import</span> Cslib.Computability.Distributed.SharedMemory.Model</span>
+<span id="L3"><span class="kw">import</span> Cslib.Computability.Distributed.SharedMemory.LinPoints</span>
+<span id="L4"><span class="kw">import</span> Cslib.Computability.Distributed.SharedMemory.Objects.FetchAdd</span>
+<span id="L5"><span class="kw">import</span> Podc.Computability.Distributed.SharedMemory.Objects.GCAS</span>
+<span id="L6"></span>
+<span id="L7"><span class="dc">/-!</span></span>
+<span id="L8"><span class="dc"># Hadzilacos–Thiessen–Toueg, *Generalized Compare-and-Swap and Space-Efficient Universal</span></span>
+<span id="L9"><span class="dc">Constructions for the Infinite-Arrival Model* (PODC 2026): Algorithm 1</span></span>
+<span id="L10"></span>
+<span id="L11"><span class="dc">Algorithm 1 is a universal construction: given the sequential specification `T` (an `ObjSpec`,</span></span>
+<span id="L12"><span class="dc">i.e. a deterministic `applyT`), it implements an object of type `T` for an arbitrary (possibly</span></span>
+<span id="L13"><span class="dc">infinite) set of processes `P` from</span></span>
+<span id="L14"></span>
+<span id="L15"><span class="dc">* `C` — a fetch&amp;increment object, initially `1` (timestamps);</span></span>
+<span id="L16"><span class="dc">* `A` — a GCAS object holding a triple `(time, operation, pointer)`, initially</span></span>
+<span id="L17"><span class="dc">  `(0, Noop, ptrNoop)`, compared lexicographically (footnote 2 of the paper);</span></span>
+<span id="L18"><span class="dc">* `S` — a CAS object holding `(time, state, response, pointer)`, initially</span></span>
+<span id="L19"><span class="dc">  `(0, s₀, ⊥, ptrNoop)`;</span></span>
+<span id="L20"><span class="dc">* dynamically allocated *cells*, one CAS object `(time, response)` each, obtained from a memory</span></span>
+<span id="L21"><span class="dc">  manager (`MM`).</span></span>
+<span id="L22"></span>
+<span id="L23"><span class="dc">## Modelling choices</span></span>
+<span id="L24"></span>
+<span id="L25"><span class="dc">* Pointers are `Ptr = WithBot ℕ`: `⊥` is `ptrNoop` (the dummy cell, initially `(0, ⊥)`), `↑n` is</span></span>
+<span id="L26"><span class="dc">  the `n`-th cell handed out by the memory manager. The memory manager is a base object whose</span></span>
+<span id="L27"><span class="dc">  `AllocateCell` returns the cells `0, 1, 2, …` in order (`mmObj`): since Algorithm 1 never frees</span></span>
+<span id="L28"><span class="dc">  cells, any allocation order is of this form up to renaming of cells.</span></span>
+<span id="L29"><span class="dc">* The initial contents of the cells are arbitrary (`cellInit`).</span></span>
+<span id="L30"><span class="dc">* `Noop` is `⊥ : WithBot T.Op`; responses stored in cells and in `S` are `RVal T.Resp`</span></span>
+<span id="L31"><span class="dc">  (`null` = `Null`, `bot` = `⊥`, `val r`). Comparing triples in `A` lexicographically needs a</span></span>
+<span id="L32"><span class="dc">  linear order on operations (`[LinearOrder T.Op]`, e.g. their bit-string encodings).</span></span>
+<span id="L33"><span class="dc">* Each line of the pseudocode that accesses a shared object is one step; local computations are</span></span>
+<span id="L34"><span class="dc">  merged into these steps. Line 2 is a step only when the process allocates; line 16 is the</span></span>
+<span id="L35"><span class="dc">  response step (it returns the response read on line 5).</span></span>
+<span id="L36"><span class="dc">-/</span></span>
+<span id="L37"></span>
+<span id="L38"><span class="kw">namespace</span> Podc.GeneralizedCAS</span>
+<span id="L39"></span>
+<span id="L40"><span class="kw">open</span> Cslib.SharedMemory</span>
+<span id="L41"></span>
+<span id="L42"><span class="dc">/-- Pointers to cells: `⊥` is `ptrNoop`, `↑n` the `n`-th allocated cell. -/</span></span>
+<span id="L43"><span class="kw">abbrev</span> <span class="const token" data-verso-hover="221">Ptr</span> := <span class="const token" data-verso-hover="222">WithBot</span> <span class="const token" data-verso-hover="36">ℕ</span></span>
+<span id="L44"></span>
+<span id="L45"><span class="dc">/-- Responses stored in shared objects: `Null`, `⊥` or a response of the type. -/</span></span>
+<span id="L46"><span class="kw">inductive</span> <span class="const token" data-verso-hover="223">RVal</span> (R : <span class="kw">Type</span>) <span class="kw">where</span></span>
+<span id="L47">  | <span class="const token" data-verso-hover="131">null</span></span>
+<span id="L48">  | <span class="const token" data-verso-hover="224">bot</span></span>
+<span id="L49">  | <span class="const token" data-verso-hover="225">val</span> (r : R)</span>
+<span id="L50">  <span class="kw">deriving</span> <span class="const token" data-verso-hover="35">DecidableEq</span></span>
+<span id="L51"></span>
+<span id="L52"><span class="dc">/-- The contents of `A`: `(time, operation, pointer)`. -/</span></span>
+<span id="L53">@[<span class="kw">ext</span>] <span class="kw">structure</span> <span class="const token" data-verso-hover="226">AVal</span> (Op : <span class="kw">Type</span>) <span class="kw">where</span></span>
+<span id="L54">  <span class="const token" data-verso-hover="149">time</span> : <span class="const token" data-verso-hover="36">ℕ</span></span>
+<span id="L55">  <span class="const token" data-verso-hover="227">op</span> : <span class="const token" data-verso-hover="222">WithBot</span> Op</span>
+<span id="L56">  <span class="const token" data-verso-hover="228">ptr</span> : <span class="const token" data-verso-hover="221">Ptr</span></span>
+<span id="L57">  <span class="kw">deriving</span> <span class="const token" data-verso-hover="35">DecidableEq</span></span>
+<span id="L58"></span>
+<span id="L59"><span class="dc">/-- Lexicographic key of an `AVal`. -/</span></span>
+<span id="L60"><span class="kw">def</span> <span class="const token" data-verso-hover="229">AVal.key</span> {Op : <span class="kw">Type</span>} (a : <span class="const token" data-verso-hover="226">AVal</span> Op) : <span class="const token" data-verso-hover="36">ℕ</span> ×ₗ (<span class="const token" data-verso-hover="222">WithBot</span> Op ×ₗ <span class="const token" data-verso-hover="221">Ptr</span>) := <span class="const token" data-verso-hover="230">toLex</span> (a.<span class="const token" data-verso-hover="149">time</span>, <span class="const token" data-verso-hover="230">toLex</span> (a.<span class="const token" data-verso-hover="227">op</span>, a.<span class="const token" data-verso-hover="228">ptr</span>))</span>
+<span id="L61"></span>
+<span id="L62"><span class="kw">lemma</span> <span class="const token" data-verso-hover="231">AVal.key_injective</span> {Op : <span class="kw">Type</span>} : <span class="const token" data-verso-hover="232">Function.Injective</span> (<span class="const token" data-verso-hover="229">AVal.key</span> (Op := Op)) := <span class="kw">by</span></span>
+<span id="L63">  <span class="kw">intro</span> a b h</span>
+<span id="L64">  <span class="kw">simp</span> only [<span class="const token" data-verso-hover="229">AVal.key</span>, <span class="const token" data-verso-hover="233">toLex_inj</span>, <span class="const token" data-verso-hover="99">Prod.mk.injEq</span>] <span class="kw">at</span> h</span>
+<span id="L65">  <span class="kw">ext</span> &lt;;&gt; <span class="kw">simp</span> [h]</span>
+<span id="L66"></span>
+<span id="L67"><span class="const token" data-verso-hover="234">instance</span> {Op : <span class="kw">Type</span>} [<span class="const token" data-verso-hover="33">LinearOrder</span> Op] : <span class="const token" data-verso-hover="33">LinearOrder</span> (<span class="const token" data-verso-hover="226">AVal</span> Op) :=</span>
+<span id="L68">  <span class="const token" data-verso-hover="235">LinearOrder.lift'</span> <span class="const token" data-verso-hover="229">AVal.key</span> <span class="const token" data-verso-hover="231">AVal.key_injective</span></span>
+<span id="L69"></span>
+<span id="L70"><span class="kw">lemma</span> <span class="const token" data-verso-hover="236">AVal.lt_iff</span> {Op : <span class="kw">Type</span>} [<span class="const token" data-verso-hover="33">LinearOrder</span> Op] (a b : <span class="const token" data-verso-hover="226">AVal</span> Op) : a &lt; b ↔ a.<span class="const token" data-verso-hover="229">key</span> &lt; b.<span class="const token" data-verso-hover="229">key</span> := <span class="const token" data-verso-hover="237">Iff.rfl</span></span>
+<span id="L71"></span>
+<span id="L72"><span class="kw">lemma</span> <span class="const token" data-verso-hover="238">AVal.time_le_of_lt</span> {Op : <span class="kw">Type</span>} [<span class="const token" data-verso-hover="33">LinearOrder</span> Op] {a b : <span class="const token" data-verso-hover="226">AVal</span> Op} (h : a &lt; b) :</span>
+<span id="L73">    a.<span class="const token" data-verso-hover="149">time</span> ≤ b.<span class="const token" data-verso-hover="149">time</span> := <span class="kw">by</span></span>
+<span id="L74">  <span class="kw">rw</span> [<span class="const token" data-verso-hover="236">AVal.lt_iff</span>, <span class="const token" data-verso-hover="229">AVal.key</span>, <span class="const token" data-verso-hover="229">AVal.key</span>, <span class="const token" data-verso-hover="239">Prod.Lex.toLex_lt_toLex</span>] <span class="kw">at</span> h</span>
+<span id="L75">  <span class="kw">rcases</span> h <span class="kw">with</span> h | ⟨h, -⟩</span>
+<span id="L76">  · <span class="kw">exact</span> h.<span class="const token" data-verso-hover="240">le</span></span>
+<span id="L77">  · <span class="kw">exact</span> h.<span class="const token" data-verso-hover="241">le</span></span>
+<span id="L78"></span>
+<span id="L79"><span class="kw">lemma</span> <span class="const token" data-verso-hover="242">AVal.time_le_of_not_lt</span> {Op : <span class="kw">Type</span>} [<span class="const token" data-verso-hover="33">LinearOrder</span> Op] {a b : <span class="const token" data-verso-hover="226">AVal</span> Op} (h : ¬ b &lt; a) :</span>
+<span id="L80">    a.<span class="const token" data-verso-hover="149">time</span> ≤ b.<span class="const token" data-verso-hover="149">time</span> := <span class="kw">by</span></span>
+<span id="L81">  <span class="kw">rcases</span> <span class="const token" data-verso-hover="69">lt_or_eq_of_le</span> (<span class="const token" data-verso-hover="243">not_lt</span>.<span class="const token" data-verso-hover="55">1</span> h) <span class="kw">with</span> h | h</span>
+<span id="L82">  · <span class="kw">exact</span> <span class="const token" data-verso-hover="238">AVal.time_le_of_lt</span> h</span>
+<span id="L83">  · <span class="kw">rw</span> [h]</span>
+<span id="L84"></span>
+<span id="L85"><span class="kw">lemma</span> <span class="const token" data-verso-hover="244">AVal.lt_of_time_lt</span> {Op : <span class="kw">Type</span>} [<span class="const token" data-verso-hover="33">LinearOrder</span> Op] {a b : <span class="const token" data-verso-hover="226">AVal</span> Op} (h : a.<span class="const token" data-verso-hover="149">time</span> &lt; b.<span class="const token" data-verso-hover="149">time</span>) :</span>
+<span id="L86">    a &lt; b := <span class="kw">by</span></span>
+<span id="L87">  <span class="kw">rw</span> [<span class="const token" data-verso-hover="236">AVal.lt_iff</span>, <span class="const token" data-verso-hover="229">AVal.key</span>, <span class="const token" data-verso-hover="229">AVal.key</span>, <span class="const token" data-verso-hover="239">Prod.Lex.toLex_lt_toLex</span>]</span>
+<span id="L88">  <span class="kw">exact</span> <span class="const token" data-verso-hover="63">Or.inl</span> h</span>
+<span id="L89"></span>
+<span id="L90"><span class="dc">/-- The contents of `S`: `(time, state, response, pointer)`. -/</span></span>
+<span id="L91">@[<span class="kw">ext</span>] <span class="kw">structure</span> <span class="const token" data-verso-hover="245">SVal</span> (St R : <span class="kw">Type</span>) <span class="kw">where</span></span>
+<span id="L92">  <span class="const token" data-verso-hover="106">time</span> : <span class="const token" data-verso-hover="36">ℕ</span></span>
+<span id="L93">  <span class="const token" data-verso-hover="246">state</span> : St</span>
+<span id="L94">  <span class="const token" data-verso-hover="247">resp</span> : <span class="const token" data-verso-hover="223">RVal</span> R</span>
+<span id="L95">  <span class="const token" data-verso-hover="103">ptr</span> : <span class="const token" data-verso-hover="221">Ptr</span></span>
+<span id="L96"></span>
+<span id="L97"><span class="dc">/-- The contents of a cell: `(time, response)`. -/</span></span>
+<span id="L98">@[<span class="kw">ext</span>] <span class="kw">structure</span> <span class="const token" data-verso-hover="37">CellVal</span> (R : <span class="kw">Type</span>) <span class="kw">where</span></span>
+<span id="L99">  <span class="const token" data-verso-hover="248">time</span> : <span class="const token" data-verso-hover="36">ℕ</span></span>
+<span id="L100">  <span class="const token" data-verso-hover="249">resp</span> : <span class="const token" data-verso-hover="223">RVal</span> R</span>
+<span id="L101">  <span class="kw">deriving</span> <span class="const token" data-verso-hover="35">DecidableEq</span></span>
+<span id="L102"></span>
+<span id="L103"><span class="dc">/-- The memory manager: `AllocateCell` returns the cells `0, 1, 2, …` in order; its state is the</span></span>
+<span id="L104"><span class="dc">number of cells allocated so far. -/</span></span>
+<span id="L105"><span class="kw">abbrev</span> <span class="const token" data-verso-hover="250">mmObj</span> : <span class="const token" data-verso-hover="6">ObjSpec</span> <span class="kw">where</span></span>
+<span id="L106">  <span class="const token" data-verso-hover="251">State</span> := <span class="const token" data-verso-hover="36">ℕ</span></span>
+<span id="L107">  <span class="const token" data-verso-hover="34">Op</span> := <span class="const token" data-verso-hover="252">Unit</span></span>
+<span id="L108">  <span class="const token" data-verso-hover="38">Resp</span> := <span class="const token" data-verso-hover="36">ℕ</span></span>
+<span id="L109">  <span class="const token" data-verso-hover="253">init</span> := <span class="nu">0</span></span>
+<span id="L110">  <span class="const token" data-verso-hover="254">δ</span> n _ := (n + <span class="nu">1</span>, n)</span>
+<span id="L111"></span>
+<span id="L112"><span class="dc">/-- The base objects of Algorithm 1. -/</span></span>
+<span id="L113"><span class="kw">inductive</span> <span class="const token" data-verso-hover="255">Obj</span> <span class="kw">where</span></span>
+<span id="L114">  | <span class="const token" data-verso-hover="256">C</span></span>
+<span id="L115">  | <span class="const token" data-verso-hover="257">A</span></span>
+<span id="L116">  | <span class="const token" data-verso-hover="258">S</span></span>
+<span id="L117">  | <span class="const token" data-verso-hover="259">MM</span></span>
+<span id="L118">  | <span class="const token" data-verso-hover="260">cell</span> (x : <span class="const token" data-verso-hover="221">Ptr</span>)</span>
+<span id="L119">  <span class="kw">deriving</span> <span class="const token" data-verso-hover="35">DecidableEq</span></span>
+<span id="L120"></span>
+<span id="L121"><span class="kw">variable</span> (T : <span class="const token" data-verso-hover="6">ObjSpec</span>) [<span class="const token" data-verso-hover="33">LinearOrder</span> T.<span class="const token" data-verso-hover="34">Op</span>]</span>
+<span id="L122"></span>
+<span id="L123"><span class="kw">open</span> Classical <span class="kw">in</span></span>
+<span id="L124"><span class="dc">/-- The sequential specifications of the base objects. -/</span></span>
+<span id="L125"><span class="kw">noncomputable</span> <span class="kw">abbrev</span> <span class="const token" data-verso-hover="261">base</span> : <span class="const token" data-verso-hover="255">Obj</span> → <span class="const token" data-verso-hover="6">ObjSpec</span></span>
+<span id="L126">  | <span class="const token" data-verso-hover="256">.</span>C =&gt; <span class="const token" data-verso-hover="262">rfaiObj</span></span>
+<span id="L127">  | <span class="const token" data-verso-hover="257">.</span>A =&gt; <span class="const token" data-verso-hover="28">gcasObject</span> (<span class="const token" data-verso-hover="226">AVal</span> T.<span class="const token" data-verso-hover="34">Op</span>) ⟨<span class="nu">0</span>, ⊥, ⊥⟩</span>
+<span id="L128">  | <span class="const token" data-verso-hover="258">.</span>S =&gt; <span class="const token" data-verso-hover="263">casObject</span> (<span class="const token" data-verso-hover="245">SVal</span> T.<span class="const token" data-verso-hover="251">State</span> T.<span class="const token" data-verso-hover="38">Resp</span>) ⟨<span class="nu">0</span>, T.<span class="const token" data-verso-hover="253">init</span>, <span class="const token" data-verso-hover="224">.</span>bot, ⊥⟩</span>
+<span id="L129">  | <span class="const token" data-verso-hover="259">.</span>MM =&gt; <span class="const token" data-verso-hover="250">mmObj</span></span>
+<span id="L130">  | <span class="const token" data-verso-hover="260">.</span>cell _ =&gt; <span class="const token" data-verso-hover="263">casObject</span> (<span class="const token" data-verso-hover="37">CellVal</span> T.<span class="const token" data-verso-hover="38">Resp</span>) ⟨<span class="nu">0</span>, <span class="const token" data-verso-hover="224">.</span>bot⟩</span>
+<span id="L131"></span>
+<span id="L132"><span class="dc">/-- Program counter: the next line to execute (`l16 r`: return `r`). -/</span></span>
+<span id="L133"><span class="kw">inductive</span> <span class="const token" data-verso-hover="111">PC</span> (R : <span class="kw">Type</span>) <span class="kw">where</span></span>
+<span id="L134">  | <span class="const token" data-verso-hover="84">l2</span> | <span class="const token" data-verso-hover="120">l3</span> | <span class="const token" data-verso-hover="121">l4</span> | <span class="const token" data-verso-hover="122">l5</span> | <span class="const token" data-verso-hover="112">l6</span> | <span class="const token" data-verso-hover="113">l7</span> | <span class="const token" data-verso-hover="114">l8</span> | <span class="const token" data-verso-hover="115">l9</span> | <span class="const token" data-verso-hover="116">l10</span> | <span class="const token" data-verso-hover="123">l13</span> | <span class="const token" data-verso-hover="117">l15</span></span>
+<span id="L135">  | <span class="const token" data-verso-hover="124">l16</span> (r : R)</span>
+<span id="L136"></span>
+<span id="L137"><span class="dc">/-- Local state of a process. `ptr` (persistent, initially `Null = none`) points to the</span></span>
+<span id="L138"><span class="dc">process's cell; `t` is the timestamp of the current operation; `snap = (t*, s*, r*, ptr*)` is the</span></span>
+<span id="L139"><span class="dc">value read from `S` on line 6; `ann = (t', o', ptr')` the value read from `A` on line 9. -/</span></span>
+<span id="L140"><span class="kw">structure</span> <span class="const token" data-verso-hover="127">Loc</span> <span class="kw">where</span></span>
+<span id="L141">  <span class="const token" data-verso-hover="78">pc</span> : <span class="const token" data-verso-hover="111">PC</span> T.<span class="const token" data-verso-hover="38">Resp</span></span>
+<span id="L142">  <span class="const token" data-verso-hover="264">op</span> : <span class="const token" data-verso-hover="222">WithBot</span> T.<span class="const token" data-verso-hover="34">Op</span></span>
+<span id="L143">  <span class="const token" data-verso-hover="90">ptr</span> : <span class="const token" data-verso-hover="265">Option</span> <span class="const token" data-verso-hover="221">Ptr</span></span>
+<span id="L144">  <span class="const token" data-verso-hover="130">t</span> : <span class="const token" data-verso-hover="36">ℕ</span></span>
+<span id="L145">  <span class="const token" data-verso-hover="102">snap</span> : <span class="const token" data-verso-hover="245">SVal</span> T.<span class="const token" data-verso-hover="251">State</span> T.<span class="const token" data-verso-hover="38">Resp</span></span>
+<span id="L146">  <span class="const token" data-verso-hover="148">ann</span> : <span class="const token" data-verso-hover="226">AVal</span> T.<span class="const token" data-verso-hover="34">Op</span></span>
+<span id="L147"></span>
+<span id="L148"><span class="kw">variable</span> {T}</span>
+<span id="L149"></span>
+<span id="L150"><span class="dc">/-- The pointer to the own cell (`ptrNoop` if not yet allocated, which never happens when it is</span></span>
+<span id="L151"><span class="dc">used). -/</span></span>
+<span id="L152"><span class="kw">def</span> <span class="const token" data-verso-hover="82">Loc.me</span> (l : <span class="const token" data-verso-hover="127">Loc</span> T) : <span class="const token" data-verso-hover="221">Ptr</span> := l.<span class="const token" data-verso-hover="90">ptr</span>.<span class="const token" data-verso-hover="266">getD</span> ⊥</span>
+<span id="L153"></span>
+<span id="L154"><span class="dc">/-- `applyT` extended to `Noop` (never used on `Noop`). -/</span></span>
+<span id="L155"><span class="kw">def</span> <span class="const token" data-verso-hover="27">applyT</span> (o : <span class="const token" data-verso-hover="222">WithBot</span> T.<span class="const token" data-verso-hover="34">Op</span>) (s : T.<span class="const token" data-verso-hover="251">State</span>) : T.<span class="const token" data-verso-hover="251">State</span> × <span class="const token" data-verso-hover="223">RVal</span> T.<span class="const token" data-verso-hover="38">Resp</span> :=</span>
+<span id="L156">  <span class="kw">match</span> o <span class="kw">with</span></span>
+<span id="L157">  | ⊥ =&gt; (s, <span class="const token" data-verso-hover="224">.</span>bot)</span>
+<span id="L158">  | (o : T.<span class="const token" data-verso-hover="34">Op</span>) =&gt; ((T.<span class="const token" data-verso-hover="254">δ</span> s o).<span class="const token" data-verso-hover="267">1</span>, <span class="const token" data-verso-hover="225">.</span>val (T.<span class="const token" data-verso-hover="254">δ</span> s o).<span class="const token" data-verso-hover="87">2</span>)</span>
+<span id="L159"></span>
+<span id="L160"><span class="dc">/-- The new value of `S` tried on line 13 (computed on line 12). -/</span></span>
+<span id="L161"><span class="kw">def</span> <span class="const token" data-verso-hover="268">Loc.newS</span> (l : <span class="const token" data-verso-hover="127">Loc</span> T) : <span class="const token" data-verso-hover="245">SVal</span> T.<span class="const token" data-verso-hover="251">State</span> T.<span class="const token" data-verso-hover="38">Resp</span> :=</span>
+<span id="L162">  ⟨l.<span class="const token" data-verso-hover="148">ann</span>.<span class="const token" data-verso-hover="149">time</span>, (<span class="const token" data-verso-hover="27">applyT</span> l.<span class="const token" data-verso-hover="148">ann</span>.<span class="const token" data-verso-hover="227">op</span> l.<span class="const token" data-verso-hover="102">snap</span>.<span class="const token" data-verso-hover="246">state</span>).<span class="const token" data-verso-hover="267">1</span>, (<span class="const token" data-verso-hover="27">applyT</span> l.<span class="const token" data-verso-hover="148">ann</span>.<span class="const token" data-verso-hover="227">op</span> l.<span class="const token" data-verso-hover="102">snap</span>.<span class="const token" data-verso-hover="246">state</span>).<span class="const token" data-verso-hover="87">2</span>, l.<span class="const token" data-verso-hover="148">ann</span>.<span class="const token" data-verso-hover="228">ptr</span>⟩</span>
+<span id="L163"></span>
+<span id="L164"><span class="dc">/-- The triple `(t, o, ptr)` of the current operation. -/</span></span>
+<span id="L165"><span class="kw">def</span> <span class="const token" data-verso-hover="269">Loc.mine</span> (l : <span class="const token" data-verso-hover="127">Loc</span> T) : <span class="const token" data-verso-hover="226">AVal</span> T.<span class="const token" data-verso-hover="34">Op</span> := ⟨l.<span class="const token" data-verso-hover="130">t</span>, l.<span class="const token" data-verso-hover="264">op</span>, l.<span class="const token" data-verso-hover="82">me</span>⟩</span>
+<span id="L166"></span>
+<span id="L167"><span class="dc">/-- The local state after an invocation of `o`. -/</span></span>
+<span id="L168"><span class="kw">def</span> <span class="const token" data-verso-hover="83">Loc.invoke</span> (l : <span class="const token" data-verso-hover="127">Loc</span> T) (o : T.<span class="const token" data-verso-hover="34">Op</span>) : <span class="const token" data-verso-hover="127">Loc</span> T :=</span>
+<span id="L169">  { l <span class="kw">with</span> <span class="const token" data-verso-hover="264">op</span> := (o : <span class="const token" data-verso-hover="222">WithBot</span> T.<span class="const token" data-verso-hover="34">Op</span>), <span class="const token" data-verso-hover="78">pc</span> := <span class="kw">if</span> l.<span class="const token" data-verso-hover="90">ptr</span> = <span class="const token" data-verso-hover="91">none</span> <span class="kw">then</span> <span class="const token" data-verso-hover="84">.</span>l2 <span class="kw">else</span> <span class="const token" data-verso-hover="120">.</span>l3 }</span>
+<span id="L170"></span>
+<span id="L171"><span class="kw">variable</span> (T)</span>
+<span id="L172"></span>
+<span id="L173"><span class="kw">open</span> Classical <span class="kw">in</span></span>
+<span id="L174"><span class="dc">/-- The next action of a process (lines 2–16 of Algorithm 1). -/</span></span>
+<span id="L175"><span class="kw">noncomputable</span> <span class="kw">def</span> <span class="const token" data-verso-hover="270">act</span> (l : <span class="const token" data-verso-hover="127">Loc</span> T) : <span class="const token" data-verso-hover="271">Action</span> T (<span class="const token" data-verso-hover="261">base</span> T) (<span class="const token" data-verso-hover="127">Loc</span> T) :=</span>
+<span id="L176">  <span class="kw">match</span> l.<span class="const token" data-verso-hover="78">pc</span> <span class="kw">with</span></span>
+<span id="L177">  | <span class="const token" data-verso-hover="84">.</span>l2 =&gt; <span class="const token" data-verso-hover="272">.</span>access <span class="const token" data-verso-hover="259">.</span>MM <span class="const token" data-verso-hover="273">(</span>) (<span class="kw">fun</span> n =&gt; { l <span class="kw">with</span> <span class="const token" data-verso-hover="90">ptr</span> := <span class="const token" data-verso-hover="46">some</span> (n : <span class="const token" data-verso-hover="221">Ptr</span>), <span class="const token" data-verso-hover="78">pc</span> := <span class="const token" data-verso-hover="120">.</span>l3 })</span>
+<span id="L178">  | <span class="const token" data-verso-hover="120">.</span>l3 =&gt; <span class="const token" data-verso-hover="272">.</span>access <span class="const token" data-verso-hover="256">.</span>C <span class="const token" data-verso-hover="274">.</span>fai (<span class="kw">fun</span> τ =&gt; { l <span class="kw">with</span> <span class="const token" data-verso-hover="130">t</span> := τ, <span class="const token" data-verso-hover="78">pc</span> := <span class="const token" data-verso-hover="121">.</span>l4 })</span>
+<span id="L179">  | <span class="const token" data-verso-hover="121">.</span>l4 =&gt; <span class="const token" data-verso-hover="272">.</span>access (<span class="const token" data-verso-hover="260">.</span>cell l.<span class="const token" data-verso-hover="82">me</span>) (<span class="const token" data-verso-hover="275">.</span>write ⟨l.<span class="const token" data-verso-hover="130">t</span>, <span class="const token" data-verso-hover="131">.</span>null⟩) (<span class="kw">fun</span> _ =&gt; { l <span class="kw">with</span> <span class="const token" data-verso-hover="78">pc</span> := <span class="const token" data-verso-hover="122">.</span>l5 })</span>
+<span id="L180">  | <span class="const token" data-verso-hover="122">.</span>l5 =&gt; <span class="const token" data-verso-hover="272">.</span>access (<span class="const token" data-verso-hover="260">.</span>cell l.<span class="const token" data-verso-hover="82">me</span>) <span class="const token" data-verso-hover="276">.</span>read (<span class="kw">fun</span> v =&gt;</span>
+<span id="L181">      <span class="kw">match</span> v <span class="kw">with</span></span>
+<span id="L182">      | <span class="const token" data-verso-hover="277">.</span>inl c =&gt;</span>
+<span id="L183">        <span class="kw">if</span> c = ⟨l.<span class="const token" data-verso-hover="130">t</span>, <span class="const token" data-verso-hover="131">.</span>null⟩ <span class="kw">then</span> { l <span class="kw">with</span> <span class="const token" data-verso-hover="78">pc</span> := <span class="const token" data-verso-hover="112">.</span>l6 } <span class="kw">else</span></span>
+<span id="L184">        <span class="kw">match</span> c.<span class="const token" data-verso-hover="249">resp</span> <span class="kw">with</span></span>
+<span id="L185">        | <span class="const token" data-verso-hover="225">.</span>val r =&gt; { l <span class="kw">with</span> <span class="const token" data-verso-hover="78">pc</span> := <span class="const token" data-verso-hover="124">.</span>l16 r }</span>
+<span id="L186">        | _ =&gt; { l <span class="kw">with</span> <span class="const token" data-verso-hover="78">pc</span> := <span class="const token" data-verso-hover="122">.</span>l5 }</span>
+<span id="L187">      | <span class="const token" data-verso-hover="278">.</span>inr _ =&gt; l)</span>
+<span id="L188">  | <span class="const token" data-verso-hover="112">.</span>l6 =&gt; <span class="const token" data-verso-hover="272">.</span>access <span class="const token" data-verso-hover="258">.</span>S <span class="const token" data-verso-hover="276">.</span>read (<span class="kw">fun</span> v =&gt;</span>
+<span id="L189">      <span class="kw">match</span> v <span class="kw">with</span></span>
+<span id="L190">      | <span class="const token" data-verso-hover="277">.</span>inl s =&gt; { l <span class="kw">with</span> <span class="const token" data-verso-hover="102">snap</span> := s, <span class="const token" data-verso-hover="78">pc</span> := <span class="const token" data-verso-hover="113">.</span>l7 }</span>
+<span id="L191">      | <span class="const token" data-verso-hover="278">.</span>inr _ =&gt; l)</span>
+<span id="L192">  | <span class="const token" data-verso-hover="113">.</span>l7 =&gt; <span class="const token" data-verso-hover="272">.</span>access (<span class="const token" data-verso-hover="260">.</span>cell l.<span class="const token" data-verso-hover="102">snap</span>.<span class="const token" data-verso-hover="103">ptr</span>) (<span class="const token" data-verso-hover="279">.</span>cas ⟨l.<span class="const token" data-verso-hover="102">snap</span>.<span class="const token" data-verso-hover="106">time</span>, <span class="const token" data-verso-hover="131">.</span>null⟩ ⟨l.<span class="const token" data-verso-hover="102">snap</span>.<span class="const token" data-verso-hover="106">time</span>, l.<span class="const token" data-verso-hover="102">snap</span>.<span class="const token" data-verso-hover="247">resp</span>⟩)</span>
+<span id="L193">      (<span class="kw">fun</span> _ =&gt; { l <span class="kw">with</span> <span class="const token" data-verso-hover="78">pc</span> := <span class="const token" data-verso-hover="114">.</span>l8 })</span>
+<span id="L194">  | <span class="const token" data-verso-hover="114">.</span>l8 =&gt; <span class="const token" data-verso-hover="272">.</span>access <span class="const token" data-verso-hover="257">.</span>A (<span class="const token" data-verso-hover="280">.</span>gcas <span class="const token" data-verso-hover="281">.</span>gt l.<span class="const token" data-verso-hover="269">mine</span> l.<span class="const token" data-verso-hover="269">mine</span>) (<span class="kw">fun</span> _ =&gt; { l <span class="kw">with</span> <span class="const token" data-verso-hover="78">pc</span> := <span class="const token" data-verso-hover="115">.</span>l9 })</span>
+<span id="L195">  | <span class="const token" data-verso-hover="115">.</span>l9 =&gt; <span class="const token" data-verso-hover="272">.</span>access <span class="const token" data-verso-hover="257">.</span>A <span class="const token" data-verso-hover="282">.</span>read (<span class="kw">fun</span> v =&gt;</span>
+<span id="L196">      <span class="kw">match</span> v <span class="kw">with</span></span>
+<span id="L197">      | <span class="const token" data-verso-hover="277">.</span>inl a =&gt; { l <span class="kw">with</span> <span class="const token" data-verso-hover="148">ann</span> := a, <span class="const token" data-verso-hover="78">pc</span> := <span class="const token" data-verso-hover="116">.</span>l10 }</span>
+<span id="L198">      | <span class="const token" data-verso-hover="278">.</span>inr _ =&gt; l)</span>
+<span id="L199">  | <span class="const token" data-verso-hover="116">.</span>l10 =&gt; <span class="const token" data-verso-hover="272">.</span>access (<span class="const token" data-verso-hover="260">.</span>cell l.<span class="const token" data-verso-hover="148">ann</span>.<span class="const token" data-verso-hover="228">ptr</span>) <span class="const token" data-verso-hover="276">.</span>read (<span class="kw">fun</span> v =&gt;</span>
+<span id="L200">      <span class="kw">match</span> v <span class="kw">with</span></span>
+<span id="L201">      | <span class="const token" data-verso-hover="277">.</span>inl c =&gt; <span class="kw">if</span> c = ⟨l.<span class="const token" data-verso-hover="148">ann</span>.<span class="const token" data-verso-hover="149">time</span>, <span class="const token" data-verso-hover="131">.</span>null⟩ <span class="kw">then</span> { l <span class="kw">with</span> <span class="const token" data-verso-hover="78">pc</span> := <span class="const token" data-verso-hover="123">.</span>l13 } <span class="kw">else</span> { l <span class="kw">with</span> <span class="const token" data-verso-hover="78">pc</span> := <span class="const token" data-verso-hover="117">.</span>l15 }</span>
+<span id="L202">      | <span class="const token" data-verso-hover="278">.</span>inr _ =&gt; l)</span>
+<span id="L203">  | <span class="const token" data-verso-hover="123">.</span>l13 =&gt; <span class="const token" data-verso-hover="272">.</span>access <span class="const token" data-verso-hover="258">.</span>S (<span class="const token" data-verso-hover="279">.</span>cas l.<span class="const token" data-verso-hover="102">snap</span> l.<span class="const token" data-verso-hover="268">newS</span>) (<span class="kw">fun</span> _ =&gt; { l <span class="kw">with</span> <span class="const token" data-verso-hover="78">pc</span> := <span class="const token" data-verso-hover="122">.</span>l5 })</span>
+<span id="L204">  | <span class="const token" data-verso-hover="117">.</span>l15 =&gt; <span class="const token" data-verso-hover="272">.</span>access <span class="const token" data-verso-hover="257">.</span>A (<span class="const token" data-verso-hover="280">.</span>gcas <span class="const token" data-verso-hover="283">.</span>eq l.<span class="const token" data-verso-hover="148">ann</span> l.<span class="const token" data-verso-hover="269">mine</span>) (<span class="kw">fun</span> _ =&gt; { l <span class="kw">with</span> <span class="const token" data-verso-hover="78">pc</span> := <span class="const token" data-verso-hover="122">.</span>l5 })</span>
+<span id="L205">  | <span class="const token" data-verso-hover="124">.</span>l16 r =&gt; <span class="const token" data-verso-hover="284">.</span>ret r { l <span class="kw">with</span> <span class="const token" data-verso-hover="78">pc</span> := <span class="const token" data-verso-hover="84">.</span>l2 }</span>
+<span id="L206"></span>
+<span id="L207"><span class="kw">variable</span> (P : <span class="kw">Type</span>)</span>
+<span id="L208"></span>
+<span id="L209"><span class="dc">/-- **Algorithm 1** for processes `P`, with initial cell contents `cellInit`. -/</span></span>
+<span id="L210"><span class="kw">noncomputable</span> <span class="kw">def</span> <span class="const token" data-verso-hover="44">alg</span> (cellInit : <span class="const token" data-verso-hover="36">ℕ</span> → <span class="const token" data-verso-hover="37">CellVal</span> T.<span class="const token" data-verso-hover="38">Resp</span>) : <span class="const token" data-verso-hover="5">Impl</span> T (<span class="const token" data-verso-hover="261">base</span> T) P (<span class="const token" data-verso-hover="127">Loc</span> T) <span class="kw">where</span></span>
+<span id="L211">  <span class="const token" data-verso-hover="285">memInit</span></span>
+<span id="L212">    | <span class="const token" data-verso-hover="256">.</span>C =&gt; (<span class="nu">1</span> : <span class="const token" data-verso-hover="36">ℕ</span>)</span>
+<span id="L213">    | <span class="const token" data-verso-hover="257">.</span>A =&gt; (⟨<span class="nu">0</span>, ⊥, ⊥⟩ : <span class="const token" data-verso-hover="226">AVal</span> T.<span class="const token" data-verso-hover="34">Op</span>)</span>
+<span id="L214">    | <span class="const token" data-verso-hover="258">.</span>S =&gt; (⟨<span class="nu">0</span>, T.<span class="const token" data-verso-hover="253">init</span>, <span class="const token" data-verso-hover="224">.</span>bot, ⊥⟩ : <span class="const token" data-verso-hover="245">SVal</span> T.<span class="const token" data-verso-hover="251">State</span> T.<span class="const token" data-verso-hover="38">Resp</span>)</span>
+<span id="L215">    | <span class="const token" data-verso-hover="259">.</span>MM =&gt; (<span class="nu">0</span> : <span class="const token" data-verso-hover="36">ℕ</span>)</span>
+<span id="L216">    | <span class="const token" data-verso-hover="260">.</span>cell x =&gt; (<span class="kw">match</span> x <span class="kw">with</span></span>
+<span id="L217">        | ⊥ =&gt; (⟨<span class="nu">0</span>, <span class="const token" data-verso-hover="224">.</span>bot⟩ : <span class="const token" data-verso-hover="37">CellVal</span> T.<span class="const token" data-verso-hover="38">Resp</span>)</span>
+<span id="L218">        | (n : ℕ) =&gt; cellInit n)</span>
+<span id="L219">  <span class="const token" data-verso-hover="286">locInit</span> _ := ⟨<span class="const token" data-verso-hover="84">.</span>l2, ⊥, <span class="const token" data-verso-hover="91">none</span>, <span class="nu">0</span>, ⟨<span class="nu">0</span>, T.<span class="const token" data-verso-hover="253">init</span>, <span class="const token" data-verso-hover="224">.</span>bot, ⊥⟩, ⟨<span class="nu">0</span>, ⊥, ⊥⟩⟩</span>
+<span id="L220">  <span class="const token" data-verso-hover="287">invoke</span> _ l o := l.<span class="const token" data-verso-hover="83">invoke</span> o</span>
+<span id="L221">  <span class="const token" data-verso-hover="288">act</span> _ l := <span class="const token" data-verso-hover="270">act</span> T l</span>
+<span id="L222"></span>
+<span id="L223"><span class="kw">end</span> Podc.GeneralizedCAS</span>
+<span id="L224"></span>
+</code></div>
+        <script>
+          window.versoHoversUrl = "PODC2026/GeneralizedCAS/-hovers.json";</script>
+        <script src="static/lean/popper.js"></script>
+        <script src="static/lean/tippy.js"></script>
+        <script src="static/lean/marked.js"></script>
+        <script src="static/lean/highlighting.js"></script>
+        <script src="static/lean/lean.js"></script>
+        </article></main><footer class="site-footer"><div class="wrap">
+        Machine-checked formalizations of PODC papers in Lean 4. Generated with <a href="https://github.com/leanprover/verso">Verso</a> from the README files of <a href="https://github.com/vasnesterov/formal_podc">vasnesterov/formal_podc</a>.</div>
+      </footer></body>
+  </html>
+

@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="light dark">
+    <link rel="icon" href="data:,">
+    <title>PowerGraphApproximation: Algorithm1.lean · Formal PODC</title><base href="../../../.././"><link rel="stylesheet" href="static/lean/verso-vars.css">
+    <link rel="stylesheet" href="static/lean/highlighting.css">
+    <link rel="stylesheet" href="static/lean/tippy-border.css">
+    <link rel="stylesheet" href="static/style.css">
+    <script defer="defer" src="static/site.js"></script>
+    </head>
+  <body>
+    <header class="site-header">
+      <div class="wrap">
+        <a class="brand" href=".">Formal PODC</a><nav class="top">
+          <a href=".">Search</a><a href="about/">About</a><a href="https://github.com/vasnesterov/formal_podc">GitHub</a></nav>
+        </div>
+      </header>
+    <main class="wrap"><article><nav class="breadcrumbs" aria-label="Breadcrumb">
+          <a href=".">Search</a><span class="sep">›</span><a href="PODC2020/">PODC 2020</a><span class="sep">›</span><a href="PODC2020/PowerGraphApproximation/">PowerGraphApproximation</a><span class="sep">›</span><a href="PODC2020/PowerGraphApproximation/src/">Lean source</a><span class="sep">›</span><span aria-current="page">Algorithm1</span></nav>
+        <h1>
+          <code>Algorithm1.lean</code></h1>
+        <div class="paper-links">
+          <p>
+            Source of <a href="PODC2020/PowerGraphApproximation/">Distributed Approximation on Power Graphs — PODC 2020</a> · <a href="https://github.com/vasnesterov/formal_podc/blob/main/Papers/PODC2020/PowerGraphApproximation/Algorithm1.lean">GitHub</a> · hover over a name for its type and documentation</p>
+          </div>
+        <div class="lean-code lean-src">
+          <code class="hl lean block" data-lean-context="Algorithm1"><span id="L1"><span class="kw">import</span> Podc.Foundations.Combinatorics.SimpleGraph.Power</span>
+<span id="L2"></span>
+<span id="L3"><span class="dc">/-!</span></span>
+<span id="L4"><span class="dc"># Algorithm 1: the `(1 + ε)`-approximation for `G²`-MVC (combinatorial core of Theorem 1)</span></span>
+<span id="L5"></span>
+<span id="L6"><span class="dc">[BCMPP20] R. Bar-Yehuda, K. Censor-Hillel, Y. Maus, S. Pai, S. V. Pemmaraju,</span></span>
+<span id="L7"><span class="dc">*Distributed Approximation on Power Graphs*, PODC 2020 (arXiv 2006.03746), Section 3.1.</span></span>
+<span id="L8"></span>
+<span id="L9"><span class="dc">We formalize the *sequential semantics* of Algorithm 1 with `ε = 1/l` (the paper reduces to this</span></span>
+<span id="L10"><span class="dc">case by `ε' = 1/⌈1/ε⌉`): Phase I repeatedly picks a centre `c ∈ C` with more than `l`</span></span>
+<span id="L11"><span class="dc">`G`-neighbours in `R`, moves `N(c) ∩ R` to the cover `S = V \ R` and removes `c` from `C`; Phase</span></span>
+<span id="L12"><span class="dc">II adds an optimal vertex cover `R*` of `G²[U]`, `U = V \ S`. The CONGEST implementation (BFS</span></span>
+<span id="L13"><span class="dc">pipelining, symmetry breaking by IDs) is not formalized; we prove the facts its round analysis</span></span>
+<span id="L14"><span class="dc">rests on.</span></span>
+<span id="L15"></span>
+<span id="L16"><span class="dc">* `lemma_3`: `G²[U]` is determined by the set `F` of `G`-edges touching `U`.</span></span>
+<span id="L17"><span class="dc">* `lemma_4`: `S ∪ R*` is a vertex cover of `G²`.</span></span>
+<span id="L18"><span class="dc">* `lemma_5`: `l |S| ≤ (l + 1) |O|` for every vertex cover `O` of `G²[S]`.</span></span>
+<span id="L19"><span class="dc">* `theorem_1_approx`: `l |S ∪ R*| ≤ (l + 1) |OPT|` (approximation factor `1 + ε`).</span></span>
+<span id="L20"><span class="dc">* `card_nbrs_U_le` (key fact of Lemma 2): after Phase I every vertex has at most `l`</span></span>
+<span id="L21"><span class="dc">  `G`-neighbours in `U`, so `|F| ≤ l n`.</span></span>
+<span id="L22"><span class="dc">* `phase1_length`: Phase I has at most `n/(l+1) ≤ ε n` iterations.</span></span>
+<span id="L23"><span class="dc">-/</span></span>
+<span id="L24"></span>
+<span id="L25"><span class="kw">namespace</span> Podc.PowerGraphApproximation.Algorithm1</span>
+<span id="L26"></span>
+<span id="L27"><span class="kw">open</span> SimpleGraph Finset Relation</span>
+<span id="L28"><span class="kw">open</span> <span class="kw">scoped</span> Classical</span>
+<span id="L29"></span>
+<span id="L30"><span class="kw">set_option</span> <span class="const token" data-verso-hover="49">linter.unusedSectionVars</span> false</span>
+<span id="L31"></span>
+<span id="L32"><span class="kw">variable</span> {V : <span class="kw">Type</span>*} [<span class="const token" data-verso-hover="50">Fintype</span> V] (G : <span class="const token" data-verso-hover="7">SimpleGraph</span> V) (l : <span class="const token" data-verso-hover="51">ℕ</span>)</span>
+<span id="L33"></span>
+<span id="L34"><span class="dc">/-- `G`-neighbours of `c` inside `R`. -/</span></span>
+<span id="L35"><span class="kw">noncomputable</span> <span class="kw">def</span> <span class="const token" data-verso-hover="52">gnbrs</span> (R : <span class="const token" data-verso-hover="9">Finset</span> V) (c : V) : <span class="const token" data-verso-hover="9">Finset</span> V := R.<span class="const token" data-verso-hover="53">filter</span> <span class="kw">fun</span> v =&gt; G.<span class="const token" data-verso-hover="54">Adj</span> c v</span>
+<span id="L36"></span>
+<span id="L37"><span class="dc">/-- State of Phase I: the possible centres `C` and the vertices `R` not in the cover. -/</span></span>
+<span id="L38"><span class="kw">structure</span> <span class="const token" data-verso-hover="55">State</span> (V : <span class="kw">Type</span>*) <span class="kw">where</span></span>
+<span id="L39">  <span class="const token" data-verso-hover="56">C</span> : <span class="const token" data-verso-hover="9">Finset</span> V</span>
+<span id="L40">  <span class="const token" data-verso-hover="57">R</span> : <span class="const token" data-verso-hover="9">Finset</span> V</span>
+<span id="L41"></span>
+<span id="L42"><span class="dc">/-- Initially `C = R = V`. -/</span></span>
+<span id="L43"><span class="kw">def</span> <span class="const token" data-verso-hover="58">init</span> : <span class="const token" data-verso-hover="55">State</span> V := ⟨<span class="const token" data-verso-hover="59">univ</span>, <span class="const token" data-verso-hover="59">univ</span>⟩</span>
+<span id="L44"></span>
+<span id="L45"><span class="dc">/-- One iteration of the while loop (lines 4–7). -/</span></span>
+<span id="L46"><span class="kw">inductive</span> <span class="const token" data-verso-hover="10">Step</span> : <span class="const token" data-verso-hover="55">State</span> V → <span class="const token" data-verso-hover="55">State</span> V → <span class="kw">Prop</span></span>
+<span id="L47">  | <span class="const token" data-verso-hover="60">pick</span> {s : <span class="const token" data-verso-hover="55">State</span> V} {c : V} (hc : c ∈ s.<span class="const token" data-verso-hover="56">C</span>) (hbig : l &lt; (<span class="const token" data-verso-hover="52">gnbrs</span> G s.<span class="const token" data-verso-hover="57">R</span> c).<span class="const token" data-verso-hover="61">card</span>) :</span>
+<span id="L48">      <span class="const token" data-verso-hover="10">Step</span> s ⟨s.<span class="const token" data-verso-hover="56">C</span>.<span class="const token" data-verso-hover="62">erase</span> c, s.<span class="const token" data-verso-hover="57">R</span> \ <span class="const token" data-verso-hover="52">gnbrs</span> G s.<span class="const token" data-verso-hover="57">R</span> c⟩</span>
+<span id="L49"></span>
+<span id="L50"><span class="dc">/-- Phase I has ended: no centre has more than `l` neighbours in `R`. -/</span></span>
+<span id="L51"><span class="kw">def</span> <span class="const token" data-verso-hover="63">Final</span> (s : <span class="const token" data-verso-hover="55">State</span> V) : <span class="kw">Prop</span> := ∀ c ∈ s.<span class="const token" data-verso-hover="56">C</span>, (<span class="const token" data-verso-hover="52">gnbrs</span> G s.<span class="const token" data-verso-hover="57">R</span> c).<span class="const token" data-verso-hover="61">card</span> ≤ l</span>
+<span id="L52"></span>
+<span id="L53"><span class="dc">/-- `O` covers all edges of `G²[X]`. -/</span></span>
+<span id="L54"><span class="kw">def</span> <span class="const token" data-verso-hover="64">CoversIn</span> (X O : <span class="const token" data-verso-hover="9">Finset</span> V) : <span class="kw">Prop</span> :=</span>
+<span id="L55">  ∀ u ∈ X, ∀ v ∈ X, (G.<span class="const token" data-verso-hover="46">power</span> <span class="nu">2</span>).<span class="const token" data-verso-hover="54">Adj</span> u v → u ∈ O ∨ v ∈ O</span>
+<span id="L56"></span>
+<span id="L57"><span class="kw">variable</span> {G l}</span>
+<span id="L58"></span>
+<span id="L59"><span class="kw">lemma</span> <span class="const token" data-verso-hover="65">mem_gnbrs</span> {R : <span class="const token" data-verso-hover="9">Finset</span> V} {c v : V} : v ∈ <span class="const token" data-verso-hover="52">gnbrs</span> G R c ↔ v ∈ R ∧ G.<span class="const token" data-verso-hover="54">Adj</span> c v := <span class="kw">by</span></span>
+<span id="L60">  <span class="kw">simp</span> [<span class="const token" data-verso-hover="52">gnbrs</span>]</span>
+<span id="L61"></span>
+<span id="L62"><span class="dc">/-- Invariant: processed centres have no neighbour left in `R`; the charging bound of Lemma 5</span></span>
+<span id="L63"><span class="dc">holds for the current cover `S = V \ R`. -/</span></span>
+<span id="L64"><span class="kw">structure</span> <span class="const token" data-verso-hover="66">Inv</span> (G : <span class="const token" data-verso-hover="7">SimpleGraph</span> V) (l : <span class="const token" data-verso-hover="51">ℕ</span>) (s : <span class="const token" data-verso-hover="55">State</span> V) : <span class="kw">Prop</span> <span class="kw">where</span></span>
+<span id="L65">  <span class="const token" data-verso-hover="67">processed</span> : ∀ c ∉ s.<span class="const token" data-verso-hover="56">C</span>, <span class="const token" data-verso-hover="52">gnbrs</span> G s.<span class="const token" data-verso-hover="57">R</span> c = ∅</span>
+<span id="L66">  <span class="const token" data-verso-hover="68">charge</span> : ∀ O : <span class="const token" data-verso-hover="9">Finset</span> V, <span class="const token" data-verso-hover="64">CoversIn</span> G (<span class="const token" data-verso-hover="59">univ</span> \ s.<span class="const token" data-verso-hover="57">R</span>) O →</span>
+<span id="L67">    l * (<span class="const token" data-verso-hover="59">univ</span> \ s.<span class="const token" data-verso-hover="57">R</span>).<span class="const token" data-verso-hover="61">card</span> ≤ (l + <span class="nu">1</span>) * (O ∩ (<span class="const token" data-verso-hover="59">univ</span> \ s.<span class="const token" data-verso-hover="57">R</span>)).<span class="const token" data-verso-hover="61">card</span></span>
+<span id="L68"></span>
+<span id="L69"><span class="kw">lemma</span> <span class="const token" data-verso-hover="69">inv_init</span> : <span class="const token" data-verso-hover="66">Inv</span> G l (<span class="const token" data-verso-hover="58">init</span> : <span class="const token" data-verso-hover="55">State</span> V) <span class="kw">where</span></span>
+<span id="L70">  <span class="const token" data-verso-hover="67">processed</span> := <span class="kw">by</span> <span class="kw">simp</span> [<span class="const token" data-verso-hover="58">init</span>]</span>
+<span id="L71">  <span class="const token" data-verso-hover="68">charge</span> := <span class="kw">by</span> <span class="kw">simp</span> [<span class="const token" data-verso-hover="58">init</span>]</span>
+<span id="L72"></span>
+<span id="L73"><span class="kw">lemma</span> <span class="const token" data-verso-hover="70">inv_step</span> {s t : <span class="const token" data-verso-hover="55">State</span> V} (hI : <span class="const token" data-verso-hover="66">Inv</span> G l s) (h : <span class="const token" data-verso-hover="10">Step</span> G l s t) : <span class="const token" data-verso-hover="66">Inv</span> G l t := <span class="kw">by</span></span>
+<span id="L74">  <span class="kw">cases</span> h <span class="kw">with</span></span>
+<span id="L75">  | @<span class="const token" data-verso-hover="60">pick</span> c hc hbig =&gt;</span>
+<span id="L76">  <span class="kw">set</span> N := <span class="const token" data-verso-hover="52">gnbrs</span> G s.<span class="const token" data-verso-hover="57">R</span> c</span>
+<span id="L77">  <span class="kw">have</span> hNR : N ⊆ s.<span class="const token" data-verso-hover="57">R</span> := <span class="const token" data-verso-hover="71">filter_subset</span> _ _</span>
+<span id="L78">  <span class="kw">have</span> hS' : <span class="const token" data-verso-hover="59">univ</span> \ (s.<span class="const token" data-verso-hover="57">R</span> \ N) = (<span class="const token" data-verso-hover="59">univ</span> \ s.<span class="const token" data-verso-hover="57">R</span>) ∪ N := <span class="kw">by</span></span>
+<span id="L79">    <span class="kw">ext</span> v; <span class="kw">simp</span> only [<span class="const token" data-verso-hover="72">mem_sdiff</span>, <span class="const token" data-verso-hover="73">mem_univ</span>, <span class="const token" data-verso-hover="74">true_and</span>, <span class="const token" data-verso-hover="75">mem_union</span>, <span class="const token" data-verso-hover="76">not_and</span>, <span class="const token" data-verso-hover="77">not_not</span>]</span>
+<span id="L80">    <span class="kw">constructor</span></span>
+<span id="L81">    · <span class="kw">intro</span> h; <span class="kw">by_cases</span> hv : v ∈ s.<span class="const token" data-verso-hover="57">R</span></span>
+<span id="L82">      · <span class="kw">exact</span> <span class="const token" data-verso-hover="78">Or.inr</span> (h hv)</span>
+<span id="L83">      · <span class="kw">exact</span> <span class="const token" data-verso-hover="79">Or.inl</span> hv</span>
+<span id="L84">    · <span class="kw">rintro</span> (h | h) h'</span>
+<span id="L85">      · <span class="kw">exact</span> <span class="const token" data-verso-hover="80">absurd</span> h' h</span>
+<span id="L86">      · <span class="kw">exact</span> h</span>
+<span id="L87">  <span class="kw">have</span> hdisj : <span class="const token" data-verso-hover="81">Disjoint</span> (<span class="const token" data-verso-hover="59">univ</span> \ s.<span class="const token" data-verso-hover="57">R</span>) N := <span class="kw">by</span></span>
+<span id="L88">    <span class="kw">rw</span> [<span class="const token" data-verso-hover="82">Finset.disjoint_left</span>]; <span class="kw">intro</span> v hv hvN; <span class="kw">exact</span> (<span class="const token" data-verso-hover="72">mem_sdiff</span>.<span class="const token" data-verso-hover="83">1</span> hv).<span class="const token" data-verso-hover="84">2</span> (hNR hvN)</span>
+<span id="L89">  <span class="kw">refine</span> ⟨?_, ?_⟩</span>
+<span id="L90">  · <span class="kw">intro</span> c' hc'</span>
+<span id="L91">    <span class="kw">by_cases</span> hcc : c' = c</span>
+<span id="L92">    · <span class="kw">subst</span> hcc</span>
+<span id="L93">      <span class="kw">ext</span> v; <span class="kw">simp</span> only [N, <span class="const token" data-verso-hover="65">mem_gnbrs</span>, <span class="const token" data-verso-hover="72">mem_sdiff</span>, <span class="const token" data-verso-hover="85">notMem_empty</span>, <span class="const token" data-verso-hover="86">iff_false</span>, <span class="const token" data-verso-hover="76">not_and</span>]</span>
+<span id="L94">      <span class="kw">intro</span> hv hadj; <span class="kw">exact</span> hv.<span class="const token" data-verso-hover="84">2</span> hv.<span class="const token" data-verso-hover="87">1</span> hadj</span>
+<span id="L95">    · <span class="kw">have</span> : c' ∉ s.<span class="const token" data-verso-hover="56">C</span> := <span class="kw">fun</span> h =&gt; hc' (<span class="const token" data-verso-hover="88">mem_erase</span>.<span class="const token" data-verso-hover="89">2</span> ⟨hcc, h⟩)</span>
+<span id="L96">      <span class="kw">have</span> h0 := hI.<span class="const token" data-verso-hover="67">processed</span> c' this</span>
+<span id="L97">      <span class="kw">ext</span> v</span>
+<span id="L98">      <span class="kw">simp</span> only [<span class="const token" data-verso-hover="65">mem_gnbrs</span>, <span class="const token" data-verso-hover="72">mem_sdiff</span>, <span class="const token" data-verso-hover="85">notMem_empty</span>, <span class="const token" data-verso-hover="86">iff_false</span>, <span class="const token" data-verso-hover="76">not_and</span>]</span>
+<span id="L99">      <span class="kw">intro</span> hv hadj</span>
+<span id="L100">      <span class="kw">have</span> : v ∈ <span class="const token" data-verso-hover="52">gnbrs</span> G s.<span class="const token" data-verso-hover="57">R</span> c' := <span class="const token" data-verso-hover="65">mem_gnbrs</span>.<span class="const token" data-verso-hover="89">2</span> ⟨hv.<span class="const token" data-verso-hover="87">1</span>, hadj⟩</span>
+<span id="L101">      <span class="kw">rw</span> [h0] <span class="kw">at</span> this; <span class="kw">simp</span> <span class="kw">at</span> this</span>
+<span id="L102">  · <span class="kw">intro</span> O hO</span>
+<span id="L103">    <span class="kw">rw</span> [hS']</span>
+<span id="L104">    <span class="kw">have</span> hO1 : <span class="const token" data-verso-hover="64">CoversIn</span> G (<span class="const token" data-verso-hover="59">univ</span> \ s.<span class="const token" data-verso-hover="57">R</span>) O := <span class="kw">fun</span> u hu v hv huv =&gt;</span>
+<span id="L105">      hO u (<span class="kw">by</span> <span class="kw">rw</span> [hS']; <span class="kw">exact</span> <span class="const token" data-verso-hover="90">mem_union_left</span> _ hu) v (<span class="kw">by</span> <span class="kw">rw</span> [hS']; <span class="kw">exact</span> <span class="const token" data-verso-hover="90">mem_union_left</span> _ hv) huv</span>
+<span id="L106">    <span class="kw">have</span> h1 := hI.<span class="const token" data-verso-hover="68">charge</span> O hO1</span>
+<span id="L107">    <span class="cm">--</span><span class="cm"> `N` is a clique of `G²` (common neighbour `c`), so `O` contains all but one of it</span></span>
+<span id="L108">    <span class="kw">have</span> hclique : N.<span class="const token" data-verso-hover="61">card</span> ≤ (O ∩ N).<span class="const token" data-verso-hover="61">card</span> + <span class="nu">1</span> := <span class="kw">by</span></span>
+<span id="L109">      <span class="kw">by_contra</span> hlt</span>
+<span id="L110">      <span class="kw">rw</span> [<span class="const token" data-verso-hover="91">not_le</span>] <span class="kw">at</span> hlt</span>
+<span id="L111">      <span class="kw">have</span> : <span class="nu">2</span> ≤ (N \ O).<span class="const token" data-verso-hover="61">card</span> := <span class="kw">by</span></span>
+<span id="L112">        <span class="kw">have</span> := <span class="const token" data-verso-hover="92">card_sdiff_add_card_inter</span> N O</span>
+<span id="L113">        <span class="kw">rw</span> [<span class="const token" data-verso-hover="93">inter_comm</span>] <span class="kw">at</span> this</span>
+<span id="L114">        <span class="kw">omega</span></span>
+<span id="L115">      <span class="kw">obtain</span> ⟨a, ha, b, hb, hab⟩ := <span class="const token" data-verso-hover="94">one_lt_card</span>.<span class="const token" data-verso-hover="83">1</span> this</span>
+<span id="L116">      <span class="kw">rw</span> [<span class="const token" data-verso-hover="72">mem_sdiff</span>] <span class="kw">at</span> ha hb</span>
+<span id="L117">      <span class="kw">have</span> hadj : (G.<span class="const token" data-verso-hover="46">power</span> <span class="nu">2</span>).<span class="const token" data-verso-hover="54">Adj</span> a b :=</span>
+<span id="L118">        <span class="const token" data-verso-hover="95">power_two_adj_of_adj_adj</span> (<span class="const token" data-verso-hover="65">mem_gnbrs</span>.<span class="const token" data-verso-hover="83">1</span> ha.<span class="const token" data-verso-hover="87">1</span>).<span class="const token" data-verso-hover="84">2</span>.<span class="const token" data-verso-hover="96">symm</span> (<span class="const token" data-verso-hover="65">mem_gnbrs</span>.<span class="const token" data-verso-hover="83">1</span> hb.<span class="const token" data-verso-hover="87">1</span>).<span class="const token" data-verso-hover="84">2</span> hab</span>
+<span id="L119">      <span class="kw">rcases</span> hO a (<span class="kw">by</span> <span class="kw">rw</span> [hS']; <span class="kw">exact</span> <span class="const token" data-verso-hover="97">mem_union_right</span> _ ha.<span class="const token" data-verso-hover="87">1</span>) b</span>
+<span id="L120">        (<span class="kw">by</span> <span class="kw">rw</span> [hS']; <span class="kw">exact</span> <span class="const token" data-verso-hover="97">mem_union_right</span> _ hb.<span class="const token" data-verso-hover="87">1</span>) hadj <span class="kw">with</span> h | h</span>
+<span id="L121">      · <span class="kw">exact</span> ha.<span class="const token" data-verso-hover="84">2</span> h</span>
+<span id="L122">      · <span class="kw">exact</span> hb.<span class="const token" data-verso-hover="84">2</span> h</span>
+<span id="L123">    <span class="kw">rw</span> [<span class="const token" data-verso-hover="98">card_union_of_disjoint</span> hdisj, <span class="const token" data-verso-hover="99">inter_union_distrib_left</span>,</span>
+<span id="L124">      <span class="const token" data-verso-hover="98">card_union_of_disjoint</span> (<span class="const token" data-verso-hover="100">disjoint_of_subset_left</span> <span class="const token" data-verso-hover="101">inter_subset_right</span></span>
+<span id="L125">        (<span class="const token" data-verso-hover="102">disjoint_of_subset_right</span> <span class="const token" data-verso-hover="101">inter_subset_right</span> hdisj))]</span>
+<span id="L126">    <span class="kw">have</span> : l + <span class="nu">1</span> ≤ N.<span class="const token" data-verso-hover="61">card</span> := hbig</span>
+<span id="L127">    <span class="kw">nlinarith</span></span>
+<span id="L128"></span>
+<span id="L129"><span class="kw">theorem</span> <span class="const token" data-verso-hover="103">inv_of_reach</span> {s : <span class="const token" data-verso-hover="55">State</span> V} (h : <span class="const token" data-verso-hover="104">ReflTransGen</span> (<span class="const token" data-verso-hover="10">Step</span> G l) <span class="const token" data-verso-hover="58">init</span> s) : <span class="const token" data-verso-hover="66">Inv</span> G l s := <span class="kw">by</span></span>
+<span id="L130">  <span class="kw">induction</span> h <span class="kw">with</span></span>
+<span id="L131">  | <span class="const token" data-verso-hover="105">refl</span> =&gt; <span class="kw">exact</span> <span class="const token" data-verso-hover="69">inv_init</span></span>
+<span id="L132">  | <span class="const token" data-verso-hover="106">tail</span> _ hst ih =&gt; <span class="kw">exact</span> <span class="const token" data-verso-hover="70">inv_step</span> ih hst</span>
+<span id="L133"></span>
+<span id="L134"><span class="dc">/-- **Lemma 5 of [BCMPP20]** (with `ε = 1/l`): after Phase I, `|S| ≤ (1 + ε)|O|`, i.e.</span></span>
+<span id="L135"><span class="dc">`l |S| ≤ (l + 1) |O|`, for every vertex cover `O` of `G²[S]`, `S = V \ R`. -/</span></span>
+<span id="L136"><span class="kw">theorem</span> <span class="const token" data-verso-hover="17">lemma_5</span> {s : <span class="const token" data-verso-hover="55">State</span> V} (h : <span class="const token" data-verso-hover="104">ReflTransGen</span> (<span class="const token" data-verso-hover="10">Step</span> G l) <span class="const token" data-verso-hover="58">init</span> s) (O : <span class="const token" data-verso-hover="9">Finset</span> V)</span>
+<span id="L137">    (hO : <span class="const token" data-verso-hover="64">CoversIn</span> G (<span class="const token" data-verso-hover="59">univ</span> \ s.<span class="const token" data-verso-hover="57">R</span>) O) :</span>
+<span id="L138">    l * (<span class="const token" data-verso-hover="59">univ</span> \ s.<span class="const token" data-verso-hover="57">R</span>).<span class="const token" data-verso-hover="61">card</span> ≤ (l + <span class="nu">1</span>) * O.<span class="const token" data-verso-hover="61">card</span> :=</span>
+<span id="L139">  ((<span class="const token" data-verso-hover="103">inv_of_reach</span> h).<span class="const token" data-verso-hover="68">charge</span> O hO).<span class="const token" data-verso-hover="107">trans</span> (<span class="const token" data-verso-hover="108">Nat.mul_le_mul_left</span> _ (<span class="const token" data-verso-hover="109">card_le_card</span> <span class="const token" data-verso-hover="110">inter_subset_left</span>))</span>
+<span id="L140"></span>
+<span id="L141"><span class="dc">/-- **Lemma 2 of [BCMPP20]**, key fact: after Phase I every vertex has at most `l = 1/ε`</span></span>
+<span id="L142"><span class="dc">`G`-neighbours in `U = R`. Hence `|F| ≤ l · n`. -/</span></span>
+<span id="L143"><span class="kw">theorem</span> <span class="const token" data-verso-hover="13">card_nbrs_U_le</span> {s : <span class="const token" data-verso-hover="55">State</span> V} (h : <span class="const token" data-verso-hover="104">ReflTransGen</span> (<span class="const token" data-verso-hover="10">Step</span> G l) <span class="const token" data-verso-hover="58">init</span> s) (hf : <span class="const token" data-verso-hover="63">Final</span> G l s)</span>
+<span id="L144">    (v : V) : (<span class="const token" data-verso-hover="52">gnbrs</span> G s.<span class="const token" data-verso-hover="57">R</span> v).<span class="const token" data-verso-hover="61">card</span> ≤ l := <span class="kw">by</span></span>
+<span id="L145">  <span class="kw">by_cases</span> hv : v ∈ s.<span class="const token" data-verso-hover="56">C</span></span>
+<span id="L146">  · <span class="kw">exact</span> hf v hv</span>
+<span id="L147">  · <span class="kw">simp</span> [(<span class="const token" data-verso-hover="103">inv_of_reach</span> h).<span class="const token" data-verso-hover="67">processed</span> v hv]</span>
+<span id="L148"></span>
+<span id="L149"><span class="dc">/-- **Lemma 3 of [BCMPP20].** For `u, v ∈ U`, adjacency in `G²[U]` is determined by the set `F`</span></span>
+<span id="L150"><span class="dc">of `G`-edges with an endpoint in `U`: `u ~ v` iff `u ≠ v` and `{u, v} ∈ F` or `u, v` have a common</span></span>
+<span id="L151"><span class="dc">neighbour `w` with `{u, w}, {w, v} ∈ F`. -/</span></span>
+<span id="L152"><span class="kw">theorem</span> <span class="const token" data-verso-hover="15">lemma_3</span> (U : <span class="const token" data-verso-hover="9">Finset</span> V) {u v : V} (hu : u ∈ U) (hv : v ∈ U) :</span>
+<span id="L153">    <span class="kw">let</span> F : V → V → <span class="kw">Prop</span> := <span class="kw">fun</span> a b =&gt; G.<span class="const token" data-verso-hover="54">Adj</span> a b ∧ (a ∈ U ∨ b ∈ U)</span>
+<span id="L154">    (G.<span class="const token" data-verso-hover="46">power</span> <span class="nu">2</span>).<span class="const token" data-verso-hover="54">Adj</span> u v ↔ u ≠ v ∧ (F u v ∨ ∃ w, F u w ∧ F w v) := <span class="kw">by</span></span>
+<span id="L155">  <span class="kw">intro</span> F</span>
+<span id="L156">  <span class="kw">rw</span> [<span class="const token" data-verso-hover="111">power_two_adj</span>]</span>
+<span id="L157">  <span class="kw">simp</span> only [F]</span>
+<span id="L158">  <span class="kw">constructor</span></span>
+<span id="L159">  · <span class="kw">rintro</span> ⟨hne, h | ⟨w, h1, h2⟩⟩</span>
+<span id="L160">    · <span class="kw">exact</span> ⟨hne, <span class="const token" data-verso-hover="79">Or.inl</span> ⟨h, <span class="const token" data-verso-hover="79">Or.inl</span> hu⟩⟩</span>
+<span id="L161">    · <span class="kw">exact</span> ⟨hne, <span class="const token" data-verso-hover="78">Or.inr</span> ⟨w, ⟨h1, <span class="const token" data-verso-hover="79">Or.inl</span> hu⟩, ⟨h2, <span class="const token" data-verso-hover="78">Or.inr</span> hv⟩⟩⟩</span>
+<span id="L162">  · <span class="kw">rintro</span> ⟨hne, h | ⟨w, h1, h2⟩⟩</span>
+<span id="L163">    · <span class="kw">exact</span> ⟨hne, <span class="const token" data-verso-hover="79">Or.inl</span> h.<span class="const token" data-verso-hover="87">1</span>⟩</span>
+<span id="L164">    · <span class="kw">exact</span> ⟨hne, <span class="const token" data-verso-hover="78">Or.inr</span> ⟨w, h1.<span class="const token" data-verso-hover="87">1</span>, h2.<span class="const token" data-verso-hover="87">1</span>⟩⟩</span>
+<span id="L165"></span>
+<span id="L166"><span class="dc">/-- **Lemma 4 of [BCMPP20].** If `R*` covers `G²[U]`, `U = R` after Phase I, then `S ∪ R*` is a</span></span>
+<span id="L167"><span class="dc">vertex cover of `G²`. -/</span></span>
+<span id="L168"><span class="kw">theorem</span> <span class="const token" data-verso-hover="16">lemma_4</span> (s : <span class="const token" data-verso-hover="55">State</span> V) {Rs : <span class="const token" data-verso-hover="9">Finset</span> V} (hRs : <span class="const token" data-verso-hover="64">CoversIn</span> G s.<span class="const token" data-verso-hover="57">R</span> Rs) :</span>
+<span id="L169">    (G.<span class="const token" data-verso-hover="46">power</span> <span class="nu">2</span>).<span class="const token" data-verso-hover="8">IsVertexCover</span> (((<span class="const token" data-verso-hover="59">univ</span> \ s.<span class="const token" data-verso-hover="57">R</span>) ∪ Rs : <span class="const token" data-verso-hover="9">Finset</span> V) : <span class="const token" data-verso-hover="112">Set</span> V) := <span class="kw">by</span></span>
+<span id="L170">  <span class="kw">intro</span> u v huv</span>
+<span id="L171">  <span class="kw">simp</span> only [<span class="const token" data-verso-hover="113">coe_union</span>, <span class="const token" data-verso-hover="114">coe_sdiff</span>, <span class="const token" data-verso-hover="115">coe_univ</span>, <span class="const token" data-verso-hover="116">Set.mem_union</span>, <span class="const token" data-verso-hover="117">Set.mem_sdiff</span>, <span class="const token" data-verso-hover="118">Set.mem_univ</span>,</span>
+<span id="L172">    <span class="const token" data-verso-hover="74">true_and</span>, <span class="const token" data-verso-hover="119">mem_coe</span>]</span>
+<span id="L173">  <span class="kw">by_cases</span> hu : u ∈ s.<span class="const token" data-verso-hover="57">R</span></span>
+<span id="L174">  · <span class="kw">by_cases</span> hv : v ∈ s.<span class="const token" data-verso-hover="57">R</span></span>
+<span id="L175">    · <span class="kw">rcases</span> hRs u hu v hv huv <span class="kw">with</span> h | h</span>
+<span id="L176">      · <span class="kw">exact</span> <span class="const token" data-verso-hover="79">Or.inl</span> (<span class="const token" data-verso-hover="78">Or.inr</span> h)</span>
+<span id="L177">      · <span class="kw">exact</span> <span class="const token" data-verso-hover="78">Or.inr</span> (<span class="const token" data-verso-hover="78">Or.inr</span> h)</span>
+<span id="L178">    · <span class="kw">exact</span> <span class="const token" data-verso-hover="78">Or.inr</span> (<span class="const token" data-verso-hover="79">Or.inl</span> hv)</span>
+<span id="L179">  · <span class="kw">exact</span> <span class="const token" data-verso-hover="79">Or.inl</span> (<span class="const token" data-verso-hover="79">Or.inl</span> hu)</span>
+<span id="L180"></span>
+<span id="L181"><span class="dc">/-- **Theorem 1 of [BCMPP20]**, approximation factor (with `ε = 1/l`): for an optimal vertex</span></span>
+<span id="L182"><span class="dc">cover `R*` of `G²[U]` (optimal among covers inside `U`), `|S ∪ R*| ≤ (1 + ε) |OPT|` for every</span></span>
+<span id="L183"><span class="dc">vertex cover `OPT` of `G²`. -/</span></span>
+<span id="L184"><span class="kw">theorem</span> <span class="const token" data-verso-hover="18">theorem_1_approx</span> {s : <span class="const token" data-verso-hover="55">State</span> V} (h : <span class="const token" data-verso-hover="104">ReflTransGen</span> (<span class="const token" data-verso-hover="10">Step</span> G l) <span class="const token" data-verso-hover="58">init</span> s) {Rs : <span class="const token" data-verso-hover="9">Finset</span> V}</span>
+<span id="L185">    (hopt : ∀ D ⊆ s.<span class="const token" data-verso-hover="57">R</span>, <span class="const token" data-verso-hover="64">CoversIn</span> G s.<span class="const token" data-verso-hover="57">R</span> D → Rs.<span class="const token" data-verso-hover="61">card</span> ≤ D.<span class="const token" data-verso-hover="61">card</span>) (OPT : <span class="const token" data-verso-hover="9">Finset</span> V)</span>
+<span id="L186">    (hOPT : (G.<span class="const token" data-verso-hover="46">power</span> <span class="nu">2</span>).<span class="const token" data-verso-hover="8">IsVertexCover</span> (OPT : <span class="const token" data-verso-hover="112">Set</span> V)) :</span>
+<span id="L187">    l * ((<span class="const token" data-verso-hover="59">univ</span> \ s.<span class="const token" data-verso-hover="57">R</span>) ∪ Rs).<span class="const token" data-verso-hover="61">card</span> ≤ (l + <span class="nu">1</span>) * OPT.<span class="const token" data-verso-hover="61">card</span> := <span class="kw">by</span></span>
+<span id="L188">  <span class="kw">have</span> hS := (<span class="const token" data-verso-hover="103">inv_of_reach</span> h).<span class="const token" data-verso-hover="68">charge</span> OPT (<span class="kw">fun</span> u _ v _ huv =&gt; hOPT huv)</span>
+<span id="L189">  <span class="kw">have</span> hU : Rs.<span class="const token" data-verso-hover="61">card</span> ≤ (OPT ∩ s.<span class="const token" data-verso-hover="57">R</span>).<span class="const token" data-verso-hover="61">card</span> :=</span>
+<span id="L190">    hopt _ <span class="const token" data-verso-hover="101">inter_subset_right</span> (<span class="kw">fun</span> u hu v hv huv =&gt; <span class="kw">by</span></span>
+<span id="L191">      <span class="kw">rcases</span> hOPT huv <span class="kw">with</span> h | h</span>
+<span id="L192">      · <span class="kw">exact</span> <span class="const token" data-verso-hover="79">Or.inl</span> (<span class="const token" data-verso-hover="120">mem_inter</span>.<span class="const token" data-verso-hover="89">2</span> ⟨h, hu⟩)</span>
+<span id="L193">      · <span class="kw">exact</span> <span class="const token" data-verso-hover="78">Or.inr</span> (<span class="const token" data-verso-hover="120">mem_inter</span>.<span class="const token" data-verso-hover="89">2</span> ⟨h, hv⟩))</span>
+<span id="L194">  <span class="kw">have</span> hsplit : (OPT ∩ (<span class="const token" data-verso-hover="59">univ</span> \ s.<span class="const token" data-verso-hover="57">R</span>)).<span class="const token" data-verso-hover="61">card</span> + (OPT ∩ s.<span class="const token" data-verso-hover="57">R</span>).<span class="const token" data-verso-hover="61">card</span> = OPT.<span class="const token" data-verso-hover="61">card</span> := <span class="kw">by</span></span>
+<span id="L195">    <span class="kw">rw</span> [← <span class="const token" data-verso-hover="98">card_union_of_disjoint</span>]</span>
+<span id="L196">    · <span class="kw">congr</span> <span class="nu">1</span>; <span class="kw">ext</span> v; <span class="kw">by_cases</span> hv : v ∈ s.<span class="const token" data-verso-hover="57">R</span> &lt;;&gt; <span class="kw">simp</span> [hv]</span>
+<span id="L197">    · <span class="kw">rw</span> [<span class="const token" data-verso-hover="82">Finset.disjoint_left</span>]; <span class="kw">intro</span> v h1 h2</span>
+<span id="L198">      <span class="kw">exact</span> (<span class="const token" data-verso-hover="72">mem_sdiff</span>.<span class="const token" data-verso-hover="83">1</span> (<span class="const token" data-verso-hover="120">mem_inter</span>.<span class="const token" data-verso-hover="83">1</span> h1).<span class="const token" data-verso-hover="84">2</span>).<span class="const token" data-verso-hover="84">2</span> (<span class="const token" data-verso-hover="120">mem_inter</span>.<span class="const token" data-verso-hover="83">1</span> h2).<span class="const token" data-verso-hover="84">2</span></span>
+<span id="L199">  <span class="kw">have</span> := <span class="const token" data-verso-hover="121">card_union_le</span> (<span class="const token" data-verso-hover="59">univ</span> \ s.<span class="const token" data-verso-hover="57">R</span>) Rs</span>
+<span id="L200">  <span class="kw">nlinarith</span></span>
+<span id="L201"></span>
+<span id="L202"><span class="dc">/-- Phase I takes at most `n / (l + 1)` iterations (`≤ ε n`): every iteration moves more than</span></span>
+<span id="L203"><span class="dc">`l` vertices out of `R`. -/</span></span>
+<span id="L204"><span class="kw">theorem</span> <span class="const token" data-verso-hover="14">phase1_length</span> (f : <span class="const token" data-verso-hover="51">ℕ</span> → <span class="const token" data-verso-hover="55">State</span> V) (m : <span class="const token" data-verso-hover="51">ℕ</span>) (h0 : f <span class="nu">0</span> = <span class="const token" data-verso-hover="58">init</span>)</span>
+<span id="L205">    (hf : ∀ i &lt; m, <span class="const token" data-verso-hover="10">Step</span> G l (f i) (f (i + <span class="nu">1</span>))) : m * (l + <span class="nu">1</span>) ≤ <span class="const token" data-verso-hover="122">Fintype.card</span> V := <span class="kw">by</span></span>
+<span id="L206">  <span class="kw">have</span> : ∀ i ≤ m, (f i).<span class="const token" data-verso-hover="57">R</span>.<span class="const token" data-verso-hover="61">card</span> + i * (l + <span class="nu">1</span>) ≤ <span class="const token" data-verso-hover="122">Fintype.card</span> V := <span class="kw">by</span></span>
+<span id="L207">    <span class="kw">intro</span> i hi</span>
+<span id="L208">    <span class="kw">induction</span> i <span class="kw">with</span></span>
+<span id="L209">    | <span class="const token" data-verso-hover="123">zero</span> =&gt; <span class="kw">simp</span> [h0, <span class="const token" data-verso-hover="58">init</span>]</span>
+<span id="L210">    | <span class="const token" data-verso-hover="124">succ</span> i ih =&gt;</span>
+<span id="L211">      <span class="kw">have</span> ih := ih (<span class="kw">by</span> <span class="kw">omega</span>)</span>
+<span id="L212">      <span class="kw">have</span> hs := hf i (<span class="kw">by</span> <span class="kw">omega</span>)</span>
+<span id="L213">      <span class="kw">cases</span> hs' : f (i + <span class="nu">1</span>) <span class="kw">with</span></span>
+<span id="L214">      | <span class="const token" data-verso-hover="125">mk</span> C' R' =&gt;</span>
+<span id="L215">      <span class="kw">rw</span> [hs'] <span class="kw">at</span> hs</span>
+<span id="L216">      <span class="kw">cases</span> hs <span class="kw">with</span></span>
+<span id="L217">      | @<span class="const token" data-verso-hover="60">pick</span> c hc hbig =&gt;</span>
+<span id="L218">      <span class="kw">have</span> := <span class="const token" data-verso-hover="92">card_sdiff_add_card_inter</span> (f i).<span class="const token" data-verso-hover="57">R</span> (<span class="const token" data-verso-hover="52">gnbrs</span> G (f i).<span class="const token" data-verso-hover="57">R</span> c)</span>
+<span id="L219">      <span class="kw">have</span> hsub : (f i).<span class="const token" data-verso-hover="57">R</span> ∩ <span class="const token" data-verso-hover="52">gnbrs</span> G (f i).<span class="const token" data-verso-hover="57">R</span> c = <span class="const token" data-verso-hover="52">gnbrs</span> G (f i).<span class="const token" data-verso-hover="57">R</span> c :=</span>
+<span id="L220">        <span class="const token" data-verso-hover="126">inter_eq_right</span>.<span class="const token" data-verso-hover="89">2</span> (<span class="const token" data-verso-hover="71">filter_subset</span> _ _)</span>
+<span id="L221">      <span class="kw">rw</span> [hsub] <span class="kw">at</span> this</span>
+<span id="L222">      <span class="kw">simp</span> only</span>
+<span id="L223">      <span class="kw">nlinarith</span></span>
+<span id="L224">  <span class="kw">have</span> := this m <span class="const token" data-verso-hover="127">le_rfl</span></span>
+<span id="L225">  <span class="kw">omega</span></span>
+<span id="L226"></span>
+<span id="L227"><span class="dc">/-- Phase I always terminates in a final state. -/</span></span>
+<span id="L228"><span class="kw">theorem</span> <span class="const token" data-verso-hover="19">exists_final</span> : ∃ s, <span class="const token" data-verso-hover="104">ReflTransGen</span> (<span class="const token" data-verso-hover="10">Step</span> G l) <span class="const token" data-verso-hover="58">init</span> s ∧ <span class="const token" data-verso-hover="63">Final</span> G l s := <span class="kw">by</span></span>
+<span id="L229">  <span class="kw">suffices</span> H : ∀ k, ∀ s, <span class="const token" data-verso-hover="104">ReflTransGen</span> (<span class="const token" data-verso-hover="10">Step</span> G l) <span class="const token" data-verso-hover="58">init</span> s → s.<span class="const token" data-verso-hover="57">R</span>.<span class="const token" data-verso-hover="61">card</span> + s.<span class="const token" data-verso-hover="56">C</span>.<span class="const token" data-verso-hover="61">card</span> ≤ k →</span>
+<span id="L230">      ∃ t, <span class="const token" data-verso-hover="104">ReflTransGen</span> (<span class="const token" data-verso-hover="10">Step</span> G l) <span class="const token" data-verso-hover="58">init</span> t ∧ <span class="const token" data-verso-hover="63">Final</span> G l t <span class="kw">from</span> H _ <span class="const token" data-verso-hover="58">init</span> <span class="const token" data-verso-hover="105">.</span>refl <span class="const token" data-verso-hover="127">le_rfl</span></span>
+<span id="L231">  <span class="kw">intro</span> k</span>
+<span id="L232">  <span class="kw">induction</span> k <span class="kw">with</span></span>
+<span id="L233">  | <span class="const token" data-verso-hover="123">zero</span> =&gt;</span>
+<span id="L234">    <span class="kw">intro</span> s hs hk</span>
+<span id="L235">    <span class="kw">refine</span> ⟨s, hs, <span class="kw">fun</span> c hc =&gt; ?_⟩</span>
+<span id="L236">    <span class="kw">have</span> : s.<span class="const token" data-verso-hover="56">C</span>.<span class="const token" data-verso-hover="61">card</span> = <span class="nu">0</span> := <span class="kw">by</span> <span class="kw">omega</span></span>
+<span id="L237">    <span class="kw">simp</span> [<span class="const token" data-verso-hover="128">card_eq_zero</span>.<span class="const token" data-verso-hover="83">1</span> this] <span class="kw">at</span> hc</span>
+<span id="L238">  | <span class="const token" data-verso-hover="124">succ</span> k ih =&gt;</span>
+<span id="L239">    <span class="kw">intro</span> s hs hk</span>
+<span id="L240">    <span class="kw">by_cases</span> hf : <span class="const token" data-verso-hover="63">Final</span> G l s</span>
+<span id="L241">    · <span class="kw">exact</span> ⟨s, hs, hf⟩</span>
+<span id="L242">    <span class="kw">simp</span> only [<span class="const token" data-verso-hover="63">Final</span>, <span class="const token" data-verso-hover="129">not_forall</span>, <span class="const token" data-verso-hover="91">not_le</span>] <span class="kw">at</span> hf</span>
+<span id="L243">    <span class="kw">obtain</span> ⟨c, hc, hbig⟩ := hf</span>
+<span id="L244">    <span class="kw">have</span> hst := <span class="const token" data-verso-hover="60">Step.pick</span> (G := G) (l := l) hc hbig</span>
+<span id="L245">    <span class="kw">refine</span> ih _ (hs.<span class="const token" data-verso-hover="106">tail</span> hst) ?_</span>
+<span id="L246">    <span class="kw">have</span> h1 := <span class="const token" data-verso-hover="130">card_erase_of_mem</span> hc</span>
+<span id="L247">    <span class="kw">have</span> h2 : (s.<span class="const token" data-verso-hover="57">R</span> \ <span class="const token" data-verso-hover="52">gnbrs</span> G s.<span class="const token" data-verso-hover="57">R</span> c).<span class="const token" data-verso-hover="61">card</span> ≤ s.<span class="const token" data-verso-hover="57">R</span>.<span class="const token" data-verso-hover="61">card</span> := <span class="const token" data-verso-hover="109">card_le_card</span> <span class="const token" data-verso-hover="131">sdiff_subset</span></span>
+<span id="L248">    <span class="kw">have</span> h3 : <span class="nu">0</span> &lt; s.<span class="const token" data-verso-hover="56">C</span>.<span class="const token" data-verso-hover="61">card</span> := <span class="const token" data-verso-hover="132">card_pos</span>.<span class="const token" data-verso-hover="89">2</span> ⟨c, hc⟩</span>
+<span id="L249">    <span class="kw">simp</span> only</span>
+<span id="L250">    <span class="kw">omega</span></span>
+<span id="L251"></span>
+<span id="L252"><span class="kw">end</span> Podc.PowerGraphApproximation.Algorithm1</span>
+<span id="L253"></span>
+</code></div>
+        <script>
+          window.versoHoversUrl = "PODC2020/PowerGraphApproximation/-hovers.json";</script>
+        <script src="static/lean/popper.js"></script>
+        <script src="static/lean/tippy.js"></script>
+        <script src="static/lean/marked.js"></script>
+        <script src="static/lean/highlighting.js"></script>
+        <script src="static/lean/lean.js"></script>
+        </article></main><footer class="site-footer"><div class="wrap">
+        Machine-checked formalizations of PODC papers in Lean 4. Generated with <a href="https://github.com/leanprover/verso">Verso</a> from the README files of <a href="https://github.com/vasnesterov/formal_podc">vasnesterov/formal_podc</a>.</div>
+      </footer></body>
+  </html>
+

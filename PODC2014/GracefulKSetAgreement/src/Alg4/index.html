@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="light dark">
+    <link rel="icon" href="data:,">
+    <title>GracefulKSetAgreement: Alg4.lean · Formal PODC</title><base href="../../../.././"><link rel="stylesheet" href="static/lean/verso-vars.css">
+    <link rel="stylesheet" href="static/lean/highlighting.css">
+    <link rel="stylesheet" href="static/lean/tippy-border.css">
+    <link rel="stylesheet" href="static/style.css">
+    <script defer="defer" src="static/site.js"></script>
+    </head>
+  <body>
+    <header class="site-header">
+      <div class="wrap">
+        <a class="brand" href=".">Formal PODC</a><nav class="top">
+          <a href=".">Search</a><a href="about/">About</a><a href="https://github.com/vasnesterov/formal_podc">GitHub</a></nav>
+        </div>
+      </header>
+    <main class="wrap"><article><nav class="breadcrumbs" aria-label="Breadcrumb">
+          <a href=".">Search</a><span class="sep">›</span><a href="PODC2014/">PODC 2014</a><span class="sep">›</span><a href="PODC2014/GracefulKSetAgreement/">GracefulKSetAgreement</a><span class="sep">›</span><a href="PODC2014/GracefulKSetAgreement/src/">Lean source</a><span class="sep">›</span><span aria-current="page">Alg4</span></nav>
+        <h1>
+          <code>Alg4.lean</code></h1>
+        <div class="paper-links">
+          <p>
+            Source of <a href="PODC2014/GracefulKSetAgreement/">Gracefully Degrading Consensus and k-Set Agreement under Dynamic Link Failures — PODC 2014</a> · <a href="https://github.com/vasnesterov/formal_podc/blob/main/Papers/PODC2014/GracefulKSetAgreement/Alg4.lean">GitHub</a> · hover over a name for its type and documentation</p>
+          </div>
+        <div class="lean-code lean-src">
+          <code class="hl lean block" data-lean-context="Alg4"><span id="L1"><span class="kw">import</span> Papers.PODC2014.GracefulKSetAgreement.Model</span>
+<span id="L2"></span>
+<span id="L3"><span class="dc">/-!</span></span>
+<span id="L4"><span class="dc"># Algorithm 1 + Algorithm 4 (the `k`-uniform `k`-set agreement algorithm, Section 7.3)</span></span>
+<span id="L5"></span>
+<span id="L6"><span class="dc">This file implements, as a full-information algorithm `alg4 n D : Alg (Fin n) ℕ St` of the model of</span></span>
+<span id="L7"><span class="dc">`Model.lean`, the paper's Algorithm 4 run together with the network approximation Algorithm 1.</span></span>
+<span id="L8"><span class="dc">The implementation is computable (bitmasks and lists), so that concrete runs can be evaluated in</span></span>
+<span id="L9"><span class="dc">the kernel (`decide +kernel`); `Alg.run_eq_cconf` identifies `Alg.run` with the computable mirror</span></span>
+<span id="L10"><span class="dc">`cconf` for patterns given by a Boolean adjacency function.</span></span>
+<span id="L11"></span>
+<span id="L12"><span class="dc">Rounds: our round index `t` (graph `ρ t`) is the paper's round `t + 1`; inside the step function,</span></span>
+<span id="L13"><span class="dc">`r = round + 1` is the paper's current round number. In round `r` the Alg. 1 step is executed</span></span>
+<span id="L14"><span class="dc">before the Alg. 4 step, and Alg. 4 uses the Alg. 1 state at the end of round `r` (paper, Sec. 7.3).</span></span>
+<span id="L15"><span class="dc">Messages are the senders' full states at the beginning of the round (full-information form).</span></span>
+<span id="L16"></span>
+<span id="L17"><span class="dc">## Representation</span></span>
+<span id="L18"></span>
+<span id="L19"><span class="dc">* Process `j : Fin n` is the number `j.val`; a set of processes is a bitmask `R : ℕ`; the edge</span></span>
+<span id="L20"><span class="dc">  `(u → w)` (`w` received `u`'s message) is bit `u * n + w`.</span></span>
+<span id="L21"><span class="dc">* Alg. 1: `A : List ℕ` with `A.getD t 0` = bitmask of the edges whose label set `T` contains the</span></span>
+<span id="L22"><span class="dc">  round `t` (so `A_p|t` of line 13 is `A.getD t 0`).</span></span>
+<span id="L23"><span class="dc">* Alg. 4: a lock `(V(R), v, τ_create)` is `Lock`. The lock history `hist_i[j][r']` is stored as a</span></span>
+<span id="L24"><span class="dc">  list of pairs `(L, e)` with `e.getD j none = some r'` the *earliest* round `r'` such that</span></span>
+<span id="L25"><span class="dc">  `L ∈ hist_i[j][r']` (`none`: `L` in no entry of row `j`). Algorithm 4 only ever reads</span></span>
+<span id="L26"><span class="dc">  `⋃_{r'' ≤ r'} hist_i[j][r'']` (line 26), which is determined by these earliest rounds, and the</span></span>
+<span id="L27"><span class="dc">  updates of lines 13–15 and 20 translate into `min` (see I4).</span></span>
+<span id="L28"></span>
+<span id="L29"><span class="dc">## Interpretation choices</span></span>
+<span id="L30"></span>
+<span id="L31"><span class="dc">* **I1** `A_p|t` (Alg. 1, line 13) has vertex set `{p} ∪ {endpoints of edges labelled t}` (with the</span></span>
+<span id="L32"><span class="dc">  edge-induced graph only, a deaf singleton could never detect itself, contradicting Lemma 13).</span></span>
+<span id="L33"><span class="dc">* **I2** `C_p|t` (line 14) is the strongly connected component of `p` in `A_p|t` if no edge of</span></span>
+<span id="L34"><span class="dc">  `A_p|t` enters it from outside, and empty otherwise (sound and complete version of line 14;</span></span>
+<span id="L35"><span class="dc">  literally, "`A_p|t` if strongly connected", Lemma 13 and Corollary 2 fail as soon as processes</span></span>
+<span id="L36"><span class="dc">  outside the root report edges leaving it).</span></span>
+<span id="L37"><span class="dc">* **I3** `InStableRoot(I)` is empty if `I` contains a round `t &lt; 1` (no graph exists there).</span></span>
+<span id="L38"><span class="dc">* **I4** Line 15 (`hist_i[i] := hist_i \ hist'_i`): every lock that newly appears in some entry</span></span>
+<span id="L39"><span class="dc">  `hist_i[x][r']` is added to `hist_i[i][r]`; since the own row always contains every lock of the</span></span>
+<span id="L40"><span class="dc">  other rows, this means: a lock not yet in row `i` gets earliest round `r` in row `i`. Lines 13–14</span></span>
+<span id="L41"><span class="dc">  copy all rows `x ≠ i` (pointwise `min` of earliest rounds).</span></span>
+<span id="L42"><span class="dc">* **I5** The multiset `S` of line 26: the multiplicity of `L` is the number of `j ∈ R` with</span></span>
+<span id="L43"><span class="dc">  `L ∈ ⋃_{r'' ≤ r'} hist_i[j][r'']` ("the number of members of `R` who got to know `L` by round</span></span>
+<span id="L44"><span class="dc">  `r − 2D`", p. 32).</span></span>
+<span id="L45"><span class="dc">* **I6** `mfrq_latest` exactly as line 27: `{x ∈ mfrq(S) | ∀ y ≠ x ∈ mfrq(S), x.τ &gt; y.τ}`; the</span></span>
+<span id="L46"><span class="dc">  fallback of line 32 is the maximum value over *all* of `S`.</span></span>
+<span id="L47"><span class="dc">* **I7** `τ_create` of a new lock is the current round `r` (lines 30, 32); locks are compared as</span></span>
+<span id="L48"><span class="dc">  triples.</span></span>
+<span id="L49"><span class="dc">* **I8** Lines 8–9: if several decisions are received, the smallest one is adopted.</span></span>
+<span id="L50"><span class="dc">* **I9** The `else if` chain of lines 17/21/23 is evaluated once per round after the history</span></span>
+<span id="L51"><span class="dc">  update; `lock` is the value set in line 19.</span></span>
+<span id="L52"><span class="dc">* **I10–I14** concern the message adversary and are listed in `MajInf.lean`.</span></span>
+<span id="L53"></span>
+<span id="L54"><span class="dc">The variable `V_p` of Alg. 1 (line 8) is not used by `InStableRoot` under I1–I2 and is omitted.</span></span>
+<span id="L55"><span class="dc">-/</span></span>
+<span id="L56"></span>
+<span id="L57"><span class="kw">namespace</span> Podc.GracefulKSetAgreement</span>
+<span id="L58"></span>
+<span id="L59"><span class="kw">open</span> Cslib.HeardOf</span>
+<span id="L60"></span>
+<span id="L61"><span class="dc">/-! ### A computable mirror of `Alg.run` -/</span></span>
+<span id="L62"></span>
+<span id="L63"><span class="kw">section</span> Mirror</span>
+<span id="L64"></span>
+<span id="L65"><span class="kw">variable</span> {n : <span class="const token" data-verso-hover="44">ℕ</span>} {σ : <span class="kw">Type</span>}</span>
+<span id="L66"></span>
+<span id="L67"><span class="dc">/-- Messages received by `i` in the graph given by the Boolean adjacency `g` (`g j i`: `i`</span></span>
+<span id="L68"><span class="dc">receives `j`), decidable version of `Cslib.HeardOf.msgs`. -/</span></span>
+<span id="L69"><span class="kw">def</span> <span class="const token" data-verso-hover="45">cmsgs</span> (g : <span class="const token" data-verso-hover="46">Fin</span> n → <span class="const token" data-verso-hover="46">Fin</span> n → <span class="const token" data-verso-hover="47">Bool</span>) (C : <span class="const token" data-verso-hover="46">Fin</span> n → σ) (i : <span class="const token" data-verso-hover="46">Fin</span> n) : <span class="const token" data-verso-hover="46">Fin</span> n → <span class="const token" data-verso-hover="48">Option</span> σ :=</span>
+<span id="L70">  <span class="kw">fun</span> j =&gt; <span class="kw">if</span> j = i ∨ g j i = <span class="const token" data-verso-hover="49">true</span> <span class="kw">then</span> <span class="const token" data-verso-hover="50">some</span> (C j) <span class="kw">else</span> <span class="const token" data-verso-hover="51">none</span></span>
+<span id="L71"></span>
+<span id="L72"><span class="dc">/-- Computable mirror of `Cslib.HeardOf.conf`. -/</span></span>
+<span id="L73"><span class="kw">def</span> <span class="const token" data-verso-hover="52">cconf</span> (step : <span class="const token" data-verso-hover="53">StepFn</span> (<span class="const token" data-verso-hover="46">Fin</span> n) σ) (g : <span class="const token" data-verso-hover="44">ℕ</span> → <span class="const token" data-verso-hover="46">Fin</span> n → <span class="const token" data-verso-hover="46">Fin</span> n → <span class="const token" data-verso-hover="47">Bool</span>) (C : <span class="const token" data-verso-hover="46">Fin</span> n → σ) :</span>
+<span id="L74">    <span class="const token" data-verso-hover="44">ℕ</span> → <span class="const token" data-verso-hover="46">Fin</span> n → σ</span>
+<span id="L75">  | <span class="nu">0</span> =&gt; C</span>
+<span id="L76">  | t + <span class="nu">1</span> =&gt; <span class="kw">fun</span> i =&gt; step i (<span class="const token" data-verso-hover="45">cmsgs</span> (g t) (<span class="const token" data-verso-hover="52">cconf</span> step g C t) i)</span>
+<span id="L77"></span>
+<span id="L78"><span class="kw">theorem</span> <span class="const token" data-verso-hover="54">conf_eq_cconf</span> (step : <span class="const token" data-verso-hover="53">StepFn</span> (<span class="const token" data-verso-hover="46">Fin</span> n) σ) {ρ : <span class="const token" data-verso-hover="44">ℕ</span> → <span class="const token" data-verso-hover="28">Graph</span> (<span class="const token" data-verso-hover="46">Fin</span> n)}</span>
+<span id="L79">    {g : <span class="const token" data-verso-hover="44">ℕ</span> → <span class="const token" data-verso-hover="46">Fin</span> n → <span class="const token" data-verso-hover="46">Fin</span> n → <span class="const token" data-verso-hover="47">Bool</span>} (hρ : ∀ t u v, ρ t u v ↔ g t u v = <span class="const token" data-verso-hover="49">true</span>) (C : <span class="const token" data-verso-hover="46">Fin</span> n → σ) :</span>
+<span id="L80">    ∀ t, <span class="const token" data-verso-hover="55">conf</span> step C ρ t = <span class="const token" data-verso-hover="52">cconf</span> step g C t</span>
+<span id="L81">  | <span class="nu">0</span> =&gt; <span class="const token" data-verso-hover="56">rfl</span></span>
+<span id="L82">  | t + <span class="nu">1</span> =&gt; <span class="kw">by</span></span>
+<span id="L83">    <span class="kw">rw</span> [<span class="const token" data-verso-hover="57">conf_succ</span>, <span class="const token" data-verso-hover="54">conf_eq_cconf</span> step hρ C t]</span>
+<span id="L84">    <span class="kw">funext</span> i</span>
+<span id="L85">    <span class="kw">simp</span> only [<span class="const token" data-verso-hover="58">next</span>, <span class="const token" data-verso-hover="52">cconf</span>]</span>
+<span id="L86">    <span class="kw">congr</span> <span class="nu">1</span></span>
+<span id="L87">    <span class="kw">funext</span> j</span>
+<span id="L88">    <span class="kw">simp</span> only [<span class="const token" data-verso-hover="59">msgs</span>, <span class="const token" data-verso-hover="45">cmsgs</span>, <span class="const token" data-verso-hover="60">Hears</span>, hρ]</span>
+<span id="L89"></span>
+<span id="L90"><span class="kw">theorem</span> <span class="const token" data-verso-hover="61">Alg.run_eq_cconf</span> {V : <span class="kw">Type</span>} (A : <span class="const token" data-verso-hover="62">Alg</span> (<span class="const token" data-verso-hover="46">Fin</span> n) V σ) {ρ : <span class="const token" data-verso-hover="44">ℕ</span> → <span class="const token" data-verso-hover="28">Graph</span> (<span class="const token" data-verso-hover="46">Fin</span> n)}</span>
+<span id="L91">    {g : <span class="const token" data-verso-hover="44">ℕ</span> → <span class="const token" data-verso-hover="46">Fin</span> n → <span class="const token" data-verso-hover="46">Fin</span> n → <span class="const token" data-verso-hover="47">Bool</span>} (hρ : ∀ t u v, ρ t u v ↔ g t u v = <span class="const token" data-verso-hover="49">true</span>) (x : <span class="const token" data-verso-hover="46">Fin</span> n → V)</span>
+<span id="L92">    (t : <span class="const token" data-verso-hover="44">ℕ</span>) : A.<span class="const token" data-verso-hover="63">run</span> x ρ t = <span class="const token" data-verso-hover="52">cconf</span> A.<span class="const token" data-verso-hover="64">step</span> g (A.<span class="const token" data-verso-hover="65">initC</span> x) t :=</span>
+<span id="L93">  <span class="const token" data-verso-hover="54">conf_eq_cconf</span> A.<span class="const token" data-verso-hover="64">step</span> hρ _ t</span>
+<span id="L94"></span>
+<span id="L95"><span class="kw">end</span> Mirror</span>
+<span id="L96"></span>
+<span id="L97"><span class="kw">namespace</span> Alg4</span>
+<span id="L98"></span>
+<span id="L99"><span class="dc">/-! ### Bitmask helpers -/</span></span>
+<span id="L100"></span>
+<span id="L101"><span class="dc">/-- The singleton bitmask `{k}`. -/</span></span>
+<span id="L102"><span class="kw">def</span> <span class="const token" data-verso-hover="66">bit</span> (k : <span class="const token" data-verso-hover="44">ℕ</span>) : <span class="const token" data-verso-hover="44">ℕ</span> := <span class="nu">2</span> ^ k</span>
+<span id="L103"></span>
+<span id="L104"><span class="dc">/-- Pointwise union of two lists of bitmasks (missing entries are `0`). -/</span></span>
+<span id="L105"><span class="kw">def</span> <span class="const token" data-verso-hover="67">orL</span> : <span class="const token" data-verso-hover="68">List</span> <span class="const token" data-verso-hover="44">ℕ</span> → <span class="const token" data-verso-hover="68">List</span> <span class="const token" data-verso-hover="44">ℕ</span> → <span class="const token" data-verso-hover="68">List</span> <span class="const token" data-verso-hover="44">ℕ</span></span>
+<span id="L106">  | [], l =&gt; l</span>
+<span id="L107">  | l, [] =&gt; l</span>
+<span id="L108">  | a :: l, b :: l' =&gt; (a ||| b) :: <span class="const token" data-verso-hover="67">orL</span> l l'</span>
+<span id="L109"></span>
+<span id="L110"><span class="dc">/-- One forward step of the closure of `X` along the edges `E` (`n` processes). -/</span></span>
+<span id="L111"><span class="kw">def</span> <span class="const token" data-verso-hover="69">post</span> (n E X : <span class="const token" data-verso-hover="44">ℕ</span>) : <span class="const token" data-verso-hover="44">ℕ</span> :=</span>
+<span id="L112">  (<span class="const token" data-verso-hover="70">List.range</span> n).<span class="const token" data-verso-hover="71">foldl</span> (<span class="kw">fun</span> acc u =&gt;</span>
+<span id="L113">    <span class="kw">if</span> X.<span class="const token" data-verso-hover="72">testBit</span> u <span class="kw">then</span></span>
+<span id="L114">      (<span class="const token" data-verso-hover="70">List.range</span> n).<span class="const token" data-verso-hover="71">foldl</span> (<span class="kw">fun</span> acc w =&gt; <span class="kw">if</span> E.<span class="const token" data-verso-hover="72">testBit</span> (u * n + w) <span class="kw">then</span> acc ||| <span class="const token" data-verso-hover="66">bit</span> w <span class="kw">else</span> acc) acc</span>
+<span id="L115">    <span class="kw">else</span> acc) X</span>
+<span id="L116"></span>
+<span id="L117"><span class="dc">/-- One backward step of the closure of `X` along the edges `E`. -/</span></span>
+<span id="L118"><span class="kw">def</span> <span class="const token" data-verso-hover="73">pre</span> (n E X : <span class="const token" data-verso-hover="44">ℕ</span>) : <span class="const token" data-verso-hover="44">ℕ</span> :=</span>
+<span id="L119">  (<span class="const token" data-verso-hover="70">List.range</span> n).<span class="const token" data-verso-hover="71">foldl</span> (<span class="kw">fun</span> acc w =&gt;</span>
+<span id="L120">    <span class="kw">if</span> X.<span class="const token" data-verso-hover="72">testBit</span> w <span class="kw">then</span></span>
+<span id="L121">      (<span class="const token" data-verso-hover="70">List.range</span> n).<span class="const token" data-verso-hover="71">foldl</span> (<span class="kw">fun</span> acc u =&gt; <span class="kw">if</span> E.<span class="const token" data-verso-hover="72">testBit</span> (u * n + w) <span class="kw">then</span> acc ||| <span class="const token" data-verso-hover="66">bit</span> u <span class="kw">else</span> acc) acc</span>
+<span id="L122">    <span class="kw">else</span> acc) X</span>
+<span id="L123"></span>
+<span id="L124"><span class="dc">/-- `k`-fold iteration. -/</span></span>
+<span id="L125"><span class="kw">def</span> <span class="const token" data-verso-hover="74">iter</span> (f : <span class="const token" data-verso-hover="44">ℕ</span> → <span class="const token" data-verso-hover="44">ℕ</span>) : <span class="const token" data-verso-hover="44">ℕ</span> → <span class="const token" data-verso-hover="44">ℕ</span> → <span class="const token" data-verso-hover="44">ℕ</span></span>
+<span id="L126">  | <span class="nu">0</span>, X =&gt; X</span>
+<span id="L127">  | k + <span class="nu">1</span>, X =&gt; <span class="const token" data-verso-hover="74">iter</span> f k (f X)</span>
+<span id="L128"></span>
+<span id="L129"><span class="dc">/-- Some edge of `E` enters the set `c` from outside. -/</span></span>
+<span id="L130"><span class="kw">def</span> <span class="const token" data-verso-hover="75">entersFromOutside</span> (n E c : <span class="const token" data-verso-hover="44">ℕ</span>) : <span class="const token" data-verso-hover="47">Bool</span> :=</span>
+<span id="L131">  (<span class="const token" data-verso-hover="70">List.range</span> n).<span class="const token" data-verso-hover="76">any</span> <span class="kw">fun</span> u =&gt; (<span class="const token" data-verso-hover="70">List.range</span> n).<span class="const token" data-verso-hover="76">any</span> <span class="kw">fun</span> w =&gt;</span>
+<span id="L132">    E.<span class="const token" data-verso-hover="72">testBit</span> (u * n + w) &amp;&amp; c.<span class="const token" data-verso-hover="72">testBit</span> w &amp;&amp; !c.<span class="const token" data-verso-hover="72">testBit</span> u</span>
+<span id="L133"></span>
+<span id="L134"><span class="dc">/-- `C_p|t` of Alg. 1, line 14 (interpretation I1–I2): the strongly connected component of `p`</span></span>
+<span id="L135"><span class="dc">in the graph with edges `E` (and vertex `p`), if no edge enters it from outside; else `0` (∅). -/</span></span>
+<span id="L136"><span class="kw">def</span> <span class="const token" data-verso-hover="77">rootSCC</span> (n E p : <span class="const token" data-verso-hover="44">ℕ</span>) : <span class="const token" data-verso-hover="44">ℕ</span> :=</span>
+<span id="L137">  <span class="kw">let</span> c := <span class="const token" data-verso-hover="74">iter</span> (<span class="const token" data-verso-hover="69">post</span> n E) n (<span class="const token" data-verso-hover="66">bit</span> p) &amp;&amp;&amp; <span class="const token" data-verso-hover="74">iter</span> (<span class="const token" data-verso-hover="73">pre</span> n E) n (<span class="const token" data-verso-hover="66">bit</span> p)</span>
+<span id="L138">  <span class="kw">if</span> <span class="const token" data-verso-hover="75">entersFromOutside</span> n E c <span class="kw">then</span> <span class="nu">0</span> <span class="kw">else</span> c</span>
+<span id="L139"></span>
+<span id="L140"><span class="dc">/-- `InStableRoot([lo, hi])` of Alg. 1 (lines 12–18) at process `p` with approximation `A`:</span></span>
+<span id="L141"><span class="dc">the common non-empty vertex set of `C_p|t`, `t ∈ [lo, hi]`, or `0` (∅). Rounds `t &lt; 1` are</span></span>
+<span id="L142"><span class="dc">not admissible (I3). -/</span></span>
+<span id="L143"><span class="kw">def</span> <span class="const token" data-verso-hover="78">inStableRoot</span> (n : <span class="const token" data-verso-hover="44">ℕ</span>) (A : <span class="const token" data-verso-hover="68">List</span> <span class="const token" data-verso-hover="44">ℕ</span>) (p lo hi : <span class="const token" data-verso-hover="44">ℕ</span>) : <span class="const token" data-verso-hover="44">ℕ</span> :=</span>
+<span id="L144">  <span class="kw">if</span> lo = <span class="nu">0</span> <span class="kw">then</span> <span class="nu">0</span> <span class="kw">else</span></span>
+<span id="L145">    <span class="kw">let</span> c := <span class="const token" data-verso-hover="77">rootSCC</span> n (A.<span class="const token" data-verso-hover="79">getD</span> lo <span class="nu">0</span>) p</span>
+<span id="L146">    <span class="kw">if</span> c ≠ <span class="nu">0</span> ∧ (<span class="const token" data-verso-hover="70">List.range</span> (hi + <span class="nu">1</span> - lo)).<span class="const token" data-verso-hover="80">all</span> (<span class="kw">fun</span> k =&gt; <span class="const token" data-verso-hover="77">rootSCC</span> n (A.<span class="const token" data-verso-hover="79">getD</span> (lo + k) <span class="nu">0</span>) p == c)</span>
+<span id="L147">    <span class="kw">then</span> c <span class="kw">else</span> <span class="nu">0</span></span>
+<span id="L148"></span>
+<span id="L149"><span class="dc">/-! ### Locks and lock histories -/</span></span>
+<span id="L150"></span>
+<span id="L151"><span class="dc">/-- A lock `(V(R), v, τ_create)`; `R` is a bitmask. -/</span></span>
+<span id="L152"><span class="kw">structure</span> <span class="const token" data-verso-hover="81">Lock</span> <span class="kw">where</span></span>
+<span id="L153">  <span class="dc">/-- The vertex set of the detected root component. -/</span></span>
+<span id="L154">  <span class="const token" data-verso-hover="82">R</span> : <span class="const token" data-verso-hover="44">ℕ</span></span>
+<span id="L155">  <span class="dc">/-- The proposal value. -/</span></span>
+<span id="L156">  <span class="const token" data-verso-hover="83">v</span> : <span class="const token" data-verso-hover="44">ℕ</span></span>
+<span id="L157">  <span class="dc">/-- The creation round. -/</span></span>
+<span id="L158">  <span class="const token" data-verso-hover="84">τ</span> : <span class="const token" data-verso-hover="44">ℕ</span></span>
+<span id="L159"><span class="kw">deriving</span> <span class="const token" data-verso-hover="85">DecidableEq</span>, <span class="const token" data-verso-hover="86">Repr</span>, <span class="const token" data-verso-hover="87">Inhabited</span></span>
+<span id="L160"></span>
+<span id="L161"><span class="dc">/-- Lock history: for each known lock, row `j` holds the earliest round `r'` with</span></span>
+<span id="L162"><span class="dc">`L ∈ hist[j][r']` (see the module docstring). -/</span></span>
+<span id="L163"><span class="kw">abbrev</span> <span class="const token" data-verso-hover="88">Hist</span> := <span class="const token" data-verso-hover="68">List</span> (<span class="const token" data-verso-hover="81">Lock</span> × <span class="const token" data-verso-hover="68">List</span> (<span class="const token" data-verso-hover="48">Option</span> <span class="const token" data-verso-hover="44">ℕ</span>))</span>
+<span id="L164"></span>
+<span id="L165"><span class="dc">/-- Minimum of earliest rounds (`none` = never). -/</span></span>
+<span id="L166"><span class="kw">def</span> <span class="const token" data-verso-hover="89">omin</span> : <span class="const token" data-verso-hover="48">Option</span> <span class="const token" data-verso-hover="44">ℕ</span> → <span class="const token" data-verso-hover="48">Option</span> <span class="const token" data-verso-hover="44">ℕ</span> → <span class="const token" data-verso-hover="48">Option</span> <span class="const token" data-verso-hover="44">ℕ</span></span>
+<span id="L167">  | <span class="const token" data-verso-hover="51">none</span>, b =&gt; b</span>
+<span id="L168">  | a, <span class="const token" data-verso-hover="51">none</span> =&gt; a</span>
+<span id="L169">  | <span class="const token" data-verso-hover="50">some</span> a, <span class="const token" data-verso-hover="50">some</span> b =&gt; <span class="const token" data-verso-hover="50">some</span> (<span class="const token" data-verso-hover="90">min</span> a b)</span>
+<span id="L170"></span>
+<span id="L171"><span class="dc">/-- Lines 13–14: copy the rows `x ≠ i` of a received lock entry. -/</span></span>
+<span id="L172"><span class="kw">def</span> <span class="const token" data-verso-hover="91">mergeRows</span> (n i : <span class="const token" data-verso-hover="44">ℕ</span>) (e e' : <span class="const token" data-verso-hover="68">List</span> (<span class="const token" data-verso-hover="48">Option</span> <span class="const token" data-verso-hover="44">ℕ</span>)) : <span class="const token" data-verso-hover="68">List</span> (<span class="const token" data-verso-hover="48">Option</span> <span class="const token" data-verso-hover="44">ℕ</span>) :=</span>
+<span id="L173">  (<span class="const token" data-verso-hover="70">List.range</span> n).<span class="const token" data-verso-hover="92">map</span> <span class="kw">fun</span> x =&gt; <span class="kw">if</span> x = i <span class="kw">then</span> e.<span class="const token" data-verso-hover="79">getD</span> x <span class="const token" data-verso-hover="51">none</span> <span class="kw">else</span> <span class="const token" data-verso-hover="89">omin</span> (e.<span class="const token" data-verso-hover="79">getD</span> x <span class="const token" data-verso-hover="51">none</span>) (e'.<span class="const token" data-verso-hover="79">getD</span> x <span class="const token" data-verso-hover="51">none</span>)</span>
+<span id="L174"></span>
+<span id="L175"><span class="dc">/-- Lines 13–14 for one received lock `L` with rows `e'`. -/</span></span>
+<span id="L176"><span class="kw">def</span> <span class="const token" data-verso-hover="93">mergeLock</span> (n i : <span class="const token" data-verso-hover="44">ℕ</span>) (h : <span class="const token" data-verso-hover="88">Hist</span>) (L : <span class="const token" data-verso-hover="81">Lock</span>) (e' : <span class="const token" data-verso-hover="68">List</span> (<span class="const token" data-verso-hover="48">Option</span> <span class="const token" data-verso-hover="44">ℕ</span>)) : <span class="const token" data-verso-hover="88">Hist</span> :=</span>
+<span id="L177">  <span class="kw">if</span> h.<span class="const token" data-verso-hover="76">any</span> (<span class="kw">fun</span> p =&gt; p.<span class="const token" data-verso-hover="94">1</span> == L) <span class="kw">then</span></span>
+<span id="L178">    h.<span class="const token" data-verso-hover="92">map</span> <span class="kw">fun</span> p =&gt; <span class="kw">if</span> p.<span class="const token" data-verso-hover="94">1</span> == L <span class="kw">then</span> (p.<span class="const token" data-verso-hover="94">1</span>, <span class="const token" data-verso-hover="91">mergeRows</span> n i p.<span class="const token" data-verso-hover="95">2</span> e') <span class="kw">else</span> p</span>
+<span id="L179">  <span class="kw">else</span> h ++ [(L, <span class="const token" data-verso-hover="91">mergeRows</span> n i (<span class="const token" data-verso-hover="96">List.replicate</span> n <span class="const token" data-verso-hover="51">none</span>) e')]</span>
+<span id="L180"></span>
+<span id="L181"><span class="dc">/-- Lines 11–14 for one received history `h'`. -/</span></span>
+<span id="L182"><span class="kw">def</span> <span class="const token" data-verso-hover="97">mergeHist</span> (n i : <span class="const token" data-verso-hover="44">ℕ</span>) (h h' : <span class="const token" data-verso-hover="88">Hist</span>) : <span class="const token" data-verso-hover="88">Hist</span> :=</span>
+<span id="L183">  h'.<span class="const token" data-verso-hover="71">foldl</span> (<span class="kw">fun</span> h p =&gt; <span class="const token" data-verso-hover="93">mergeLock</span> n i h p.<span class="const token" data-verso-hover="94">1</span> p.<span class="const token" data-verso-hover="95">2</span>) h</span>
+<span id="L184"></span>
+<span id="L185"><span class="dc">/-- Line 15 (I4): locks newly learned in round `r` enter the own row with round `r`. -/</span></span>
+<span id="L186"><span class="kw">def</span> <span class="const token" data-verso-hover="98">learnNew</span> (i r : <span class="const token" data-verso-hover="44">ℕ</span>) (h : <span class="const token" data-verso-hover="88">Hist</span>) : <span class="const token" data-verso-hover="88">Hist</span> :=</span>
+<span id="L187">  h.<span class="const token" data-verso-hover="92">map</span> <span class="kw">fun</span> p =&gt;</span>
+<span id="L188">    <span class="kw">if</span> p.<span class="const token" data-verso-hover="95">2</span>.<span class="const token" data-verso-hover="79">getD</span> i <span class="const token" data-verso-hover="51">none</span> = <span class="const token" data-verso-hover="51">none</span> ∧ p.<span class="const token" data-verso-hover="95">2</span>.<span class="const token" data-verso-hover="76">any</span> <span class="const token" data-verso-hover="99">Option.isSome</span> <span class="kw">then</span> (p.<span class="const token" data-verso-hover="94">1</span>, p.<span class="const token" data-verso-hover="95">2</span>.<span class="const token" data-verso-hover="100">set</span> i (<span class="const token" data-verso-hover="50">some</span> r)) <span class="kw">else</span> p</span>
+<span id="L189"></span>
+<span id="L190"><span class="dc">/-- Line 20: a lock created in round `r` is put into `hist_i[i][r]`. -/</span></span>
+<span id="L191"><span class="kw">def</span> <span class="const token" data-verso-hover="101">addOwn</span> (n i r : <span class="const token" data-verso-hover="44">ℕ</span>) (h : <span class="const token" data-verso-hover="88">Hist</span>) (L : <span class="const token" data-verso-hover="81">Lock</span>) : <span class="const token" data-verso-hover="88">Hist</span> :=</span>
+<span id="L192">  <span class="kw">let</span> own : <span class="const token" data-verso-hover="68">List</span> (<span class="const token" data-verso-hover="48">Option</span> <span class="const token" data-verso-hover="44">ℕ</span>) := (<span class="const token" data-verso-hover="70">List.range</span> n).<span class="const token" data-verso-hover="92">map</span> <span class="kw">fun</span> x =&gt; <span class="kw">if</span> x = i <span class="kw">then</span> <span class="const token" data-verso-hover="50">some</span> r <span class="kw">else</span> <span class="const token" data-verso-hover="51">none</span></span>
+<span id="L193">  <span class="kw">if</span> h.<span class="const token" data-verso-hover="76">any</span> (<span class="kw">fun</span> p =&gt; p.<span class="const token" data-verso-hover="94">1</span> == L) <span class="kw">then</span></span>
+<span id="L194">    h.<span class="const token" data-verso-hover="92">map</span> <span class="kw">fun</span> p =&gt; <span class="kw">if</span> p.<span class="const token" data-verso-hover="94">1</span> == L <span class="kw">then</span> (p.<span class="const token" data-verso-hover="94">1</span>, p.<span class="const token" data-verso-hover="95">2</span>.<span class="const token" data-verso-hover="100">set</span> i (<span class="const token" data-verso-hover="89">omin</span> (p.<span class="const token" data-verso-hover="95">2</span>.<span class="const token" data-verso-hover="79">getD</span> i <span class="const token" data-verso-hover="51">none</span>) (<span class="const token" data-verso-hover="50">some</span> r))) <span class="kw">else</span> p</span>
+<span id="L195">  <span class="kw">else</span> h ++ [(L, own)]</span>
+<span id="L196"></span>
+<span id="L197"><span class="dc">/-- Row `j` knows the lock by round `r'`. -/</span></span>
+<span id="L198"><span class="kw">def</span> <span class="const token" data-verso-hover="102">knowsBy</span> (e : <span class="const token" data-verso-hover="68">List</span> (<span class="const token" data-verso-hover="48">Option</span> <span class="const token" data-verso-hover="44">ℕ</span>)) (j r' : <span class="const token" data-verso-hover="44">ℕ</span>) : <span class="const token" data-verso-hover="47">Bool</span> :=</span>
+<span id="L199">  <span class="kw">match</span> e.<span class="const token" data-verso-hover="79">getD</span> j <span class="const token" data-verso-hover="51">none</span> <span class="kw">with</span></span>
+<span id="L200">  | <span class="const token" data-verso-hover="50">some</span> k =&gt; <span class="const token" data-verso-hover="103">decide</span> (k ≤ r')</span>
+<span id="L201">  | <span class="const token" data-verso-hover="51">none</span> =&gt; <span class="const token" data-verso-hover="104">false</span></span>
+<span id="L202"></span>
+<span id="L203"><span class="dc">/-- Multiplicity of a lock in the multiset `S` of line 26 (I5). -/</span></span>
+<span id="L204"><span class="kw">def</span> <span class="const token" data-verso-hover="105">mult</span> (n R r' : <span class="const token" data-verso-hover="44">ℕ</span>) (e : <span class="const token" data-verso-hover="68">List</span> (<span class="const token" data-verso-hover="48">Option</span> <span class="const token" data-verso-hover="44">ℕ</span>)) : <span class="const token" data-verso-hover="44">ℕ</span> :=</span>
+<span id="L205">  ((<span class="const token" data-verso-hover="70">List.range</span> n).<span class="const token" data-verso-hover="106">filter</span> <span class="kw">fun</span> j =&gt; R.<span class="const token" data-verso-hover="72">testBit</span> j &amp;&amp; <span class="const token" data-verso-hover="102">knowsBy</span> e j r').<span class="const token" data-verso-hover="107">length</span></span>
+<span id="L206"></span>
+<span id="L207"><span class="dc">/-- `GetLock(R, r')` (lines 25–33) called in round `r` (I5–I7). -/</span></span>
+<span id="L208"><span class="kw">def</span> <span class="const token" data-verso-hover="108">getLock</span> (n : <span class="const token" data-verso-hover="44">ℕ</span>) (h : <span class="const token" data-verso-hover="88">Hist</span>) (R r' r : <span class="const token" data-verso-hover="44">ℕ</span>) : <span class="const token" data-verso-hover="81">Lock</span> :=</span>
+<span id="L209">  <span class="kw">let</span> S : <span class="const token" data-verso-hover="68">List</span> (<span class="const token" data-verso-hover="81">Lock</span> × <span class="const token" data-verso-hover="44">ℕ</span>) := h.<span class="const token" data-verso-hover="109">filterMap</span> <span class="kw">fun</span> p =&gt;</span>
+<span id="L210">    <span class="kw">let</span> c := <span class="const token" data-verso-hover="105">mult</span> n R r' p.<span class="const token" data-verso-hover="95">2</span></span>
+<span id="L211">    <span class="kw">if</span> c = <span class="nu">0</span> <span class="kw">then</span> <span class="const token" data-verso-hover="51">none</span> <span class="kw">else</span> <span class="const token" data-verso-hover="50">some</span> (p.<span class="const token" data-verso-hover="94">1</span>, c)</span>
+<span id="L212">  <span class="kw">let</span> m := S.<span class="const token" data-verso-hover="71">foldl</span> (<span class="kw">fun</span> a q =&gt; <span class="const token" data-verso-hover="110">max</span> a q.<span class="const token" data-verso-hover="95">2</span>) <span class="nu">0</span></span>
+<span id="L213">  <span class="kw">let</span> mfrq := (S.<span class="const token" data-verso-hover="106">filter</span> <span class="kw">fun</span> q =&gt; q.<span class="const token" data-verso-hover="95">2</span> == m).<span class="const token" data-verso-hover="92">map</span> <span class="const token" data-verso-hover="94">Prod.fst</span></span>
+<span id="L214">  <span class="kw">let</span> latest := mfrq.<span class="const token" data-verso-hover="106">filter</span> <span class="kw">fun</span> x =&gt; mfrq.<span class="const token" data-verso-hover="80">all</span> <span class="kw">fun</span> y =&gt; y == x || <span class="const token" data-verso-hover="103">decide</span> (y.<span class="const token" data-verso-hover="84">τ</span> &lt; x.<span class="const token" data-verso-hover="84">τ</span>)</span>
+<span id="L215">  <span class="kw">match</span> latest <span class="kw">with</span></span>
+<span id="L216">  | [L] =&gt; ⟨R, L.<span class="const token" data-verso-hover="83">v</span>, r⟩</span>
+<span id="L217">  | _ =&gt; ⟨R, S.<span class="const token" data-verso-hover="71">foldl</span> (<span class="kw">fun</span> a q =&gt; <span class="const token" data-verso-hover="110">max</span> a q.<span class="const token" data-verso-hover="94">1</span>.<span class="const token" data-verso-hover="83">v</span>) <span class="nu">0</span>, r⟩</span>
+<span id="L218"></span>
+<span id="L219"><span class="dc">/-! ### The algorithm -/</span></span>
+<span id="L220"></span>
+<span id="L221"><span class="dc">/-- Local state of Alg. 1 + Alg. 4. -/</span></span>
+<span id="L222"><span class="kw">structure</span> <span class="const token" data-verso-hover="111">St</span> <span class="kw">where</span></span>
+<span id="L223">  <span class="dc">/-- Number of completed rounds. -/</span></span>
+<span id="L224">  <span class="const token" data-verso-hover="112">round</span> : <span class="const token" data-verso-hover="44">ℕ</span></span>
+<span id="L225">  <span class="dc">/-- Network approximation `A_p` of Alg. 1 (labels per round as bitmasks). -/</span></span>
+<span id="L226">  <span class="const token" data-verso-hover="113">A</span> : <span class="const token" data-verso-hover="68">List</span> <span class="const token" data-verso-hover="44">ℕ</span></span>
+<span id="L227">  <span class="dc">/-- Lock history `hist` of Alg. 4. -/</span></span>
+<span id="L228">  <span class="const token" data-verso-hover="114">hist</span> : <span class="const token" data-verso-hover="88">Hist</span></span>
+<span id="L229">  <span class="dc">/-- `ℓ`, the most recent lock round (`none` = ⊥). -/</span></span>
+<span id="L230">  <span class="const token" data-verso-hover="115">ell</span> : <span class="const token" data-verso-hover="48">Option</span> <span class="const token" data-verso-hover="44">ℕ</span></span>
+<span id="L231">  <span class="dc">/-- The current lock (line 19). -/</span></span>
+<span id="L232">  <span class="const token" data-verso-hover="116">lock</span> : <span class="const token" data-verso-hover="48">Option</span> <span class="const token" data-verso-hover="81">Lock</span></span>
+<span id="L233">  <span class="dc">/-- `decision` (`none` = ⊥). -/</span></span>
+<span id="L234">  <span class="const token" data-verso-hover="117">decision</span> : <span class="const token" data-verso-hover="48">Option</span> <span class="const token" data-verso-hover="44">ℕ</span></span>
+<span id="L235"><span class="kw">deriving</span> <span class="const token" data-verso-hover="87">Inhabited</span></span>
+<span id="L236"></span>
+<span id="L237"><span class="dc">/-- Initial state (Alg. 4, lines 1–4; Alg. 1, line 1): the virtual lock `({p_i}, x_i, 0)`. -/</span></span>
+<span id="L238"><span class="kw">def</span> <span class="const token" data-verso-hover="118">init</span> (n : <span class="const token" data-verso-hover="44">ℕ</span>) (i : <span class="const token" data-verso-hover="46">Fin</span> n) (x : <span class="const token" data-verso-hover="44">ℕ</span>) : <span class="const token" data-verso-hover="111">St</span> <span class="kw">where</span></span>
+<span id="L239">  <span class="const token" data-verso-hover="112">round</span> := <span class="nu">0</span></span>
+<span id="L240">  <span class="const token" data-verso-hover="113">A</span> := []</span>
+<span id="L241">  <span class="const token" data-verso-hover="114">hist</span> := [(⟨<span class="const token" data-verso-hover="66">bit</span> i.<span class="const token" data-verso-hover="119">val</span>, x, <span class="nu">0</span>⟩, (<span class="const token" data-verso-hover="70">List.range</span> n).<span class="const token" data-verso-hover="92">map</span> <span class="kw">fun</span> j =&gt; <span class="kw">if</span> j = i.<span class="const token" data-verso-hover="119">val</span> <span class="kw">then</span> <span class="const token" data-verso-hover="50">some</span> <span class="nu">0</span> <span class="kw">else</span> <span class="const token" data-verso-hover="51">none</span>)]</span>
+<span id="L242">  <span class="const token" data-verso-hover="115">ell</span> := <span class="const token" data-verso-hover="51">none</span></span>
+<span id="L243">  <span class="const token" data-verso-hover="116">lock</span> := <span class="const token" data-verso-hover="51">none</span></span>
+<span id="L244">  <span class="const token" data-verso-hover="117">decision</span> := <span class="const token" data-verso-hover="51">none</span></span>
+<span id="L245"></span>
+<span id="L246"><span class="dc">/-- Round `r` computation of Alg. 4 (lines 7–24), after the history update, given the</span></span>
+<span id="L247"><span class="dc">network approximation `A` at the end of round `r`. -/</span></span>
+<span id="L248"><span class="kw">def</span> <span class="const token" data-verso-hover="120">core</span> (n D i r : <span class="const token" data-verso-hover="44">ℕ</span>) (A : <span class="const token" data-verso-hover="68">List</span> <span class="const token" data-verso-hover="44">ℕ</span>) (s : <span class="const token" data-verso-hover="111">St</span>) (h : <span class="const token" data-verso-hover="88">Hist</span>) : <span class="const token" data-verso-hover="111">St</span> :=</span>
+<span id="L249">  <span class="kw">let</span> s1 : <span class="const token" data-verso-hover="111">St</span> := { s <span class="kw">with</span> <span class="const token" data-verso-hover="112">round</span> := r, <span class="const token" data-verso-hover="113">A</span> := A, <span class="const token" data-verso-hover="114">hist</span> := h }</span>
+<span id="L250">  <span class="kw">let</span> myRoot := <span class="const token" data-verso-hover="78">inStableRoot</span> n A i (r - <span class="nu">2</span> * D) (r - D)</span>
+<span id="L251">  <span class="kw">match</span> s.<span class="const token" data-verso-hover="115">ell</span> <span class="kw">with</span></span>
+<span id="L252">  | <span class="const token" data-verso-hover="51">none</span> =&gt;</span>
+<span id="L253">    <span class="kw">if</span> myRoot ≠ <span class="nu">0</span> <span class="kw">then</span></span>
+<span id="L254">      <span class="kw">let</span> L := <span class="const token" data-verso-hover="108">getLock</span> n h myRoot (r - <span class="nu">2</span> * D) r</span>
+<span id="L255">      { s1 <span class="kw">with</span> <span class="const token" data-verso-hover="114">hist</span> := <span class="const token" data-verso-hover="101">addOwn</span> n i r h L, <span class="const token" data-verso-hover="115">ell</span> := <span class="const token" data-verso-hover="50">some</span> (r - <span class="nu">2</span> * D), <span class="const token" data-verso-hover="116">lock</span> := <span class="const token" data-verso-hover="50">some</span> L }</span>
+<span id="L256">    <span class="kw">else</span> s1</span>
+<span id="L257">  | <span class="const token" data-verso-hover="50">some</span> l =&gt;</span>
+<span id="L258">    <span class="kw">if</span> myRoot = <span class="nu">0</span> <span class="kw">then</span> { s1 <span class="kw">with</span> <span class="const token" data-verso-hover="115">ell</span> := <span class="const token" data-verso-hover="51">none</span> }</span>
+<span id="L259">    <span class="kw">else</span> <span class="kw">if</span> <span class="const token" data-verso-hover="78">inStableRoot</span> n A i l (l + <span class="nu">2</span> * D) ≠ <span class="nu">0</span> <span class="kw">then</span> { s1 <span class="kw">with</span> <span class="const token" data-verso-hover="117">decision</span> := s.<span class="const token" data-verso-hover="116">lock</span>.<span class="const token" data-verso-hover="121">map</span> <span class="const token" data-verso-hover="83">Lock.v</span> }</span>
+<span id="L260">    <span class="kw">else</span> s1</span>
+<span id="L261"></span>
+<span id="L262"><span class="dc">/-- One round of Alg. 1 + Alg. 4 at process `i` (full-information form: `m j` is the state of</span></span>
+<span id="L263"><span class="dc">`j` at the beginning of the round if `i` hears `j`). -/</span></span>
+<span id="L264"><span class="kw">def</span> <span class="const token" data-verso-hover="122">step</span> (n D : <span class="const token" data-verso-hover="44">ℕ</span>) : <span class="const token" data-verso-hover="53">StepFn</span> (<span class="const token" data-verso-hover="46">Fin</span> n) <span class="const token" data-verso-hover="111">St</span> := <span class="kw">fun</span> i m =&gt;</span>
+<span id="L265">  <span class="kw">let</span> s := (m i).<span class="const token" data-verso-hover="123">getD</span> <span class="const token" data-verso-hover="124">default</span></span>
+<span id="L266">  <span class="kw">let</span> r := s.<span class="const token" data-verso-hover="112">round</span> + <span class="nu">1</span></span>
+<span id="L267">  <span class="kw">let</span> ids := (<span class="const token" data-verso-hover="125">List.finRange</span> n).<span class="const token" data-verso-hover="106">filter</span> <span class="kw">fun</span> j =&gt; j ≠ i ∧ (m j).<span class="const token" data-verso-hover="99">isSome</span></span>
+<span id="L268">  <span class="kw">let</span> nbrs : <span class="const token" data-verso-hover="68">List</span> <span class="const token" data-verso-hover="111">St</span> := ids.<span class="const token" data-verso-hover="109">filterMap</span> m</span>
+<span id="L269">  <span class="cm">--</span><span class="cm"> Alg. 1, lines 3–11</span></span>
+<span id="L270">  <span class="kw">let</span> newEdges := ids.<span class="const token" data-verso-hover="71">foldl</span> (<span class="kw">fun</span> acc j =&gt; acc ||| <span class="const token" data-verso-hover="66">bit</span> (j.<span class="const token" data-verso-hover="119">val</span> * n + i.<span class="const token" data-verso-hover="119">val</span>)) <span class="nu">0</span></span>
+<span id="L271">  <span class="kw">let</span> A := <span class="const token" data-verso-hover="67">orL</span> (nbrs.<span class="const token" data-verso-hover="71">foldl</span> (<span class="kw">fun</span> acc s' =&gt; <span class="const token" data-verso-hover="67">orL</span> acc s'.<span class="const token" data-verso-hover="113">A</span>) s.<span class="const token" data-verso-hover="113">A</span>) (<span class="const token" data-verso-hover="96">List.replicate</span> r <span class="nu">0</span> ++ [newEdges])</span>
+<span id="L272">  <span class="kw">match</span> s.<span class="const token" data-verso-hover="117">decision</span> <span class="kw">with</span></span>
+<span id="L273">  | <span class="const token" data-verso-hover="50">some</span> _ =&gt; { s <span class="kw">with</span> <span class="const token" data-verso-hover="112">round</span> := r, <span class="const token" data-verso-hover="113">A</span> := A }</span>
+<span id="L274">  | <span class="const token" data-verso-hover="51">none</span> =&gt;</span>
+<span id="L275">    <span class="kw">match</span> (nbrs.<span class="const token" data-verso-hover="109">filterMap</span> <span class="const token" data-verso-hover="117">St.decision</span>).<span class="const token" data-verso-hover="126">min?</span> <span class="kw">with</span></span>
+<span id="L276">    | <span class="const token" data-verso-hover="50">some</span> d =&gt; { s <span class="kw">with</span> <span class="const token" data-verso-hover="112">round</span> := r, <span class="const token" data-verso-hover="113">A</span> := A, <span class="const token" data-verso-hover="117">decision</span> := <span class="const token" data-verso-hover="50">some</span> d }   <span class="cm">--</span><span class="cm"> lines 8–9</span></span>
+<span id="L277">    | <span class="const token" data-verso-hover="51">none</span> =&gt;</span>
+<span id="L278">      <span class="kw">let</span> h := <span class="const token" data-verso-hover="98">learnNew</span> i.<span class="const token" data-verso-hover="119">val</span> r (nbrs.<span class="const token" data-verso-hover="71">foldl</span> (<span class="kw">fun</span> h s' =&gt; <span class="const token" data-verso-hover="97">mergeHist</span> n i.<span class="const token" data-verso-hover="119">val</span> h s'.<span class="const token" data-verso-hover="114">hist</span>) s.<span class="const token" data-verso-hover="114">hist</span>)</span>
+<span id="L279">      <span class="const token" data-verso-hover="120">core</span> n D i.<span class="const token" data-verso-hover="119">val</span> r A s h</span>
+<span id="L280"></span>
+<span id="L281"><span class="kw">end</span> Alg4</span>
+<span id="L282"></span>
+<span id="L283"><span class="kw">open</span> Alg4 <span class="kw">in</span></span>
+<span id="L284"><span class="dc">/-- **Algorithm 4 with Algorithm 1** (Section 7.3) for `n` processes and dynamic causal diameter</span></span>
+<span id="L285"><span class="dc">`D`, with inputs in `ℕ`. -/</span></span>
+<span id="L286"><span class="kw">def</span> <span class="const token" data-verso-hover="36">alg4</span> (n D : <span class="const token" data-verso-hover="44">ℕ</span>) : <span class="const token" data-verso-hover="62">Alg</span> (<span class="const token" data-verso-hover="46">Fin</span> n) <span class="const token" data-verso-hover="44">ℕ</span> <span class="const token" data-verso-hover="111">St</span> <span class="kw">where</span></span>
+<span id="L287">  <span class="const token" data-verso-hover="127">init</span> := <span class="const token" data-verso-hover="118">init</span> n</span>
+<span id="L288">  <span class="const token" data-verso-hover="64">step</span> := <span class="const token" data-verso-hover="122">step</span> n D</span>
+<span id="L289">  <span class="const token" data-verso-hover="128">dec</span> := <span class="const token" data-verso-hover="117">St.decision</span></span>
+<span id="L290">  <span class="const token" data-verso-hover="129">dec_stable</span> := <span class="kw">by</span></span>
+<span id="L291">    <span class="kw">intro</span> i m s v hm hv</span>
+<span id="L292">    <span class="kw">simp</span> only [<span class="const token" data-verso-hover="122">step</span>, hm, <span class="const token" data-verso-hover="130">Option.getD_some</span>, hv]</span>
+<span id="L293"></span>
+<span id="L294"><span class="kw">end</span> Podc.GracefulKSetAgreement</span>
+<span id="L295"></span>
+</code></div>
+        <script>
+          window.versoHoversUrl = "PODC2014/GracefulKSetAgreement/-hovers.json";</script>
+        <script src="static/lean/popper.js"></script>
+        <script src="static/lean/tippy.js"></script>
+        <script src="static/lean/marked.js"></script>
+        <script src="static/lean/highlighting.js"></script>
+        <script src="static/lean/lean.js"></script>
+        </article></main><footer class="site-footer"><div class="wrap">
+        Machine-checked formalizations of PODC papers in Lean 4. Generated with <a href="https://github.com/leanprover/verso">Verso</a> from the README files of <a href="https://github.com/vasnesterov/formal_podc">vasnesterov/formal_podc</a>.</div>
+      </footer></body>
+  </html>
+

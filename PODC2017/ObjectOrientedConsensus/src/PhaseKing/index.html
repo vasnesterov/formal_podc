@@ -1,0 +1,523 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="light dark">
+    <link rel="icon" href="data:,">
+    <title>ObjectOrientedConsensus: PhaseKing.lean · Formal PODC</title><base href="../../../.././"><link rel="stylesheet" href="static/lean/verso-vars.css">
+    <link rel="stylesheet" href="static/lean/highlighting.css">
+    <link rel="stylesheet" href="static/lean/tippy-border.css">
+    <link rel="stylesheet" href="static/style.css">
+    <script defer="defer" src="static/site.js"></script>
+    </head>
+  <body>
+    <header class="site-header">
+      <div class="wrap">
+        <a class="brand" href=".">Formal PODC</a><nav class="top">
+          <a href=".">Search</a><a href="about/">About</a><a href="https://github.com/vasnesterov/formal_podc">GitHub</a></nav>
+        </div>
+      </header>
+    <main class="wrap"><article><nav class="breadcrumbs" aria-label="Breadcrumb">
+          <a href=".">Search</a><span class="sep">›</span><a href="PODC2017/">PODC 2017</a><span class="sep">›</span><a href="PODC2017/ObjectOrientedConsensus/">ObjectOrientedConsensus</a><span class="sep">›</span><a href="PODC2017/ObjectOrientedConsensus/src/">Lean source</a><span class="sep">›</span><span aria-current="page">PhaseKing</span></nav>
+        <h1>
+          <code>PhaseKing.lean</code></h1>
+        <div class="paper-links">
+          <p>
+            Source of <a href="PODC2017/ObjectOrientedConsensus/">Object Oriented Consensus — PODC 2017</a> · <a href="https://github.com/vasnesterov/formal_podc/blob/main/Papers/PODC2017/ObjectOrientedConsensus/PhaseKing.lean">GitHub</a> · hover over a name for its type and documentation</p>
+          </div>
+        <div class="lean-code lean-src">
+          <code class="hl lean block" data-lean-context="PhaseKing"><span id="L1"><span class="kw">import</span> Mathlib</span>
+<span id="L2"><span class="kw">import</span> Cslib.Computability.Distributed.Byzantine.KingPhase</span>
+<span id="L3"><span class="kw">import</span> Papers.PODC2017.ObjectOrientedConsensus.Template</span>
+<span id="L4"></span>
+<span id="L5"><span class="dc">/-!</span></span>
+<span id="L6"><span class="dc"># Phase-King as adopt-commit + conciliator (Section 4.1 of [AACV])</span></span>
+<span id="L7"></span>
+<span id="L8"><span class="dc">Synchronous message passing, `n = Fintype.card P` processes, the processes outside `H` are Byzantine,</span></span>
+<span id="L9"><span class="dc">`#Hᶜ ≤ t` and `3t &lt; n`. Values are `Fin 3`: inputs are `0, 1`, and `2` is the "no value" mark of the</span></span>
+<span id="L10"><span class="dc">Phase-King algorithm.</span></span>
+<span id="L11"></span>
+<span id="L12"><span class="dc">* Algorithm 3 (adopt-commit). One instance is determined by the honest inputs `x` and the messages the</span></span>
+<span id="L13"><span class="dc">  Byzantine processes send (`b1 p q`, `b2 p q`: what `p` receives from `q ∉ H` in exchange 1/2); honest</span></span>
+<span id="L14"><span class="dc">  messages are computed. `acOut … p` is the output of `p`.</span></span>
+<span id="L15"><span class="dc">  - Lemma 2 (coherence, convergence): `lemma2_coherence`, `lemma2_convergence`.</span></span>
+<span id="L16"><span class="dc">  - Lemma 2 (validity) is **false**: fault-free, inputs `0, 0, 1, 1`, everybody returns `(adopt, 2)`</span></span>
+<span id="L17"><span class="dc">    (`lemma2_validity_false`). The returned value is an input or `2` (`lemma2_validity_bot`), and returning</span></span>
+<span id="L18"><span class="dc">    the own input instead of `2` gives a correct adopt-commit object (`lemma2_fixed`).</span></span>
+<span id="L19"><span class="dc">* The composed protocol (Algorithm 2 with Algorithms 3 and 4, all processes keep participating, the king</span></span>
+<span id="L20"><span class="dc">  of round `m` is `king m`): `val`, `out`.</span></span>
+<span id="L21"><span class="dc">  - Lemma 3 (eventual agreement at an honest king): `lemma3_honest_king`; persistence: `persistence`.</span></span>
+<span id="L22"><span class="dc">  - Lemma 3 (validity) is **false** for a Byzantine king, and Algorithm 2's rule "decide on commit"</span></span>
+<span id="L23"><span class="dc">    then **violates agreement**: `template_disagreement` (`n = 4`, `t = 1`).</span></span>
+<span id="L24"><span class="dc">  - Repair (Phase-King's own rule): decide on a commit only in rounds `≥ t` (0-based), i.e. after</span></span>
+<span id="L25"><span class="dc">    `t + 1` distinct kings: `repaired_agreement`, `repaired_validity`, `repaired_termination`.</span></span>
+<span id="L26"><span class="dc">-/</span></span>
+<span id="L27"></span>
+<span id="L28"><span class="kw">namespace</span> Podc.ObjectOrientedConsensus.PhaseKing</span>
+<span id="L29"></span>
+<span id="L30"><span class="kw">open</span> Finset</span>
+<span id="L31"></span>
+<span id="L32"><span class="kw">variable</span> {P : <span class="kw">Type</span>*} [<span class="const token" data-verso-hover="40">Fintype</span> P] [<span class="const token" data-verso-hover="41">DecidableEq</span> P]</span>
+<span id="L33"></span>
+<span id="L34"><span class="dc">/-- `cnt r k`: the number of processes from which the received messages `r` contain `k`. -/</span></span>
+<span id="L35"><span class="kw">def</span> <span class="const token" data-verso-hover="126">cnt</span> (r : P → <span class="const token" data-verso-hover="57">Option</span> (<span class="const token" data-verso-hover="122">Fin</span> <span class="nu">3</span>)) (k : <span class="const token" data-verso-hover="122">Fin</span> <span class="nu">3</span>) : <span class="const token" data-verso-hover="43">ℕ</span> := #{q | r q = <span class="const token" data-verso-hover="58">some</span> k}</span>
+<span id="L36"></span>
+<span id="L37"><span class="dc">/-- Exchange 1 of Algorithm 3: `v ← 2`; for `k = 0, 1`: if `C(k) ≥ n − t` then `v ← k`. -/</span></span>
+<span id="L38"><span class="kw">def</span> <span class="const token" data-verso-hover="127">ex1</span> (t : <span class="const token" data-verso-hover="43">ℕ</span>) (r : P → <span class="const token" data-verso-hover="57">Option</span> (<span class="const token" data-verso-hover="122">Fin</span> <span class="nu">3</span>)) : <span class="const token" data-verso-hover="122">Fin</span> <span class="nu">3</span> :=</span>
+<span id="L39">  <span class="kw">if</span> <span class="const token" data-verso-hover="54">Fintype.card</span> P - t ≤ <span class="const token" data-verso-hover="126">cnt</span> r <span class="nu">1</span> <span class="kw">then</span> <span class="nu">1</span> <span class="kw">else</span> <span class="kw">if</span> <span class="const token" data-verso-hover="54">Fintype.card</span> P - t ≤ <span class="const token" data-verso-hover="126">cnt</span> r <span class="nu">0</span> <span class="kw">then</span> <span class="nu">0</span> <span class="kw">else</span> <span class="nu">2</span></span>
+<span id="L40"></span>
+<span id="L41"><span class="dc">/-- Exchange 2 of Algorithm 3: for `k = 2 downto 0`: if `D(k) &gt; t` then `v ← k` (so `v` becomes the</span></span>
+<span id="L42"><span class="dc">smallest `k` with `D(k) &gt; t`, if any). -/</span></span>
+<span id="L43"><span class="kw">def</span> <span class="const token" data-verso-hover="128">ex2</span> (t : <span class="const token" data-verso-hover="43">ℕ</span>) (v : <span class="const token" data-verso-hover="122">Fin</span> <span class="nu">3</span>) (r : P → <span class="const token" data-verso-hover="57">Option</span> (<span class="const token" data-verso-hover="122">Fin</span> <span class="nu">3</span>)) : <span class="const token" data-verso-hover="122">Fin</span> <span class="nu">3</span> :=</span>
+<span id="L44">  <span class="kw">if</span> t &lt; <span class="const token" data-verso-hover="126">cnt</span> r <span class="nu">0</span> <span class="kw">then</span> <span class="nu">0</span> <span class="kw">else</span> <span class="kw">if</span> t &lt; <span class="const token" data-verso-hover="126">cnt</span> r <span class="nu">1</span> <span class="kw">then</span> <span class="nu">1</span> <span class="kw">else</span> <span class="kw">if</span> t &lt; <span class="const token" data-verso-hover="126">cnt</span> r <span class="nu">2</span> <span class="kw">then</span> <span class="nu">2</span> <span class="kw">else</span> v</span>
+<span id="L45"></span>
+<span id="L46"><span class="dc">/-- Return statement of Algorithm 3. -/</span></span>
+<span id="L47"><span class="kw">def</span> <span class="const token" data-verso-hover="129">acRet</span> (t : <span class="const token" data-verso-hover="43">ℕ</span>) (v : <span class="const token" data-verso-hover="122">Fin</span> <span class="nu">3</span>) (r : P → <span class="const token" data-verso-hover="57">Option</span> (<span class="const token" data-verso-hover="122">Fin</span> <span class="nu">3</span>)) : <span class="const token" data-verso-hover="60">Conf</span> × <span class="const token" data-verso-hover="122">Fin</span> <span class="nu">3</span> :=</span>
+<span id="L48">  <span class="kw">if</span> <span class="const token" data-verso-hover="128">ex2</span> t v r ≠ <span class="nu">2</span> ∧ <span class="const token" data-verso-hover="54">Fintype.card</span> P - t ≤ <span class="const token" data-verso-hover="126">cnt</span> r (<span class="const token" data-verso-hover="128">ex2</span> t v r) <span class="kw">then</span> (<span class="const token" data-verso-hover="61">.</span>commit, <span class="const token" data-verso-hover="128">ex2</span> t v r)</span>
+<span id="L49">  <span class="kw">else</span> (<span class="const token" data-verso-hover="24">.</span>adopt, <span class="const token" data-verso-hover="128">ex2</span> t v r)</span>
+<span id="L50"></span>
+<span id="L51"><span class="kw">variable</span> (t : <span class="const token" data-verso-hover="43">ℕ</span>) (H : <span class="const token" data-verso-hover="45">Finset</span> P)</span>
+<span id="L52"></span>
+<span id="L53"><span class="dc">/-- Messages received by `p` in exchange 1: honest `q` sends its input `x q`. -/</span></span>
+<span id="L54"><span class="kw">def</span> <span class="const token" data-verso-hover="130">recv1</span> (b1 : P → P → <span class="const token" data-verso-hover="57">Option</span> (<span class="const token" data-verso-hover="122">Fin</span> <span class="nu">3</span>)) (x : P → <span class="const token" data-verso-hover="122">Fin</span> <span class="nu">3</span>) (p : P) : P → <span class="const token" data-verso-hover="57">Option</span> (<span class="const token" data-verso-hover="122">Fin</span> <span class="nu">3</span>) :=</span>
+<span id="L55">  <span class="kw">fun</span> q =&gt; <span class="kw">if</span> q ∈ H <span class="kw">then</span> <span class="const token" data-verso-hover="58">some</span> (x q) <span class="kw">else</span> b1 p q</span>
+<span id="L56"></span>
+<span id="L57"><span class="dc">/-- The value of `p` after exchange 1. -/</span></span>
+<span id="L58"><span class="kw">def</span> <span class="const token" data-verso-hover="131">v1</span> (b1 : P → P → <span class="const token" data-verso-hover="57">Option</span> (<span class="const token" data-verso-hover="122">Fin</span> <span class="nu">3</span>)) (x : P → <span class="const token" data-verso-hover="122">Fin</span> <span class="nu">3</span>) (p : P) : <span class="const token" data-verso-hover="122">Fin</span> <span class="nu">3</span> := <span class="const token" data-verso-hover="127">ex1</span> t (<span class="const token" data-verso-hover="130">recv1</span> H b1 x p)</span>
+<span id="L59"></span>
+<span id="L60"><span class="dc">/-- Messages received by `p` in exchange 2: honest `q` sends `v1 q`. -/</span></span>
+<span id="L61"><span class="kw">def</span> <span class="const token" data-verso-hover="132">recv2</span> (b1 b2 : P → P → <span class="const token" data-verso-hover="57">Option</span> (<span class="const token" data-verso-hover="122">Fin</span> <span class="nu">3</span>)) (x : P → <span class="const token" data-verso-hover="122">Fin</span> <span class="nu">3</span>) (p : P) : P → <span class="const token" data-verso-hover="57">Option</span> (<span class="const token" data-verso-hover="122">Fin</span> <span class="nu">3</span>) :=</span>
+<span id="L62">  <span class="kw">fun</span> q =&gt; <span class="kw">if</span> q ∈ H <span class="kw">then</span> <span class="const token" data-verso-hover="58">some</span> (<span class="const token" data-verso-hover="131">v1</span> t H b1 x q) <span class="kw">else</span> b2 p q</span>
+<span id="L63"></span>
+<span id="L64"><span class="dc">/-- **Algorithm 3** (Phase-King's adopt-commit): the output of `p`. -/</span></span>
+<span id="L65"><span class="kw">def</span> <span class="const token" data-verso-hover="133">acOut</span> (b1 b2 : P → P → <span class="const token" data-verso-hover="57">Option</span> (<span class="const token" data-verso-hover="122">Fin</span> <span class="nu">3</span>)) (x : P → <span class="const token" data-verso-hover="122">Fin</span> <span class="nu">3</span>) (p : P) : <span class="const token" data-verso-hover="60">Conf</span> × <span class="const token" data-verso-hover="122">Fin</span> <span class="nu">3</span> :=</span>
+<span id="L66">  <span class="const token" data-verso-hover="129">acRet</span> t (<span class="const token" data-verso-hover="131">v1</span> t H b1 x p) (<span class="const token" data-verso-hover="132">recv2</span> t H b1 b2 x p)</span>
+<span id="L67"></span>
+<span id="L68"><span class="kw">variable</span> {t H}</span>
+<span id="L69"></span>
+<span id="L70"><span class="dc">/-! ### Counting -/</span></span>
+<span id="L71"></span>
+<span id="L72"><span class="kw">lemma</span> <span class="const token" data-verso-hover="134">card_compl_add</span> : <span class="kw">#H</span> + <span class="kw">#H</span>ᶜ = <span class="const token" data-verso-hover="54">Fintype.card</span> P := <span class="kw">by</span></span>
+<span id="L73">  <span class="kw">rw</span> [<span class="const token" data-verso-hover="135">card_compl</span>]; <span class="kw">have</span> := H.<span class="const token" data-verso-hover="99">card_le_univ</span>; <span class="kw">omega</span></span>
+<span id="L74"></span>
+<span id="L75"><span class="dc">/-- If every honest `q` delivers `y q`, the count of `k` is between the honest count and the honest</span></span>
+<span id="L76"><span class="dc">count plus `#Hᶜ`. -/</span></span>
+<span id="L77"><span class="kw">lemma</span> <span class="const token" data-verso-hover="136">cnt_bounds</span> {r : P → <span class="const token" data-verso-hover="57">Option</span> (<span class="const token" data-verso-hover="122">Fin</span> <span class="nu">3</span>)} {y : P → <span class="const token" data-verso-hover="122">Fin</span> <span class="nu">3</span>} (hr : ∀ q ∈ H, r q = <span class="const token" data-verso-hover="58">some</span> (y q)) (k : <span class="const token" data-verso-hover="122">Fin</span> <span class="nu">3</span>) :</span>
+<span id="L78">    #{q ∈ H | y q = k} ≤ <span class="const token" data-verso-hover="126">cnt</span> r k ∧ <span class="const token" data-verso-hover="126">cnt</span> r k ≤ #{q ∈ H | y q = k} + <span class="kw">#H</span>ᶜ := <span class="kw">by</span></span>
+<span id="L79">  <span class="kw">have</span> hH : ({q ∈ H | y q = k} : <span class="const token" data-verso-hover="45">Finset</span> P) = {q ∈ H | r q = <span class="const token" data-verso-hover="58">some</span> k} := <span class="kw">by</span></span>
+<span id="L80">    <span class="kw">ext</span> q; <span class="kw">simp</span> only [<span class="const token" data-verso-hover="107">mem_filter</span>]</span>
+<span id="L81">    <span class="kw">constructor</span></span>
+<span id="L82">    · <span class="kw">rintro</span> ⟨hq, <span class="kw">rfl</span>⟩; <span class="kw">exact</span> ⟨hq, hr q hq⟩</span>
+<span id="L83">    · <span class="kw">rintro</span> ⟨hq, h⟩; <span class="kw">rw</span> [hr q hq] <span class="kw">at</span> h; <span class="kw">exact</span> ⟨hq, <span class="const token" data-verso-hover="77">Option.some_injective</span> _ h⟩</span>
+<span id="L84">  <span class="kw">constructor</span></span>
+<span id="L85">  · <span class="kw">rw</span> [hH, <span class="const token" data-verso-hover="126">cnt</span>]; <span class="kw">exact</span> <span class="const token" data-verso-hover="67">card_le_card</span> <span class="kw">fun</span> q =&gt; <span class="kw">by</span> <span class="kw">simp</span> +<span class="const token" data-verso-hover="137">contextual</span></span>
+<span id="L86">  · <span class="kw">rw</span> [hH, <span class="const token" data-verso-hover="126">cnt</span>]</span>
+<span id="L87">    <span class="kw">calc</span> #{q | r q = <span class="const token" data-verso-hover="58">some</span> k} ≤ #({q ∈ H | r q = <span class="const token" data-verso-hover="58">some</span> k} ∪ Hᶜ) :=</span>
+<span id="L88">          <span class="const token" data-verso-hover="67">card_le_card</span> <span class="kw">fun</span> q =&gt; <span class="kw">by</span> <span class="kw">by_cases</span> hq : q ∈ H &lt;;&gt; <span class="kw">simp_all</span></span>
+<span id="L89">      _ ≤ _ := <span class="const token" data-verso-hover="138">card_union_le</span> _ _</span>
+<span id="L90"></span>
+<span id="L91"><span class="kw">lemma</span> <span class="const token" data-verso-hover="139">ex1_ne_two</span> {r : P → <span class="const token" data-verso-hover="57">Option</span> (<span class="const token" data-verso-hover="122">Fin</span> <span class="nu">3</span>)} (h : <span class="const token" data-verso-hover="127">ex1</span> t r ≠ <span class="nu">2</span>) : <span class="const token" data-verso-hover="54">Fintype.card</span> P - t ≤ <span class="const token" data-verso-hover="126">cnt</span> r (<span class="const token" data-verso-hover="127">ex1</span> t r) := <span class="kw">by</span></span>
+<span id="L92">  <span class="kw">unfold</span> <span class="const token" data-verso-hover="127">ex1</span> <span class="kw">at</span> *</span>
+<span id="L93">  <span class="kw">split_ifs</span> <span class="kw">at</span> * <span class="kw">with</span> h1 h0 &lt;;&gt; <span class="kw">simp_all</span></span>
+<span id="L94"></span>
+<span id="L95"><span class="dc">/-- Two distinct values cannot both reach `n − t` among the honest-plus-Byzantine counts. -/</span></span>
+<span id="L96"><span class="kw">lemma</span> <span class="const token" data-verso-hover="140">eq_of_two_quorums</span> (hB : <span class="kw">#H</span>ᶜ ≤ t) (hn : <span class="nu">3</span> * t &lt; <span class="const token" data-verso-hover="54">Fintype.card</span> P) {y : P → <span class="const token" data-verso-hover="122">Fin</span> <span class="nu">3</span>} {a b : <span class="const token" data-verso-hover="122">Fin</span> <span class="nu">3</span>}</span>
+<span id="L97">    (ha : <span class="const token" data-verso-hover="54">Fintype.card</span> P - t ≤ #{q ∈ H | y q = a} + <span class="kw">#H</span>ᶜ)</span>
+<span id="L98">    (hb : <span class="const token" data-verso-hover="54">Fintype.card</span> P - t ≤ #{q ∈ H | y q = b} + <span class="kw">#H</span>ᶜ) : a = b := <span class="kw">by</span></span>
+<span id="L99">  <span class="kw">by_contra</span> hab</span>
+<span id="L100">  <span class="kw">have</span> hdisj : <span class="const token" data-verso-hover="141">Disjoint</span> ({q ∈ H | y q = a} : <span class="const token" data-verso-hover="45">Finset</span> P) {q ∈ H | y q = b} := <span class="kw">by</span></span>
+<span id="L101">    <span class="kw">rw</span> [<span class="const token" data-verso-hover="142">disjoint_filter</span>]; <span class="kw">intro</span> q _ h1 h2; <span class="kw">exact</span> hab (h1 ▸ h2)</span>
+<span id="L102">  <span class="kw">have</span> := <span class="const token" data-verso-hover="143">card_union_of_disjoint</span> hdisj</span>
+<span id="L103">  <span class="kw">have</span> hsub : ({q ∈ H | y q = a} ∪ {q ∈ H | y q = b} : <span class="const token" data-verso-hover="45">Finset</span> P) ⊆ H := <span class="kw">by</span></span>
+<span id="L104">    <span class="kw">intro</span> q; <span class="kw">simp</span> only [<span class="const token" data-verso-hover="144">mem_union</span>, <span class="const token" data-verso-hover="107">mem_filter</span>]; <span class="kw">tauto</span></span>
+<span id="L105">  <span class="kw">have</span> := <span class="const token" data-verso-hover="67">card_le_card</span> hsub</span>
+<span id="L106">  <span class="kw">have</span> := <span class="const token" data-verso-hover="134">card_compl_add</span> (H := H)</span>
+<span id="L107">  <span class="kw">omega</span></span>
+<span id="L108"></span>
+<span id="L109"><span class="kw">variable</span> (b1 b2 : P → P → <span class="const token" data-verso-hover="57">Option</span> (<span class="const token" data-verso-hover="122">Fin</span> <span class="nu">3</span>)) (x : P → <span class="const token" data-verso-hover="122">Fin</span> <span class="nu">3</span>)</span>
+<span id="L110"></span>
+<span id="L111"><span class="kw">lemma</span> <span class="const token" data-verso-hover="145">recv1_honest</span> : ∀ q ∈ H, <span class="const token" data-verso-hover="130">recv1</span> H b1 x p q = <span class="const token" data-verso-hover="58">some</span> (x q) := <span class="kw">fun</span> q hq =&gt; <span class="kw">by</span> <span class="kw">simp</span> [<span class="const token" data-verso-hover="130">recv1</span>, hq]</span>
+<span id="L112"></span>
+<span id="L113"><span class="kw">lemma</span> <span class="const token" data-verso-hover="146">recv2_honest</span> : ∀ q ∈ H, <span class="const token" data-verso-hover="132">recv2</span> t H b1 b2 x p q = <span class="const token" data-verso-hover="58">some</span> (<span class="const token" data-verso-hover="131">v1</span> t H b1 x q) := <span class="kw">fun</span> q hq =&gt; <span class="kw">by</span></span>
+<span id="L114">  <span class="kw">simp</span> [<span class="const token" data-verso-hover="132">recv2</span>, hq]</span>
+<span id="L115"></span>
+<span id="L116"><span class="dc">/-- After exchange 1, all non-`2` values (of any process) coincide. -/</span></span>
+<span id="L117"><span class="kw">lemma</span> <span class="const token" data-verso-hover="147">v1_agree</span> (hB : <span class="kw">#H</span>ᶜ ≤ t) (hn : <span class="nu">3</span> * t &lt; <span class="const token" data-verso-hover="54">Fintype.card</span> P) {p p' : P}</span>
+<span id="L118">    (hp : <span class="const token" data-verso-hover="131">v1</span> t H b1 x p ≠ <span class="nu">2</span>) (hp' : <span class="const token" data-verso-hover="131">v1</span> t H b1 x p' ≠ <span class="nu">2</span>) : <span class="const token" data-verso-hover="131">v1</span> t H b1 x p = <span class="const token" data-verso-hover="131">v1</span> t H b1 x p' := <span class="kw">by</span></span>
+<span id="L119">  <span class="kw">have</span> h1 := <span class="const token" data-verso-hover="139">ex1_ne_two</span> hp</span>
+<span id="L120">  <span class="kw">have</span> h2 := <span class="const token" data-verso-hover="139">ex1_ne_two</span> hp'</span>
+<span id="L121">  <span class="kw">exact</span> <span class="const token" data-verso-hover="140">eq_of_two_quorums</span> hB hn</span>
+<span id="L122">    (h1.<span class="const token" data-verso-hover="104">trans</span> (<span class="const token" data-verso-hover="136">cnt_bounds</span> (<span class="const token" data-verso-hover="145">recv1_honest</span> b1 x) _).<span class="const token" data-verso-hover="148">2</span>) (h2.<span class="const token" data-verso-hover="104">trans</span> (<span class="const token" data-verso-hover="136">cnt_bounds</span> (<span class="const token" data-verso-hover="145">recv1_honest</span> b1 x) _).<span class="const token" data-verso-hover="148">2</span>)</span>
+<span id="L123"></span>
+<span id="L124"><span class="dc">/-- A non-`2` value after exchange 1 is an honest input. -/</span></span>
+<span id="L125"><span class="kw">lemma</span> <span class="const token" data-verso-hover="149">v1_valid</span> (hB : <span class="kw">#H</span>ᶜ ≤ t) (hn : <span class="nu">3</span> * t &lt; <span class="const token" data-verso-hover="54">Fintype.card</span> P) {p : P} (hp : <span class="const token" data-verso-hover="131">v1</span> t H b1 x p ≠ <span class="nu">2</span>) :</span>
+<span id="L126">    ∃ q ∈ H, x q = <span class="const token" data-verso-hover="131">v1</span> t H b1 x p := <span class="kw">by</span></span>
+<span id="L127">  <span class="kw">have</span> h1 := (<span class="const token" data-verso-hover="139">ex1_ne_two</span> hp).<span class="const token" data-verso-hover="104">trans</span> (<span class="const token" data-verso-hover="136">cnt_bounds</span> (<span class="const token" data-verso-hover="145">recv1_honest</span> (H := H) (p := p) b1 x) (<span class="const token" data-verso-hover="131">v1</span> t H b1 x p)).<span class="const token" data-verso-hover="148">2</span></span>
+<span id="L128">  <span class="kw">have</span> hpos : <span class="nu">0</span> &lt; #{q ∈ H | x q = <span class="const token" data-verso-hover="131">v1</span> t H b1 x p} := <span class="kw">by</span> <span class="kw">omega</span></span>
+<span id="L129">  <span class="kw">obtain</span> ⟨q, hq⟩ := <span class="const token" data-verso-hover="150">card_pos</span>.<span class="const token" data-verso-hover="91">1</span> hpos</span>
+<span id="L130">  <span class="kw">simp</span> only [<span class="const token" data-verso-hover="107">mem_filter</span>] <span class="kw">at</span> hq</span>
+<span id="L131">  <span class="kw">exact</span> ⟨q, hq.<span class="const token" data-verso-hover="95">1</span>, hq.<span class="const token" data-verso-hover="148">2</span>⟩</span>
+<span id="L132"></span>
+<span id="L133"><span class="dc">/-- The returned value of an honest process is the exchange-1 value of an honest process. -/</span></span>
+<span id="L134"><span class="kw">lemma</span> <span class="const token" data-verso-hover="151">acOut_eq_v1</span> (hB : <span class="kw">#H</span>ᶜ ≤ t) {p : P} (hp : p ∈ H) :</span>
+<span id="L135">    ∃ q ∈ H, <span class="const token" data-verso-hover="131">v1</span> t H b1 x q = (<span class="const token" data-verso-hover="133">acOut</span> t H b1 b2 x p).<span class="const token" data-verso-hover="81">2</span> := <span class="kw">by</span></span>
+<span id="L136">  <span class="kw">have</span> key : ∀ k, t &lt; <span class="const token" data-verso-hover="126">cnt</span> (<span class="const token" data-verso-hover="132">recv2</span> t H b1 b2 x p) k → ∃ q ∈ H, <span class="const token" data-verso-hover="131">v1</span> t H b1 x q = k := <span class="kw">by</span></span>
+<span id="L137">    <span class="kw">intro</span> k hk</span>
+<span id="L138">    <span class="kw">have</span> := (<span class="const token" data-verso-hover="136">cnt_bounds</span> (<span class="const token" data-verso-hover="146">recv2_honest</span> (t := t) (H := H) (p := p) b1 b2 x) k).<span class="const token" data-verso-hover="148">2</span></span>
+<span id="L139">    <span class="kw">obtain</span> ⟨q, hq⟩ := <span class="const token" data-verso-hover="150">card_pos</span>.<span class="const token" data-verso-hover="91">1</span> (<span class="kw">show</span> <span class="nu">0</span> &lt; #{q ∈ H | <span class="const token" data-verso-hover="131">v1</span> t H b1 x q = k} <span class="kw">by</span> <span class="kw">omega</span>)</span>
+<span id="L140">    <span class="kw">simp</span> only [<span class="const token" data-verso-hover="107">mem_filter</span>] <span class="kw">at</span> hq</span>
+<span id="L141">    <span class="kw">exact</span> ⟨q, hq⟩</span>
+<span id="L142">  <span class="kw">have</span> hret : (<span class="const token" data-verso-hover="133">acOut</span> t H b1 b2 x p).<span class="const token" data-verso-hover="81">2</span> = <span class="const token" data-verso-hover="128">ex2</span> t (<span class="const token" data-verso-hover="131">v1</span> t H b1 x p) (<span class="const token" data-verso-hover="132">recv2</span> t H b1 b2 x p) := <span class="kw">by</span></span>
+<span id="L143">    <span class="kw">simp</span> only [<span class="const token" data-verso-hover="133">acOut</span>, <span class="const token" data-verso-hover="129">acRet</span>]; <span class="kw">split_ifs</span> &lt;;&gt; <span class="kw">rfl</span></span>
+<span id="L144">  <span class="kw">rw</span> [hret]</span>
+<span id="L145">  <span class="kw">unfold</span> <span class="const token" data-verso-hover="128">ex2</span></span>
+<span id="L146">  <span class="kw">split_ifs</span> <span class="kw">with</span> h0 h1 h2</span>
+<span id="L147">  · <span class="kw">exact</span> key <span class="nu">0</span> h0</span>
+<span id="L148">  · <span class="kw">exact</span> key <span class="nu">1</span> h1</span>
+<span id="L149">  · <span class="kw">exact</span> key <span class="nu">2</span> h2</span>
+<span id="L150">  · <span class="kw">exact</span> ⟨p, hp, <span class="const token" data-verso-hover="84">rfl</span>⟩</span>
+<span id="L151"></span>
+<span id="L152"><span class="dc">/-- **Lemma 2 of [AACV], validity (corrected form).** An honest process returns an honest input or the</span></span>
+<span id="L153"><span class="dc">mark `2`. -/</span></span>
+<span id="L154"><span class="kw">theorem</span> <span class="const token" data-verso-hover="17">lemma2_validity_bot</span> (hB : <span class="kw">#H</span>ᶜ ≤ t) (hn : <span class="nu">3</span> * t &lt; <span class="const token" data-verso-hover="54">Fintype.card</span> P) {p : P} (hp : p ∈ H) :</span>
+<span id="L155">    (<span class="const token" data-verso-hover="133">acOut</span> t H b1 b2 x p).<span class="const token" data-verso-hover="81">2</span> = <span class="nu">2</span> ∨ ∃ q ∈ H, x q = (<span class="const token" data-verso-hover="133">acOut</span> t H b1 b2 x p).<span class="const token" data-verso-hover="81">2</span> := <span class="kw">by</span></span>
+<span id="L156">  <span class="kw">obtain</span> ⟨q, hq, hqv⟩ := <span class="const token" data-verso-hover="151">acOut_eq_v1</span> b1 b2 x hB hp</span>
+<span id="L157">  <span class="kw">by_cases</span> h2 : <span class="const token" data-verso-hover="131">v1</span> t H b1 x q = <span class="nu">2</span></span>
+<span id="L158">  · <span class="kw">left</span>; <span class="kw">rw</span> [← hqv, h2]</span>
+<span id="L159">  · <span class="kw">right</span>; <span class="kw">rw</span> [← hqv]; <span class="kw">exact</span> <span class="const token" data-verso-hover="149">v1_valid</span> b1 x hB hn h2</span>
+<span id="L160"></span>
+<span id="L161"><span class="dc">/-- **Lemma 2 of [AACV], coherence.** If an honest process commits, every honest process returns the</span></span>
+<span id="L162"><span class="dc">same value. -/</span></span>
+<span id="L163"><span class="kw">theorem</span> <span class="const token" data-verso-hover="31">lemma2_coherence</span> (hB : <span class="kw">#H</span>ᶜ ≤ t) (hn : <span class="nu">3</span> * t &lt; <span class="const token" data-verso-hover="54">Fintype.card</span> P) {p : P} (hp : p ∈ H)</span>
+<span id="L164">    (hc : (<span class="const token" data-verso-hover="133">acOut</span> t H b1 b2 x p).<span class="const token" data-verso-hover="80">1</span> = <span class="const token" data-verso-hover="61">.</span>commit) {q : P} (hq : q ∈ H) :</span>
+<span id="L165">    (<span class="const token" data-verso-hover="133">acOut</span> t H b1 b2 x q).<span class="const token" data-verso-hover="81">2</span> = (<span class="const token" data-verso-hover="133">acOut</span> t H b1 b2 x p).<span class="const token" data-verso-hover="81">2</span> := <span class="kw">by</span></span>
+<span id="L166">  <span class="kw">set</span> w := <span class="const token" data-verso-hover="128">ex2</span> t (<span class="const token" data-verso-hover="131">v1</span> t H b1 x p) (<span class="const token" data-verso-hover="132">recv2</span> t H b1 b2 x p) <span class="kw">with</span> hw</span>
+<span id="L167">  <span class="kw">have</span> hcw : (<span class="const token" data-verso-hover="133">acOut</span> t H b1 b2 x p) = (<span class="const token" data-verso-hover="61">.</span>commit, w) ∧ w ≠ <span class="nu">2</span> ∧</span>
+<span id="L168">      <span class="const token" data-verso-hover="54">Fintype.card</span> P - t ≤ <span class="const token" data-verso-hover="126">cnt</span> (<span class="const token" data-verso-hover="132">recv2</span> t H b1 b2 x p) w := <span class="kw">by</span></span>
+<span id="L169">    <span class="kw">simp</span> only [<span class="const token" data-verso-hover="133">acOut</span>, <span class="const token" data-verso-hover="129">acRet</span>] <span class="kw">at</span> hc ⊢</span>
+<span id="L170">    <span class="kw">split_ifs</span> <span class="kw">at</span> hc ⊢ <span class="kw">with</span> h</span>
+<span id="L171">    · <span class="kw">exact</span> ⟨<span class="const token" data-verso-hover="84">rfl</span>, h⟩</span>
+<span id="L172">  <span class="kw">obtain</span> ⟨hpo, hw2, hwc⟩ := hcw</span>
+<span id="L173">  <span class="kw">rw</span> [hpo]</span>
+<span id="L174">  <span class="kw">show</span> _ = w</span>
+<span id="L175">  <span class="cm">--</span><span class="cm"> many honest processes hold `w` after exchange 1</span></span>
+<span id="L176">  <span class="kw">have</span> hHw := (<span class="const token" data-verso-hover="136">cnt_bounds</span> (<span class="const token" data-verso-hover="146">recv2_honest</span> (t := t) (H := H) (p := p) b1 b2 x) w).<span class="const token" data-verso-hover="148">2</span></span>
+<span id="L177">  <span class="kw">have</span> hpos : <span class="nu">0</span> &lt; #{r ∈ H | <span class="const token" data-verso-hover="131">v1</span> t H b1 x r = w} := <span class="kw">by</span> <span class="kw">omega</span></span>
+<span id="L178">  <span class="kw">obtain</span> ⟨r, hr⟩ := <span class="const token" data-verso-hover="150">card_pos</span>.<span class="const token" data-verso-hover="91">1</span> hpos</span>
+<span id="L179">  <span class="kw">simp</span> only [<span class="const token" data-verso-hover="107">mem_filter</span>] <span class="kw">at</span> hr</span>
+<span id="L180">  <span class="cm">--</span><span class="cm"> all honest non-2 exchange-1 values are `w`</span></span>
+<span id="L181">  <span class="kw">have</span> hother : ∀ k, k ≠ w → k ≠ <span class="nu">2</span> → <span class="const token" data-verso-hover="126">cnt</span> (<span class="const token" data-verso-hover="132">recv2</span> t H b1 b2 x q) k ≤ t := <span class="kw">by</span></span>
+<span id="L182">    <span class="kw">intro</span> k hkw hk2</span>
+<span id="L183">    <span class="kw">have</span> h := (<span class="const token" data-verso-hover="136">cnt_bounds</span> (<span class="const token" data-verso-hover="146">recv2_honest</span> (t := t) (H := H) (p := q) b1 b2 x) k).<span class="const token" data-verso-hover="148">2</span></span>
+<span id="L184">    <span class="kw">have</span> h0 : #{s ∈ H | <span class="const token" data-verso-hover="131">v1</span> t H b1 x s = k} = <span class="nu">0</span> := <span class="kw">by</span></span>
+<span id="L185">      <span class="kw">rw</span> [<span class="const token" data-verso-hover="152">card_eq_zero</span>, <span class="const token" data-verso-hover="153">filter_eq_empty_iff</span>]</span>
+<span id="L186">      <span class="kw">intro</span> s _ hs</span>
+<span id="L187">      <span class="kw">apply</span> hkw</span>
+<span id="L188">      <span class="kw">rw</span> [← hs, ← hr.<span class="const token" data-verso-hover="148">2</span>]</span>
+<span id="L189">      <span class="kw">exact</span> <span class="const token" data-verso-hover="147">v1_agree</span> b1 x hB hn (hs ▸ hk2) (hr.<span class="const token" data-verso-hover="148">2</span> ▸ hw2)</span>
+<span id="L190">    <span class="kw">omega</span></span>
+<span id="L191">  <span class="kw">have</span> hwq : t &lt; <span class="const token" data-verso-hover="126">cnt</span> (<span class="const token" data-verso-hover="132">recv2</span> t H b1 b2 x q) w := <span class="kw">by</span></span>
+<span id="L192">    <span class="kw">have</span> := (<span class="const token" data-verso-hover="136">cnt_bounds</span> (<span class="const token" data-verso-hover="146">recv2_honest</span> (t := t) (H := H) (p := q) b1 b2 x) w).<span class="const token" data-verso-hover="95">1</span></span>
+<span id="L193">    <span class="kw">omega</span></span>
+<span id="L194">  <span class="kw">have</span> hret : (<span class="const token" data-verso-hover="133">acOut</span> t H b1 b2 x q).<span class="const token" data-verso-hover="81">2</span> = <span class="const token" data-verso-hover="128">ex2</span> t (<span class="const token" data-verso-hover="131">v1</span> t H b1 x q) (<span class="const token" data-verso-hover="132">recv2</span> t H b1 b2 x q) := <span class="kw">by</span></span>
+<span id="L195">    <span class="kw">simp</span> only [<span class="const token" data-verso-hover="133">acOut</span>, <span class="const token" data-verso-hover="129">acRet</span>]; <span class="kw">split_ifs</span> &lt;;&gt; <span class="kw">rfl</span></span>
+<span id="L196">  <span class="kw">rw</span> [hret]</span>
+<span id="L197">  <span class="kw">have</span> hw01 : w = <span class="nu">0</span> ∨ w = <span class="nu">1</span> := <span class="kw">by</span> <span class="kw">omega</span></span>
+<span id="L198">  <span class="kw">rcases</span> hw01 <span class="kw">with</span> h | h</span>
+<span id="L199">  · <span class="kw">simp</span> only [<span class="const token" data-verso-hover="128">ex2</span>, h] <span class="kw">at</span> hwq ⊢; <span class="kw">simp</span> [hwq]</span>
+<span id="L200">  · <span class="kw">have</span> h0 := hother <span class="nu">0</span> (<span class="kw">by</span> <span class="kw">rw</span> [h]; <span class="kw">decide</span>) (<span class="kw">by</span> <span class="kw">decide</span>)</span>
+<span id="L201">    <span class="kw">simp</span> only [<span class="const token" data-verso-hover="128">ex2</span>, h] <span class="kw">at</span> hwq ⊢</span>
+<span id="L202">    <span class="kw">simp</span> [hwq, <span class="const token" data-verso-hover="154">not_lt</span>.<span class="const token" data-verso-hover="89">2</span> h0]</span>
+<span id="L203"></span>
+<span id="L204"><span class="dc">/-- **Lemma 2 of [AACV], convergence.** If all honest inputs are `v ∈ {0, 1}`, every honest process</span></span>
+<span id="L205"><span class="dc">returns `(commit, v)`. -/</span></span>
+<span id="L206"><span class="kw">theorem</span> <span class="const token" data-verso-hover="32">lemma2_convergence</span> (hB : <span class="kw">#H</span>ᶜ ≤ t) (hn : <span class="nu">3</span> * t &lt; <span class="const token" data-verso-hover="54">Fintype.card</span> P) {v : <span class="const token" data-verso-hover="122">Fin</span> <span class="nu">3</span>} (hv : v ≠ <span class="nu">2</span>)</span>
+<span id="L207">    (hx : ∀ q ∈ H, x q = v) (p : P) : <span class="const token" data-verso-hover="133">acOut</span> t H b1 b2 x p = (<span class="const token" data-verso-hover="61">.</span>commit, v) := <span class="kw">by</span></span>
+<span id="L208">  <span class="kw">have</span> hHc := <span class="const token" data-verso-hover="134">card_compl_add</span> (H := H)</span>
+<span id="L209">  <span class="kw">have</span> hall : ∀ (y : P → <span class="const token" data-verso-hover="122">Fin</span> <span class="nu">3</span>), (∀ q ∈ H, y q = v) → #{q ∈ H | y q = v} = <span class="kw">#H</span> := <span class="kw">fun</span> y hy =&gt; <span class="kw">by</span></span>
+<span id="L210">    <span class="kw">rw</span> [<span class="const token" data-verso-hover="98">filter_true_of_mem</span> hy]</span>
+<span id="L211">  <span class="kw">have</span> hnone : ∀ (y : P → <span class="const token" data-verso-hover="122">Fin</span> <span class="nu">3</span>), (∀ q ∈ H, y q = v) → ∀ k ≠ v, #{q ∈ H | y q = k} = <span class="nu">0</span> :=</span>
+<span id="L212">    <span class="kw">fun</span> y hy k hk =&gt; <span class="kw">by</span></span>
+<span id="L213">      <span class="kw">rw</span> [<span class="const token" data-verso-hover="152">card_eq_zero</span>, <span class="const token" data-verso-hover="153">filter_eq_empty_iff</span>]; <span class="kw">intro</span> q hq h; <span class="kw">exact</span> hk (h ▸ hy q hq)</span>
+<span id="L214">  <span class="kw">have</span> hv1 : ∀ p, <span class="const token" data-verso-hover="131">v1</span> t H b1 x p = v := <span class="kw">by</span></span>
+<span id="L215">    <span class="kw">intro</span> p</span>
+<span id="L216">    <span class="kw">have</span> hc := <span class="const token" data-verso-hover="136">cnt_bounds</span> (<span class="const token" data-verso-hover="145">recv1_honest</span> (H := H) (p := p) b1 x)</span>
+<span id="L217">    <span class="kw">have</span> hcv := (hc v).<span class="const token" data-verso-hover="95">1</span>; <span class="kw">rw</span> [hall x hx] <span class="kw">at</span> hcv</span>
+<span id="L218">    <span class="kw">simp</span> only [<span class="const token" data-verso-hover="131">v1</span>, <span class="const token" data-verso-hover="127">ex1</span>]</span>
+<span id="L219">    <span class="kw">have</span> hv01 : v = <span class="nu">0</span> ∨ v = <span class="nu">1</span> := <span class="kw">by</span> <span class="kw">omega</span></span>
+<span id="L220">    <span class="kw">rcases</span> hv01 <span class="kw">with</span> <span class="kw">rfl</span> | <span class="kw">rfl</span></span>
+<span id="L221">    · <span class="kw">have</span> h1 := (hc <span class="nu">1</span>).<span class="const token" data-verso-hover="148">2</span>; <span class="kw">rw</span> [hnone x hx <span class="nu">1</span> (<span class="kw">by</span> <span class="kw">decide</span>)] <span class="kw">at</span> h1</span>
+<span id="L222">      <span class="kw">rw</span> [<span class="const token" data-verso-hover="155">if_neg</span> (<span class="kw">by</span> <span class="kw">omega</span>), <span class="const token" data-verso-hover="156">if_pos</span> (<span class="kw">by</span> <span class="kw">omega</span>)]</span>
+<span id="L223">    · <span class="kw">rw</span> [<span class="const token" data-verso-hover="156">if_pos</span> (<span class="kw">by</span> <span class="kw">omega</span>)]</span>
+<span id="L224">  <span class="kw">have</span> hc := <span class="const token" data-verso-hover="136">cnt_bounds</span> (<span class="const token" data-verso-hover="146">recv2_honest</span> (t := t) (H := H) (p := p) b1 b2 x)</span>
+<span id="L225">  <span class="kw">have</span> hv1' : ∀ q ∈ H, <span class="const token" data-verso-hover="131">v1</span> t H b1 x q = v := <span class="kw">fun</span> q _ =&gt; hv1 q</span>
+<span id="L226">  <span class="kw">have</span> hcv := (hc v).<span class="const token" data-verso-hover="95">1</span>; <span class="kw">rw</span> [hall _ hv1'] <span class="kw">at</span> hcv</span>
+<span id="L227">  <span class="kw">have</span> hk : ∀ k ≠ v, <span class="const token" data-verso-hover="126">cnt</span> (<span class="const token" data-verso-hover="132">recv2</span> t H b1 b2 x p) k ≤ t := <span class="kw">fun</span> k hkv =&gt; <span class="kw">by</span></span>
+<span id="L228">    <span class="kw">have</span> := (hc k).<span class="const token" data-verso-hover="148">2</span>; <span class="kw">rw</span> [hnone _ hv1' k hkv] <span class="kw">at</span> this; <span class="kw">omega</span></span>
+<span id="L229">  <span class="kw">have</span> hex : <span class="const token" data-verso-hover="128">ex2</span> t (<span class="const token" data-verso-hover="131">v1</span> t H b1 x p) (<span class="const token" data-verso-hover="132">recv2</span> t H b1 b2 x p) = v := <span class="kw">by</span></span>
+<span id="L230">    <span class="kw">have</span> hv01 : v = <span class="nu">0</span> ∨ v = <span class="nu">1</span> := <span class="kw">by</span> <span class="kw">omega</span></span>
+<span id="L231">    <span class="kw">rcases</span> hv01 <span class="kw">with</span> <span class="kw">rfl</span> | <span class="kw">rfl</span></span>
+<span id="L232">    · <span class="kw">simp</span> only [<span class="const token" data-verso-hover="128">ex2</span>]; <span class="kw">rw</span> [<span class="const token" data-verso-hover="156">if_pos</span> (<span class="kw">by</span> <span class="kw">omega</span>)]</span>
+<span id="L233">    · <span class="kw">simp</span> only [<span class="const token" data-verso-hover="128">ex2</span>]; <span class="kw">rw</span> [<span class="const token" data-verso-hover="155">if_neg</span> (<span class="const token" data-verso-hover="154">not_lt</span>.<span class="const token" data-verso-hover="89">2</span> (hk <span class="nu">0</span> (<span class="kw">by</span> <span class="kw">decide</span>))), <span class="const token" data-verso-hover="156">if_pos</span> (<span class="kw">by</span> <span class="kw">omega</span>)]</span>
+<span id="L234">  <span class="kw">simp</span> only [<span class="const token" data-verso-hover="133">acOut</span>, <span class="const token" data-verso-hover="129">acRet</span>, hex]</span>
+<span id="L235">  <span class="kw">rw</span> [<span class="const token" data-verso-hover="156">if_pos</span> ⟨hv, <span class="kw">by</span> <span class="kw">omega</span>⟩]</span>
+<span id="L236"></span>
+<span id="L237"><span class="dc">/-- **Lemma 2 of [AACV], validity, is false.** Fault-free (`H = univ`), `n = 4`, `t = 1`, inputs</span></span>
+<span id="L238"><span class="dc">`0, 0, 1, 1`: every process returns `(adopt, 2)`, and `2` is not an input. -/</span></span>
+<span id="L239"><span class="kw">theorem</span> <span class="const token" data-verso-hover="16">lemma2_validity_false</span> :</span>
+<span id="L240">    <span class="kw">let</span> x : <span class="const token" data-verso-hover="122">Fin</span> <span class="nu">4</span> → <span class="const token" data-verso-hover="122">Fin</span> <span class="nu">3</span> := ![<span class="nu">0</span>, <span class="nu">0</span>, <span class="nu">1</span>, <span class="nu">1</span>]</span>
+<span id="L241">    (#(<span class="const token" data-verso-hover="64">univ</span> : <span class="const token" data-verso-hover="45">Finset</span> (<span class="const token" data-verso-hover="122">Fin</span> <span class="nu">4</span>))ᶜ ≤ <span class="nu">1</span> ∧ <span class="nu">3</span> * <span class="nu">1</span> &lt; <span class="const token" data-verso-hover="54">Fintype.card</span> (<span class="const token" data-verso-hover="122">Fin</span> <span class="nu">4</span>)) ∧</span>
+<span id="L242">    ∀ (b1 b2 : <span class="const token" data-verso-hover="122">Fin</span> <span class="nu">4</span> → <span class="const token" data-verso-hover="122">Fin</span> <span class="nu">4</span> → <span class="const token" data-verso-hover="57">Option</span> (<span class="const token" data-verso-hover="122">Fin</span> <span class="nu">3</span>)) (p : <span class="const token" data-verso-hover="122">Fin</span> <span class="nu">4</span>),</span>
+<span id="L243">      <span class="const token" data-verso-hover="133">acOut</span> <span class="nu">1</span> <span class="const token" data-verso-hover="64">univ</span> b1 b2 x p = (<span class="const token" data-verso-hover="24">.</span>adopt, <span class="nu">2</span>) ∧ ∀ q, x q ≠ <span class="nu">2</span> := <span class="kw">by</span></span>
+<span id="L244">  <span class="kw">intro</span> x</span>
+<span id="L245">  <span class="kw">refine</span> ⟨<span class="kw">by</span> <span class="kw">decide</span>, <span class="kw">fun</span> b1 b2 p =&gt; ?_⟩</span>
+<span id="L246">  <span class="kw">have</span> hr1 : ∀ p, <span class="const token" data-verso-hover="130">recv1</span> <span class="const token" data-verso-hover="64">univ</span> b1 x p = <span class="kw">fun</span> q =&gt; <span class="const token" data-verso-hover="58">some</span> (x q) := <span class="kw">fun</span> p =&gt; <span class="kw">by</span></span>
+<span id="L247">    <span class="kw">funext</span> q; <span class="kw">simp</span> [<span class="const token" data-verso-hover="130">recv1</span>]</span>
+<span id="L248">  <span class="kw">have</span> h1 : ∀ p, <span class="const token" data-verso-hover="131">v1</span> <span class="nu">1</span> <span class="const token" data-verso-hover="64">univ</span> b1 x p = <span class="nu">2</span> := <span class="kw">by</span></span>
+<span id="L249">    <span class="kw">intro</span> p; <span class="kw">simp</span> only [<span class="const token" data-verso-hover="131">v1</span>, hr1]; <span class="kw">revert</span> p; <span class="kw">decide</span></span>
+<span id="L250">  <span class="kw">have</span> hr2 : ∀ p, <span class="const token" data-verso-hover="132">recv2</span> <span class="nu">1</span> <span class="const token" data-verso-hover="64">univ</span> b1 b2 x p = <span class="kw">fun</span> _ =&gt; <span class="const token" data-verso-hover="58">some</span> <span class="nu">2</span> := <span class="kw">fun</span> p =&gt; <span class="kw">by</span></span>
+<span id="L251">    <span class="kw">funext</span> q; <span class="kw">simp</span> [<span class="const token" data-verso-hover="132">recv2</span>, h1]</span>
+<span id="L252">  <span class="kw">have</span> h2 : ∀ p, <span class="const token" data-verso-hover="133">acOut</span> <span class="nu">1</span> <span class="const token" data-verso-hover="64">univ</span> b1 b2 x p = (<span class="const token" data-verso-hover="24">.</span>adopt, <span class="nu">2</span>) := <span class="kw">by</span></span>
+<span id="L253">    <span class="kw">intro</span> p; <span class="kw">simp</span> only [<span class="const token" data-verso-hover="133">acOut</span>, hr2, h1]; <span class="kw">revert</span> p; <span class="kw">decide</span></span>
+<span id="L254">  <span class="kw">exact</span> ⟨h2 p, <span class="kw">by</span> <span class="kw">decide</span>⟩</span>
+<span id="L255"></span>
+<span id="L256"><span class="dc">/-- Algorithm 3 with the one-line fix "return `(adopt, own input)` instead of `(adopt, 2)`". -/</span></span>
+<span id="L257"><span class="kw">def</span> <span class="const token" data-verso-hover="157">acOutFix</span> (b1 b2 : P → P → <span class="const token" data-verso-hover="57">Option</span> (<span class="const token" data-verso-hover="122">Fin</span> <span class="nu">3</span>)) (x : P → <span class="const token" data-verso-hover="122">Fin</span> <span class="nu">3</span>) (p : P) : <span class="const token" data-verso-hover="60">Conf</span> × <span class="const token" data-verso-hover="122">Fin</span> <span class="nu">3</span> :=</span>
+<span id="L258">  <span class="kw">if</span> (<span class="const token" data-verso-hover="133">acOut</span> t H b1 b2 x p).<span class="const token" data-verso-hover="81">2</span> = <span class="nu">2</span> <span class="kw">then</span> (<span class="const token" data-verso-hover="24">.</span>adopt, x p) <span class="kw">else</span> <span class="const token" data-verso-hover="133">acOut</span> t H b1 b2 x p</span>
+<span id="L259"></span>
+<span id="L260"><span class="dc">/-- **Lemma 2 of [AACV], repaired.** With binary honest inputs, the fixed Algorithm 3 is an</span></span>
+<span id="L261"><span class="dc">adopt-commit object on the honest processes (validity, coherence, convergence). -/</span></span>
+<span id="L262"><span class="kw">theorem</span> <span class="const token" data-verso-hover="18">lemma2_fixed</span> (hB : <span class="kw">#H</span>ᶜ ≤ t) (hn : <span class="nu">3</span> * t &lt; <span class="const token" data-verso-hover="54">Fintype.card</span> P) (hx : ∀ q ∈ H, x q ≠ <span class="nu">2</span>) :</span>
+<span id="L263">    <span class="const token" data-verso-hover="22">IsAC</span> (↑H : <span class="const token" data-verso-hover="92">Set</span> P) ↑H x (<span class="const token" data-verso-hover="157">acOutFix</span> (t := t) (H := H) b1 b2 x) <span class="kw">where</span></span>
+<span id="L264">  <span class="const token" data-verso-hover="158">sub</span> := <span class="const token" data-verso-hover="123">subset_rfl</span></span>
+<span id="L265">  <span class="const token" data-verso-hover="159">noVac</span> p _ := <span class="kw">by</span></span>
+<span id="L266">    <span class="kw">simp</span> only [<span class="const token" data-verso-hover="157">acOutFix</span>, <span class="const token" data-verso-hover="133">acOut</span>, <span class="const token" data-verso-hover="129">acRet</span>]; <span class="kw">split_ifs</span> &lt;;&gt; <span class="kw">simp</span></span>
+<span id="L267">  <span class="const token" data-verso-hover="160">validity</span> p hp := <span class="kw">by</span></span>
+<span id="L268">    <span class="kw">simp</span> only [<span class="const token" data-verso-hover="157">acOutFix</span>]</span>
+<span id="L269">    <span class="kw">split_ifs</span> <span class="kw">with</span> h</span>
+<span id="L270">    · <span class="kw">exact</span> ⟨p, hp, <span class="const token" data-verso-hover="84">rfl</span>⟩</span>
+<span id="L271">    · <span class="kw">rcases</span> <span class="const token" data-verso-hover="17">lemma2_validity_bot</span> b1 b2 x hB hn hp <span class="kw">with</span> h' | ⟨q, hq, hqv⟩</span>
+<span id="L272">      · <span class="kw">exact</span> <span class="const token" data-verso-hover="83">absurd</span> h' h</span>
+<span id="L273">      · <span class="kw">exact</span> ⟨q, hq, hqv.<span class="const token" data-verso-hover="96">symm</span>⟩</span>
+<span id="L274">  <span class="const token" data-verso-hover="161">convergence</span> v hv p hp := <span class="kw">by</span></span>
+<span id="L275">    <span class="kw">by_cases</span> hH : H.<span class="const token" data-verso-hover="162">Nonempty</span></span>
+<span id="L276">    · <span class="kw">obtain</span> ⟨q, hq⟩ := hH</span>
+<span id="L277">      <span class="kw">have</span> hv2 : v ≠ <span class="nu">2</span> := hv q hq ▸ hx q hq</span>
+<span id="L278">      <span class="kw">have</span> := <span class="const token" data-verso-hover="32">lemma2_convergence</span> b1 b2 x hB hn hv2 hv p</span>
+<span id="L279">      <span class="kw">simp</span> [<span class="const token" data-verso-hover="157">acOutFix</span>, this, hv2]</span>
+<span id="L280">    · <span class="kw">exact</span> <span class="const token" data-verso-hover="83">absurd</span> hp (<span class="kw">by</span> <span class="kw">simp</span> [<span class="const token" data-verso-hover="163">not_nonempty_iff_eq_empty</span>.<span class="const token" data-verso-hover="91">1</span> hH])</span>
+<span id="L281">  <span class="const token" data-verso-hover="164">coherence</span> p hp hc q hq := <span class="kw">by</span></span>
+<span id="L282">    <span class="kw">have</span> hpc : (<span class="const token" data-verso-hover="133">acOut</span> t H b1 b2 x p).<span class="const token" data-verso-hover="80">1</span> = <span class="const token" data-verso-hover="61">.</span>commit ∧ (<span class="const token" data-verso-hover="133">acOut</span> t H b1 b2 x p).<span class="const token" data-verso-hover="81">2</span> ≠ <span class="nu">2</span> := <span class="kw">by</span></span>
+<span id="L283">      <span class="kw">simp</span> only [<span class="const token" data-verso-hover="157">acOutFix</span>] <span class="kw">at</span> hc</span>
+<span id="L284">      <span class="kw">split_ifs</span> <span class="kw">at</span> hc <span class="kw">with</span> h</span>
+<span id="L285">      <span class="kw">exact</span> ⟨hc, h⟩</span>
+<span id="L286">    <span class="kw">have</span> hcoh := <span class="const token" data-verso-hover="31">lemma2_coherence</span> b1 b2 x hB hn hp hpc.<span class="const token" data-verso-hover="95">1</span> hq</span>
+<span id="L287">    <span class="kw">simp</span> only [<span class="const token" data-verso-hover="157">acOutFix</span>, hcoh, <span class="const token" data-verso-hover="155">if_neg</span> hpc.<span class="const token" data-verso-hover="148">2</span>]</span>
+<span id="L288"></span>
+<span id="L289"><span class="dc">/-! ### The composed protocol: Algorithm 2 with Algorithms 3 and 4 -/</span></span>
+<span id="L290"></span>
+<span id="L291"><span class="dc">/-- The Byzantine processes' messages in all rounds: `b1 m p q`, `b2 m p q` (exchanges 1, 2 of</span></span>
+<span id="L292"><span class="dc">round `m`, from `q ∉ H` to `p`) and `bk m p` (what a Byzantine king of round `m` makes `p` adopt). -/</span></span>
+<span id="L293"><span class="kw">structure</span> <span class="const token" data-verso-hover="165">Adv</span> (P : <span class="kw">Type</span>*) <span class="kw">where</span></span>
+<span id="L294">  <span class="dc">/-- Exchange-1 messages of Byzantine processes. -/</span></span>
+<span id="L295">  <span class="const token" data-verso-hover="166">b1</span> : <span class="const token" data-verso-hover="43">ℕ</span> → P → P → <span class="const token" data-verso-hover="57">Option</span> (<span class="const token" data-verso-hover="122">Fin</span> <span class="nu">3</span>)</span>
+<span id="L296">  <span class="dc">/-- Exchange-2 messages of Byzantine processes. -/</span></span>
+<span id="L297">  <span class="const token" data-verso-hover="167">b2</span> : <span class="const token" data-verso-hover="43">ℕ</span> → P → P → <span class="const token" data-verso-hover="57">Option</span> (<span class="const token" data-verso-hover="122">Fin</span> <span class="nu">3</span>)</span>
+<span id="L298">  <span class="dc">/-- The king's message from a Byzantine king. -/</span></span>
+<span id="L299">  <span class="const token" data-verso-hover="168">bk</span> : <span class="const token" data-verso-hover="43">ℕ</span> → P → <span class="const token" data-verso-hover="122">Fin</span> <span class="nu">3</span></span>
+<span id="L300"></span>
+<span id="L301"><span class="kw">variable</span> (t H) (king : <span class="const token" data-verso-hover="43">ℕ</span> → P) (adv : <span class="const token" data-verso-hover="165">Adv</span> P) (inp : P → <span class="const token" data-verso-hover="122">Fin</span> <span class="nu">3</span>)</span>
+<span id="L302"></span>
+<span id="L303"><span class="dc">/-- **Algorithm 4** (Phase-King's conciliator): the value `p` receives from the king of round `m`. An</span></span>
+<span id="L304"><span class="dc">honest king broadcasts `min 1 σ` of its adopt-commit output `σ`; a Byzantine king sends anything. -/</span></span>
+<span id="L305"><span class="kw">def</span> <span class="const token" data-verso-hover="169">kingMsg</span> (m : <span class="const token" data-verso-hover="43">ℕ</span>) (y : P → <span class="const token" data-verso-hover="122">Fin</span> <span class="nu">3</span>) (p : P) : <span class="const token" data-verso-hover="122">Fin</span> <span class="nu">3</span> :=</span>
+<span id="L306">  <span class="kw">if</span> king m ∈ H <span class="kw">then</span> <span class="const token" data-verso-hover="170">min</span> <span class="nu">1</span> (<span class="const token" data-verso-hover="133">acOut</span> t H (adv.<span class="const token" data-verso-hover="166">b1</span> m) (adv.<span class="const token" data-verso-hover="167">b2</span> m) y (king m)).<span class="const token" data-verso-hover="81">2</span> <span class="kw">else</span> adv.<span class="const token" data-verso-hover="168">bk</span> m p</span>
+<span id="L307"></span>
+<span id="L308"><span class="dc">/-- One round of Algorithm 2: on commit keep the committed value, on adopt take the conciliator's. -/</span></span>
+<span id="L309"><span class="kw">def</span> <span class="const token" data-verso-hover="171">step</span> (m : <span class="const token" data-verso-hover="43">ℕ</span>) (y : P → <span class="const token" data-verso-hover="122">Fin</span> <span class="nu">3</span>) (p : P) : <span class="const token" data-verso-hover="122">Fin</span> <span class="nu">3</span> :=</span>
+<span id="L310">  <span class="kw">if</span> (<span class="const token" data-verso-hover="133">acOut</span> t H (adv.<span class="const token" data-verso-hover="166">b1</span> m) (adv.<span class="const token" data-verso-hover="167">b2</span> m) y p).<span class="const token" data-verso-hover="80">1</span> = <span class="const token" data-verso-hover="61">.</span>commit <span class="kw">then</span> (<span class="const token" data-verso-hover="133">acOut</span> t H (adv.<span class="const token" data-verso-hover="166">b1</span> m) (adv.<span class="const token" data-verso-hover="167">b2</span> m) y p).<span class="const token" data-verso-hover="81">2</span></span>
+<span id="L311">  <span class="kw">else</span> <span class="const token" data-verso-hover="169">kingMsg</span> t H king adv m y p</span>
+<span id="L312"></span>
+<span id="L313"><span class="dc">/-- The values entering round `m` (only those of honest processes matter). -/</span></span>
+<span id="L314"><span class="kw">def</span> <span class="const token" data-verso-hover="172">val</span> : <span class="const token" data-verso-hover="43">ℕ</span> → P → <span class="const token" data-verso-hover="122">Fin</span> <span class="nu">3</span></span>
+<span id="L315">  | <span class="nu">0</span> =&gt; inp</span>
+<span id="L316">  | m + <span class="nu">1</span> =&gt; <span class="const token" data-verso-hover="171">step</span> t H king adv m (<span class="const token" data-verso-hover="172">val</span> m)</span>
+<span id="L317"></span>
+<span id="L318"><span class="dc">/-- The adopt-commit outputs of round `m`. -/</span></span>
+<span id="L319"><span class="kw">def</span> <span class="const token" data-verso-hover="173">out</span> (m : <span class="const token" data-verso-hover="43">ℕ</span>) (p : P) : <span class="const token" data-verso-hover="60">Conf</span> × <span class="const token" data-verso-hover="122">Fin</span> <span class="nu">3</span> := <span class="const token" data-verso-hover="133">acOut</span> t H (adv.<span class="const token" data-verso-hover="166">b1</span> m) (adv.<span class="const token" data-verso-hover="167">b2</span> m) (<span class="const token" data-verso-hover="172">val</span> t H king adv inp m) p</span>
+<span id="L320"></span>
+<span id="L321"><span class="kw">variable</span> {t H king adv inp}</span>
+<span id="L322"></span>
+<span id="L323"><span class="kw">lemma</span> <span class="const token" data-verso-hover="174">val_succ</span> (m : <span class="const token" data-verso-hover="43">ℕ</span>) (p : P) : <span class="const token" data-verso-hover="172">val</span> t H king adv inp (m + <span class="nu">1</span>) p =</span>
+<span id="L324">    <span class="kw">if</span> (<span class="const token" data-verso-hover="173">out</span> t H king adv inp m p).<span class="const token" data-verso-hover="80">1</span> = <span class="const token" data-verso-hover="61">.</span>commit <span class="kw">then</span> (<span class="const token" data-verso-hover="173">out</span> t H king adv inp m p).<span class="const token" data-verso-hover="81">2</span></span>
+<span id="L325">    <span class="kw">else</span> <span class="const token" data-verso-hover="169">kingMsg</span> t H king adv m (<span class="const token" data-verso-hover="172">val</span> t H king adv inp m) p := <span class="const token" data-verso-hover="84">rfl</span></span>
+<span id="L326"></span>
+<span id="L327"><span class="kw">lemma</span> <span class="const token" data-verso-hover="175">out_commit_ne_two</span> {m : <span class="const token" data-verso-hover="43">ℕ</span>} {p : P} (h : (<span class="const token" data-verso-hover="173">out</span> t H king adv inp m p).<span class="const token" data-verso-hover="80">1</span> = <span class="const token" data-verso-hover="61">.</span>commit) :</span>
+<span id="L328">    (<span class="const token" data-verso-hover="173">out</span> t H king adv inp m p).<span class="const token" data-verso-hover="81">2</span> ≠ <span class="nu">2</span> := <span class="kw">by</span></span>
+<span id="L329">  <span class="kw">simp</span> only [<span class="const token" data-verso-hover="173">out</span>, <span class="const token" data-verso-hover="133">acOut</span>, <span class="const token" data-verso-hover="129">acRet</span>] <span class="kw">at</span> h ⊢; <span class="kw">split_ifs</span> <span class="kw">at</span> h ⊢ <span class="kw">with</span> h' &lt;;&gt; <span class="kw">simp_all</span></span>
+<span id="L330"></span>
+<span id="L331"><span class="dc">/-- **Lemma 3 of [AACV] (eventual agreement).** After a round with an honest king, all honest processes</span></span>
+<span id="L332"><span class="dc">hold the same value, namely `min 1 σ` for the king's adopt-commit output `σ`. -/</span></span>
+<span id="L333"><span class="kw">theorem</span> <span class="const token" data-verso-hover="6">lemma3_honest_king</span> (hB : <span class="kw">#H</span>ᶜ ≤ t) (hn : <span class="nu">3</span> * t &lt; <span class="const token" data-verso-hover="54">Fintype.card</span> P) {m : <span class="const token" data-verso-hover="43">ℕ</span>} (hk : king m ∈ H) :</span>
+<span id="L334">    ∀ p ∈ H, <span class="const token" data-verso-hover="172">val</span> t H king adv inp (m + <span class="nu">1</span>) p = <span class="const token" data-verso-hover="170">min</span> <span class="nu">1</span> (<span class="const token" data-verso-hover="173">out</span> t H king adv inp m (king m)).<span class="const token" data-verso-hover="81">2</span> := <span class="kw">by</span></span>
+<span id="L335">  <span class="kw">refine</span> <span class="const token" data-verso-hover="37">Cslib.Byzantine.kingPhase_agreement</span> (H := (↑H : <span class="const token" data-verso-hover="92">Set</span> P))</span>
+<span id="L336">    (val := <span class="kw">fun</span> p =&gt; (<span class="const token" data-verso-hover="173">out</span> t H king adv inp m p).<span class="const token" data-verso-hover="81">2</span>)</span>
+<span id="L337">    (strong := <span class="kw">fun</span> p =&gt; (<span class="const token" data-verso-hover="173">out</span> t H king adv inp m p).<span class="const token" data-verso-hover="80">1</span> = <span class="const token" data-verso-hover="61">.</span>commit)</span>
+<span id="L338">    (keep := <span class="const token" data-verso-hover="176">id</span>) (adopt := <span class="kw">fun</span> v =&gt; <span class="const token" data-verso-hover="170">min</span> <span class="nu">1</span> v) ?_ ?_ ?_ ?_</span>
+<span id="L339">  · <span class="kw">intro</span> i hi hc</span>
+<span id="L340">    <span class="kw">exact</span> (<span class="const token" data-verso-hover="31">lemma2_coherence</span> _ _ _ hB hn hi hc hk)</span>
+<span id="L341">  · <span class="kw">intro</span> i _ hc; <span class="kw">simp</span> only [<span class="const token" data-verso-hover="174">val_succ</span>, <span class="const token" data-verso-hover="156">if_pos</span> hc, <span class="const token" data-verso-hover="176">id</span>]</span>
+<span id="L342">  · <span class="kw">intro</span> i _ hc; <span class="kw">simp</span> only [<span class="const token" data-verso-hover="174">val_succ</span>, <span class="const token" data-verso-hover="155">if_neg</span> hc, <span class="const token" data-verso-hover="169">kingMsg</span>, <span class="const token" data-verso-hover="156">if_pos</span> hk]; <span class="kw">rfl</span></span>
+<span id="L343">  · <span class="kw">intro</span> i _ hc</span>
+<span id="L344">    <span class="kw">have</span> := <span class="const token" data-verso-hover="175">out_commit_ne_two</span> hc</span>
+<span id="L345">    <span class="kw">simp</span> only [<span class="const token" data-verso-hover="176">id</span>]</span>
+<span id="L346">    <span class="kw">generalize</span> (<span class="const token" data-verso-hover="173">out</span> t H king adv inp m i).<span class="const token" data-verso-hover="81">2</span> = w <span class="kw">at</span> this ⊢</span>
+<span id="L347">    <span class="kw">revert</span> w; <span class="kw">decide</span></span>
+<span id="L348"></span>
+<span id="L349"><span class="dc">/-- **Persistence.** If all honest processes enter round `m` with `v ∈ {0, 1}`, they commit `v` in</span></span>
+<span id="L350"><span class="dc">round `m` and every later round. -/</span></span>
+<span id="L351"><span class="kw">theorem</span> <span class="const token" data-verso-hover="7">persistence</span> (hB : <span class="kw">#H</span>ᶜ ≤ t) (hn : <span class="nu">3</span> * t &lt; <span class="const token" data-verso-hover="54">Fintype.card</span> P) {m : <span class="const token" data-verso-hover="43">ℕ</span>} {v : <span class="const token" data-verso-hover="122">Fin</span> <span class="nu">3</span>} (hv : v ≠ <span class="nu">2</span>)</span>
+<span id="L352">    (h : ∀ p ∈ H, <span class="const token" data-verso-hover="172">val</span> t H king adv inp m p = v) :</span>
+<span id="L353">    ∀ k, ∀ p ∈ H, <span class="const token" data-verso-hover="172">val</span> t H king adv inp (m + k) p = v ∧ <span class="const token" data-verso-hover="173">out</span> t H king adv inp (m + k) p = (<span class="const token" data-verso-hover="61">.</span>commit, v) := <span class="kw">by</span></span>
+<span id="L354">  <span class="kw">intro</span> k</span>
+<span id="L355">  <span class="kw">induction</span> k <span class="kw">with</span></span>
+<span id="L356">  | <span class="const token" data-verso-hover="177">zero</span> =&gt;</span>
+<span id="L357">    <span class="kw">intro</span> p hp</span>
+<span id="L358">    <span class="kw">exact</span> ⟨h p hp, <span class="const token" data-verso-hover="32">lemma2_convergence</span> _ _ _ hB hn hv h p⟩</span>
+<span id="L359">  | <span class="const token" data-verso-hover="178">succ</span> k ih =&gt;</span>
+<span id="L360">    <span class="kw">have</span> hval : ∀ p ∈ H, <span class="const token" data-verso-hover="172">val</span> t H king adv inp (m + (k + <span class="nu">1</span>)) p = v := <span class="kw">fun</span> p hp =&gt; <span class="kw">by</span></span>
+<span id="L361">      <span class="kw">rw</span> [← <span class="const token" data-verso-hover="179">add_assoc</span>, <span class="const token" data-verso-hover="174">val_succ</span>, (ih p hp).<span class="const token" data-verso-hover="148">2</span>]; <span class="kw">simp</span></span>
+<span id="L362">    <span class="kw">exact</span> <span class="kw">fun</span> p hp =&gt; ⟨hval p hp, <span class="const token" data-verso-hover="32">lemma2_convergence</span> _ _ _ hB hn hv hval p⟩</span>
+<span id="L363"></span>
+<span id="L364"><span class="dc">/-- Among `t + 1` distinct kings one is honest. -/</span></span>
+<span id="L365"><span class="kw">theorem</span> <span class="const token" data-verso-hover="33">exists_honest_king</span> (hB : <span class="kw">#H</span>ᶜ ≤ t) (hinj : <span class="const token" data-verso-hover="180">Set.InjOn</span> king (<span class="const token" data-verso-hover="181">Set.Iic</span> t)) :</span>
+<span id="L366">    ∃ m ≤ t, king m ∈ H := <span class="kw">by</span></span>
+<span id="L367">  <span class="kw">by_contra</span> hne</span>
+<span id="L368">  push <span class="const token" data-verso-hover="182">Not</span> <span class="kw">at</span> hne</span>
+<span id="L369">  <span class="kw">have</span> hsub : (<span class="const token" data-verso-hover="183">range</span> (t + <span class="nu">1</span>)).<span class="const token" data-verso-hover="184">image</span> king ⊆ Hᶜ := <span class="kw">by</span></span>
+<span id="L370">    <span class="kw">intro</span> p hp</span>
+<span id="L371">    <span class="kw">obtain</span> ⟨m, hm, <span class="kw">rfl</span>⟩ := <span class="const token" data-verso-hover="185">mem_image</span>.<span class="const token" data-verso-hover="91">1</span> hp</span>
+<span id="L372">    <span class="kw">simp</span> only [<span class="const token" data-verso-hover="186">mem_compl</span>]; <span class="kw">exact</span> hne m (<span class="kw">by</span> <span class="kw">simpa</span> [<span class="const token" data-verso-hover="187">Nat.lt_succ_iff</span>] <span class="kw">using</span> hm)</span>
+<span id="L373">  <span class="kw">have</span> := <span class="const token" data-verso-hover="67">card_le_card</span> hsub</span>
+<span id="L374">  <span class="kw">rw</span> [<span class="const token" data-verso-hover="188">card_image_of_injOn</span> (<span class="kw">fun</span> a ha b hb h =&gt; hinj (<span class="kw">by</span> <span class="kw">simpa</span> [<span class="const token" data-verso-hover="187">Nat.lt_succ_iff</span>] <span class="kw">using</span> ha)</span>
+<span id="L375">    (<span class="kw">by</span> <span class="kw">simpa</span> [<span class="const token" data-verso-hover="187">Nat.lt_succ_iff</span>] <span class="kw">using</span> hb) h), <span class="const token" data-verso-hover="189">card_range</span>] <span class="kw">at</span> this</span>
+<span id="L376">  <span class="kw">omega</span></span>
+<span id="L377"></span>
+<span id="L378"><span class="dc">/-- After an honest king's round `m₀`, every honest commit (in round `m₀` or later) has the value all</span></span>
+<span id="L379"><span class="dc">honest processes hold after round `m₀`. -/</span></span>
+<span id="L380"><span class="kw">theorem</span> <span class="const token" data-verso-hover="8">commit_after_honest_king</span> (hB : <span class="kw">#H</span>ᶜ ≤ t) (hn : <span class="nu">3</span> * t &lt; <span class="const token" data-verso-hover="54">Fintype.card</span> P) {m₀ m : <span class="const token" data-verso-hover="43">ℕ</span>}</span>
+<span id="L381">    (hk : king m₀ ∈ H) (hm : m₀ ≤ m) {p : P} (hp : p ∈ H)</span>
+<span id="L382">    (hc : (<span class="const token" data-verso-hover="173">out</span> t H king adv inp m p).<span class="const token" data-verso-hover="80">1</span> = <span class="const token" data-verso-hover="61">.</span>commit) :</span>
+<span id="L383">    (<span class="const token" data-verso-hover="173">out</span> t H king adv inp m p).<span class="const token" data-verso-hover="81">2</span> = <span class="const token" data-verso-hover="170">min</span> <span class="nu">1</span> (<span class="const token" data-verso-hover="173">out</span> t H king adv inp m₀ (king m₀)).<span class="const token" data-verso-hover="81">2</span> := <span class="kw">by</span></span>
+<span id="L384">  <span class="kw">set</span> w := <span class="const token" data-verso-hover="170">min</span> <span class="nu">1</span> (<span class="const token" data-verso-hover="173">out</span> t H king adv inp m₀ (king m₀)).<span class="const token" data-verso-hover="81">2</span></span>
+<span id="L385">  <span class="kw">have</span> hw : w ≠ <span class="nu">2</span> := <span class="kw">by</span></span>
+<span id="L386">    <span class="kw">simp</span> only [w]; <span class="kw">generalize</span> (<span class="const token" data-verso-hover="173">out</span> t H king adv inp m₀ (king m₀)).<span class="const token" data-verso-hover="81">2</span> = a; <span class="kw">revert</span> a; <span class="kw">decide</span></span>
+<span id="L387">  <span class="kw">rcases</span> hm.<span class="const token" data-verso-hover="190">eq_or_lt</span> <span class="kw">with</span> <span class="kw">rfl</span> | hlt</span>
+<span id="L388">  · <span class="kw">have</span> hcoh := <span class="const token" data-verso-hover="31">lemma2_coherence</span> _ _ _ hB hn hp hc hk</span>
+<span id="L389">    <span class="kw">have</span> h2 := <span class="const token" data-verso-hover="175">out_commit_ne_two</span> hc</span>
+<span id="L390">    <span class="kw">simp</span> only [w, <span class="const token" data-verso-hover="173">out</span>] <span class="kw">at</span> hcoh h2 ⊢</span>
+<span id="L391">    <span class="kw">rw</span> [hcoh]</span>
+<span id="L392">    <span class="kw">generalize</span> (<span class="const token" data-verso-hover="133">acOut</span> t H (adv.<span class="const token" data-verso-hover="166">b1</span> m₀) (adv.<span class="const token" data-verso-hover="167">b2</span> m₀) (<span class="const token" data-verso-hover="172">val</span> t H king adv inp m₀) p).<span class="const token" data-verso-hover="81">2</span> = a <span class="kw">at</span> h2 ⊢</span>
+<span id="L393">    <span class="kw">revert</span> a; <span class="kw">decide</span></span>
+<span id="L394">  · <span class="kw">obtain</span> ⟨k, <span class="kw">rfl</span>⟩ := <span class="const token" data-verso-hover="191">Nat.exists_eq_add_of_lt</span> hlt</span>
+<span id="L395">    <span class="kw">have</span> := (<span class="const token" data-verso-hover="7">persistence</span> hB hn hw (<span class="const token" data-verso-hover="6">lemma3_honest_king</span> hB hn hk) k p hp).<span class="const token" data-verso-hover="148">2</span></span>
+<span id="L396">    <span class="kw">rw</span> [<span class="kw">show</span> m₀ + k + <span class="nu">1</span> = m₀ + <span class="nu">1</span> + k <span class="kw">by</span> <span class="kw">omega</span>, this]</span>
+<span id="L397"></span>
+<span id="L398"><span class="dc">/-- **Repaired template, agreement.** If the kings of rounds `0, …, t` are distinct and honest</span></span>
+<span id="L399"><span class="dc">processes decide on a commit only from round `t` on (0-based; the paper's round `t + 1`), all honest</span></span>
+<span id="L400"><span class="dc">decisions agree. -/</span></span>
+<span id="L401"><span class="kw">theorem</span> <span class="const token" data-verso-hover="3">repaired_agreement</span> (hB : <span class="kw">#H</span>ᶜ ≤ t) (hn : <span class="nu">3</span> * t &lt; <span class="const token" data-verso-hover="54">Fintype.card</span> P)</span>
+<span id="L402">    (hinj : <span class="const token" data-verso-hover="180">Set.InjOn</span> king (<span class="const token" data-verso-hover="181">Set.Iic</span> t)) {m m' : <span class="const token" data-verso-hover="43">ℕ</span>} (hm : t ≤ m) (hm' : t ≤ m') {p q : P}</span>
+<span id="L403">    (hp : p ∈ H) (hq : q ∈ H) (hpc : (<span class="const token" data-verso-hover="173">out</span> t H king adv inp m p).<span class="const token" data-verso-hover="80">1</span> = <span class="const token" data-verso-hover="61">.</span>commit)</span>
+<span id="L404">    (hqc : (<span class="const token" data-verso-hover="173">out</span> t H king adv inp m' q).<span class="const token" data-verso-hover="80">1</span> = <span class="const token" data-verso-hover="61">.</span>commit) :</span>
+<span id="L405">    (<span class="const token" data-verso-hover="173">out</span> t H king adv inp m p).<span class="const token" data-verso-hover="81">2</span> = (<span class="const token" data-verso-hover="173">out</span> t H king adv inp m' q).<span class="const token" data-verso-hover="81">2</span> := <span class="kw">by</span></span>
+<span id="L406">  <span class="kw">obtain</span> ⟨m₀, hm₀, hk⟩ := <span class="const token" data-verso-hover="33">exists_honest_king</span> hB hinj</span>
+<span id="L407">  <span class="kw">rw</span> [<span class="const token" data-verso-hover="8">commit_after_honest_king</span> hB hn hk (hm₀.<span class="const token" data-verso-hover="104">trans</span> hm) hp hpc,</span>
+<span id="L408">    <span class="const token" data-verso-hover="8">commit_after_honest_king</span> hB hn hk (hm₀.<span class="const token" data-verso-hover="104">trans</span> hm') hq hqc]</span>
+<span id="L409"></span>
+<span id="L410"><span class="dc">/-- **Repaired template, termination.** Every honest process commits in round `t + 1` (0-based). -/</span></span>
+<span id="L411"><span class="kw">theorem</span> <span class="const token" data-verso-hover="4">repaired_termination</span> (hB : <span class="kw">#H</span>ᶜ ≤ t) (hn : <span class="nu">3</span> * t &lt; <span class="const token" data-verso-hover="54">Fintype.card</span> P)</span>
+<span id="L412">    (hinj : <span class="const token" data-verso-hover="180">Set.InjOn</span> king (<span class="const token" data-verso-hover="181">Set.Iic</span> t)) : ∀ p ∈ H, (<span class="const token" data-verso-hover="173">out</span> t H king adv inp (t + <span class="nu">1</span>) p).<span class="const token" data-verso-hover="80">1</span> = <span class="const token" data-verso-hover="61">.</span>commit := <span class="kw">by</span></span>
+<span id="L413">  <span class="kw">obtain</span> ⟨m₀, hm₀, hk⟩ := <span class="const token" data-verso-hover="33">exists_honest_king</span> hB hinj</span>
+<span id="L414">  <span class="kw">have</span> hw : <span class="const token" data-verso-hover="170">min</span> <span class="nu">1</span> (<span class="const token" data-verso-hover="173">out</span> t H king adv inp m₀ (king m₀)).<span class="const token" data-verso-hover="81">2</span> ≠ <span class="nu">2</span> := <span class="kw">by</span></span>
+<span id="L415">    <span class="kw">generalize</span> (<span class="const token" data-verso-hover="173">out</span> t H king adv inp m₀ (king m₀)).<span class="const token" data-verso-hover="81">2</span> = a; <span class="kw">revert</span> a; <span class="kw">decide</span></span>
+<span id="L416">  <span class="kw">have</span> := <span class="const token" data-verso-hover="7">persistence</span> hB hn hw (<span class="const token" data-verso-hover="6">lemma3_honest_king</span> hB hn hk) (t - m₀)</span>
+<span id="L417">  <span class="kw">intro</span> p hp</span>
+<span id="L418">  <span class="kw">rw</span> [<span class="kw">show</span> t + <span class="nu">1</span> = m₀ + <span class="nu">1</span> + (t - m₀) <span class="kw">by</span> <span class="kw">omega</span>, (this p hp).<span class="const token" data-verso-hover="148">2</span>]</span>
+<span id="L419"></span>
+<span id="L420"><span class="dc">/-- **Validity of the composed protocol.** With binary honest inputs, every honest commit value is an</span></span>
+<span id="L421"><span class="dc">honest input. -/</span></span>
+<span id="L422"><span class="kw">theorem</span> <span class="const token" data-verso-hover="5">repaired_validity</span> (hB : <span class="kw">#H</span>ᶜ ≤ t) (hn : <span class="nu">3</span> * t &lt; <span class="const token" data-verso-hover="54">Fintype.card</span> P) (hinp : ∀ q ∈ H, inp q ≠ <span class="nu">2</span>)</span>
+<span id="L423">    {m : <span class="const token" data-verso-hover="43">ℕ</span>} {p : P} (hp : p ∈ H) (hc : (<span class="const token" data-verso-hover="173">out</span> t H king adv inp m p).<span class="const token" data-verso-hover="80">1</span> = <span class="const token" data-verso-hover="61">.</span>commit) :</span>
+<span id="L424">    ∃ q ∈ H, inp q = (<span class="const token" data-verso-hover="173">out</span> t H king adv inp m p).<span class="const token" data-verso-hover="81">2</span> := <span class="kw">by</span></span>
+<span id="L425">  <span class="kw">have</span> h2 := <span class="const token" data-verso-hover="175">out_commit_ne_two</span> hc</span>
+<span id="L426">  <span class="kw">by_cases</span> hu : ∃ v, ∀ q ∈ H, inp q = v</span>
+<span id="L427">  · <span class="kw">obtain</span> ⟨v, hv⟩ := hu</span>
+<span id="L428">    <span class="kw">have</span> hv2 : v ≠ <span class="nu">2</span> := hv p hp ▸ hinp p hp</span>
+<span id="L429">    <span class="kw">have</span> := (<span class="const token" data-verso-hover="7">persistence</span> (king := king) (adv := adv) (m := <span class="nu">0</span>) hB hn hv2 (<span class="kw">by</span> <span class="kw">simpa</span> [<span class="const token" data-verso-hover="172">val</span>] <span class="kw">using</span> hv) m p hp).<span class="const token" data-verso-hover="148">2</span></span>
+<span id="L430">    <span class="kw">rw</span> [<span class="const token" data-verso-hover="192">zero_add</span>] <span class="kw">at</span> this</span>
+<span id="L431">    <span class="kw">exact</span> ⟨p, hp, <span class="kw">by</span> <span class="kw">rw</span> [this, hv p hp]⟩</span>
+<span id="L432">  · push <span class="const token" data-verso-hover="182">Not</span> <span class="kw">at</span> hu</span>
+<span id="L433">    <span class="kw">obtain</span> ⟨q₀, hq₀, h0⟩ := hu <span class="nu">0</span></span>
+<span id="L434">    <span class="kw">obtain</span> ⟨q₁, hq₁, h1⟩ := hu <span class="nu">1</span></span>
+<span id="L435">    <span class="kw">have</span> hq₀' : inp q₀ = <span class="nu">1</span> := <span class="kw">by</span> <span class="kw">have</span> := hinp q₀ hq₀; <span class="kw">omega</span></span>
+<span id="L436">    <span class="kw">have</span> hq₁' : inp q₁ = <span class="nu">0</span> := <span class="kw">by</span> <span class="kw">have</span> := hinp q₁ hq₁; <span class="kw">omega</span></span>
+<span id="L437">    <span class="kw">generalize</span> (<span class="const token" data-verso-hover="173">out</span> t H king adv inp m p).<span class="const token" data-verso-hover="81">2</span> = w <span class="kw">at</span> h2 ⊢</span>
+<span id="L438">    <span class="kw">have</span> : w = <span class="nu">0</span> ∨ w = <span class="nu">1</span> := <span class="kw">by</span> <span class="kw">omega</span></span>
+<span id="L439">    <span class="kw">rcases</span> this <span class="kw">with</span> <span class="kw">rfl</span> | <span class="kw">rfl</span></span>
+<span id="L440">    · <span class="kw">exact</span> ⟨q₁, hq₁, hq₁'⟩</span>
+<span id="L441">    · <span class="kw">exact</span> ⟨q₀, hq₀, hq₀'⟩</span>
+<span id="L442"></span>
+<span id="L443"><span class="dc">/-! ### Counterexample: Algorithm 2 with Algorithms 3–4 violates agreement -/</span></span>
+<span id="L444"></span>
+<span id="L445"><span class="dc">/-- The honest processes `1, 2, 3` of the counterexample (process `0` is Byzantine). -/</span></span>
+<span id="L446"><span class="kw">def</span> <span class="const token" data-verso-hover="193">cxH</span> : <span class="const token" data-verso-hover="45">Finset</span> (<span class="const token" data-verso-hover="122">Fin</span> <span class="nu">4</span>) := {<span class="nu">1</span>, <span class="nu">2</span>, <span class="nu">3</span>}</span>
+<span id="L447"></span>
+<span id="L448"><span class="dc">/-- The king of round `m` is process `m` (mod 4), as in the paper (round `m` has king `m`). -/</span></span>
+<span id="L449"><span class="kw">def</span> <span class="const token" data-verso-hover="194">cxKing</span> (m : <span class="const token" data-verso-hover="43">ℕ</span>) : <span class="const token" data-verso-hover="122">Fin</span> <span class="nu">4</span> := <span class="const token" data-verso-hover="195">Fin.ofNat</span> <span class="nu">4</span> m</span>
+<span id="L450"></span>
+<span id="L451"><span class="dc">/-- The Byzantine process `0` (king of round 0). Round 0, exchange 1: it sends `1` to process `3` and</span></span>
+<span id="L452"><span class="dc">`0` to the others; exchange 2: `0` to process `1`, `2` to the others; as king it sends `1`. Round 1:</span></span>
+<span id="L453"><span class="dc">it sends `1` everywhere. -/</span></span>
+<span id="L454"><span class="kw">def</span> <span class="const token" data-verso-hover="196">cxAdv</span> : <span class="const token" data-verso-hover="165">Adv</span> (<span class="const token" data-verso-hover="122">Fin</span> <span class="nu">4</span>) <span class="kw">where</span></span>
+<span id="L455">  <span class="const token" data-verso-hover="166">b1</span> m p _ := <span class="kw">if</span> m = <span class="nu">0</span> <span class="kw">then</span> (<span class="kw">if</span> p = <span class="nu">3</span> <span class="kw">then</span> <span class="const token" data-verso-hover="58">some</span> <span class="nu">1</span> <span class="kw">else</span> <span class="const token" data-verso-hover="58">some</span> <span class="nu">0</span>) <span class="kw">else</span> <span class="const token" data-verso-hover="58">some</span> <span class="nu">1</span></span>
+<span id="L456">  <span class="const token" data-verso-hover="167">b2</span> m p _ := <span class="kw">if</span> m = <span class="nu">0</span> <span class="kw">then</span> (<span class="kw">if</span> p = <span class="nu">1</span> <span class="kw">then</span> <span class="const token" data-verso-hover="58">some</span> <span class="nu">0</span> <span class="kw">else</span> <span class="const token" data-verso-hover="58">some</span> <span class="nu">2</span>) <span class="kw">else</span> <span class="const token" data-verso-hover="58">some</span> <span class="nu">1</span></span>
+<span id="L457">  <span class="const token" data-verso-hover="168">bk</span> _ _ := <span class="nu">1</span></span>
+<span id="L458"></span>
+<span id="L459"><span class="dc">/-- Honest inputs: process `1` and `2` start with `0`, process `3` with `1`. -/</span></span>
+<span id="L460"><span class="kw">def</span> <span class="const token" data-verso-hover="197">cxInp</span> : <span class="const token" data-verso-hover="122">Fin</span> <span class="nu">4</span> → <span class="const token" data-verso-hover="122">Fin</span> <span class="nu">3</span> := ![<span class="nu">0</span>, <span class="nu">0</span>, <span class="nu">0</span>, <span class="nu">1</span>]</span>
+<span id="L461"></span>
+<span id="L462"><span class="dc">/-- **The Phase-King decomposition violates agreement** (`n = 4`, `t = 1`). In round 0 (king: the</span></span>
+<span id="L463"><span class="dc">Byzantine process 0) honest process 1 commits `0` and decides; honest processes 2 and 3 adopt `0`</span></span>
+<span id="L464"><span class="dc">but take the king's `1` (so the conciliator returns a value nobody adopted: Algorithm 4 is not</span></span>
+<span id="L465"><span class="dc">valid, contrary to Lemma 3). In round 1 processes 2 and 3 commit and decide `1`. -/</span></span>
+<span id="L466"><span class="kw">theorem</span> <span class="const token" data-verso-hover="0">template_disagreement</span> :</span>
+<span id="L467">    (<span class="kw">#</span><span class="const token" data-verso-hover="193">cxH</span>ᶜ ≤ <span class="nu">1</span> ∧ <span class="nu">3</span> * <span class="nu">1</span> &lt; <span class="const token" data-verso-hover="54">Fintype.card</span> (<span class="const token" data-verso-hover="122">Fin</span> <span class="nu">4</span>) ∧ <span class="const token" data-verso-hover="180">Set.InjOn</span> <span class="const token" data-verso-hover="194">cxKing</span> (<span class="const token" data-verso-hover="181">Set.Iic</span> <span class="nu">1</span>) ∧ ∀ q ∈ <span class="const token" data-verso-hover="193">cxH</span>, <span class="const token" data-verso-hover="197">cxInp</span> q ≠ <span class="nu">2</span>) ∧</span>
+<span id="L468">    <span class="const token" data-verso-hover="173">out</span> <span class="nu">1</span> <span class="const token" data-verso-hover="193">cxH</span> <span class="const token" data-verso-hover="194">cxKing</span> <span class="const token" data-verso-hover="196">cxAdv</span> <span class="const token" data-verso-hover="197">cxInp</span> <span class="nu">0</span> <span class="nu">1</span> = (<span class="const token" data-verso-hover="61">.</span>commit, <span class="nu">0</span>) ∧</span>
+<span id="L469">    <span class="const token" data-verso-hover="173">out</span> <span class="nu">1</span> <span class="const token" data-verso-hover="193">cxH</span> <span class="const token" data-verso-hover="194">cxKing</span> <span class="const token" data-verso-hover="196">cxAdv</span> <span class="const token" data-verso-hover="197">cxInp</span> <span class="nu">0</span> <span class="nu">2</span> = (<span class="const token" data-verso-hover="24">.</span>adopt, <span class="nu">0</span>) ∧</span>
+<span id="L470">    <span class="const token" data-verso-hover="173">out</span> <span class="nu">1</span> <span class="const token" data-verso-hover="193">cxH</span> <span class="const token" data-verso-hover="194">cxKing</span> <span class="const token" data-verso-hover="196">cxAdv</span> <span class="const token" data-verso-hover="197">cxInp</span> <span class="nu">0</span> <span class="nu">3</span> = (<span class="const token" data-verso-hover="24">.</span>adopt, <span class="nu">0</span>) ∧</span>
+<span id="L471">    <span class="const token" data-verso-hover="169">kingMsg</span> <span class="nu">1</span> <span class="const token" data-verso-hover="193">cxH</span> <span class="const token" data-verso-hover="194">cxKing</span> <span class="const token" data-verso-hover="196">cxAdv</span> <span class="nu">0</span> <span class="const token" data-verso-hover="197">cxInp</span> <span class="nu">2</span> = <span class="nu">1</span> ∧</span>
+<span id="L472">    <span class="const token" data-verso-hover="173">out</span> <span class="nu">1</span> <span class="const token" data-verso-hover="193">cxH</span> <span class="const token" data-verso-hover="194">cxKing</span> <span class="const token" data-verso-hover="196">cxAdv</span> <span class="const token" data-verso-hover="197">cxInp</span> <span class="nu">1</span> <span class="nu">2</span> = (<span class="const token" data-verso-hover="61">.</span>commit, <span class="nu">1</span>) ∧</span>
+<span id="L473">    <span class="const token" data-verso-hover="173">out</span> <span class="nu">1</span> <span class="const token" data-verso-hover="193">cxH</span> <span class="const token" data-verso-hover="194">cxKing</span> <span class="const token" data-verso-hover="196">cxAdv</span> <span class="const token" data-verso-hover="197">cxInp</span> <span class="nu">1</span> <span class="nu">3</span> = (<span class="const token" data-verso-hover="61">.</span>commit, <span class="nu">1</span>) := <span class="kw">by</span></span>
+<span id="L474">  <span class="kw">refine</span> ⟨⟨<span class="kw">by</span> <span class="kw">decide</span>, <span class="kw">by</span> <span class="kw">decide</span>, ?_, <span class="kw">by</span> <span class="kw">decide</span>⟩, ?_⟩</span>
+<span id="L475">  · <span class="kw">intro</span> a ha b hb h</span>
+<span id="L476">    <span class="kw">simp</span> only [<span class="const token" data-verso-hover="198">Set.mem_Iic</span>] <span class="kw">at</span> ha hb</span>
+<span id="L477">    <span class="kw">interval_cases</span> a &lt;;&gt; <span class="kw">interval_cases</span> b &lt;;&gt; <span class="kw">first</span> | <span class="kw">rfl</span> | (<span class="kw">revert</span> h; <span class="kw">decide</span>)</span>
+<span id="L478">  · <span class="kw">refine</span> ⟨<span class="kw">by</span> <span class="kw">decide</span>, <span class="kw">by</span> <span class="kw">decide</span>, <span class="kw">by</span> <span class="kw">decide</span>, <span class="kw">by</span> <span class="kw">decide</span>, <span class="kw">by</span> <span class="kw">decide</span>, <span class="kw">by</span> <span class="kw">decide</span>⟩</span>
+<span id="L479"></span>
+<span id="L480"><span class="kw">end</span> Podc.ObjectOrientedConsensus.PhaseKing</span>
+<span id="L481"></span>
+</code></div>
+        <script>
+          window.versoHoversUrl = "PODC2017/ObjectOrientedConsensus/-hovers.json";</script>
+        <script src="static/lean/popper.js"></script>
+        <script src="static/lean/tippy.js"></script>
+        <script src="static/lean/marked.js"></script>
+        <script src="static/lean/highlighting.js"></script>
+        <script src="static/lean/lean.js"></script>
+        </article></main><footer class="site-footer"><div class="wrap">
+        Machine-checked formalizations of PODC papers in Lean 4. Generated with <a href="https://github.com/leanprover/verso">Verso</a> from the README files of <a href="https://github.com/vasnesterov/formal_podc">vasnesterov/formal_podc</a>.</div>
+      </footer></body>
+  </html>
+

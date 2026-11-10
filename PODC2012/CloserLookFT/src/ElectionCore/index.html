@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="light dark">
+    <link rel="icon" href="data:,">
+    <title>CloserLookFT: ElectionCore.lean · Formal PODC</title><base href="../../../.././"><link rel="stylesheet" href="static/lean/verso-vars.css">
+    <link rel="stylesheet" href="static/lean/highlighting.css">
+    <link rel="stylesheet" href="static/lean/tippy-border.css">
+    <link rel="stylesheet" href="static/style.css">
+    <script defer="defer" src="static/site.js"></script>
+    </head>
+  <body>
+    <header class="site-header">
+      <div class="wrap">
+        <a class="brand" href=".">Formal PODC</a><nav class="top">
+          <a href=".">Search</a><a href="about/">About</a><a href="https://github.com/vasnesterov/formal_podc">GitHub</a></nav>
+        </div>
+      </header>
+    <main class="wrap"><article><nav class="breadcrumbs" aria-label="Breadcrumb">
+          <a href=".">Search</a><span class="sep">›</span><a href="PODC2012/">PODC 2012</a><span class="sep">›</span><a href="PODC2012/CloserLookFT/">CloserLookFT</a><span class="sep">›</span><a href="PODC2012/CloserLookFT/src/">Lean source</a><span class="sep">›</span><span aria-current="page">ElectionCore</span></nav>
+        <h1>
+          <code>ElectionCore.lean</code></h1>
+        <div class="paper-links">
+          <p>
+            Source of <a href="PODC2012/CloserLookFT/">A Closer Look at Fault Tolerance — PODC 2012</a> · <a href="https://github.com/vasnesterov/formal_podc/blob/main/Papers/PODC2012/CloserLookFT/ElectionCore.lean">GitHub</a> · hover over a name for its type and documentation</p>
+          </div>
+        <div class="lean-code lean-src">
+          <code class="hl lean block" data-lean-context="ElectionCore"><span id="L1"><span class="kw">import</span> Mathlib.Algebra.Order.BigOperators.Group.Finset</span>
+<span id="L2"><span class="kw">import</span> Mathlib.Algebra.BigOperators.Intervals</span>
+<span id="L3"><span class="kw">import</span> Mathlib.Data.Fintype.Card</span>
+<span id="L4"><span class="kw">import</span> Mathlib.Order.Fin.Basic</span>
+<span id="L5"><span class="kw">import</span> Mathlib.Tactic.Linarith</span>
+<span id="L6"><span class="kw">import</span> Mathlib.Tactic.Positivity</span>
+<span id="L7"><span class="kw">import</span> Mathlib.Tactic.Ring</span>
+<span id="L8"></span>
+<span id="L9"><span class="dc">/-!</span></span>
+<span id="L10"><span class="dc"># The almost-wait-free symmetric election algorithm (Section 2.1), as a transition system</span></span>
+<span id="L11"></span>
+<span id="L12"><span class="dc">Taubenfeld, *A closer look at fault tolerance*, PODC 2012 (full version of 22 Feb 2017),</span></span>
+<span id="L13"><span class="dc">Section 2.1. Process `p`'s program:</span></span>
+<span id="L14"></span>
+<span id="L15"><span class="dc">```</span></span>
+<span id="L16"><span class="dc">function election (e: object name) return:value in {0, 1};</span></span>
+<span id="L17"><span class="dc">1  e.turn := p;</span></span>
+<span id="L18"><span class="dc">2  for level := 1 to ⌈log n⌉ do</span></span>
+<span id="L19"><span class="dc">3    repeat</span></span>
+<span id="L20"><span class="dc">4      if e.done = 1 then return(0) fi;</span></span>
+<span id="L21"><span class="dc">5      if e.turn ≠ p then</span></span>
+<span id="L22"><span class="dc">6        for j := 1 to level − 1 do if e.V[j] = p then e.V[j] := 0 fi od;</span></span>
+<span id="L23"><span class="dc">7        return(0) fi</span></span>
+<span id="L24"><span class="dc">8    until e.V[level] = 0;</span></span>
+<span id="L25"><span class="dc">9    e.V[level] := p;</span></span>
+<span id="L26"><span class="dc">10   if e.turn ≠ p then</span></span>
+<span id="L27"><span class="dc">11     for j := 1 to level do if e.V[j] = p then e.V[j] := 0 fi od;</span></span>
+<span id="L28"><span class="dc">12     return(0) fi</span></span>
+<span id="L29"><span class="dc">13 od;</span></span>
+<span id="L30"><span class="dc">14 e.done := 1; return(1).</span></span>
+<span id="L31"><span class="dc">```</span></span>
+<span id="L32"></span>
+<span id="L33"><span class="dc">This file models one election object as a transition system over the shared registers</span></span>
+<span id="L34"><span class="dc">`turn`, `done`, `V[·]` (`EMem`) and the local states of the processes (`ELoc`); every step of a</span></span>
+<span id="L35"><span class="dc">process accesses exactly one register atomically. The CSLib `Impl` wrapper is in</span></span>
+<span id="L36"><span class="dc">`Election.lean`.</span></span>
+<span id="L37"></span>
+<span id="L38"><span class="dc">Modelling choices:</span></span>
+<span id="L39"><span class="dc">* levels are `0`-based: the paper's level `k` is our level `k - 1`, `V[k]` is `V (k - 1)`; the</span></span>
+<span id="L40"><span class="dc">  number of levels is a parameter `L` (the paper takes `L = ⌈log₂ n⌉`);</span></span>
+<span id="L41"><span class="dc">* the value `0` of a register is `none`, identifiers are elements of an arbitrary type `P` that</span></span>
+<span id="L42"><span class="dc">  are only compared for equality (the algorithm is *symmetric*);</span></span>
+<span id="L43"><span class="dc">* a `for` loop that clears `V[0..b-1]` is the sequence of states `clr k b j` (read `V[j]`) and</span></span>
+<span id="L44"><span class="dc">  `clw k b j` (write `V[j] := 0`), the `return(0)` after it is folded into the last step;</span></span>
+<span id="L45"><span class="dc">* the returned states `out r a w c` record ghost information about the process's past</span></span>
+<span id="L46"><span class="dc">  (`a` levels passed, registers `V[0..w-1]` written, registers below `c` cleared); the algorithm</span></span>
+<span id="L47"><span class="dc">  never reads it.</span></span>
+<span id="L48"><span class="dc">-/</span></span>
+<span id="L49"></span>
+<span id="L50"><span class="kw">namespace</span> Podc.CloserLookFT</span>
+<span id="L51"></span>
+<span id="L52"><span class="dc">/-- The shared registers of one election object: `turn`, `done` and the array `V`</span></span>
+<span id="L53"><span class="dc">(`none` = the value `0`). -/</span></span>
+<span id="L54"><span class="kw">structure</span> <span class="const token" data-verso-hover="323">EMem</span> (P : <span class="kw">Type</span>) <span class="kw">where</span></span>
+<span id="L55">  <span class="dc">/-- `e.turn` -/</span></span>
+<span id="L56">  <span class="const token" data-verso-hover="324">turn</span> : <span class="const token" data-verso-hover="39">Option</span> P</span>
+<span id="L57">  <span class="dc">/-- `e.done` -/</span></span>
+<span id="L58">  <span class="const token" data-verso-hover="325">done</span> : <span class="const token" data-verso-hover="265">Bool</span></span>
+<span id="L59">  <span class="dc">/-- `e.V[k + 1]` is `V k` -/</span></span>
+<span id="L60">  <span class="const token" data-verso-hover="326">V</span> : <span class="const token" data-verso-hover="180">ℕ</span> → <span class="const token" data-verso-hover="39">Option</span> P</span>
+<span id="L61"></span>
+<span id="L62"><span class="dc">/-- The initial memory: all registers `0`. -/</span></span>
+<span id="L63"><span class="kw">def</span> <span class="const token" data-verso-hover="294">EMem.init</span> (P : <span class="kw">Type</span>) : <span class="const token" data-verso-hover="323">EMem</span> P := ⟨<span class="const token" data-verso-hover="11">none</span>, <span class="const token" data-verso-hover="266">false</span>, <span class="kw">fun</span> _ =&gt; <span class="const token" data-verso-hover="11">none</span>⟩</span>
+<span id="L64"></span>
+<span id="L65"><span class="dc">/-- Local states (program counters) of a process. Levels are `0`-based. -/</span></span>
+<span id="L66"><span class="kw">inductive</span> <span class="const token" data-verso-hover="269">ELoc</span> <span class="kw">where</span></span>
+<span id="L67">  <span class="dc">/-- not invoked yet -/</span></span>
+<span id="L68">  | <span class="const token" data-verso-hover="271">idle</span></span>
+<span id="L69">  <span class="dc">/-- line 1: about to write `turn := p` -/</span></span>
+<span id="L70">  | <span class="const token" data-verso-hover="272">start</span></span>
+<span id="L71">  <span class="dc">/-- line 4 at level `k`: about to read `done` -/</span></span>
+<span id="L72">  | <span class="const token" data-verso-hover="273">rdone</span> (k : <span class="const token" data-verso-hover="180">ℕ</span>)</span>
+<span id="L73">  <span class="dc">/-- line 5 at level `k`: about to read `turn` -/</span></span>
+<span id="L74">  | <span class="const token" data-verso-hover="276">rturn</span> (k : <span class="const token" data-verso-hover="180">ℕ</span>)</span>
+<span id="L75">  <span class="dc">/-- line 8 at level `k`: about to read `V[k]` -/</span></span>
+<span id="L76">  | <span class="const token" data-verso-hover="277">rv</span> (k : <span class="const token" data-verso-hover="180">ℕ</span>)</span>
+<span id="L77">  <span class="dc">/-- line 9 at level `k`: about to write `V[k] := p` -/</span></span>
+<span id="L78">  | <span class="const token" data-verso-hover="279">wv</span> (k : <span class="const token" data-verso-hover="180">ℕ</span>)</span>
+<span id="L79">  <span class="dc">/-- line 10 at level `k`: about to read `turn` -/</span></span>
+<span id="L80">  | <span class="const token" data-verso-hover="280">rturn2</span> (k : <span class="const token" data-verso-hover="180">ℕ</span>)</span>
+<span id="L81">  <span class="dc">/-- lines 6/11 (level `k`): clearing `V[0..b-1]`, about to read `V[j]` -/</span></span>
+<span id="L82">  | <span class="const token" data-verso-hover="281">clr</span> (k b j : <span class="const token" data-verso-hover="180">ℕ</span>)</span>
+<span id="L83">  <span class="dc">/-- lines 6/11 (level `k`): clearing `V[0..b-1]`, about to write `V[j] := 0` -/</span></span>
+<span id="L84">  | <span class="const token" data-verso-hover="282">clw</span> (k b j : <span class="const token" data-verso-hover="180">ℕ</span>)</span>
+<span id="L85">  <span class="dc">/-- line 14: about to write `done := 1` -/</span></span>
+<span id="L86">  | <span class="const token" data-verso-hover="274">wdone</span></span>
+<span id="L87">  <span class="dc">/-- returned `r` (ghost: passed `a` levels, wrote `V[0..w-1]`, cleared below `c`) -/</span></span>
+<span id="L88">  | <span class="const token" data-verso-hover="275">out</span> (r : <span class="const token" data-verso-hover="265">Bool</span>) (a w c : <span class="const token" data-verso-hover="180">ℕ</span>)</span>
+<span id="L89">  <span class="kw">deriving</span> <span class="const token" data-verso-hover="32">DecidableEq</span></span>
+<span id="L90"></span>
+<span id="L91"><span class="kw">variable</span> {P : <span class="kw">Type</span>} [<span class="const token" data-verso-hover="32">DecidableEq</span> P]</span>
+<span id="L92"></span>
+<span id="L93"><span class="dc">/-- The state after finishing index `j - 1` of the clearing loop for `V[0..b-1]` at level `k`. -/</span></span>
+<span id="L94"><span class="kw">def</span> <span class="const token" data-verso-hover="278">nextClr</span> (k b j : <span class="const token" data-verso-hover="180">ℕ</span>) : <span class="const token" data-verso-hover="269">ELoc</span> := <span class="kw">if</span> j &lt; b <span class="kw">then</span> <span class="const token" data-verso-hover="281">.</span>clr k b j <span class="kw">else</span> <span class="const token" data-verso-hover="275">.</span>out <span class="const token" data-verso-hover="266">false</span> k b b</span>
+<span id="L95"></span>
+<span id="L96"><span class="dc">/-- One atomic step of process `p` (with `L` levels) in local state `l` and memory `m`. -/</span></span>
+<span id="L97"><span class="kw">def</span> <span class="const token" data-verso-hover="302">estep</span> (L : <span class="const token" data-verso-hover="180">ℕ</span>) (p : P) (m : <span class="const token" data-verso-hover="323">EMem</span> P) : <span class="const token" data-verso-hover="269">ELoc</span> → <span class="const token" data-verso-hover="323">EMem</span> P × <span class="const token" data-verso-hover="269">ELoc</span></span>
+<span id="L98">  | <span class="const token" data-verso-hover="271">.</span>idle =&gt; (m, <span class="const token" data-verso-hover="271">.</span>idle)</span>
+<span id="L99">  | <span class="const token" data-verso-hover="272">.</span>start =&gt; ({ m <span class="kw">with</span> <span class="const token" data-verso-hover="324">turn</span> := <span class="const token" data-verso-hover="44">some</span> p }, <span class="kw">if</span> <span class="nu">0</span> &lt; L <span class="kw">then</span> <span class="const token" data-verso-hover="273">.</span>rdone <span class="nu">0</span> <span class="kw">else</span> <span class="const token" data-verso-hover="274">.</span>wdone)</span>
+<span id="L100">  | <span class="const token" data-verso-hover="273">.</span>rdone k =&gt; (m, <span class="kw">if</span> m.<span class="const token" data-verso-hover="325">done</span> <span class="kw">then</span> <span class="const token" data-verso-hover="275">.</span>out <span class="const token" data-verso-hover="266">false</span> k k <span class="nu">0</span> <span class="kw">else</span> <span class="const token" data-verso-hover="276">.</span>rturn k)</span>
+<span id="L101">  | <span class="const token" data-verso-hover="276">.</span>rturn k =&gt; (m, <span class="kw">if</span> m.<span class="const token" data-verso-hover="324">turn</span> = <span class="const token" data-verso-hover="44">some</span> p <span class="kw">then</span> <span class="const token" data-verso-hover="277">.</span>rv k <span class="kw">else</span> <span class="const token" data-verso-hover="278">nextClr</span> k k <span class="nu">0</span>)</span>
+<span id="L102">  | <span class="const token" data-verso-hover="277">.</span>rv k =&gt; (m, <span class="kw">if</span> m.<span class="const token" data-verso-hover="326">V</span> k = <span class="const token" data-verso-hover="11">none</span> <span class="kw">then</span> <span class="const token" data-verso-hover="279">.</span>wv k <span class="kw">else</span> <span class="const token" data-verso-hover="273">.</span>rdone k)</span>
+<span id="L103">  | <span class="const token" data-verso-hover="279">.</span>wv k =&gt; ({ m <span class="kw">with</span> <span class="const token" data-verso-hover="326">V</span> := <span class="const token" data-verso-hover="75">Function.update</span> m.<span class="const token" data-verso-hover="326">V</span> k (<span class="const token" data-verso-hover="44">some</span> p) }, <span class="const token" data-verso-hover="280">.</span>rturn2 k)</span>
+<span id="L104">  | <span class="const token" data-verso-hover="280">.</span>rturn2 k =&gt; (m, <span class="kw">if</span> m.<span class="const token" data-verso-hover="324">turn</span> = <span class="const token" data-verso-hover="44">some</span> p <span class="kw">then</span> (<span class="kw">if</span> k + <span class="nu">1</span> &lt; L <span class="kw">then</span> <span class="const token" data-verso-hover="273">.</span>rdone (k + <span class="nu">1</span>) <span class="kw">else</span> <span class="const token" data-verso-hover="274">.</span>wdone)</span>
+<span id="L105">      <span class="kw">else</span> <span class="const token" data-verso-hover="278">nextClr</span> k (k + <span class="nu">1</span>) <span class="nu">0</span>)</span>
+<span id="L106">  | <span class="const token" data-verso-hover="281">.</span>clr k b j =&gt; (m, <span class="kw">if</span> m.<span class="const token" data-verso-hover="326">V</span> j = <span class="const token" data-verso-hover="44">some</span> p <span class="kw">then</span> <span class="const token" data-verso-hover="282">.</span>clw k b j <span class="kw">else</span> <span class="const token" data-verso-hover="278">nextClr</span> k b (j + <span class="nu">1</span>))</span>
+<span id="L107">  | <span class="const token" data-verso-hover="282">.</span>clw k b j =&gt; ({ m <span class="kw">with</span> <span class="const token" data-verso-hover="326">V</span> := <span class="const token" data-verso-hover="75">Function.update</span> m.<span class="const token" data-verso-hover="326">V</span> j <span class="const token" data-verso-hover="11">none</span> }, <span class="const token" data-verso-hover="278">nextClr</span> k b (j + <span class="nu">1</span>))</span>
+<span id="L108">  | <span class="const token" data-verso-hover="274">.</span>wdone =&gt; ({ m <span class="kw">with</span> <span class="const token" data-verso-hover="325">done</span> := <span class="const token" data-verso-hover="283">true</span> }, <span class="const token" data-verso-hover="275">.</span>out <span class="const token" data-verso-hover="283">true</span> L L <span class="nu">0</span>)</span>
+<span id="L109">  | <span class="const token" data-verso-hover="275">.</span>out r a w c =&gt; (m, <span class="const token" data-verso-hover="275">.</span>out r a w c)</span>
+<span id="L110"></span>
+<span id="L111"><span class="dc">/-- A global state of one election object: memory and local states. -/</span></span>
+<span id="L112"><span class="kw">structure</span> <span class="const token" data-verso-hover="291">ESys</span> (P : <span class="kw">Type</span>) <span class="kw">where</span></span>
+<span id="L113">  <span class="dc">/-- the shared registers -/</span></span>
+<span id="L114">  <span class="const token" data-verso-hover="327">m</span> : <span class="const token" data-verso-hover="323">EMem</span> P</span>
+<span id="L115">  <span class="dc">/-- the local states -/</span></span>
+<span id="L116">  <span class="const token" data-verso-hover="312">loc</span> : P → <span class="const token" data-verso-hover="269">ELoc</span></span>
+<span id="L117"></span>
+<span id="L118"><span class="dc">/-- The initial state: all registers `0`, all processes idle. -/</span></span>
+<span id="L119"><span class="kw">def</span> <span class="const token" data-verso-hover="293">ESys.init</span> (P : <span class="kw">Type</span>) : <span class="const token" data-verso-hover="291">ESys</span> P := ⟨<span class="const token" data-verso-hover="294">EMem.init</span> P, <span class="kw">fun</span> _ =&gt; <span class="const token" data-verso-hover="271">.</span>idle⟩</span>
+<span id="L120"></span>
+<span id="L121"><span class="dc">/-- Process `p` takes one step. -/</span></span>
+<span id="L122"><span class="kw">def</span> <span class="const token" data-verso-hover="301">ESys.step</span> (L : <span class="const token" data-verso-hover="180">ℕ</span>) (p : P) (s : <span class="const token" data-verso-hover="291">ESys</span> P) : <span class="const token" data-verso-hover="291">ESys</span> P :=</span>
+<span id="L123">  ⟨(<span class="const token" data-verso-hover="302">estep</span> L p s.<span class="const token" data-verso-hover="327">m</span> (s.<span class="const token" data-verso-hover="312">loc</span> p)).<span class="const token" data-verso-hover="42">1</span>, <span class="const token" data-verso-hover="75">Function.update</span> s.<span class="const token" data-verso-hover="312">loc</span> p (<span class="const token" data-verso-hover="302">estep</span> L p s.<span class="const token" data-verso-hover="327">m</span> (s.<span class="const token" data-verso-hover="312">loc</span> p)).<span class="const token" data-verso-hover="43">2</span>⟩</span>
+<span id="L124"></span>
+<span id="L125"><span class="dc">/-- Process `p` invokes `election` (only effective if `p` is idle). -/</span></span>
+<span id="L126"><span class="kw">def</span> <span class="const token" data-verso-hover="297">ESys.invoke</span> (p : P) (s : <span class="const token" data-verso-hover="291">ESys</span> P) : <span class="const token" data-verso-hover="291">ESys</span> P :=</span>
+<span id="L127">  <span class="kw">if</span> s.<span class="const token" data-verso-hover="312">loc</span> p = <span class="const token" data-verso-hover="271">.</span>idle <span class="kw">then</span> ⟨s.<span class="const token" data-verso-hover="327">m</span>, <span class="const token" data-verso-hover="75">Function.update</span> s.<span class="const token" data-verso-hover="312">loc</span> p <span class="const token" data-verso-hover="272">.</span>start⟩ <span class="kw">else</span> s</span>
+<span id="L128"></span>
+<span id="L129"><span class="dc">/-- Reachable states (any interleaving of invocations and steps; crashes are processes that</span></span>
+<span id="L130"><span class="dc">stop taking steps, so they need no separate transition). -/</span></span>
+<span id="L131"><span class="kw">inductive</span> <span class="const token" data-verso-hover="306">EReach</span> (L : <span class="const token" data-verso-hover="180">ℕ</span>) : <span class="const token" data-verso-hover="291">ESys</span> P → <span class="kw">Prop</span></span>
+<span id="L132">  | <span class="const token" data-verso-hover="308">init</span> : <span class="const token" data-verso-hover="306">EReach</span> L (<span class="const token" data-verso-hover="293">ESys.init</span> P)</span>
+<span id="L133">  | <span class="const token" data-verso-hover="309">step</span> {s} (p : P) : <span class="const token" data-verso-hover="306">EReach</span> L s → <span class="const token" data-verso-hover="306">EReach</span> L (s.<span class="const token" data-verso-hover="301">step</span> L p)</span>
+<span id="L134">  | <span class="const token" data-verso-hover="310">invoke</span> {s} (p : P) : <span class="const token" data-verso-hover="306">EReach</span> L s → <span class="const token" data-verso-hover="306">EReach</span> L (s.<span class="const token" data-verso-hover="297">invoke</span> p)</span>
+<span id="L135"></span>
+<span id="L136"><span class="kw">namespace</span> ELoc</span>
+<span id="L137"></span>
+<span id="L138"><span class="dc">/-- Number of levels passed (ghost). -/</span></span>
+<span id="L139"><span class="kw">def</span> <span class="const token" data-verso-hover="328">passed</span> (L : <span class="const token" data-verso-hover="180">ℕ</span>) : <span class="const token" data-verso-hover="269">ELoc</span> → <span class="const token" data-verso-hover="180">ℕ</span></span>
+<span id="L140">  | <span class="const token" data-verso-hover="271">idle</span> | <span class="const token" data-verso-hover="272">start</span> =&gt; <span class="nu">0</span></span>
+<span id="L141">  | <span class="const token" data-verso-hover="273">rdone</span> k | <span class="const token" data-verso-hover="276">rturn</span> k | <span class="const token" data-verso-hover="277">rv</span> k | <span class="const token" data-verso-hover="279">wv</span> k | <span class="const token" data-verso-hover="280">rturn2</span> k =&gt; k</span>
+<span id="L142">  | <span class="const token" data-verso-hover="281">clr</span> k _ _ | <span class="const token" data-verso-hover="282">clw</span> k _ _ =&gt; k</span>
+<span id="L143">  | <span class="const token" data-verso-hover="274">wdone</span> =&gt; L</span>
+<span id="L144">  | <span class="const token" data-verso-hover="275">out</span> _ a _ _ =&gt; a</span>
+<span id="L145"></span>
+<span id="L146"><span class="dc">/-- The registers `V[0..written-1]` have been written by the process (ghost). -/</span></span>
+<span id="L147"><span class="kw">def</span> <span class="const token" data-verso-hover="329">written</span> (L : <span class="const token" data-verso-hover="180">ℕ</span>) : <span class="const token" data-verso-hover="269">ELoc</span> → <span class="const token" data-verso-hover="180">ℕ</span></span>
+<span id="L148">  | <span class="const token" data-verso-hover="271">idle</span> | <span class="const token" data-verso-hover="272">start</span> =&gt; <span class="nu">0</span></span>
+<span id="L149">  | <span class="const token" data-verso-hover="273">rdone</span> k | <span class="const token" data-verso-hover="276">rturn</span> k | <span class="const token" data-verso-hover="277">rv</span> k | <span class="const token" data-verso-hover="279">wv</span> k =&gt; k</span>
+<span id="L150">  | <span class="const token" data-verso-hover="280">rturn2</span> k =&gt; k + <span class="nu">1</span></span>
+<span id="L151">  | <span class="const token" data-verso-hover="281">clr</span> _ b _ | <span class="const token" data-verso-hover="282">clw</span> _ b _ =&gt; b</span>
+<span id="L152">  | <span class="const token" data-verso-hover="274">wdone</span> =&gt; L</span>
+<span id="L153">  | <span class="const token" data-verso-hover="275">out</span> _ _ w _ =&gt; w</span>
+<span id="L154"></span>
+<span id="L155"><span class="dc">/-- Registers below `lo` no longer hold the process's identifier. -/</span></span>
+<span id="L156"><span class="kw">def</span> <span class="const token" data-verso-hover="330">lo</span> : <span class="const token" data-verso-hover="269">ELoc</span> → <span class="const token" data-verso-hover="180">ℕ</span></span>
+<span id="L157">  | <span class="const token" data-verso-hover="281">clr</span> _ _ j | <span class="const token" data-verso-hover="282">clw</span> _ _ j =&gt; j</span>
+<span id="L158">  | <span class="const token" data-verso-hover="275">out</span> _ _ _ c =&gt; c</span>
+<span id="L159">  | _ =&gt; <span class="nu">0</span></span>
+<span id="L160"></span>
+<span id="L161"><span class="dc">/-- The process is about to write `0` into `V[i]`. -/</span></span>
+<span id="L162"><span class="kw">def</span> <span class="const token" data-verso-hover="331">clwAt</span> : <span class="const token" data-verso-hover="269">ELoc</span> → <span class="const token" data-verso-hover="180">ℕ</span> → <span class="kw">Prop</span></span>
+<span id="L163">  | <span class="const token" data-verso-hover="282">clw</span> _ _ j, i =&gt; j = i</span>
+<span id="L164">  | _, _ =&gt; <span class="const token" data-verso-hover="238">False</span></span>
+<span id="L165"></span>
+<span id="L166"><span class="const token" data-verso-hover="332">instance</span> (l : <span class="const token" data-verso-hover="269">ELoc</span>) (i : <span class="const token" data-verso-hover="180">ℕ</span>) : <span class="const token" data-verso-hover="333">Decidable</span> (l.<span class="const token" data-verso-hover="331">clwAt</span> i) := <span class="kw">by</span></span>
+<span id="L167">  <span class="kw">cases</span> l &lt;;&gt; <span class="kw">simp</span> only [<span class="const token" data-verso-hover="331">clwAt</span>] &lt;;&gt; <span class="kw">infer_instance</span></span>
+<span id="L168"></span>
+<span id="L169"><span class="dc">/-- The process has written `turn` (it is not idle and not about to execute line 1). -/</span></span>
+<span id="L170"><span class="kw">def</span> <span class="const token" data-verso-hover="334">Started</span> (l : <span class="const token" data-verso-hover="269">ELoc</span>) : <span class="kw">Prop</span> := l ≠ <span class="const token" data-verso-hover="271">idle</span> ∧ l ≠ <span class="const token" data-verso-hover="272">start</span></span>
+<span id="L171"></span>
+<span id="L172"><span class="dc">/-- The process is elected: it is at line 14 or has returned `1`. -/</span></span>
+<span id="L173"><span class="kw">def</span> <span class="const token" data-verso-hover="313">Elected</span> : <span class="const token" data-verso-hover="269">ELoc</span> → <span class="kw">Prop</span></span>
+<span id="L174">  | <span class="const token" data-verso-hover="274">wdone</span> =&gt; <span class="const token" data-verso-hover="335">True</span></span>
+<span id="L175">  | <span class="const token" data-verso-hover="275">out</span> <span class="const token" data-verso-hover="283">true</span> _ _ _ =&gt; <span class="const token" data-verso-hover="335">True</span></span>
+<span id="L176">  | _ =&gt; <span class="const token" data-verso-hover="238">False</span></span>
+<span id="L177"></span>
+<span id="L178"><span class="dc">/-- Well-formedness of local states. -/</span></span>
+<span id="L179"><span class="kw">def</span> <span class="const token" data-verso-hover="287">WF</span> (L : <span class="const token" data-verso-hover="180">ℕ</span>) : <span class="const token" data-verso-hover="269">ELoc</span> → <span class="kw">Prop</span></span>
+<span id="L180">  | <span class="const token" data-verso-hover="271">idle</span> | <span class="const token" data-verso-hover="272">start</span> | <span class="const token" data-verso-hover="274">wdone</span> =&gt; <span class="const token" data-verso-hover="335">True</span></span>
+<span id="L181">  | <span class="const token" data-verso-hover="273">rdone</span> k | <span class="const token" data-verso-hover="276">rturn</span> k | <span class="const token" data-verso-hover="277">rv</span> k | <span class="const token" data-verso-hover="279">wv</span> k | <span class="const token" data-verso-hover="280">rturn2</span> k =&gt; k &lt; L</span>
+<span id="L182">  | <span class="const token" data-verso-hover="281">clr</span> k b j | <span class="const token" data-verso-hover="282">clw</span> k b j =&gt; k &lt; L ∧ (b = k ∨ b = k + <span class="nu">1</span>) ∧ j &lt; b</span>
+<span id="L183">  | <span class="const token" data-verso-hover="275">out</span> r a w c =&gt; a ≤ w ∧ w ≤ L ∧ c ≤ w ∧ (r = <span class="const token" data-verso-hover="283">true</span> → a = L ∧ w = L ∧ c = <span class="nu">0</span>)</span>
+<span id="L184"></span>
+<span id="L185"><span class="kw">end</span> ELoc</span>
+<span id="L186"></span>
+<span id="L187"><span class="kw">end</span> Podc.CloserLookFT</span>
+<span id="L188"></span>
+</code></div>
+        <script>
+          window.versoHoversUrl = "PODC2012/CloserLookFT/-hovers.json";</script>
+        <script src="static/lean/popper.js"></script>
+        <script src="static/lean/tippy.js"></script>
+        <script src="static/lean/marked.js"></script>
+        <script src="static/lean/highlighting.js"></script>
+        <script src="static/lean/lean.js"></script>
+        </article></main><footer class="site-footer"><div class="wrap">
+        Machine-checked formalizations of PODC papers in Lean 4. Generated with <a href="https://github.com/leanprover/verso">Verso</a> from the README files of <a href="https://github.com/vasnesterov/formal_podc">vasnesterov/formal_podc</a>.</div>
+      </footer></body>
+  </html>
+

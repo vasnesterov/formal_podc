@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="light dark">
+    <link rel="icon" href="data:,">
+    <title>MultiVersionSTM: Model.lean · Formal PODC</title><base href="../../../.././"><link rel="stylesheet" href="static/lean/verso-vars.css">
+    <link rel="stylesheet" href="static/lean/highlighting.css">
+    <link rel="stylesheet" href="static/lean/tippy-border.css">
+    <link rel="stylesheet" href="static/style.css">
+    <script defer="defer" src="static/site.js"></script>
+    </head>
+  <body>
+    <header class="site-header">
+      <div class="wrap">
+        <a class="brand" href=".">Formal PODC</a><nav class="top">
+          <a href=".">Search</a><a href="about/">About</a><a href="https://github.com/vasnesterov/formal_podc">GitHub</a></nav>
+        </div>
+      </header>
+    <main class="wrap"><article><nav class="breadcrumbs" aria-label="Breadcrumb">
+          <a href=".">Search</a><span class="sep">›</span><a href="PODC2010/">PODC 2010</a><span class="sep">›</span><a href="PODC2010/MultiVersionSTM/">MultiVersionSTM</a><span class="sep">›</span><a href="PODC2010/MultiVersionSTM/src/">Lean source</a><span class="sep">›</span><span aria-current="page">Model</span></nav>
+        <h1>
+          <code>Model.lean</code></h1>
+        <div class="paper-links">
+          <p>
+            Source of <a href="PODC2010/MultiVersionSTM/">Maintaining Multiple Versions in STM — PODC 2010</a> · <a href="https://github.com/vasnesterov/formal_podc/blob/main/Papers/PODC2010/MultiVersionSTM/Model.lean">GitHub</a> · hover over a name for its type and documentation</p>
+          </div>
+        <div class="lean-code lean-src">
+          <code class="hl lean block" data-lean-context="Model"><span id="L1"><span class="kw">import</span> Mathlib</span>
+<span id="L2"></span>
+<span id="L3"><span class="dc">/-!</span></span>
+<span id="L4"><span class="dc"># Transactional histories of a multi-versioned STM</span></span>
+<span id="L5"></span>
+<span id="L6"><span class="dc">Perelman, Fan, Keidar. *On Maintaining Multiple Versions in STM.* PODC 2010 (Technion CCIT</span></span>
+<span id="L7"><span class="dc">Report #765, May 2010), Sections 3–5.</span></span>
+<span id="L8"></span>
+<span id="L9"><span class="dc">This file fixes the *history* level of the model.</span></span>
+<span id="L10"></span>
+<span id="L11"><span class="dc">* **Transactions** are identified by elements of `Tx`. Whether a transaction is read-only is known</span></span>
+<span id="L12"><span class="dc">  a priori (`TxSys.ro`), and so is the thread that runs it (`TxSys.thr`).</span></span>
+<span id="L13"><span class="dc">* **Operations** (`Inv`): `read T o`, `write T o`, `commit T`. Every transactional step is</span></span>
+<span id="L14"><span class="dc">  atomic (Section 3: "all the base steps for running a transactional step appear to execute</span></span>
+<span id="L15"><span class="dc">  atomically"), so an event is an invocation together with its response.</span></span>
+<span id="L16"><span class="dc">* **Versions instead of values.** A write does not carry a value: the version of `o` written by</span></span>
+<span id="L17"><span class="dc">  `W` is named by `W`, and a successful read returns the version it reads (`none` is the initial</span></span>
+<span id="L18"><span class="dc">  version, `some W` the version written by `W`). This is the paper's notation `oᵢʲ` and the</span></span>
+<span id="L19"><span class="dc">  standard multiversion abstraction; it is the value semantics on histories in which all written</span></span>
+<span id="L20"><span class="dc">  values are distinct.</span></span>
+<span id="L21"><span class="dc">* **Responses** (`Resp`): `none` is the abort response `A(T)`; `some r` is a successful response</span></span>
+<span id="L22"><span class="dc">  (for a read, `r` is the version read; for a write or a commit, `r` is ignored).</span></span>
+<span id="L23"><span class="dc">* **Strict serializability** (`StrictSer`) is checked on the complete (committed or aborted)</span></span>
+<span id="L24"><span class="dc">  transactions, as in the paper: there is an injective position function `pos` on them that</span></span>
+<span id="L25"><span class="dc">  respects the real-time order and makes every successful read legal (a read after an own write</span></span>
+<span id="L26"><span class="dc">  returns the own write; otherwise it returns the version of the last committed writer before the</span></span>
+<span id="L27"><span class="dc">  reader, or the initial version).</span></span>
+<span id="L28"><span class="dc">* **MV-permissiveness** (Definition 2, `MVPerm`): only update transactions abort, and only when</span></span>
+<span id="L29"><span class="dc">  they conflict with a *concurrent* update transaction.</span></span>
+<span id="L30"><span class="dc">* **Versions kept, overwritten versions, and the precedence relation** of Section 7.</span></span>
+<span id="L31"><span class="dc">-/</span></span>
+<span id="L32"></span>
+<span id="L33"><span class="kw">namespace</span> Podc.MultiVersionSTM</span>
+<span id="L34"></span>
+<span id="L35"><span class="dc">/-- Static information about transactions: whether a transaction is read-only (known a priori,</span></span>
+<span id="L36"><span class="dc">Section 3), and the thread `thr T` that runs it. -/</span></span>
+<span id="L37"><span class="kw">class</span> <span class="const token" data-verso-hover="8">TxSys</span> (Tx : <span class="kw">Type</span>) (P : <span class="const token" data-verso-hover="257">outParam</span> <span class="kw">Type</span>) <span class="kw">where</span></span>
+<span id="L38">  <span class="dc">/-- `ro T` iff `T` is a read-only transaction. -/</span></span>
+<span id="L39">  <span class="const token" data-verso-hover="214">ro</span> : Tx → <span class="const token" data-verso-hover="258">Bool</span></span>
+<span id="L40">  <span class="dc">/-- The thread running `T`. -/</span></span>
+<span id="L41">  <span class="const token" data-verso-hover="177">thr</span> : Tx → P</span>
+<span id="L42"></span>
+<span id="L43"><span class="kw">export</span> TxSys (<span class="const token" data-verso-hover="214">ro</span> <span class="const token" data-verso-hover="177">thr</span>)</span>
+<span id="L44"></span>
+<span id="L45"><span class="dc">/-- Transactional operations (invocations). -/</span></span>
+<span id="L46"><span class="kw">inductive</span> <span class="const token" data-verso-hover="93">Inv</span> (Tx O : <span class="kw">Type</span>) <span class="kw">where</span></span>
+<span id="L47">  | <span class="const token" data-verso-hover="219">read</span> (T : Tx) (o : O)</span>
+<span id="L48">  | <span class="const token" data-verso-hover="59">write</span> (T : Tx) (o : O)</span>
+<span id="L49">  | <span class="const token" data-verso-hover="52">commit</span> (T : Tx)</span>
+<span id="L50">  <span class="kw">deriving</span> <span class="const token" data-verso-hover="259">DecidableEq</span></span>
+<span id="L51"></span>
+<span id="L52"><span class="kw">namespace</span> Inv</span>
+<span id="L53"></span>
+<span id="L54"><span class="kw">variable</span> {Tx O : <span class="kw">Type</span>}</span>
+<span id="L55"></span>
+<span id="L56"><span class="dc">/-- The transaction of an invocation. -/</span></span>
+<span id="L57"><span class="kw">def</span> <span class="const token" data-verso-hover="50">tx</span> : <span class="const token" data-verso-hover="93">Inv</span> Tx O → Tx</span>
+<span id="L58">  | <span class="const token" data-verso-hover="219">read</span> T _ =&gt; T</span>
+<span id="L59">  | <span class="const token" data-verso-hover="59">write</span> T _ =&gt; T</span>
+<span id="L60">  | <span class="const token" data-verso-hover="52">commit</span> T =&gt; T</span>
+<span id="L61"></span>
+<span id="L62"><span class="dc">/-- The transactional object accessed by an invocation. -/</span></span>
+<span id="L63"><span class="kw">def</span> <span class="const token" data-verso-hover="64">obj?</span> : <span class="const token" data-verso-hover="93">Inv</span> Tx O → <span class="const token" data-verso-hover="252">Option</span> O</span>
+<span id="L64">  | <span class="const token" data-verso-hover="219">read</span> _ o =&gt; <span class="const token" data-verso-hover="53">some</span> o</span>
+<span id="L65">  | <span class="const token" data-verso-hover="59">write</span> _ o =&gt; <span class="const token" data-verso-hover="53">some</span> o</span>
+<span id="L66">  | <span class="const token" data-verso-hover="52">commit</span> _ =&gt; <span class="const token" data-verso-hover="57">none</span></span>
+<span id="L67"></span>
+<span id="L68">@[<span class="kw">simp</span>] <span class="kw">lemma</span> <span class="const token" data-verso-hover="260">tx_read</span> (T : Tx) (o : O) : (<span class="const token" data-verso-hover="219">read</span> T o).<span class="const token" data-verso-hover="50">tx</span> = T := <span class="const token" data-verso-hover="61">rfl</span></span>
+<span id="L69">@[<span class="kw">simp</span>] <span class="kw">lemma</span> <span class="const token" data-verso-hover="261">tx_write</span> (T : Tx) (o : O) : (<span class="const token" data-verso-hover="59">write</span> T o).<span class="const token" data-verso-hover="50">tx</span> = T := <span class="const token" data-verso-hover="61">rfl</span></span>
+<span id="L70">@[<span class="kw">simp</span>] <span class="kw">lemma</span> <span class="const token" data-verso-hover="262">tx_commit</span> (T : Tx) : (<span class="const token" data-verso-hover="52">commit</span> T : <span class="const token" data-verso-hover="93">Inv</span> Tx O).<span class="const token" data-verso-hover="50">tx</span> = T := <span class="const token" data-verso-hover="61">rfl</span></span>
+<span id="L71">@[<span class="kw">simp</span>] <span class="kw">lemma</span> <span class="const token" data-verso-hover="263">obj?_read</span> (T : Tx) (o : O) : (<span class="const token" data-verso-hover="219">read</span> T o).<span class="const token" data-verso-hover="64">obj?</span> = <span class="const token" data-verso-hover="53">some</span> o := <span class="const token" data-verso-hover="61">rfl</span></span>
+<span id="L72">@[<span class="kw">simp</span>] <span class="kw">lemma</span> <span class="const token" data-verso-hover="264">obj?_write</span> (T : Tx) (o : O) : (<span class="const token" data-verso-hover="59">write</span> T o).<span class="const token" data-verso-hover="64">obj?</span> = <span class="const token" data-verso-hover="53">some</span> o := <span class="const token" data-verso-hover="61">rfl</span></span>
+<span id="L73">@[<span class="kw">simp</span>] <span class="kw">lemma</span> <span class="const token" data-verso-hover="265">obj?_commit</span> (T : Tx) : (<span class="const token" data-verso-hover="52">commit</span> T : <span class="const token" data-verso-hover="93">Inv</span> Tx O).<span class="const token" data-verso-hover="64">obj?</span> = <span class="const token" data-verso-hover="57">none</span> := <span class="const token" data-verso-hover="61">rfl</span></span>
+<span id="L74"></span>
+<span id="L75"><span class="kw">end</span> Inv</span>
+<span id="L76"></span>
+<span id="L77"><span class="dc">/-- Responses: `none` is the abort response `A(T)`; `some r` is a successful response, where `r`</span></span>
+<span id="L78"><span class="dc">is the version read (for reads) and is ignored otherwise. -/</span></span>
+<span id="L79"><span class="kw">abbrev</span> <span class="const token" data-verso-hover="228">Resp</span> (Tx : <span class="kw">Type</span>) := <span class="const token" data-verso-hover="252">Option</span> (<span class="const token" data-verso-hover="252">Option</span> Tx)</span>
+<span id="L80"></span>
+<span id="L81"><span class="dc">/-- An event: an invocation with its response (transactional steps are atomic). -/</span></span>
+<span id="L82"><span class="kw">structure</span> <span class="const token" data-verso-hover="28">Event</span> (Tx O : <span class="kw">Type</span>) <span class="kw">where</span></span>
+<span id="L83">  <span class="const token" data-verso-hover="49">inv</span> : <span class="const token" data-verso-hover="93">Inv</span> Tx O</span>
+<span id="L84">  <span class="const token" data-verso-hover="56">resp</span> : <span class="const token" data-verso-hover="228">Resp</span> Tx</span>
+<span id="L85">  <span class="kw">deriving</span> <span class="const token" data-verso-hover="259">DecidableEq</span></span>
+<span id="L86"></span>
+<span id="L87"><span class="dc">/-- A transactional history. -/</span></span>
+<span id="L88"><span class="kw">abbrev</span> <span class="const token" data-verso-hover="27">Hist</span> (Tx O : <span class="kw">Type</span>) := <span class="const token" data-verso-hover="92">List</span> (<span class="const token" data-verso-hover="28">Event</span> Tx O)</span>
+<span id="L89"></span>
+<span id="L90"><span class="dc">/-- An object version: the object and its writer (`none` = initial version). -/</span></span>
+<span id="L91"><span class="kw">abbrev</span> <span class="const token" data-verso-hover="266">Version</span> (Tx O : <span class="kw">Type</span>) := O × <span class="const token" data-verso-hover="252">Option</span> Tx</span>
+<span id="L92"></span>
+<span id="L93"><span class="kw">variable</span> {Tx O P : <span class="kw">Type</span>}</span>
+<span id="L94"></span>
+<span id="L95"><span class="dc">/-! ### Transactions in a history -/</span></span>
+<span id="L96"></span>
+<span id="L97"><span class="dc">/-- `T` has begun in `h` (it has an event). -/</span></span>
+<span id="L98"><span class="kw">def</span> <span class="const token" data-verso-hover="30">Began</span> (h : <span class="const token" data-verso-hover="27">Hist</span> Tx O) (T : Tx) : <span class="kw">Prop</span> := ∃ e ∈ h, e.<span class="const token" data-verso-hover="49">inv</span>.<span class="const token" data-verso-hover="50">tx</span> = T</span>
+<span id="L99"></span>
+<span id="L100"><span class="dc">/-- `T` committed in `h`. -/</span></span>
+<span id="L101"><span class="kw">def</span> <span class="const token" data-verso-hover="32">Committed</span> (h : <span class="const token" data-verso-hover="27">Hist</span> Tx O) (T : Tx) : <span class="kw">Prop</span> := ∃ r, (⟨<span class="const token" data-verso-hover="52">.</span>commit T, <span class="const token" data-verso-hover="53">some</span> r⟩ : <span class="const token" data-verso-hover="28">Event</span> Tx O) ∈ h</span>
+<span id="L102"></span>
+<span id="L103"><span class="dc">/-- `T` was aborted in `h`. -/</span></span>
+<span id="L104"><span class="kw">def</span> <span class="const token" data-verso-hover="34">Aborted</span> (h : <span class="const token" data-verso-hover="27">Hist</span> Tx O) (T : Tx) : <span class="kw">Prop</span> := ∃ e ∈ h, e.<span class="const token" data-verso-hover="49">inv</span>.<span class="const token" data-verso-hover="50">tx</span> = T ∧ e.<span class="const token" data-verso-hover="56">resp</span> = <span class="const token" data-verso-hover="57">none</span></span>
+<span id="L105"></span>
+<span id="L106"><span class="dc">/-- `T` is complete (committed or aborted) in `h`. -/</span></span>
+<span id="L107"><span class="kw">def</span> <span class="const token" data-verso-hover="36">Terminated</span> (h : <span class="const token" data-verso-hover="27">Hist</span> Tx O) (T : Tx) : <span class="kw">Prop</span> := <span class="const token" data-verso-hover="32">Committed</span> h T ∨ <span class="const token" data-verso-hover="34">Aborted</span> h T</span>
+<span id="L108"></span>
+<span id="L109"><span class="dc">/-- `T` is live in `h`: it has begun and is not complete. -/</span></span>
+<span id="L110"><span class="kw">def</span> <span class="const token" data-verso-hover="267">Live</span> (h : <span class="const token" data-verso-hover="27">Hist</span> Tx O) (T : Tx) : <span class="kw">Prop</span> := <span class="const token" data-verso-hover="30">Began</span> h T ∧ ¬ <span class="const token" data-verso-hover="36">Terminated</span> h T</span>
+<span id="L111"></span>
+<span id="L112"><span class="dc">/-- `T` invoked a write to `o` in `h`. -/</span></span>
+<span id="L113"><span class="kw">def</span> <span class="const token" data-verso-hover="38">Writes</span> (h : <span class="const token" data-verso-hover="27">Hist</span> Tx O) (T : Tx) (o : O) : <span class="kw">Prop</span> := ∃ r, (⟨<span class="const token" data-verso-hover="59">.</span>write T o, r⟩ : <span class="const token" data-verso-hover="28">Event</span> Tx O) ∈ h</span>
+<span id="L114"></span>
+<span id="L115"><span class="dc">/-- `T` invoked a read or a write of `o` in `h`. -/</span></span>
+<span id="L116"><span class="kw">def</span> <span class="const token" data-verso-hover="40">Accesses</span> (h : <span class="const token" data-verso-hover="27">Hist</span> Tx O) (T : Tx) (o : O) : <span class="kw">Prop</span> := ∃ e ∈ h, e.<span class="const token" data-verso-hover="49">inv</span>.<span class="const token" data-verso-hover="50">tx</span> = T ∧ e.<span class="const token" data-verso-hover="49">inv</span>.<span class="const token" data-verso-hover="64">obj?</span> = <span class="const token" data-verso-hover="53">some</span> o</span>
+<span id="L117"></span>
+<span id="L118"><span class="dc">/-- `W` is a committed transaction that wrote `o`: it created a version of `o`. -/</span></span>
+<span id="L119"><span class="kw">def</span> <span class="const token" data-verso-hover="239">CWriter</span> (h : <span class="const token" data-verso-hover="27">Hist</span> Tx O) (o : O) (W : Tx) : <span class="kw">Prop</span> := <span class="const token" data-verso-hover="32">Committed</span> h W ∧ <span class="const token" data-verso-hover="38">Writes</span> h W o</span>
+<span id="L120"></span>
+<span id="L121"><span class="dc">/-- Real-time order `A ≺_H B`: the commit of `A` precedes the first step of `B`. -/</span></span>
+<span id="L122"><span class="kw">def</span> <span class="const token" data-verso-hover="205">RT</span> (h : <span class="const token" data-verso-hover="27">Hist</span> Tx O) (A B : Tx) : <span class="kw">Prop</span> :=</span>
+<span id="L123">  <span class="const token" data-verso-hover="30">Began</span> h B ∧ ∃ h₁ h₂, h = h₁ ++ h₂ ∧ <span class="const token" data-verso-hover="32">Committed</span> h₁ A ∧ ¬ <span class="const token" data-verso-hover="30">Began</span> h₁ B</span>
+<span id="L124"></span>
+<span id="L125"><span class="dc">/-- `A` committed before `B` (the order in which versions are installed). -/</span></span>
+<span id="L126"><span class="kw">def</span> <span class="const token" data-verso-hover="242">CommitBefore</span> (h : <span class="const token" data-verso-hover="27">Hist</span> Tx O) (A B : Tx) : <span class="kw">Prop</span> :=</span>
+<span id="L127">  ∃ h₁ h₂, h = h₁ ++ h₂ ∧ <span class="const token" data-verso-hover="32">Committed</span> h₁ A ∧ ¬ <span class="const token" data-verso-hover="32">Committed</span> h₁ B</span>
+<span id="L128"></span>
+<span id="L129"><span class="dc">/-- Two transactions are concurrent: both have begun and neither precedes the other in real</span></span>
+<span id="L130"><span class="dc">time. -/</span></span>
+<span id="L131"><span class="kw">def</span> <span class="const token" data-verso-hover="208">Concurrent</span> (h : <span class="const token" data-verso-hover="27">Hist</span> Tx O) (A B : Tx) : <span class="kw">Prop</span> :=</span>
+<span id="L132">  <span class="const token" data-verso-hover="30">Began</span> h A ∧ <span class="const token" data-verso-hover="30">Began</span> h B ∧ ¬ <span class="const token" data-verso-hover="205">RT</span> h A B ∧ ¬ <span class="const token" data-verso-hover="205">RT</span> h B A</span>
+<span id="L133"></span>
+<span id="L134"><span class="dc">/-- Two transactions conflict: they access a common object and at least one of them writes it. -/</span></span>
+<span id="L135"><span class="kw">def</span> <span class="const token" data-verso-hover="217">Conflict</span> (h : <span class="const token" data-verso-hover="27">Hist</span> Tx O) (A B : Tx) : <span class="kw">Prop</span> :=</span>
+<span id="L136">  ∃ o, <span class="const token" data-verso-hover="40">Accesses</span> h A o ∧ <span class="const token" data-verso-hover="40">Accesses</span> h B o ∧ (<span class="const token" data-verso-hover="38">Writes</span> h A o ∨ <span class="const token" data-verso-hover="38">Writes</span> h B o)</span>
+<span id="L137"></span>
+<span id="L138"><span class="dc">/-! ### Strict serializability -/</span></span>
+<span id="L139"></span>
+<span id="L140"><span class="dc">/-- A read of `o` by `T` returning `v`, that does not follow a write of `T` to `o`, is legal for</span></span>
+<span id="L141"><span class="dc">the serialization positions `pos`: it returns the version of the last committed writer of `o`</span></span>
+<span id="L142"><span class="dc">before `T`, or the initial version if there is none. -/</span></span>
+<span id="L143"><span class="kw">def</span> <span class="const token" data-verso-hover="253">ExtLegal</span> (h : <span class="const token" data-verso-hover="27">Hist</span> Tx O) (pos : Tx → <span class="const token" data-verso-hover="231">ℕ</span>) (T : Tx) (o : O) : <span class="const token" data-verso-hover="252">Option</span> Tx → <span class="kw">Prop</span></span>
+<span id="L144">  | <span class="const token" data-verso-hover="57">none</span> =&gt; ∀ W, <span class="const token" data-verso-hover="239">CWriter</span> h o W → W ≠ T → pos T &lt; pos W</span>
+<span id="L145">  | <span class="const token" data-verso-hover="53">some</span> W =&gt; W ≠ T ∧ <span class="const token" data-verso-hover="239">CWriter</span> h o W ∧ pos W &lt; pos T ∧</span>
+<span id="L146">      ∀ W', <span class="const token" data-verso-hover="239">CWriter</span> h o W' → W' ≠ T → pos W' &lt; pos T → pos W' ≤ pos W</span>
+<span id="L147"></span>
+<span id="L148"><span class="dc">/-- `pos` serializes the complete (committed or aborted) transactions of `h`: it is injective on</span></span>
+<span id="L149"><span class="dc">them, respects the real-time order, and makes every successful read of a complete transaction</span></span>
+<span id="L150"><span class="dc">legal. Only committed transactions install versions (`ExtLegal` uses `CWriter`). -/</span></span>
+<span id="L151"><span class="kw">def</span> <span class="const token" data-verso-hover="250">SerWitness</span> (h : <span class="const token" data-verso-hover="27">Hist</span> Tx O) (pos : Tx → <span class="const token" data-verso-hover="231">ℕ</span>) : <span class="kw">Prop</span> :=</span>
+<span id="L152">  (∀ A B, <span class="const token" data-verso-hover="36">Terminated</span> h A → <span class="const token" data-verso-hover="36">Terminated</span> h B → pos A = pos B → A = B) ∧</span>
+<span id="L153">  (∀ A B, <span class="const token" data-verso-hover="32">Committed</span> h A → <span class="const token" data-verso-hover="36">Terminated</span> h B → <span class="const token" data-verso-hover="205">RT</span> h A B → pos A &lt; pos B) ∧</span>
+<span id="L154">  (∀ T, <span class="const token" data-verso-hover="36">Terminated</span> h T → ∀ h₁ o v h₂, h = h₁ ++ ⟨<span class="const token" data-verso-hover="219">.</span>read T o, <span class="const token" data-verso-hover="53">some</span> v⟩ :: h₂ →</span>
+<span id="L155">    (<span class="const token" data-verso-hover="38">Writes</span> h₁ T o → v = <span class="const token" data-verso-hover="53">some</span> T) ∧ (¬ <span class="const token" data-verso-hover="38">Writes</span> h₁ T o → <span class="const token" data-verso-hover="253">ExtLegal</span> h pos T o v))</span>
+<span id="L156"></span>
+<span id="L157"><span class="dc">/-- **Strict serializability** (Section 3): `complete(H)`, the committed and aborted</span></span>
+<span id="L158"><span class="dc">transactions, is equivalent to a legal sequential history that respects the real-time order. -/</span></span>
+<span id="L159"><span class="kw">def</span> <span class="const token" data-verso-hover="10">StrictSer</span> (h : <span class="const token" data-verso-hover="27">Hist</span> Tx O) : <span class="kw">Prop</span> := ∃ pos, <span class="const token" data-verso-hover="250">SerWitness</span> h pos</span>
+<span id="L160"></span>
+<span id="L161"><span class="dc">/-! ### Well-formed histories, MV-permissiveness, reads of written versions -/</span></span>
+<span id="L162"></span>
+<span id="L163"><span class="kw">section</span> Sys</span>
+<span id="L164"></span>
+<span id="L165"><span class="kw">variable</span> [<span class="const token" data-verso-hover="8">TxSys</span> Tx P]</span>
+<span id="L166"></span>
+<span id="L167"><span class="dc">/-- The invocation `i` may follow the history `h`: its transaction is not complete, a read-only</span></span>
+<span id="L168"><span class="dc">transaction does not write, and a thread starts a new transaction only when its previous</span></span>
+<span id="L169"><span class="dc">transactions are complete (each thread runs at most one transaction at a time). -/</span></span>
+<span id="L170"><span class="kw">def</span> <span class="const token" data-verso-hover="81">OKNext</span> (h : <span class="const token" data-verso-hover="27">Hist</span> Tx O) (i : <span class="const token" data-verso-hover="93">Inv</span> Tx O) : <span class="kw">Prop</span> :=</span>
+<span id="L171">  ¬ <span class="const token" data-verso-hover="36">Terminated</span> h i.<span class="const token" data-verso-hover="50">tx</span> ∧ (∀ T o, i = <span class="const token" data-verso-hover="59">.</span>write T o → <span class="const token" data-verso-hover="214">ro</span> T = <span class="const token" data-verso-hover="216">false</span>) ∧</span>
+<span id="L172">  (¬ <span class="const token" data-verso-hover="30">Began</span> h i.<span class="const token" data-verso-hover="50">tx</span> → ∀ T', T' ≠ i.<span class="const token" data-verso-hover="50">tx</span> → <span class="const token" data-verso-hover="177">thr</span> T' = <span class="const token" data-verso-hover="177">thr</span> i.<span class="const token" data-verso-hover="50">tx</span> → <span class="const token" data-verso-hover="30">Began</span> h T' → <span class="const token" data-verso-hover="36">Terminated</span> h T')</span>
+<span id="L173"></span>
+<span id="L174"><span class="dc">/-- A well-formed history: every invocation may follow the history before it. -/</span></span>
+<span id="L175"><span class="kw">def</span> <span class="const token" data-verso-hover="78">WF</span> (h : <span class="const token" data-verso-hover="27">Hist</span> Tx O) : <span class="kw">Prop</span> := ∀ h₁ e h₂, h = h₁ ++ e :: h₂ → <span class="const token" data-verso-hover="81">OKNext</span> h₁ e.<span class="const token" data-verso-hover="49">inv</span></span>
+<span id="L176"></span>
+<span id="L177"><span class="dc">/-- **MV-permissiveness** (Definition 2) of a history: a transaction aborts only when it is an</span></span>
+<span id="L178"><span class="dc">update transaction that conflicts with another, concurrent, update transaction. -/</span></span>
+<span id="L179"><span class="kw">def</span> <span class="const token" data-verso-hover="18">MVPerm</span> (h : <span class="const token" data-verso-hover="27">Hist</span> Tx O) : <span class="kw">Prop</span> :=</span>
+<span id="L180">  ∀ h₁ i h₂, h = h₁ ++ ⟨i, <span class="const token" data-verso-hover="57">none</span>⟩ :: h₂ →</span>
+<span id="L181">    <span class="const token" data-verso-hover="214">ro</span> i.<span class="const token" data-verso-hover="50">tx</span> = <span class="const token" data-verso-hover="216">false</span> ∧ ∃ T', T' ≠ i.<span class="const token" data-verso-hover="50">tx</span> ∧ <span class="const token" data-verso-hover="214">ro</span> T' = <span class="const token" data-verso-hover="216">false</span> ∧</span>
+<span id="L182">      <span class="const token" data-verso-hover="208">Concurrent</span> (h₁ ++ [⟨i, <span class="const token" data-verso-hover="57">none</span>⟩]) i.<span class="const token" data-verso-hover="50">tx</span> T' ∧ <span class="const token" data-verso-hover="217">Conflict</span> (h₁ ++ [⟨i, <span class="const token" data-verso-hover="57">none</span>⟩]) i.<span class="const token" data-verso-hover="50">tx</span> T'</span>
+<span id="L183"></span>
+<span id="L184"><span class="kw">end</span> Sys</span>
+<span id="L185"></span>
+<span id="L186"><span class="dc">/-- A read returns the initial version or a version whose write has been invoked (in the value</span></span>
+<span id="L187"><span class="dc">semantics: a read returns the initial value or a value that has been written). -/</span></span>
+<span id="L188"><span class="kw">def</span> <span class="const token" data-verso-hover="268">ReadsWritten</span> (h : <span class="const token" data-verso-hover="27">Hist</span> Tx O) : <span class="kw">Prop</span> :=</span>
+<span id="L189">  ∀ h₁ T o W h₂, h = h₁ ++ ⟨<span class="const token" data-verso-hover="219">.</span>read T o, <span class="const token" data-verso-hover="53">some</span> (<span class="const token" data-verso-hover="53">some</span> W)⟩ :: h₂ → <span class="const token" data-verso-hover="38">Writes</span> h₁ W o</span>
+<span id="L190"></span>
+<span id="L191"><span class="dc">/-! ### Versions -/</span></span>
+<span id="L192"></span>
+<span id="L193"><span class="dc">/-- The version exists in `h`: the initial version, or one written by a committed transaction. -/</span></span>
+<span id="L194"><span class="kw">def</span> <span class="const token" data-verso-hover="269">VExists</span> (h : <span class="const token" data-verso-hover="27">Hist</span> Tx O) : <span class="const token" data-verso-hover="266">Version</span> Tx O → <span class="kw">Prop</span></span>
+<span id="L195">  | (_, <span class="const token" data-verso-hover="57">none</span>) =&gt; <span class="const token" data-verso-hover="135">True</span></span>
+<span id="L196">  | (o, <span class="const token" data-verso-hover="53">some</span> W) =&gt; <span class="const token" data-verso-hover="239">CWriter</span> h o W</span>
+<span id="L197"></span>
+<span id="L198"><span class="dc">/-- The version `w` of the same object was written after the version `v` (by a committed</span></span>
+<span id="L199"><span class="dc">transaction that committed after `v`'s writer). -/</span></span>
+<span id="L200"><span class="kw">def</span> <span class="const token" data-verso-hover="270">WrittenAfter</span> (h : <span class="const token" data-verso-hover="27">Hist</span> Tx O) (v w : <span class="const token" data-verso-hover="266">Version</span> Tx O) : <span class="kw">Prop</span> :=</span>
+<span id="L201">  w.<span class="const token" data-verso-hover="94">1</span> = v.<span class="const token" data-verso-hover="94">1</span> ∧ ∃ W', w.<span class="const token" data-verso-hover="95">2</span> = <span class="const token" data-verso-hover="53">some</span> W' ∧ <span class="const token" data-verso-hover="239">CWriter</span> h v.<span class="const token" data-verso-hover="94">1</span> W' ∧ ∀ W, v.<span class="const token" data-verso-hover="95">2</span> = <span class="const token" data-verso-hover="53">some</span> W → <span class="const token" data-verso-hover="242">CommitBefore</span> h W W'</span>
+<span id="L202"></span>
+<span id="L203"><span class="dc">/-- An *old* (overwritten) version: it exists and a later version of the same object exists. -/</span></span>
+<span id="L204"><span class="kw">def</span> <span class="const token" data-verso-hover="271">Old</span> (h : <span class="const token" data-verso-hover="27">Hist</span> Tx O) (v : <span class="const token" data-verso-hover="266">Version</span> Tx O) : <span class="kw">Prop</span> :=</span>
+<span id="L205">  <span class="const token" data-verso-hover="269">VExists</span> h v ∧ ∃ w, <span class="const token" data-verso-hover="270">WrittenAfter</span> h v w</span>
+<span id="L206"></span>
+<span id="L207"><span class="dc">/-- `W'` is the committed writer that overwrote version `v` of `o` (the next version). -/</span></span>
+<span id="L208"><span class="kw">def</span> <span class="const token" data-verso-hover="272">NextWriter</span> (h : <span class="const token" data-verso-hover="27">Hist</span> Tx O) (o : O) (v : <span class="const token" data-verso-hover="252">Option</span> Tx) (W' : Tx) : <span class="kw">Prop</span> :=</span>
+<span id="L209">  <span class="const token" data-verso-hover="270">WrittenAfter</span> h (o, v) (o, <span class="const token" data-verso-hover="53">some</span> W') ∧</span>
+<span id="L210">    ∀ W'', <span class="const token" data-verso-hover="270">WrittenAfter</span> h (o, v) (o, <span class="const token" data-verso-hover="53">some</span> W'') → W'' ≠ W' → <span class="const token" data-verso-hover="242">CommitBefore</span> h W' W''</span>
+<span id="L211"></span>
+<span id="L212"><span class="dc">/-! ### The precedence relation of Section 7 -/</span></span>
+<span id="L213"></span>
+<span id="L214"><span class="dc">/-- One step of the transaction precedence relation of Section 7: real-time order,</span></span>
+<span id="L215"><span class="dc">read-after-write, write-after-write, and write-after-read (anti-dependence). -/</span></span>
+<span id="L216"><span class="kw">def</span> <span class="const token" data-verso-hover="273">PrecEdge</span> (h : <span class="const token" data-verso-hover="27">Hist</span> Tx O) (A B : Tx) : <span class="kw">Prop</span> :=</span>
+<span id="L217">  <span class="const token" data-verso-hover="205">RT</span> h A B ∨</span>
+<span id="L218">  (A ≠ B ∧ ∃ o, (⟨<span class="const token" data-verso-hover="219">.</span>read B o, <span class="const token" data-verso-hover="53">some</span> (<span class="const token" data-verso-hover="53">some</span> A)⟩ : <span class="const token" data-verso-hover="28">Event</span> Tx O) ∈ h) ∨</span>
+<span id="L219">  (∃ o, <span class="const token" data-verso-hover="239">CWriter</span> h o A ∧ <span class="const token" data-verso-hover="239">CWriter</span> h o B ∧ <span class="const token" data-verso-hover="242">CommitBefore</span> h A B) ∨</span>
+<span id="L220">  (A ≠ B ∧ ∃ o v, (⟨<span class="const token" data-verso-hover="219">.</span>read A o, <span class="const token" data-verso-hover="53">some</span> v⟩ : <span class="const token" data-verso-hover="28">Event</span> Tx O) ∈ h ∧ <span class="const token" data-verso-hover="272">NextWriter</span> h o v B)</span>
+<span id="L221"></span>
+<span id="L222"><span class="dc">/-- The transaction precedence relation of Section 7 (`A` precedes `B`). -/</span></span>
+<span id="L223"><span class="kw">def</span> <span class="const token" data-verso-hover="274">Prec</span> (h : <span class="const token" data-verso-hover="27">Hist</span> Tx O) : Tx → Tx → <span class="kw">Prop</span> := <span class="const token" data-verso-hover="275">Relation.TransGen</span> (<span class="const token" data-verso-hover="273">PrecEdge</span> h)</span>
+<span id="L224"></span>
+<span id="L225"><span class="kw">end</span> Podc.MultiVersionSTM</span>
+<span id="L226"></span>
+</code></div>
+        <script>
+          window.versoHoversUrl = "PODC2010/MultiVersionSTM/-hovers.json";</script>
+        <script src="static/lean/popper.js"></script>
+        <script src="static/lean/tippy.js"></script>
+        <script src="static/lean/marked.js"></script>
+        <script src="static/lean/highlighting.js"></script>
+        <script src="static/lean/lean.js"></script>
+        </article></main><footer class="site-footer"><div class="wrap">
+        Machine-checked formalizations of PODC papers in Lean 4. Generated with <a href="https://github.com/leanprover/verso">Verso</a> from the README files of <a href="https://github.com/vasnesterov/formal_podc">vasnesterov/formal_podc</a>.</div>
+      </footer></body>
+  </html>
+

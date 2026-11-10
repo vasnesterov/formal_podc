@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="light dark">
+    <link rel="icon" href="data:,">
+    <title>KnapsackLCA: MaximalFeasible.lean · Formal PODC</title><base href="../../../.././"><link rel="stylesheet" href="static/lean/verso-vars.css">
+    <link rel="stylesheet" href="static/lean/highlighting.css">
+    <link rel="stylesheet" href="static/lean/tippy-border.css">
+    <link rel="stylesheet" href="static/style.css">
+    <script defer="defer" src="static/site.js"></script>
+    </head>
+  <body>
+    <header class="site-header">
+      <div class="wrap">
+        <a class="brand" href=".">Formal PODC</a><nav class="top">
+          <a href=".">Search</a><a href="about/">About</a><a href="https://github.com/vasnesterov/formal_podc">GitHub</a></nav>
+        </div>
+      </header>
+    <main class="wrap"><article><nav class="breadcrumbs" aria-label="Breadcrumb">
+          <a href=".">Search</a><span class="sep">›</span><a href="PODC2025/">PODC 2025</a><span class="sep">›</span><a href="PODC2025/KnapsackLCA/">KnapsackLCA</a><span class="sep">›</span><a href="PODC2025/KnapsackLCA/src/">Lean source</a><span class="sep">›</span><span aria-current="page">MaximalFeasible</span></nav>
+        <h1>
+          <code>MaximalFeasible.lean</code></h1>
+        <div class="paper-links">
+          <p>
+            Source of <a href="PODC2025/KnapsackLCA/">Local Computation Algorithms for Knapsack — PODC 2025</a> · <a href="https://github.com/vasnesterov/formal_podc/blob/main/Papers/PODC2025/KnapsackLCA/MaximalFeasible.lean">GitHub</a> · hover over a name for its type and documentation</p>
+          </div>
+        <div class="lean-code lean-src">
+          <code class="hl lean block" data-lean-context="MaximalFeasible"><span id="L1"><span class="kw">import</span> Papers.PODC2025.KnapsackLCA.Defs</span>
+<span id="L2"></span>
+<span id="L3"><span class="dc">/-!</span></span>
+<span id="L4"><span class="dc"># No sublinear LCA for maximal feasible Knapsack (Theorem 3.4)</span></span>
+<span id="L5"></span>
+<span id="L6"><span class="dc">The hard distribution of the paper (weights scaled by `4`, so that they are integers): pick an</span></span>
+<span id="L7"><span class="dc">ordered pair `i ≠ j` uniformly, give item `i` weight `3`, item `j` weight `1` or `3` with</span></span>
+<span id="L8"><span class="dc">probability `1/2` each, all other items weight `0`; weight limit `4`; all profits `1/n`</span></span>
+<span id="L9"><span class="dc">(so the instances are normalised, as Definition 2.2 requires).</span></span>
+<span id="L10"></span>
+<span id="L11"><span class="dc">The paper draws `(i, j)` from `[n]²`, which allows `i = j` (ill-defined weights); we use ordered</span></span>
+<span id="L12"><span class="dc">pairs of distinct indices.</span></span>
+<span id="L13"></span>
+<span id="L14"><span class="dc">The paper's Lemma 3.5 argues *per query `k`* that the answer on the "default view" (only zero</span></span>
+<span id="L15"><span class="dc">weights seen) must be "yes", from the global error bound `1/5`; this does not follow (the error</span></span>
+<span id="L16"><span class="dc">is an average over `k`). We replace it by a joint counting argument: if `b_k` is the default</span></span>
+<span id="L17"><span class="dc">answer on query `k` and `m` of the `b_k` are "yes", the deterministic algorithm fails on</span></span>
+<span id="L18"><span class="dc">* `(i, j, light)` whenever `b_i = no` and `j` is not probed on the default run of `i`;</span></span>
+<span id="L19"><span class="dc">* `(i, j, heavy)` whenever `b_i = b_j` and neither probes the other,</span></span>
+<span id="L20"><span class="dc">which is a fraction at least `1/2 (1 - y + y² + (1-y)²) - O(q/n) ≥ 7/16 - O(q/n)` of the</span></span>
+<span id="L21"><span class="dc">distribution (`y = m/n`), for every choice of the `b_k` (`count_le`).</span></span>
+<span id="L22"></span>
+<span id="L23"><span class="dc">* `theorem_3_4`: global correctness with failure probability `1/5` (the paper's "probability of</span></span>
+<span id="L24"><span class="dc">  success at least 4/5") forces at least `n/11` queries, for every `n ≥ 2` — the paper's constant.</span></span>
+<span id="L25"><span class="dc">* `theorem_3_4_perQuery`: per-query correctness with failure probability `1/5` forces at least</span></span>
+<span id="L26"><span class="dc">  `n/40 - 1/5` queries.</span></span>
+<span id="L27"><span class="dc">-/</span></span>
+<span id="L28"></span>
+<span id="L29"><span class="kw">namespace</span> Podc.KnapsackLCA</span>
+<span id="L30"></span>
+<span id="L31"><span class="kw">open</span> Cslib Cslib.Probability.PMF Cslib.QueryTree</span>
+<span id="L32"></span>
+<span id="L33"><span class="kw">variable</span> {Ω : <span class="kw">Type</span>*} {n : <span class="const token" data-verso-hover="24">ℕ</span>}</span>
+<span id="L34"></span>
+<span id="L35"><span class="dc">/-- The hard instance of Theorem 3.4 (weights scaled by 4): `w_i = 3`, `w_j = 3` if `heavy`</span></span>
+<span id="L36"><span class="dc">else `1`, other weights `0`, weight limit `4`, profits `1/n`. -/</span></span>
+<span id="L37"><span class="kw">noncomputable</span> <span class="kw">def</span> <span class="const token" data-verso-hover="192">hardInstance</span> (i j : <span class="const token" data-verso-hover="26">Fin</span> n) (heavy : <span class="const token" data-verso-hover="48">Bool</span>) : <span class="const token" data-verso-hover="10">Instance</span> n <span class="kw">where</span></span>
+<span id="L38">  <span class="const token" data-verso-hover="25">item</span> ℓ := ((<span class="nu">1</span> : <span class="const token" data-verso-hover="27">ℝ</span>) / n, <span class="kw">if</span> ℓ = i <span class="kw">then</span> <span class="nu">3</span> <span class="kw">else</span> <span class="kw">if</span> ℓ = j <span class="kw">then</span> (<span class="kw">if</span> heavy <span class="kw">then</span> <span class="nu">3</span> <span class="kw">else</span> <span class="nu">1</span>) <span class="kw">else</span> <span class="nu">0</span>)</span>
+<span id="L39">  <span class="const token" data-verso-hover="28">cap</span> := <span class="nu">4</span></span>
+<span id="L40"></span>
+<span id="L41"><span class="dc">/-- What the algorithm sees on query `k` as long as it only probes zero-weight items. -/</span></span>
+<span id="L42"><span class="kw">noncomputable</span> <span class="kw">def</span> <span class="const token" data-verso-hover="193">defaultOracle</span> (k : <span class="const token" data-verso-hover="26">Fin</span> n) : <span class="const token" data-verso-hover="26">Fin</span> n → <span class="const token" data-verso-hover="27">ℝ</span> × <span class="const token" data-verso-hover="24">ℕ</span> :=</span>
+<span id="L43">  <span class="kw">fun</span> ℓ =&gt; ((<span class="nu">1</span> : <span class="const token" data-verso-hover="27">ℝ</span>) / n, <span class="kw">if</span> ℓ = k <span class="kw">then</span> <span class="nu">3</span> <span class="kw">else</span> <span class="nu">0</span>)</span>
+<span id="L44"></span>
+<span id="L45"><span class="kw">theorem</span> <span class="const token" data-verso-hover="194">hardInstance_normalized</span> (i j : <span class="const token" data-verso-hover="26">Fin</span> n) (h : <span class="const token" data-verso-hover="48">Bool</span>) : (<span class="const token" data-verso-hover="192">hardInstance</span> i j h).<span class="const token" data-verso-hover="12">Normalized</span> := <span class="kw">by</span></span>
+<span id="L46">  <span class="kw">have</span> hn : (n : <span class="const token" data-verso-hover="27">ℝ</span>) ≠ <span class="nu">0</span> := <span class="kw">by</span> <span class="kw">have</span> := i.<span class="const token" data-verso-hover="195">pos</span>; <span class="kw">positivity</span></span>
+<span id="L47">  <span class="kw">refine</span> ⟨⟨<span class="kw">fun</span> ℓ =&gt; <span class="kw">by</span> <span class="kw">simp</span> [<span class="const token" data-verso-hover="192">hardInstance</span>, <span class="const token" data-verso-hover="29">Instance.profit</span>], <span class="kw">fun</span> ℓ =&gt; ?_⟩, ?_⟩</span>
+<span id="L48">  · <span class="kw">simp</span> only [<span class="const token" data-verso-hover="31">Instance.weight</span>, <span class="const token" data-verso-hover="192">hardInstance</span>]; <span class="kw">split_ifs</span> &lt;;&gt; <span class="kw">norm_num</span></span>
+<span id="L49">  · <span class="kw">simp</span> [<span class="const token" data-verso-hover="29">Instance.profit</span>, <span class="const token" data-verso-hover="192">hardInstance</span>, hn]</span>
+<span id="L50"></span>
+<span id="L51"><span class="kw">theorem</span> <span class="const token" data-verso-hover="196">hardInstance_load</span> {i j : <span class="const token" data-verso-hover="26">Fin</span> n} (hij : i ≠ j) (h : <span class="const token" data-verso-hover="48">Bool</span>) (C : <span class="const token" data-verso-hover="34">Finset</span> (<span class="const token" data-verso-hover="26">Fin</span> n)) :</span>
+<span id="L52">    (<span class="const token" data-verso-hover="192">hardInstance</span> i j h).<span class="const token" data-verso-hover="35">load</span> C =</span>
+<span id="L53">      (<span class="kw">if</span> i ∈ C <span class="kw">then</span> <span class="nu">3</span> <span class="kw">else</span> <span class="nu">0</span>) + (<span class="kw">if</span> j ∈ C <span class="kw">then</span> (<span class="kw">if</span> h <span class="kw">then</span> <span class="nu">3</span> <span class="kw">else</span> <span class="nu">1</span>) <span class="kw">else</span> <span class="nu">0</span>) := <span class="kw">by</span></span>
+<span id="L54">  <span class="kw">simp</span> only [<span class="const token" data-verso-hover="35">Instance.load</span>, <span class="const token" data-verso-hover="31">Instance.weight</span>, <span class="const token" data-verso-hover="192">hardInstance</span>]</span>
+<span id="L55">  <span class="kw">rw</span> [<span class="const token" data-verso-hover="148">Finset.sum_congr</span> <span class="const token" data-verso-hover="106">rfl</span> <span class="kw">fun</span> ℓ _ =&gt; (<span class="kw">show</span> (<span class="kw">if</span> ℓ = i <span class="kw">then</span> <span class="nu">3</span> <span class="kw">else</span></span>
+<span id="L56">      <span class="kw">if</span> ℓ = j <span class="kw">then</span> (<span class="kw">if</span> h <span class="kw">then</span> <span class="nu">3</span> <span class="kw">else</span> <span class="nu">1</span>) <span class="kw">else</span> <span class="nu">0</span>) =</span>
+<span id="L57">      (<span class="kw">if</span> ℓ = i <span class="kw">then</span> <span class="nu">3</span> <span class="kw">else</span> <span class="nu">0</span>) + (<span class="kw">if</span> ℓ = j <span class="kw">then</span> (<span class="kw">if</span> h <span class="kw">then</span> <span class="nu">3</span> <span class="kw">else</span> <span class="nu">1</span>) <span class="kw">else</span> <span class="nu">0</span>) <span class="kw">by</span></span>
+<span id="L58">    <span class="kw">by_cases</span> h1 : ℓ = i</span>
+<span id="L59">    · <span class="kw">subst</span> h1; <span class="kw">simp</span> [hij]</span>
+<span id="L60">    · <span class="kw">simp</span> [h1])]</span>
+<span id="L61">  <span class="kw">rw</span> [<span class="const token" data-verso-hover="197">Finset.sum_add_distrib</span>, <span class="const token" data-verso-hover="198">Finset.sum_ite_eq'</span>, <span class="const token" data-verso-hover="198">Finset.sum_ite_eq'</span>]</span>
+<span id="L62"></span>
+<span id="L63"><span class="dc">/-- Light case: every maximal feasible solution contains `i` (in fact all items). -/</span></span>
+<span id="L64"><span class="kw">theorem</span> <span class="const token" data-verso-hover="199">mem_of_light</span> {i j : <span class="const token" data-verso-hover="26">Fin</span> n} (hij : i ≠ j) {C : <span class="const token" data-verso-hover="34">Finset</span> (<span class="const token" data-verso-hover="26">Fin</span> n)}</span>
+<span id="L65">    (hC : (<span class="const token" data-verso-hover="192">hardInstance</span> i j <span class="const token" data-verso-hover="105">false</span>).<span class="const token" data-verso-hover="39">IsMaximalFeasible</span> C) : i ∈ C := <span class="kw">by</span></span>
+<span id="L66">  <span class="kw">by_contra</span> hi</span>
+<span id="L67">  <span class="kw">apply</span> hC.<span class="const token" data-verso-hover="43">2</span> i hi</span>
+<span id="L68">  <span class="kw">simp</span> only [<span class="const token" data-verso-hover="36">Instance.Feasible</span>, <span class="const token" data-verso-hover="196">hardInstance_load</span> hij, <span class="const token" data-verso-hover="200">Finset.mem_insert</span>, <span class="const token" data-verso-hover="201">true_or</span>, <span class="const token" data-verso-hover="202">ite_true</span>]</span>
+<span id="L69">  <span class="kw">show</span> _ ≤ <span class="nu">4</span></span>
+<span id="L70">  <span class="kw">simp</span> only [<span class="const token" data-verso-hover="203">Bool.false_eq_true</span>, <span class="const token" data-verso-hover="204">ite_false</span>]</span>
+<span id="L71">  <span class="kw">split_ifs</span> &lt;;&gt; <span class="kw">omega</span></span>
+<span id="L72"></span>
+<span id="L73"><span class="dc">/-- Heavy case: a maximal feasible solution contains exactly one of `i`, `j`. -/</span></span>
+<span id="L74"><span class="kw">theorem</span> <span class="const token" data-verso-hover="205">mem_iff_of_heavy</span> {i j : <span class="const token" data-verso-hover="26">Fin</span> n} (hij : i ≠ j) {C : <span class="const token" data-verso-hover="34">Finset</span> (<span class="const token" data-verso-hover="26">Fin</span> n)}</span>
+<span id="L75">    (hC : (<span class="const token" data-verso-hover="192">hardInstance</span> i j <span class="const token" data-verso-hover="54">true</span>).<span class="const token" data-verso-hover="39">IsMaximalFeasible</span> C) : i ∈ C ↔ j ∉ C := <span class="kw">by</span></span>
+<span id="L76">  <span class="kw">have</span> h1 := hC.<span class="const token" data-verso-hover="42">1</span></span>
+<span id="L77">  <span class="kw">simp</span> only [<span class="const token" data-verso-hover="36">Instance.Feasible</span>, <span class="const token" data-verso-hover="196">hardInstance_load</span> hij] <span class="kw">at</span> h1</span>
+<span id="L78">  <span class="kw">change</span> _ ≤ <span class="nu">4</span> <span class="kw">at</span> h1</span>
+<span id="L79">  <span class="kw">constructor</span></span>
+<span id="L80">  · <span class="kw">intro</span> hi hj; <span class="kw">simp</span> [hi, hj] <span class="kw">at</span> h1</span>
+<span id="L81">  · <span class="kw">intro</span> hj</span>
+<span id="L82">    <span class="kw">by_contra</span> hi</span>
+<span id="L83">    <span class="kw">apply</span> hC.<span class="const token" data-verso-hover="43">2</span> i hi</span>
+<span id="L84">    <span class="kw">simp</span> only [<span class="const token" data-verso-hover="36">Instance.Feasible</span>, <span class="const token" data-verso-hover="196">hardInstance_load</span> hij, <span class="const token" data-verso-hover="200">Finset.mem_insert</span>, <span class="const token" data-verso-hover="201">true_or</span>, <span class="const token" data-verso-hover="202">ite_true</span>,</span>
+<span id="L85">      hj, <span class="const token" data-verso-hover="169">Ne.symm</span> hij, <span class="const token" data-verso-hover="206">false_or</span>]</span>
+<span id="L86">    <span class="kw">show</span> <span class="nu">3</span> + <span class="nu">0</span> ≤ <span class="nu">4</span></span>
+<span id="L87">    <span class="kw">omega</span></span>
+<span id="L88"></span>
+<span id="L89"><span class="kw">theorem</span> <span class="const token" data-verso-hover="207">hardInstance_item_left</span> {i j : <span class="const token" data-verso-hover="26">Fin</span> n} (h : <span class="const token" data-verso-hover="48">Bool</span>) {ℓ : <span class="const token" data-verso-hover="26">Fin</span> n} (hℓ : ℓ ≠ j) :</span>
+<span id="L90">    (<span class="const token" data-verso-hover="192">hardInstance</span> i j h).<span class="const token" data-verso-hover="25">item</span> ℓ = <span class="const token" data-verso-hover="193">defaultOracle</span> i ℓ := <span class="kw">by</span></span>
+<span id="L91">  <span class="kw">simp</span> [<span class="const token" data-verso-hover="192">hardInstance</span>, <span class="const token" data-verso-hover="193">defaultOracle</span>, hℓ]</span>
+<span id="L92"></span>
+<span id="L93"><span class="kw">theorem</span> <span class="const token" data-verso-hover="208">hardInstance_item_right</span> {i j : <span class="const token" data-verso-hover="26">Fin</span> n} (hij : i ≠ j) {ℓ : <span class="const token" data-verso-hover="26">Fin</span> n} (hℓ : ℓ ≠ i) :</span>
+<span id="L94">    (<span class="const token" data-verso-hover="192">hardInstance</span> i j <span class="const token" data-verso-hover="54">true</span>).<span class="const token" data-verso-hover="25">item</span> ℓ = <span class="const token" data-verso-hover="193">defaultOracle</span> j ℓ := <span class="kw">by</span></span>
+<span id="L95">  <span class="kw">by_cases</span> h : ℓ = j</span>
+<span id="L96">  · <span class="kw">subst</span> h; <span class="kw">simp</span> [<span class="const token" data-verso-hover="192">hardInstance</span>, <span class="const token" data-verso-hover="193">defaultOracle</span>, hℓ]</span>
+<span id="L97">  · <span class="kw">simp</span> [<span class="const token" data-verso-hover="192">hardInstance</span>, <span class="const token" data-verso-hover="193">defaultOracle</span>, hℓ, h]</span>
+<span id="L98"></span>
+<span id="L99"><span class="kw">namespace</span> LCA</span>
+<span id="L100"></span>
+<span id="L101"><span class="kw">variable</span> (A : <span class="const token" data-verso-hover="44">LCA</span> n Ω)</span>
+<span id="L102"></span>
+<span id="L103"><span class="dc">/-- The answer on query `k` with seed `r` on the default view. -/</span></span>
+<span id="L104"><span class="kw">noncomputable</span> <span class="kw">def</span> <span class="const token" data-verso-hover="209">bit</span> (r : Ω) (k : <span class="const token" data-verso-hover="26">Fin</span> n) : <span class="const token" data-verso-hover="48">Bool</span> := (A.<span class="const token" data-verso-hover="47">run</span> <span class="nu">4</span> r k).<span class="const token" data-verso-hover="50">eval</span> (<span class="const token" data-verso-hover="193">defaultOracle</span> k)</span>
+<span id="L105"></span>
+<span id="L106"><span class="dc">/-- The items probed on query `k` with seed `r` on the default view. -/</span></span>
+<span id="L107"><span class="kw">noncomputable</span> <span class="kw">def</span> <span class="const token" data-verso-hover="210">probes</span> (r : Ω) (k : <span class="const token" data-verso-hover="26">Fin</span> n) : <span class="const token" data-verso-hover="211">List</span> (<span class="const token" data-verso-hover="26">Fin</span> n) :=</span>
+<span id="L108">  (A.<span class="const token" data-verso-hover="47">run</span> <span class="nu">4</span> r k).<span class="const token" data-verso-hover="212">queried</span> (<span class="const token" data-verso-hover="193">defaultOracle</span> k)</span>
+<span id="L109"></span>
+<span id="L110"><span class="dc">/-- The answers to the two special queries `i`, `j` are consistent with one maximal feasible</span></span>
+<span id="L111"><span class="dc">solution of the hard instance. -/</span></span>
+<span id="L112"><span class="kw">def</span> <span class="const token" data-verso-hover="213">LocalOK</span> (r : Ω) (i j : <span class="const token" data-verso-hover="26">Fin</span> n) (h : <span class="const token" data-verso-hover="48">Bool</span>) : <span class="kw">Prop</span> :=</span>
+<span id="L113">  ∃ C, (<span class="const token" data-verso-hover="192">hardInstance</span> i j h).<span class="const token" data-verso-hover="39">IsMaximalFeasible</span> C ∧</span>
+<span id="L114">    (A.<span class="const token" data-verso-hover="49">answer</span> (<span class="const token" data-verso-hover="192">hardInstance</span> i j h) r i = <span class="const token" data-verso-hover="54">true</span> ↔ i ∈ C) ∧</span>
+<span id="L115">    (A.<span class="const token" data-verso-hover="49">answer</span> (<span class="const token" data-verso-hover="192">hardInstance</span> i j h) r j = <span class="const token" data-verso-hover="54">true</span> ↔ j ∈ C)</span>
+<span id="L116"></span>
+<span id="L117"><span class="kw">theorem</span> <span class="const token" data-verso-hover="214">answer_left</span> {i j : <span class="const token" data-verso-hover="26">Fin</span> n} (h : <span class="const token" data-verso-hover="48">Bool</span>) {r : Ω} (hj : j ∉ A.<span class="const token" data-verso-hover="210">probes</span> r i) :</span>
+<span id="L118">    A.<span class="const token" data-verso-hover="49">answer</span> (<span class="const token" data-verso-hover="192">hardInstance</span> i j h) r i = A.<span class="const token" data-verso-hover="209">bit</span> r i := <span class="kw">by</span></span>
+<span id="L119">  <span class="kw">refine</span> <span class="const token" data-verso-hover="215">eval_eq_of_agree</span> _ _ _ <span class="kw">fun</span> ℓ hℓ =&gt; <span class="const token" data-verso-hover="207">hardInstance_item_left</span> h ?_</span>
+<span id="L120">  <span class="kw">rintro</span> <span class="kw">rfl</span>; <span class="kw">exact</span> hj hℓ</span>
+<span id="L121"></span>
+<span id="L122"><span class="kw">theorem</span> <span class="const token" data-verso-hover="216">answer_right</span> {i j : <span class="const token" data-verso-hover="26">Fin</span> n} (hij : i ≠ j) {r : Ω} (hi : i ∉ A.<span class="const token" data-verso-hover="210">probes</span> r j) :</span>
+<span id="L123">    A.<span class="const token" data-verso-hover="49">answer</span> (<span class="const token" data-verso-hover="192">hardInstance</span> i j <span class="const token" data-verso-hover="54">true</span>) r j = A.<span class="const token" data-verso-hover="209">bit</span> r j := <span class="kw">by</span></span>
+<span id="L124">  <span class="kw">refine</span> <span class="const token" data-verso-hover="215">eval_eq_of_agree</span> _ _ _ <span class="kw">fun</span> ℓ hℓ =&gt; <span class="const token" data-verso-hover="208">hardInstance_item_right</span> hij ?_</span>
+<span id="L125">  <span class="kw">rintro</span> <span class="kw">rfl</span>; <span class="kw">exact</span> hi hℓ</span>
+<span id="L126"></span>
+<span id="L127"><span class="kw">theorem</span> <span class="const token" data-verso-hover="217">localOK_light</span> {r : Ω} {i j : <span class="const token" data-verso-hover="26">Fin</span> n} (hij : i ≠ j) (h : A.<span class="const token" data-verso-hover="213">LocalOK</span> r i j <span class="const token" data-verso-hover="105">false</span>) :</span>
+<span id="L128">    A.<span class="const token" data-verso-hover="209">bit</span> r i = <span class="const token" data-verso-hover="54">true</span> ∨ j ∈ A.<span class="const token" data-verso-hover="210">probes</span> r i := <span class="kw">by</span></span>
+<span id="L129">  <span class="kw">by_contra</span> hcon</span>
+<span id="L130">  push <span class="const token" data-verso-hover="218">Not</span> <span class="kw">at</span> hcon</span>
+<span id="L131">  <span class="kw">obtain</span> ⟨C, hC, hi, -⟩ := h</span>
+<span id="L132">  <span class="kw">have</span> := hi.<span class="const token" data-verso-hover="77">2</span> (<span class="const token" data-verso-hover="199">mem_of_light</span> hij hC)</span>
+<span id="L133">  <span class="kw">rw</span> [<span class="const token" data-verso-hover="214">answer_left</span> A <span class="const token" data-verso-hover="105">false</span> hcon.<span class="const token" data-verso-hover="43">2</span>] <span class="kw">at</span> this</span>
+<span id="L134">  <span class="kw">simp</span> [this] <span class="kw">at</span> hcon</span>
+<span id="L135"></span>
+<span id="L136"><span class="kw">theorem</span> <span class="const token" data-verso-hover="219">localOK_heavy</span> {r : Ω} {i j : <span class="const token" data-verso-hover="26">Fin</span> n} (hij : i ≠ j) (h : A.<span class="const token" data-verso-hover="213">LocalOK</span> r i j <span class="const token" data-verso-hover="54">true</span>) :</span>
+<span id="L137">    A.<span class="const token" data-verso-hover="209">bit</span> r i ≠ A.<span class="const token" data-verso-hover="209">bit</span> r j ∨ j ∈ A.<span class="const token" data-verso-hover="210">probes</span> r i ∨ i ∈ A.<span class="const token" data-verso-hover="210">probes</span> r j := <span class="kw">by</span></span>
+<span id="L138">  <span class="kw">by_contra</span> hcon</span>
+<span id="L139">  push <span class="const token" data-verso-hover="218">Not</span> <span class="kw">at</span> hcon</span>
+<span id="L140">  <span class="kw">obtain</span> ⟨hb, hpj, hpi⟩ := hcon</span>
+<span id="L141">  <span class="kw">obtain</span> ⟨C, hC, hi, hj⟩ := h</span>
+<span id="L142">  <span class="kw">rw</span> [<span class="const token" data-verso-hover="214">answer_left</span> A <span class="const token" data-verso-hover="54">true</span> hpj] <span class="kw">at</span> hi</span>
+<span id="L143">  <span class="kw">rw</span> [<span class="const token" data-verso-hover="216">answer_right</span> A hij hpi] <span class="kw">at</span> hj</span>
+<span id="L144">  <span class="kw">have</span> := <span class="const token" data-verso-hover="205">mem_iff_of_heavy</span> hij hC</span>
+<span id="L145">  <span class="kw">cases</span> hbi : A.<span class="const token" data-verso-hover="209">bit</span> r i &lt;;&gt; <span class="kw">rw</span> [hbi] <span class="kw">at</span> hi &lt;;&gt; <span class="kw">rw</span> [← hb, hbi] <span class="kw">at</span> hj &lt;;&gt; <span class="kw">simp_all</span></span>
+<span id="L146"></span>
+<span id="L147"><span class="dc">/-- Weight of a hard instance in the uniform distribution (up to normalisation): `1` for</span></span>
+<span id="L148"><span class="dc">`i ≠ j`, `0` otherwise. -/</span></span>
+<span id="L149"><span class="kw">noncomputable</span> <span class="kw">def</span> <span class="const token" data-verso-hover="220">pairWeight</span> (x : <span class="const token" data-verso-hover="26">Fin</span> n × <span class="const token" data-verso-hover="26">Fin</span> n × <span class="const token" data-verso-hover="48">Bool</span>) : <span class="const token" data-verso-hover="27">ℝ</span> := <span class="kw">if</span> x.<span class="const token" data-verso-hover="30">1</span> = x.<span class="const token" data-verso-hover="32">2</span><span class="nu">.</span><span class="const token" data-verso-hover="30">1</span> <span class="kw">then</span> <span class="nu">0</span> <span class="kw">else</span> <span class="nu">1</span></span>
+<span id="L150"></span>
+<span id="L151"><span class="dc">/-- **Counting core of Theorem 3.4.** For every seed, the number of hard instances on which the</span></span>
+<span id="L152"><span class="dc">two special answers are consistent with a maximal feasible solution is at most</span></span>
+<span id="L153"><span class="dc">`2 n (n-1) - (7n² - 10n - 1)/8 + 3 n q`. -/</span></span>
+<span id="L154"><span class="kw">theorem</span> <span class="const token" data-verso-hover="9">count_le</span> {q : <span class="const token" data-verso-hover="24">ℕ</span>} (hq : A.<span class="const token" data-verso-hover="13">QueryBound</span> q) (r : Ω) :</span>
+<span id="L155">    ∑ x : <span class="const token" data-verso-hover="26">Fin</span> n × <span class="const token" data-verso-hover="26">Fin</span> n × <span class="const token" data-verso-hover="48">Bool</span>, {r | A.<span class="const token" data-verso-hover="213">LocalOK</span> r x.<span class="const token" data-verso-hover="30">1</span> x.<span class="const token" data-verso-hover="32">2</span><span class="nu">.</span><span class="const token" data-verso-hover="30">1</span> x.<span class="const token" data-verso-hover="32">2</span><span class="nu">.</span><span class="const token" data-verso-hover="32">2</span>}.<span class="const token" data-verso-hover="221">indicator</span></span>
+<span id="L156">        (<span class="kw">fun</span> _ =&gt; <span class="const token" data-verso-hover="220">pairWeight</span> x) r ≤</span>
+<span id="L157">      <span class="nu">2</span> * ((n : <span class="const token" data-verso-hover="27">ℝ</span>) ^ <span class="nu">2</span> - n) - (<span class="nu">7</span> * (n : <span class="const token" data-verso-hover="27">ℝ</span>) ^ <span class="nu">2</span> - <span class="nu">10</span> * n - <span class="nu">1</span>) / <span class="nu">8</span> + <span class="nu">3</span> * n * q := <span class="kw">by</span></span>
+<span id="L158">  <span class="kw">classical</span></span>
+<span id="L159">  <span class="kw">set</span> x : <span class="const token" data-verso-hover="26">Fin</span> n → <span class="const token" data-verso-hover="27">ℝ</span> := <span class="kw">fun</span> i =&gt; <span class="kw">if</span> A.<span class="const token" data-verso-hover="209">bit</span> r i <span class="kw">then</span> <span class="nu">1</span> <span class="kw">else</span> <span class="nu">0</span></span>
+<span id="L160">  <span class="kw">set</span> p : <span class="const token" data-verso-hover="26">Fin</span> n → <span class="const token" data-verso-hover="26">Fin</span> n → <span class="const token" data-verso-hover="27">ℝ</span> := <span class="kw">fun</span> i j =&gt; <span class="kw">if</span> j ∈ A.<span class="const token" data-verso-hover="210">probes</span> r i <span class="kw">then</span> <span class="nu">1</span> <span class="kw">else</span> <span class="nu">0</span></span>
+<span id="L161">  <span class="kw">set</span> m : <span class="const token" data-verso-hover="27">ℝ</span> := ∑ i, x i</span>
+<span id="L162">  <span class="kw">have</span> hx01 : ∀ i, x i = <span class="nu">0</span> ∨ x i = <span class="nu">1</span> := <span class="kw">fun</span> i =&gt; <span class="kw">by</span> <span class="kw">simp</span> only [x]; <span class="kw">split_ifs</span> &lt;;&gt; <span class="kw">simp</span></span>
+<span id="L163">  <span class="kw">have</span> hp0 : ∀ i j, <span class="nu">0</span> ≤ p i j := <span class="kw">fun</span> i j =&gt; <span class="kw">by</span> <span class="kw">simp</span> only [p]; <span class="kw">split_ifs</span> &lt;;&gt; <span class="kw">norm_num</span></span>
+<span id="L164">  <span class="cm">--</span><span class="cm"> pointwise bounds</span></span>
+<span id="L165">  <span class="kw">set</span> g : <span class="const token" data-verso-hover="26">Fin</span> n → <span class="const token" data-verso-hover="26">Fin</span> n → <span class="const token" data-verso-hover="27">ℝ</span> := <span class="kw">fun</span> i j =&gt; x i * x j + (<span class="nu">1</span> - x i) * (<span class="nu">1</span> - x j)</span>
+<span id="L166">  <span class="kw">have</span> hlight : ∀ i j, {r | A.<span class="const token" data-verso-hover="213">LocalOK</span> r i j <span class="const token" data-verso-hover="105">false</span>}.<span class="const token" data-verso-hover="221">indicator</span> (<span class="kw">fun</span> _ =&gt; <span class="const token" data-verso-hover="220">pairWeight</span> (i, j, <span class="const token" data-verso-hover="105">false</span>)) r</span>
+<span id="L167">      ≤ (<span class="kw">if</span> i = j <span class="kw">then</span> <span class="nu">0</span> <span class="kw">else</span> x i) + p i j := <span class="kw">by</span></span>
+<span id="L168">    <span class="kw">intro</span> i j</span>
+<span id="L169">    <span class="kw">by_cases</span> hij : i = j</span>
+<span id="L170">    · <span class="kw">subst</span> hij</span>
+<span id="L171">      <span class="kw">have</span> h0 : <span class="const token" data-verso-hover="220">pairWeight</span> (i, i, <span class="const token" data-verso-hover="105">false</span>) = <span class="nu">0</span> := <span class="kw">by</span> <span class="kw">simp</span> [<span class="const token" data-verso-hover="220">pairWeight</span>]</span>
+<span id="L172">      <span class="kw">rw</span> [<span class="const token" data-verso-hover="222">Set.indicator_apply</span>, h0, <span class="const token" data-verso-hover="223">ite_self</span>]; <span class="kw">simpa</span> <span class="kw">using</span> hp0 i i</span>
+<span id="L173">    · <span class="kw">rw</span> [<span class="const token" data-verso-hover="222">Set.indicator_apply</span>]</span>
+<span id="L174">      <span class="kw">split_ifs</span> <span class="kw">with</span> hok</span>
+<span id="L175">      · <span class="kw">rcases</span> A.<span class="const token" data-verso-hover="217">localOK_light</span> hij hok <span class="kw">with</span> hb | hp</span>
+<span id="L176">        · <span class="kw">simp</span> [<span class="const token" data-verso-hover="220">pairWeight</span>, hij, x, hb, hp0]</span>
+<span id="L177">        · <span class="kw">simp</span> only [<span class="const token" data-verso-hover="220">pairWeight</span>, hij, x, p, hp, <span class="const token" data-verso-hover="204">ite_false</span>, <span class="const token" data-verso-hover="202">ite_true</span>]</span>
+<span id="L178">          <span class="kw">split_ifs</span> &lt;;&gt; <span class="kw">norm_num</span></span>
+<span id="L179">      · <span class="kw">rcases</span> hx01 i <span class="kw">with</span> h | h &lt;;&gt; <span class="kw">rw</span> [h] &lt;;&gt; <span class="kw">linarith</span> [hp0 i j]</span>
+<span id="L180">  <span class="kw">have</span> hheavy : ∀ i j, {r | A.<span class="const token" data-verso-hover="213">LocalOK</span> r i j <span class="const token" data-verso-hover="54">true</span>}.<span class="const token" data-verso-hover="221">indicator</span> (<span class="kw">fun</span> _ =&gt; <span class="const token" data-verso-hover="220">pairWeight</span> (i, j, <span class="const token" data-verso-hover="54">true</span>)) r</span>
+<span id="L181">      ≤ (<span class="kw">if</span> i = j <span class="kw">then</span> <span class="nu">0</span> <span class="kw">else</span> <span class="nu">1</span> - g i j) + p i j + p j i := <span class="kw">by</span></span>
+<span id="L182">    <span class="kw">intro</span> i j</span>
+<span id="L183">    <span class="kw">have</span> hg : ∀ i j, <span class="nu">0</span> ≤ <span class="nu">1</span> - g i j ∧ <span class="nu">1</span> - g i j ≤ <span class="nu">1</span> := <span class="kw">fun</span> i j =&gt; <span class="kw">by</span></span>
+<span id="L184">      <span class="kw">rcases</span> hx01 i <span class="kw">with</span> h | h &lt;;&gt; <span class="kw">rcases</span> hx01 j <span class="kw">with</span> h' | h' &lt;;&gt; <span class="kw">simp</span> [g, h, h']</span>
+<span id="L185">    <span class="kw">by_cases</span> hij : i = j</span>
+<span id="L186">    · <span class="kw">subst</span> hij</span>
+<span id="L187">      <span class="kw">have</span> h0 : <span class="const token" data-verso-hover="220">pairWeight</span> (i, i, <span class="const token" data-verso-hover="54">true</span>) = <span class="nu">0</span> := <span class="kw">by</span> <span class="kw">simp</span> [<span class="const token" data-verso-hover="220">pairWeight</span>]</span>
+<span id="L188">      <span class="kw">rw</span> [<span class="const token" data-verso-hover="222">Set.indicator_apply</span>, h0, <span class="const token" data-verso-hover="223">ite_self</span>]; <span class="kw">simpa</span> <span class="kw">using</span> <span class="const token" data-verso-hover="224">add_nonneg</span> (hp0 i i) (hp0 i i)</span>
+<span id="L189">    · <span class="kw">rw</span> [<span class="const token" data-verso-hover="222">Set.indicator_apply</span>]</span>
+<span id="L190">      <span class="kw">split_ifs</span> <span class="kw">with</span> hok</span>
+<span id="L191">      · <span class="kw">rcases</span> A.<span class="const token" data-verso-hover="219">localOK_heavy</span> hij hok <span class="kw">with</span> hb | hp | hp</span>
+<span id="L192">        · <span class="kw">have</span> : <span class="nu">1</span> - g i j = <span class="nu">1</span> := <span class="kw">by</span></span>
+<span id="L193">            <span class="kw">simp</span> only [g, x]</span>
+<span id="L194">            <span class="kw">cases</span> hbi : A.<span class="const token" data-verso-hover="209">bit</span> r i &lt;;&gt; <span class="kw">cases</span> hbj : A.<span class="const token" data-verso-hover="209">bit</span> r j &lt;;&gt; <span class="kw">simp_all</span></span>
+<span id="L195">          <span class="kw">simp</span> only [<span class="const token" data-verso-hover="220">pairWeight</span>, hij, this, <span class="const token" data-verso-hover="204">ite_false</span>]; <span class="kw">linarith</span> [hp0 i j, hp0 j i]</span>
+<span id="L196">        · <span class="kw">simp</span> only [<span class="const token" data-verso-hover="220">pairWeight</span>, hij, p, hp, <span class="const token" data-verso-hover="204">ite_false</span>, <span class="const token" data-verso-hover="202">ite_true</span>]</span>
+<span id="L197">          <span class="kw">linarith</span> [hg i j, hp0 j i]</span>
+<span id="L198">        · <span class="kw">simp</span> only [<span class="const token" data-verso-hover="220">pairWeight</span>, hij, p, hp, <span class="const token" data-verso-hover="204">ite_false</span>, <span class="const token" data-verso-hover="202">ite_true</span>]</span>
+<span id="L199">          <span class="kw">linarith</span> [hg i j, hp0 i j]</span>
+<span id="L200">      · <span class="kw">linarith</span> [hg i j, hp0 i j, hp0 j i]</span>
+<span id="L201">  <span class="cm">--</span><span class="cm"> probes</span></span>
+<span id="L202">  <span class="kw">have</span> hprow : ∀ i, ∑ j, p i j ≤ q := <span class="kw">by</span></span>
+<span id="L203">    <span class="kw">intro</span> i</span>
+<span id="L204">    <span class="kw">simp</span> only [p]</span>
+<span id="L205">    <span class="kw">rw</span> [← <span class="const token" data-verso-hover="225">Finset.sum_filter</span>, <span class="const token" data-verso-hover="226">Finset.sum_const</span>, <span class="const token" data-verso-hover="227">nsmul_eq_mul</span>, <span class="const token" data-verso-hover="188">mul_one</span>]</span>
+<span id="L206">    <span class="kw">have</span> h1 : (<span class="const token" data-verso-hover="52">Finset.univ</span>.<span class="const token" data-verso-hover="53">filter</span> <span class="kw">fun</span> j =&gt; j ∈ A.<span class="const token" data-verso-hover="210">probes</span> r i).<span class="const token" data-verso-hover="80">card</span> ≤ q := <span class="kw">by</span></span>
+<span id="L207">      <span class="kw">calc</span> _ ≤ (A.<span class="const token" data-verso-hover="210">probes</span> r i).<span class="const token" data-verso-hover="228">toFinset</span>.<span class="const token" data-verso-hover="80">card</span> := <span class="const token" data-verso-hover="229">Finset.card_le_card</span> <span class="kw">fun</span> j hj =&gt; <span class="kw">by</span></span>
+<span id="L208">              <span class="kw">simp</span> only [<span class="const token" data-verso-hover="75">Finset.mem_filter</span>] <span class="kw">at</span> hj; <span class="kw">simpa</span> <span class="kw">using</span> hj.<span class="const token" data-verso-hover="43">2</span></span>
+<span id="L209">        _ ≤ (A.<span class="const token" data-verso-hover="210">probes</span> r i).<span class="const token" data-verso-hover="230">length</span> := <span class="const token" data-verso-hover="231">List.toFinset_card_le</span> _</span>
+<span id="L210">        _ = (A.<span class="const token" data-verso-hover="47">run</span> <span class="nu">4</span> r i).<span class="const token" data-verso-hover="55">cost</span> (<span class="const token" data-verso-hover="193">defaultOracle</span> i) := <span class="const token" data-verso-hover="232">length_queried</span> _ _</span>
+<span id="L211">        _ ≤ q := hq _ _ _ _</span>
+<span id="L212">    <span class="kw">exact_mod_cast</span> h1</span>
+<span id="L213">  <span class="kw">have</span> hpsum : ∑ i, ∑ j, p i j ≤ n * q := <span class="kw">by</span></span>
+<span id="L214">    <span class="kw">calc</span> _ ≤ ∑ _i : <span class="const token" data-verso-hover="26">Fin</span> n, (q : <span class="const token" data-verso-hover="27">ℝ</span>) := <span class="const token" data-verso-hover="184">Finset.sum_le_sum</span> <span class="kw">fun</span> i _ =&gt; hprow i</span>
+<span id="L215">      _ = n * q := <span class="kw">by</span> <span class="kw">simp</span></span>
+<span id="L216">  <span class="kw">have</span> hpsum' : ∑ i, ∑ j, p j i ≤ n * q := <span class="kw">by</span> <span class="kw">rw</span> [<span class="const token" data-verso-hover="233">Finset.sum_comm</span>]; <span class="kw">exact</span> hpsum</span>
+<span id="L217">  <span class="cm">--</span><span class="cm"> the main sums</span></span>
+<span id="L218">  <span class="kw">have</span> hS1 : ∑ i : <span class="const token" data-verso-hover="26">Fin</span> n, ∑ j : <span class="const token" data-verso-hover="26">Fin</span> n, (<span class="kw">if</span> i = j <span class="kw">then</span> <span class="nu">0</span> <span class="kw">else</span> x i) = m * (n - <span class="nu">1</span>) := <span class="kw">by</span></span>
+<span id="L219">    <span class="kw">have</span> : ∀ i : <span class="const token" data-verso-hover="26">Fin</span> n, ∑ j : <span class="const token" data-verso-hover="26">Fin</span> n, (<span class="kw">if</span> i = j <span class="kw">then</span> <span class="nu">0</span> <span class="kw">else</span> x i) = x i * (n - <span class="nu">1</span>) := <span class="kw">fun</span> i =&gt; <span class="kw">by</span></span>
+<span id="L220">      <span class="kw">rw</span> [<span class="const token" data-verso-hover="148">Finset.sum_congr</span> <span class="const token" data-verso-hover="106">rfl</span> <span class="kw">fun</span> j _ =&gt; (<span class="kw">show</span> (<span class="kw">if</span> i = j <span class="kw">then</span> <span class="nu">0</span> <span class="kw">else</span> x i) =</span>
+<span id="L221">        x i - (<span class="kw">if</span> i = j <span class="kw">then</span> x i <span class="kw">else</span> <span class="nu">0</span>) <span class="kw">by</span> <span class="kw">split_ifs</span> &lt;;&gt; <span class="kw">ring</span>)]</span>
+<span id="L222">      <span class="kw">rw</span> [<span class="const token" data-verso-hover="234">Finset.sum_sub_distrib</span>, <span class="const token" data-verso-hover="235">Finset.sum_ite_eq</span>]; <span class="kw">simp</span>; <span class="kw">ring</span></span>
+<span id="L223">    <span class="kw">simp</span> only [this, m, <span class="const token" data-verso-hover="236">Finset.sum_mul</span>]</span>
+<span id="L224">  <span class="kw">have</span> hS2 : ∑ i : <span class="const token" data-verso-hover="26">Fin</span> n, ∑ j : <span class="const token" data-verso-hover="26">Fin</span> n, (<span class="kw">if</span> i = j <span class="kw">then</span> <span class="nu">0</span> <span class="kw">else</span> <span class="nu">1</span> - g i j) =</span>
+<span id="L225">      n ^ <span class="nu">2</span> - (m ^ <span class="nu">2</span> + (n - m) ^ <span class="nu">2</span>) := <span class="kw">by</span></span>
+<span id="L226">    <span class="kw">have</span> hgii : ∀ i, g i i = <span class="nu">1</span> := <span class="kw">fun</span> i =&gt; <span class="kw">by</span> <span class="kw">rcases</span> hx01 i <span class="kw">with</span> h | h &lt;;&gt; <span class="kw">simp</span> [g, h]</span>
+<span id="L227">    <span class="kw">have</span> : ∀ i : <span class="const token" data-verso-hover="26">Fin</span> n, ∑ j : <span class="const token" data-verso-hover="26">Fin</span> n, (<span class="kw">if</span> i = j <span class="kw">then</span> <span class="nu">0</span> <span class="kw">else</span> <span class="nu">1</span> - g i j) = ∑ j, (<span class="nu">1</span> - g i j) := <span class="kw">by</span></span>
+<span id="L228">      <span class="kw">intro</span> i</span>
+<span id="L229">      <span class="kw">refine</span> <span class="const token" data-verso-hover="148">Finset.sum_congr</span> <span class="const token" data-verso-hover="106">rfl</span> <span class="kw">fun</span> j _ =&gt; ?_</span>
+<span id="L230">      <span class="kw">split_ifs</span> <span class="kw">with</span> h</span>
+<span id="L231">      · <span class="kw">subst</span> h; <span class="kw">simp</span> [hgii]</span>
+<span id="L232">      · <span class="kw">rfl</span></span>
+<span id="L233">    <span class="kw">simp</span> only [this, <span class="const token" data-verso-hover="234">Finset.sum_sub_distrib</span>, g, <span class="const token" data-verso-hover="197">Finset.sum_add_distrib</span>, ← <span class="const token" data-verso-hover="237">Finset.mul_sum</span>,</span>
+<span id="L234">      ← <span class="const token" data-verso-hover="236">Finset.sum_mul</span>, <span class="const token" data-verso-hover="226">Finset.sum_const</span>, <span class="const token" data-verso-hover="185">Finset.card_univ</span>, <span class="const token" data-verso-hover="186">Fintype.card_fin</span>, <span class="const token" data-verso-hover="227">nsmul_eq_mul</span>]</span>
+<span id="L235">    <span class="kw">simp</span> only [m]</span>
+<span id="L236">    <span class="kw">ring</span></span>
+<span id="L237">  <span class="cm">--</span><span class="cm"> assemble</span></span>
+<span id="L238">  <span class="kw">rw</span> [<span class="const token" data-verso-hover="238">Fintype.sum_prod_type</span>]</span>
+<span id="L239">  <span class="kw">simp</span> only [<span class="const token" data-verso-hover="238">Fintype.sum_prod_type</span>, <span class="const token" data-verso-hover="239">Fintype.sum_bool</span>]</span>
+<span id="L240">  <span class="kw">have</span> hsum : ∑ i : <span class="const token" data-verso-hover="26">Fin</span> n, ∑ j : <span class="const token" data-verso-hover="26">Fin</span> n,</span>
+<span id="L241">      ({r | A.<span class="const token" data-verso-hover="213">LocalOK</span> r i j <span class="const token" data-verso-hover="54">true</span>}.<span class="const token" data-verso-hover="221">indicator</span> (<span class="kw">fun</span> _ =&gt; <span class="const token" data-verso-hover="220">pairWeight</span> (i, j, <span class="const token" data-verso-hover="54">true</span>)) r +</span>
+<span id="L242">        {r | A.<span class="const token" data-verso-hover="213">LocalOK</span> r i j <span class="const token" data-verso-hover="105">false</span>}.<span class="const token" data-verso-hover="221">indicator</span> (<span class="kw">fun</span> _ =&gt; <span class="const token" data-verso-hover="220">pairWeight</span> (i, j, <span class="const token" data-verso-hover="105">false</span>)) r) ≤</span>
+<span id="L243">      ∑ i : <span class="const token" data-verso-hover="26">Fin</span> n, ∑ j : <span class="const token" data-verso-hover="26">Fin</span> n, ((<span class="kw">if</span> i = j <span class="kw">then</span> <span class="nu">0</span> <span class="kw">else</span> <span class="nu">1</span> - g i j) + (<span class="kw">if</span> i = j <span class="kw">then</span> <span class="nu">0</span> <span class="kw">else</span> x i)</span>
+<span id="L244">        + <span class="nu">2</span> * p i j + p j i) := <span class="kw">by</span></span>
+<span id="L245">    <span class="kw">refine</span> <span class="const token" data-verso-hover="184">Finset.sum_le_sum</span> <span class="kw">fun</span> i _ =&gt; <span class="const token" data-verso-hover="184">Finset.sum_le_sum</span> <span class="kw">fun</span> j _ =&gt; ?_</span>
+<span id="L246">    <span class="kw">linarith</span> [hlight i j, hheavy i j]</span>
+<span id="L247">  <span class="kw">refine</span> hsum.<span class="const token" data-verso-hover="59">trans</span> ?_</span>
+<span id="L248">  <span class="kw">simp</span> only [<span class="const token" data-verso-hover="197">Finset.sum_add_distrib</span>, ← <span class="const token" data-verso-hover="237">Finset.mul_sum</span>]</span>
+<span id="L249">  <span class="kw">rw</span> [hS1, hS2]</span>
+<span id="L250">  <span class="kw">have</span> hm0 : <span class="nu">0</span> ≤ m := <span class="const token" data-verso-hover="240">Finset.sum_nonneg</span> <span class="kw">fun</span> i _ =&gt; <span class="kw">by</span> <span class="kw">rcases</span> hx01 i <span class="kw">with</span> h | h &lt;;&gt; <span class="kw">simp</span> [h]</span>
+<span id="L251">  <span class="kw">nlinarith</span> [<span class="const token" data-verso-hover="241">sq_nonneg</span> (<span class="nu">4</span> * ((n : <span class="const token" data-verso-hover="27">ℝ</span>) - m) - (n + <span class="nu">1</span>)), hpsum, hpsum']</span>
+<span id="L252"></span>
+<span id="L253"><span class="dc">/-- **Yao step of Theorem 3.4.** If on every hard instance the two special answers are</span></span>
+<span id="L254"><span class="dc">consistent with a maximal feasible solution with probability `≥ 1 - ε`, then</span></span>
+<span id="L255"><span class="dc">`(1 - ε) · 2n(n-1) ≤ 2n(n-1) - (7n² - 10n - 1)/8 + 3nq`. -/</span></span>
+<span id="L256"><span class="kw">theorem</span> <span class="const token" data-verso-hover="242">yao_bound</span> {q : <span class="const token" data-verso-hover="24">ℕ</span>} (hq : A.<span class="const token" data-verso-hover="13">QueryBound</span> q) (ε : <span class="const token" data-verso-hover="27">ℝ</span>)</span>
+<span id="L257">    (hgood : ∀ i j h, i ≠ j → <span class="nu">1</span> - ε ≤ <span class="const token" data-verso-hover="57">probReal</span> A.<span class="const token" data-verso-hover="45">seed</span> {r | A.<span class="const token" data-verso-hover="213">LocalOK</span> r i j h}) :</span>
+<span id="L258">    (<span class="nu">1</span> - ε) * (<span class="nu">2</span> * ((n : <span class="const token" data-verso-hover="27">ℝ</span>) ^ <span class="nu">2</span> - n)) ≤</span>
+<span id="L259">      <span class="nu">2</span> * ((n : <span class="const token" data-verso-hover="27">ℝ</span>) ^ <span class="nu">2</span> - n) - (<span class="nu">7</span> * (n : <span class="const token" data-verso-hover="27">ℝ</span>) ^ <span class="nu">2</span> - <span class="nu">10</span> * n - <span class="nu">1</span>) / <span class="nu">8</span> + <span class="nu">3</span> * n * q := <span class="kw">by</span></span>
+<span id="L260">  <span class="kw">classical</span></span>
+<span id="L261">  <span class="kw">have</span> hw : ∀ x : <span class="const token" data-verso-hover="26">Fin</span> n × <span class="const token" data-verso-hover="26">Fin</span> n × <span class="const token" data-verso-hover="48">Bool</span>, <span class="nu">0</span> ≤ <span class="const token" data-verso-hover="220">pairWeight</span> x := <span class="kw">fun</span> x =&gt; <span class="kw">by</span></span>
+<span id="L262">    <span class="kw">simp</span> only [<span class="const token" data-verso-hover="220">pairWeight</span>]; <span class="kw">split_ifs</span> &lt;;&gt; <span class="kw">norm_num</span></span>
+<span id="L263">  <span class="kw">have</span> hU := <span class="const token" data-verso-hover="16">sum_mul_probReal_le</span> A.<span class="const token" data-verso-hover="45">seed</span> <span class="const token" data-verso-hover="52">Finset.univ</span> <span class="const token" data-verso-hover="220">pairWeight</span> hw</span>
+<span id="L264">    (<span class="kw">fun</span> x =&gt; {r | A.<span class="const token" data-verso-hover="213">LocalOK</span> r x.<span class="const token" data-verso-hover="30">1</span> x.<span class="const token" data-verso-hover="32">2</span><span class="nu">.</span><span class="const token" data-verso-hover="30">1</span> x.<span class="const token" data-verso-hover="32">2</span><span class="nu">.</span><span class="const token" data-verso-hover="32">2</span>}) _ (A.<span class="const token" data-verso-hover="9">count_le</span> hq)</span>
+<span id="L265">  <span class="kw">have</span> hlow : ∀ x : <span class="const token" data-verso-hover="26">Fin</span> n × <span class="const token" data-verso-hover="26">Fin</span> n × <span class="const token" data-verso-hover="48">Bool</span>, (<span class="nu">1</span> - ε) * <span class="const token" data-verso-hover="220">pairWeight</span> x ≤</span>
+<span id="L266">      <span class="const token" data-verso-hover="220">pairWeight</span> x * <span class="const token" data-verso-hover="57">probReal</span> A.<span class="const token" data-verso-hover="45">seed</span> {r | A.<span class="const token" data-verso-hover="213">LocalOK</span> r x.<span class="const token" data-verso-hover="30">1</span> x.<span class="const token" data-verso-hover="32">2</span><span class="nu">.</span><span class="const token" data-verso-hover="30">1</span> x.<span class="const token" data-verso-hover="32">2</span><span class="nu">.</span><span class="const token" data-verso-hover="32">2</span>} := <span class="kw">by</span></span>
+<span id="L267">    <span class="kw">rintro</span> ⟨i, j, h⟩</span>
+<span id="L268">    <span class="kw">simp</span> only [<span class="const token" data-verso-hover="220">pairWeight</span>]</span>
+<span id="L269">    <span class="kw">split_ifs</span> <span class="kw">with</span> hij</span>
+<span id="L270">    · <span class="kw">simp</span></span>
+<span id="L271">    · <span class="kw">simpa</span> <span class="kw">using</span> hgood i j h hij</span>
+<span id="L272">  <span class="kw">have</span> htot : ∑ x : <span class="const token" data-verso-hover="26">Fin</span> n × <span class="const token" data-verso-hover="26">Fin</span> n × <span class="const token" data-verso-hover="48">Bool</span>, <span class="const token" data-verso-hover="220">pairWeight</span> x = <span class="nu">2</span> * ((n : <span class="const token" data-verso-hover="27">ℝ</span>) ^ <span class="nu">2</span> - n) := <span class="kw">by</span></span>
+<span id="L273">    <span class="kw">simp</span> only [<span class="const token" data-verso-hover="238">Fintype.sum_prod_type</span>, <span class="const token" data-verso-hover="239">Fintype.sum_bool</span>]</span>
+<span id="L274">    <span class="kw">have</span> e : ∀ i j : <span class="const token" data-verso-hover="26">Fin</span> n, <span class="const token" data-verso-hover="220">pairWeight</span> (i, j, <span class="const token" data-verso-hover="54">true</span>) + <span class="const token" data-verso-hover="220">pairWeight</span> (i, j, <span class="const token" data-verso-hover="105">false</span>) =</span>
+<span id="L275">        <span class="nu">2</span> - (<span class="kw">if</span> i = j <span class="kw">then</span> <span class="nu">2</span> <span class="kw">else</span> <span class="nu">0</span>) := <span class="kw">by</span></span>
+<span id="L276">      <span class="kw">intro</span> i j; <span class="kw">simp</span> only [<span class="const token" data-verso-hover="220">pairWeight</span>]; <span class="kw">split_ifs</span> &lt;;&gt; <span class="kw">norm_num</span></span>
+<span id="L277">    <span class="kw">simp</span> only [e, <span class="const token" data-verso-hover="234">Finset.sum_sub_distrib</span>, <span class="const token" data-verso-hover="235">Finset.sum_ite_eq</span>, <span class="const token" data-verso-hover="78">Finset.mem_univ</span>, <span class="const token" data-verso-hover="202">ite_true</span>,</span>
+<span id="L278">      <span class="const token" data-verso-hover="226">Finset.sum_const</span>, <span class="const token" data-verso-hover="185">Finset.card_univ</span>, <span class="const token" data-verso-hover="186">Fintype.card_fin</span>, <span class="const token" data-verso-hover="227">nsmul_eq_mul</span>]</span>
+<span id="L279">    <span class="kw">ring</span></span>
+<span id="L280">  <span class="kw">calc</span> (<span class="nu">1</span> - ε) * (<span class="nu">2</span> * ((n : <span class="const token" data-verso-hover="27">ℝ</span>) ^ <span class="nu">2</span> - n)) = ∑ x, (<span class="nu">1</span> - ε) * <span class="const token" data-verso-hover="220">pairWeight</span> x := <span class="kw">by</span></span>
+<span id="L281">        <span class="kw">rw</span> [← <span class="const token" data-verso-hover="237">Finset.mul_sum</span>, htot]</span>
+<span id="L282">    _ ≤ ∑ x, <span class="const token" data-verso-hover="220">pairWeight</span> x * <span class="const token" data-verso-hover="57">probReal</span> A.<span class="const token" data-verso-hover="45">seed</span> {r | A.<span class="const token" data-verso-hover="213">LocalOK</span> r x.<span class="const token" data-verso-hover="30">1</span> x.<span class="const token" data-verso-hover="32">2</span><span class="nu">.</span><span class="const token" data-verso-hover="30">1</span> x.<span class="const token" data-verso-hover="32">2</span><span class="nu">.</span><span class="const token" data-verso-hover="32">2</span>} :=</span>
+<span id="L283">        <span class="const token" data-verso-hover="184">Finset.sum_le_sum</span> <span class="kw">fun</span> x _ =&gt; hlow x</span>
+<span id="L284">    _ ≤ _ := hU</span>
+<span id="L285"></span>
+<span id="L286"><span class="kw">end</span> LCA</span>
+<span id="L287"></span>
+<span id="L288"><span class="dc">/-- **Theorem 3.4** (global correctness, the reading used in the paper's proof). An LCA that,</span></span>
+<span id="L289"><span class="dc">on every normalised instance, gives access to a maximal feasible solution with success</span></span>
+<span id="L290"><span class="dc">probability at least `4/5` (failure probability `1/5`) makes at least `n/11` queries, for every</span></span>
+<span id="L291"><span class="dc">`n ≥ 2`. (The paper writes "`(t(n), 4/5)`-LCA", i.e. failure probability `4/5`; its proof uses</span></span>
+<span id="L292"><span class="dc">success probability `4/5`.) -/</span></span>
+<span id="L293"><span class="kw">theorem</span> <span class="const token" data-verso-hover="7">theorem_3_4</span> (hn : <span class="nu">2</span> ≤ n) (A : <span class="const token" data-verso-hover="44">LCA</span> n Ω) {q : <span class="const token" data-verso-hover="24">ℕ</span>} (hq : A.<span class="const token" data-verso-hover="13">QueryBound</span> q)</span>
+<span id="L294">    (hA : A.<span class="const token" data-verso-hover="15">CorrectStrong</span> {I | I.<span class="const token" data-verso-hover="12">Normalized</span>} (<span class="kw">fun</span> I C =&gt; I.<span class="const token" data-verso-hover="39">IsMaximalFeasible</span> C) (<span class="nu">1</span> / <span class="nu">5</span>)) :</span>
+<span id="L295">    (n : <span class="const token" data-verso-hover="27">ℝ</span>) / <span class="nu">11</span> ≤ q := <span class="kw">by</span></span>
+<span id="L296">  <span class="kw">have</span> key := A.<span class="const token" data-verso-hover="242">yao_bound</span> hq (<span class="nu">1</span> / <span class="nu">5</span>) <span class="kw">fun</span> i j h hij =&gt; <span class="kw">by</span></span>
+<span id="L297">    <span class="kw">refine</span> (hA _ (<span class="const token" data-verso-hover="194">hardInstance_normalized</span> i j h)).<span class="const token" data-verso-hover="59">trans</span> (<span class="const token" data-verso-hover="60">probReal_mono</span> _ <span class="kw">fun</span> r hr =&gt; ?_)</span>
+<span id="L298">    <span class="kw">exact</span> ⟨_, hr, <span class="kw">by</span> <span class="kw">simp</span> [<span class="const token" data-verso-hover="51">LCA.solution</span>], <span class="kw">by</span> <span class="kw">simp</span> [<span class="const token" data-verso-hover="51">LCA.solution</span>]⟩</span>
+<span id="L299">  <span class="kw">have</span> hn' : (<span class="nu">2</span> : <span class="const token" data-verso-hover="27">ℝ</span>) ≤ n := <span class="kw">by</span> <span class="kw">exact_mod_cast</span> hn</span>
+<span id="L300">  <span class="kw">by_contra</span> hlt</span>
+<span id="L301">  push <span class="const token" data-verso-hover="218">Not</span> <span class="kw">at</span> hlt</span>
+<span id="L302">  <span class="kw">rcases</span> <span class="const token" data-verso-hover="155">Nat.eq_zero_or_pos</span> q <span class="kw">with</span> h0 | hpos</span>
+<span id="L303">  · <span class="kw">rw</span> [h0] <span class="kw">at</span> key; <span class="kw">push_cast</span> <span class="kw">at</span> key; <span class="kw">nlinarith</span></span>
+<span id="L304">  · <span class="kw">have</span> hq1 : (<span class="nu">1</span> : <span class="const token" data-verso-hover="27">ℝ</span>) ≤ q := <span class="kw">by</span> <span class="kw">exact_mod_cast</span> hpos</span>
+<span id="L305">    <span class="kw">nlinarith</span></span>
+<span id="L306"></span>
+<span id="L307"><span class="dc">/-- **Theorem 3.4** (per-query correctness, Definition 2.2 read query by query). An LCA that,</span></span>
+<span id="L308"><span class="dc">on every normalised instance, answers every single query consistently with a maximal feasible</span></span>
+<span id="L309"><span class="dc">solution with failure probability `1/5` makes at least `n/40 - 1/5` queries. -/</span></span>
+<span id="L310"><span class="kw">theorem</span> <span class="const token" data-verso-hover="8">theorem_3_4_perQuery</span> (hn : <span class="nu">1</span> ≤ n) (A : <span class="const token" data-verso-hover="44">LCA</span> n Ω) {q : <span class="const token" data-verso-hover="24">ℕ</span>} (hq : A.<span class="const token" data-verso-hover="13">QueryBound</span> q)</span>
+<span id="L311">    (hA : A.<span class="const token" data-verso-hover="14">Correct</span> {I | I.<span class="const token" data-verso-hover="12">Normalized</span>} (<span class="kw">fun</span> I C =&gt; I.<span class="const token" data-verso-hover="39">IsMaximalFeasible</span> C) (<span class="nu">1</span> / <span class="nu">5</span>)) :</span>
+<span id="L312">    (n : <span class="const token" data-verso-hover="27">ℝ</span>) / <span class="nu">40</span> - <span class="nu">1</span> / <span class="nu">5</span> ≤ q := <span class="kw">by</span></span>
+<span id="L313">  <span class="kw">have</span> key := A.<span class="const token" data-verso-hover="242">yao_bound</span> hq (<span class="nu">2</span> / <span class="nu">5</span>) <span class="kw">fun</span> i j h hij =&gt; <span class="kw">by</span></span>
+<span id="L314">    <span class="kw">obtain</span> ⟨C, hC⟩ := hA _ (<span class="const token" data-verso-hover="194">hardInstance_normalized</span> i j h)</span>
+<span id="L315">    <span class="kw">have</span> h2 := <span class="const token" data-verso-hover="243">probReal_add_le_inter</span> A.<span class="const token" data-verso-hover="45">seed</span> (E := {r | (<span class="const token" data-verso-hover="192">hardInstance</span> i j h).<span class="const token" data-verso-hover="39">IsMaximalFeasible</span></span>
+<span id="L316">      (C r) ∧ (A.<span class="const token" data-verso-hover="49">answer</span> (<span class="const token" data-verso-hover="192">hardInstance</span> i j h) r i = <span class="const token" data-verso-hover="54">true</span> ↔ i ∈ C r)})</span>
+<span id="L317">      (F := {r | (<span class="const token" data-verso-hover="192">hardInstance</span> i j h).<span class="const token" data-verso-hover="39">IsMaximalFeasible</span> (C r) ∧</span>
+<span id="L318">        (A.<span class="const token" data-verso-hover="49">answer</span> (<span class="const token" data-verso-hover="192">hardInstance</span> i j h) r j = <span class="const token" data-verso-hover="54">true</span> ↔ j ∈ C r)})</span>
+<span id="L319">    <span class="kw">have</span> h3 : <span class="const token" data-verso-hover="57">probReal</span> A.<span class="const token" data-verso-hover="45">seed</span> ({r | (<span class="const token" data-verso-hover="192">hardInstance</span> i j h).<span class="const token" data-verso-hover="39">IsMaximalFeasible</span> (C r) ∧</span>
+<span id="L320">        (A.<span class="const token" data-verso-hover="49">answer</span> (<span class="const token" data-verso-hover="192">hardInstance</span> i j h) r i = <span class="const token" data-verso-hover="54">true</span> ↔ i ∈ C r)} ∩</span>
+<span id="L321">        {r | (<span class="const token" data-verso-hover="192">hardInstance</span> i j h).<span class="const token" data-verso-hover="39">IsMaximalFeasible</span> (C r) ∧</span>
+<span id="L322">        (A.<span class="const token" data-verso-hover="49">answer</span> (<span class="const token" data-verso-hover="192">hardInstance</span> i j h) r j = <span class="const token" data-verso-hover="54">true</span> ↔ j ∈ C r)}) ≤</span>
+<span id="L323">        <span class="const token" data-verso-hover="57">probReal</span> A.<span class="const token" data-verso-hover="45">seed</span> {r | A.<span class="const token" data-verso-hover="213">LocalOK</span> r i j h} :=</span>
+<span id="L324">      <span class="const token" data-verso-hover="60">probReal_mono</span> _ <span class="kw">fun</span> r hr =&gt; ⟨C r, hr.<span class="const token" data-verso-hover="42">1</span><span class="nu">.</span><span class="const token" data-verso-hover="42">1</span>, hr.<span class="const token" data-verso-hover="42">1</span><span class="nu">.</span><span class="const token" data-verso-hover="43">2</span>, hr.<span class="const token" data-verso-hover="43">2</span><span class="nu">.</span><span class="const token" data-verso-hover="43">2</span>⟩</span>
+<span id="L325">    <span class="kw">linarith</span> [hC i, hC j]</span>
+<span id="L326">  <span class="kw">have</span> hn' : (<span class="nu">1</span> : <span class="const token" data-verso-hover="27">ℝ</span>) ≤ n := <span class="kw">by</span> <span class="kw">exact_mod_cast</span> hn</span>
+<span id="L327">  <span class="kw">have</span> hq0 : (<span class="nu">0</span> : <span class="const token" data-verso-hover="27">ℝ</span>) ≤ q := <span class="const token" data-verso-hover="244">Nat.cast_nonneg</span> q</span>
+<span id="L328">  <span class="kw">by_contra</span> hlt</span>
+<span id="L329">  push <span class="const token" data-verso-hover="218">Not</span> <span class="kw">at</span> hlt</span>
+<span id="L330">  <span class="kw">nlinarith</span></span>
+<span id="L331"></span>
+<span id="L332"><span class="kw">end</span> Podc.KnapsackLCA</span>
+<span id="L333"></span>
+</code></div>
+        <script>
+          window.versoHoversUrl = "PODC2025/KnapsackLCA/-hovers.json";</script>
+        <script src="static/lean/popper.js"></script>
+        <script src="static/lean/tippy.js"></script>
+        <script src="static/lean/marked.js"></script>
+        <script src="static/lean/highlighting.js"></script>
+        <script src="static/lean/lean.js"></script>
+        </article></main><footer class="site-footer"><div class="wrap">
+        Machine-checked formalizations of PODC papers in Lean 4. Generated with <a href="https://github.com/leanprover/verso">Verso</a> from the README files of <a href="https://github.com/vasnesterov/formal_podc">vasnesterov/formal_podc</a>.</div>
+      </footer></body>
+  </html>
+

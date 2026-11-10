@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="light dark">
+    <link rel="icon" href="data:,">
+    <title>DominatingSetArboricity: Distributed.lean · Formal PODC</title><base href="../../../.././"><link rel="stylesheet" href="static/lean/verso-vars.css">
+    <link rel="stylesheet" href="static/lean/highlighting.css">
+    <link rel="stylesheet" href="static/lean/tippy-border.css">
+    <link rel="stylesheet" href="static/style.css">
+    <script defer="defer" src="static/site.js"></script>
+    </head>
+  <body>
+    <header class="site-header">
+      <div class="wrap">
+        <a class="brand" href=".">Formal PODC</a><nav class="top">
+          <a href=".">Search</a><a href="about/">About</a><a href="https://github.com/vasnesterov/formal_podc">GitHub</a></nav>
+        </div>
+      </header>
+    <main class="wrap"><article><nav class="breadcrumbs" aria-label="Breadcrumb">
+          <a href=".">Search</a><span class="sep">›</span><a href="PODC2022/">PODC 2022</a><span class="sep">›</span><a href="PODC2022/DominatingSetArboricity/">DominatingSetArboricity</a><span class="sep">›</span><a href="PODC2022/DominatingSetArboricity/src/">Lean source</a><span class="sep">›</span><span aria-current="page">Distributed</span></nav>
+        <h1>
+          <code>Distributed.lean</code></h1>
+        <div class="paper-links">
+          <p>
+            Source of <a href="PODC2022/DominatingSetArboricity/">Distributed Dominating Set in Bounded Arboricity Graphs — PODC 2022</a> · <a href="https://github.com/vasnesterov/formal_podc/blob/main/Papers/PODC2022/DominatingSetArboricity/Distributed.lean">GitHub</a> · hover over a name for its type and documentation</p>
+          </div>
+        <div class="lean-code lean-src">
+          <code class="hl lean block" data-lean-context="Distributed"><span id="L1"><span class="kw">import</span> Papers.PODC2022.DominatingSetArboricity.Deterministic</span>
+<span id="L2"><span class="kw">import</span> Cslib.Computability.Distributed.Local.Identifiers</span>
+<span id="L3"><span class="kw">import</span> Cslib.Computability.Distributed.Local.OnlineLocalLocality</span>
+<span id="L4"></span>
+<span id="L5"><span class="dc">/-!</span></span>
+<span id="L6"><span class="dc"># Distributed implementation of the deterministic algorithm (Theorem 1.1, round complexity)</span></span>
+<span id="L7"></span>
+<span id="L8"><span class="dc">We implement the algorithm of Theorem 1.1 in CSLib's synchronous locally-iterative model</span></span>
+<span id="L9"><span class="dc">(`Cslib.LocallyIterative.Algorithm`): in every round each node replaces its state by a function of</span></span>
+<span id="L10"><span class="dc">the round number, its own state and the *set* of states of its neighbours. States carry the node's</span></span>
+<span id="L11"><span class="dc">identifier, so the set of neighbour states determines the multiset of neighbour values.</span></span>
+<span id="L12"></span>
+<span id="L13"><span class="dc">Global knowledge (as assumed in the paper): `Δ` (an upper bound used to initialise packing values;</span></span>
+<span id="L14"><span class="dc">we instantiate it with the maximum degree), `ε`, and the number of iterations `r` (a function of `Δ`,</span></span>
+<span id="L15"><span class="dc">`α`, `ε`). Local input: the node's weight.</span></span>
+<span id="L16"></span>
+<span id="L17"><span class="dc">Rounds (`T = 2r + 2` in total):</span></span>
+<span id="L18"><span class="dc">* round `0`: compute `τ_v` (minimum weight in `N⁺_v`), a node `pick_v ∈ N⁺_v` of weight `τ_v`, and</span></span>
+<span id="L19"><span class="dc">  `x_v = τ_v/(Δ+1)`;</span></span>
+<span id="L20"><span class="dc">* rounds `2i+1`, `2i+2` (`i &lt; r`): iteration `i` of Lemma 4.1 — first `X_v` is computed and `v`</span></span>
+<span id="L21"><span class="dc">  joins `S` if `X_v ≥ w_v/(1+ε)`; then `v` learns whether it is dominated and, if not, multiplies</span></span>
+<span id="L22"><span class="dc">  `x_v` by `1+ε`;</span></span>
+<span id="L23"><span class="dc">* round `2r+1`: `v` joins the output if it is in `S` or was picked by an undominated node of `N⁺_v`.</span></span>
+<span id="L24"></span>
+<span id="L25"><span class="dc">Every message is the sender's state: an identifier, a weight, `τ`, an identifier, a packing value</span></span>
+<span id="L26"><span class="dc">`x = τ (1+ε)^j/(Δ+1)` with `j ≤ r` (`Inv`), and three bits — i.e. `O(1)` numbers of the input size</span></span>
+<span id="L27"><span class="dc">(we do not formalize bit complexity).</span></span>
+<span id="L28"></span>
+<span id="L29"><span class="dc">Main result: `run_out_eq_detDS` — after `2r+2` rounds the set of nodes with `out = True` is exactly</span></span>
+<span id="L30"><span class="dc">`detDS G α ε w`; together with `theorem_1_1` and `numIter_detLam_le` this gives Theorem 1.1:</span></span>
+<span id="L31"><span class="dc">a deterministic `(2α+1)(1+ε)`-approximation in `2r+2 = O(log(Δ/α)/ε)` rounds (`distributed_theorem_1_1`).</span></span>
+<span id="L32"><span class="dc">-/</span></span>
+<span id="L33"></span>
+<span id="L34"><span class="kw">set_option</span> <span class="const token" data-verso-hover="111">linter.unusedSectionVars</span> false</span>
+<span id="L35"></span>
+<span id="L36"><span class="kw">namespace</span> DominatingSetArboricity</span>
+<span id="L37"></span>
+<span id="L38"><span class="kw">open</span> Finset SimpleGraph Cslib.LocallyIterative</span>
+<span id="L39"></span>
+<span id="L40"><span class="dc">/-- Local state of a node. -/</span></span>
+<span id="L41"><span class="kw">structure</span> <span class="const token" data-verso-hover="157">NState</span> (V : <span class="kw">Type</span>*) <span class="kw">where</span></span>
+<span id="L42">  <span class="dc">/-- identifier -/</span></span>
+<span id="L43">  <span class="const token" data-verso-hover="158">id</span> : V</span>
+<span id="L44">  <span class="dc">/-- weight (local input) -/</span></span>
+<span id="L45">  <span class="const token" data-verso-hover="159">w</span> : <span class="const token" data-verso-hover="85">ℝ</span></span>
+<span id="L46">  <span class="dc">/-- `τ_v` -/</span></span>
+<span id="L47">  <span class="const token" data-verso-hover="160">tau</span> : <span class="const token" data-verso-hover="85">ℝ</span></span>
+<span id="L48">  <span class="dc">/-- a minimum-weight dominator of the node -/</span></span>
+<span id="L49">  <span class="const token" data-verso-hover="161">pick</span> : V</span>
+<span id="L50">  <span class="dc">/-- packing value -/</span></span>
+<span id="L51">  <span class="const token" data-verso-hover="162">x</span> : <span class="const token" data-verso-hover="85">ℝ</span></span>
+<span id="L52">  <span class="dc">/-- in the partial dominating set `S` -/</span></span>
+<span id="L53">  <span class="const token" data-verso-hover="163">inS</span> : <span class="kw">Prop</span></span>
+<span id="L54">  <span class="dc">/-- dominated by `S` -/</span></span>
+<span id="L55">  <span class="const token" data-verso-hover="164">dom</span> : <span class="kw">Prop</span></span>
+<span id="L56">  <span class="dc">/-- in the final output -/</span></span>
+<span id="L57">  <span class="const token" data-verso-hover="165">out</span> : <span class="kw">Prop</span></span>
+<span id="L58"></span>
+<span id="L59"><span class="kw">variable</span> {V : <span class="kw">Type</span>*}</span>
+<span id="L60"></span>
+<span id="L61"><span class="dc">/-- Round 0: compute `τ`, `pick`, initial packing value. -/</span></span>
+<span id="L62"><span class="kw">noncomputable</span> <span class="kw">def</span> <span class="const token" data-verso-hover="166">initStep</span> (Δ : <span class="const token" data-verso-hover="115">ℕ</span>) (s : <span class="const token" data-verso-hover="157">NState</span> V) (N : <span class="const token" data-verso-hover="61">Set</span> (<span class="const token" data-verso-hover="157">NState</span> V)) : <span class="const token" data-verso-hover="157">NState</span> V :=</span>
+<span id="L63">  haveI : <span class="const token" data-verso-hover="97">Nonempty</span> V := ⟨s.<span class="const token" data-verso-hover="158">id</span>⟩</span>
+<span id="L64">  <span class="kw">let</span> τ := <span class="const token" data-verso-hover="167">sInf</span> (<span class="const token" data-verso-hover="159">NState.w</span> '' <span class="const token" data-verso-hover="52">insert</span> s N)</span>
+<span id="L65">  { s <span class="kw">with</span> <span class="const token" data-verso-hover="160">tau</span> := τ, <span class="const token" data-verso-hover="161">pick</span> := <span class="const token" data-verso-hover="98">Classical.epsilon</span> <span class="kw">fun</span> u =&gt; ∃ t ∈ <span class="const token" data-verso-hover="52">insert</span> s N, t.<span class="const token" data-verso-hover="158">id</span> = u ∧ t.<span class="const token" data-verso-hover="159">w</span> = τ,</span>
+<span id="L66">           <span class="const token" data-verso-hover="162">x</span> := τ / (Δ + <span class="nu">1</span>), <span class="const token" data-verso-hover="163">inS</span> := <span class="const token" data-verso-hover="168">False</span>, <span class="const token" data-verso-hover="164">dom</span> := <span class="const token" data-verso-hover="168">False</span>, <span class="const token" data-verso-hover="165">out</span> := <span class="const token" data-verso-hover="168">False</span> }</span>
+<span id="L67"></span>
+<span id="L68"><span class="dc">/-- First round of an iteration: compute `X_v` and possibly join `S`. -/</span></span>
+<span id="L69"><span class="kw">noncomputable</span> <span class="kw">def</span> <span class="const token" data-verso-hover="169">stepA</span> (ε : <span class="const token" data-verso-hover="85">ℝ</span>) (s : <span class="const token" data-verso-hover="157">NState</span> V) (N : <span class="const token" data-verso-hover="61">Set</span> (<span class="const token" data-verso-hover="157">NState</span> V)) : <span class="const token" data-verso-hover="157">NState</span> V :=</span>
+<span id="L70">  { s <span class="kw">with</span> <span class="const token" data-verso-hover="163">inS</span> := s.<span class="const token" data-verso-hover="163">inS</span> ∨ s.<span class="const token" data-verso-hover="159">w</span> / (<span class="nu">1</span> + ε) ≤ s.<span class="const token" data-verso-hover="162">x</span> + ∑ᶠ t ∈ N, t.<span class="const token" data-verso-hover="162">x</span> }</span>
+<span id="L71"></span>
+<span id="L72"><span class="kw">open</span> <span class="kw">scoped</span> Classical <span class="kw">in</span></span>
+<span id="L73"><span class="dc">/-- Second round of an iteration: learn domination, raise the packing value if undominated. -/</span></span>
+<span id="L74"><span class="kw">noncomputable</span> <span class="kw">def</span> <span class="const token" data-verso-hover="170">stepB</span> (ε : <span class="const token" data-verso-hover="85">ℝ</span>) (s : <span class="const token" data-verso-hover="157">NState</span> V) (N : <span class="const token" data-verso-hover="61">Set</span> (<span class="const token" data-verso-hover="157">NState</span> V)) : <span class="const token" data-verso-hover="157">NState</span> V :=</span>
+<span id="L75">  { s <span class="kw">with</span> <span class="const token" data-verso-hover="164">dom</span> := s.<span class="const token" data-verso-hover="163">inS</span> ∨ ∃ t ∈ N, t.<span class="const token" data-verso-hover="163">inS</span>,</span>
+<span id="L76">           <span class="const token" data-verso-hover="162">x</span> := <span class="kw">if</span> s.<span class="const token" data-verso-hover="163">inS</span> ∨ ∃ t ∈ N, t.<span class="const token" data-verso-hover="163">inS</span> <span class="kw">then</span> s.<span class="const token" data-verso-hover="162">x</span> <span class="kw">else</span> s.<span class="const token" data-verso-hover="162">x</span> * (<span class="nu">1</span> + ε) }</span>
+<span id="L77"></span>
+<span id="L78"><span class="dc">/-- Final round: join the output if in `S` or picked by an undominated node of `N⁺_v`. -/</span></span>
+<span id="L79"><span class="kw">def</span> <span class="const token" data-verso-hover="171">stepC</span> (s : <span class="const token" data-verso-hover="157">NState</span> V) (N : <span class="const token" data-verso-hover="61">Set</span> (<span class="const token" data-verso-hover="157">NState</span> V)) : <span class="const token" data-verso-hover="157">NState</span> V :=</span>
+<span id="L80">  { s <span class="kw">with</span> <span class="const token" data-verso-hover="165">out</span> := s.<span class="const token" data-verso-hover="163">inS</span> ∨ (¬ s.<span class="const token" data-verso-hover="164">dom</span> ∧ s.<span class="const token" data-verso-hover="161">pick</span> = s.<span class="const token" data-verso-hover="158">id</span>) ∨ ∃ t ∈ N, ¬ t.<span class="const token" data-verso-hover="164">dom</span> ∧ t.<span class="const token" data-verso-hover="161">pick</span> = s.<span class="const token" data-verso-hover="158">id</span> }</span>
+<span id="L81"></span>
+<span id="L82"><span class="dc">/-- The distributed algorithm with parameters `Δ`, `ε` and `r` iterations. -/</span></span>
+<span id="L83"><span class="kw">noncomputable</span> <span class="kw">def</span> <span class="const token" data-verso-hover="172">alg</span> (Δ r : <span class="const token" data-verso-hover="115">ℕ</span>) (ε : <span class="const token" data-verso-hover="85">ℝ</span>) : <span class="const token" data-verso-hover="173">Algorithm</span> (<span class="const token" data-verso-hover="157">NState</span> V) :=</span>
+<span id="L84">  ⟨<span class="kw">fun</span> t s N =&gt;</span>
+<span id="L85">    <span class="kw">if</span> t = <span class="nu">0</span> <span class="kw">then</span> <span class="const token" data-verso-hover="166">initStep</span> Δ s N</span>
+<span id="L86">    <span class="kw">else</span> <span class="kw">if</span> t ≤ <span class="nu">2</span> * r <span class="kw">then</span> (<span class="kw">if</span> t % <span class="nu">2</span> = <span class="nu">1</span> <span class="kw">then</span> <span class="const token" data-verso-hover="169">stepA</span> ε s N <span class="kw">else</span> <span class="const token" data-verso-hover="170">stepB</span> ε s N)</span>
+<span id="L87">    <span class="kw">else</span> <span class="kw">if</span> t = <span class="nu">2</span> * r + <span class="nu">1</span> <span class="kw">then</span> <span class="const token" data-verso-hover="171">stepC</span> s N <span class="kw">else</span> s⟩</span>
+<span id="L88"></span>
+<span id="L89"><span class="dc">/-- Initial configuration: identifiers and weights. -/</span></span>
+<span id="L90"><span class="kw">def</span> <span class="const token" data-verso-hover="174">c0</span> (w : V → <span class="const token" data-verso-hover="85">ℝ</span>) : V → <span class="const token" data-verso-hover="157">NState</span> V := <span class="kw">fun</span> v =&gt; ⟨v, w v, <span class="nu">0</span>, v, <span class="nu">0</span>, <span class="const token" data-verso-hover="168">False</span>, <span class="const token" data-verso-hover="168">False</span>, <span class="const token" data-verso-hover="168">False</span>⟩</span>
+<span id="L91"></span>
+<span id="L92"><span class="kw">variable</span> [<span class="const token" data-verso-hover="44">Fintype</span> V] [<span class="const token" data-verso-hover="45">DecidableEq</span> V] {G : <span class="const token" data-verso-hover="46">SimpleGraph</span> V} [<span class="const token" data-verso-hover="47">DecidableRel</span> G.<span class="const token" data-verso-hover="48">Adj</span>]</span>
+<span id="L93"></span>
+<span id="L94"><span class="dc">/-- The configuration encoding a state of the centralized procedure. -/</span></span>
+<span id="L95"><span class="kw">noncomputable</span> <span class="kw">def</span> <span class="const token" data-verso-hover="175">enc</span> (G : <span class="const token" data-verso-hover="46">SimpleGraph</span> V) [<span class="const token" data-verso-hover="47">DecidableRel</span> G.<span class="const token" data-verso-hover="48">Adj</span>] (w : V → <span class="const token" data-verso-hover="85">ℝ</span>) (p : <span class="const token" data-verso-hover="176">PState</span> V) :</span>
+<span id="L96">    V → <span class="const token" data-verso-hover="157">NState</span> V :=</span>
+<span id="L97">  <span class="kw">fun</span> v =&gt; ⟨v, w v, <span class="const token" data-verso-hover="94">tau</span> G w v, <span class="const token" data-verso-hover="96">tauNode</span> G w v, p.<span class="const token" data-verso-hover="132">x</span> v, v ∈ p.<span class="const token" data-verso-hover="117">S</span>, v ∈ <span class="const token" data-verso-hover="80">dom</span> G p.<span class="const token" data-verso-hover="117">S</span>, <span class="const token" data-verso-hover="168">False</span>⟩</span>
+<span id="L98"></span>
+<span id="L99"><span class="kw">theorem</span> <span class="const token" data-verso-hover="177">X_eq</span> (x : V → <span class="const token" data-verso-hover="85">ℝ</span>) (v : V) : <span class="const token" data-verso-hover="178">X</span> G x v = x v + ∑ u ∈ G.<span class="const token" data-verso-hover="53">neighborFinset</span> v, x u := <span class="kw">by</span></span>
+<span id="L100">  <span class="kw">rw</span> [<span class="const token" data-verso-hover="178">X</span>, <span class="const token" data-verso-hover="51">cnbr_eq_insert</span>, <span class="const token" data-verso-hover="179">sum_insert</span> (<span class="kw">by</span> <span class="kw">simp</span>)]</span>
+<span id="L101"></span>
+<span id="L102"><span class="kw">theorem</span> <span class="const token" data-verso-hover="180">initStep_c0</span> (w : V → <span class="const token" data-verso-hover="85">ℝ</span>) (v : V) :</span>
+<span id="L103">    <span class="const token" data-verso-hover="166">initStep</span> G.<span class="const token" data-verso-hover="74">maxDegree</span> (<span class="const token" data-verso-hover="174">c0</span> w v) (<span class="const token" data-verso-hover="181">nbrColors</span> G (<span class="const token" data-verso-hover="174">c0</span> w) v) = <span class="const token" data-verso-hover="175">enc</span> G w (<span class="const token" data-verso-hover="182">runP</span> G <span class="nu">0</span> w <span class="nu">0</span>) v := <span class="kw">by</span></span>
+<span id="L104">  <span class="kw">have</span> hτ : <span class="const token" data-verso-hover="167">sInf</span> (<span class="const token" data-verso-hover="159">NState.w</span> '' <span class="const token" data-verso-hover="52">insert</span> (<span class="const token" data-verso-hover="174">c0</span> w v) (<span class="const token" data-verso-hover="181">nbrColors</span> G (<span class="const token" data-verso-hover="174">c0</span> w) v)) = <span class="const token" data-verso-hover="94">tau</span> G w v := <span class="kw">by</span></span>
+<span id="L105">    <span class="kw">rw</span> [<span class="const token" data-verso-hover="183">insert_nbrColors</span>, ← <span class="const token" data-verso-hover="60">coe_cnbr</span>, <span class="const token" data-verso-hover="184">Set.image_image</span>, <span class="const token" data-verso-hover="94">tau</span>, <span class="const token" data-verso-hover="185">Finset.inf'_eq_csInf_image</span>]</span>
+<span id="L106">    <span class="kw">rfl</span></span>
+<span id="L107">  <span class="kw">simp</span> only [<span class="const token" data-verso-hover="166">initStep</span>, hτ, <span class="const token" data-verso-hover="175">enc</span>, <span class="const token" data-verso-hover="182">runP</span>, <span class="const token" data-verso-hover="186">Function.iterate_zero</span>, <span class="const token" data-verso-hover="187">id</span>, <span class="const token" data-verso-hover="188">init</span>]</span>
+<span id="L108">  <span class="kw">congr</span> <span class="nu">1</span></span>
+<span id="L109">  · <span class="kw">congr</span> <span class="nu">1</span></span>
+<span id="L110">    <span class="kw">funext</span> u</span>
+<span id="L111">    <span class="kw">apply</span> <span class="const token" data-verso-hover="33">propext</span></span>
+<span id="L112">    <span class="kw">rw</span> [<span class="const token" data-verso-hover="183">insert_nbrColors</span>, ← <span class="const token" data-verso-hover="60">coe_cnbr</span>]</span>
+<span id="L113">    <span class="kw">simp</span> only [<span class="const token" data-verso-hover="189">Set.mem_image</span>, <span class="const token" data-verso-hover="65">mem_coe</span>]</span>
+<span id="L114">    <span class="kw">constructor</span></span>
+<span id="L115">    · <span class="kw">rintro</span> ⟨_, ⟨u', hu', <span class="kw">rfl</span>⟩, <span class="kw">rfl</span>, h⟩; <span class="kw">exact</span> ⟨hu', h⟩</span>
+<span id="L116">    · <span class="kw">rintro</span> ⟨hu, h⟩; <span class="kw">exact</span> ⟨<span class="const token" data-verso-hover="174">c0</span> w u, ⟨u, hu, <span class="const token" data-verso-hover="54">rfl</span>⟩, <span class="const token" data-verso-hover="54">rfl</span>, h⟩</span>
+<span id="L117">  <span class="kw">all_goals</span> <span class="kw">simp</span> [<span class="const token" data-verso-hover="83">mem_dom</span>]</span>
+<span id="L118"></span>
+<span id="L119"><span class="kw">theorem</span> <span class="const token" data-verso-hover="190">stepA_enc</span> {ε : <span class="const token" data-verso-hover="85">ℝ</span>} (w : V → <span class="const token" data-verso-hover="85">ℝ</span>) (p : <span class="const token" data-verso-hover="176">PState</span> V) (v : V) :</span>
+<span id="L120">    <span class="const token" data-verso-hover="169">stepA</span> ε (<span class="const token" data-verso-hover="175">enc</span> G w p v) (<span class="const token" data-verso-hover="181">nbrColors</span> G (<span class="const token" data-verso-hover="175">enc</span> G w p) v) =</span>
+<span id="L121">      { <span class="const token" data-verso-hover="175">enc</span> G w p v <span class="kw">with</span> <span class="const token" data-verso-hover="163">inS</span> := v ∈ (<span class="const token" data-verso-hover="191">iter</span> G ε w p).<span class="const token" data-verso-hover="117">S</span> } := <span class="kw">by</span></span>
+<span id="L122">  <span class="kw">simp</span> only [<span class="const token" data-verso-hover="169">stepA</span>, <span class="const token" data-verso-hover="175">enc</span>, <span class="const token" data-verso-hover="191">iter</span>, <span class="const token" data-verso-hover="192">finsum_nbrColors</span> (c := <span class="const token" data-verso-hover="175">enc</span> G w p) <span class="const token" data-verso-hover="158">NState.id</span> (<span class="kw">fun</span> u =&gt; <span class="const token" data-verso-hover="54">rfl</span>), <span class="const token" data-verso-hover="177">X_eq</span>]</span>
+<span id="L123">  <span class="kw">congr</span> <span class="nu">1</span></span>
+<span id="L124">  <span class="kw">simp</span></span>
+<span id="L125"></span>
+<span id="L126"><span class="kw">theorem</span> <span class="const token" data-verso-hover="193">stepB_half</span> {ε : <span class="const token" data-verso-hover="85">ℝ</span>} (w : V → <span class="const token" data-verso-hover="85">ℝ</span>) (p : <span class="const token" data-verso-hover="176">PState</span> V) (v : V) :</span>
+<span id="L127">    <span class="const token" data-verso-hover="170">stepB</span> ε ({ <span class="const token" data-verso-hover="175">enc</span> G w p v <span class="kw">with</span> <span class="const token" data-verso-hover="163">inS</span> := v ∈ (<span class="const token" data-verso-hover="191">iter</span> G ε w p).<span class="const token" data-verso-hover="117">S</span> })</span>
+<span id="L128">      (<span class="const token" data-verso-hover="181">nbrColors</span> G (<span class="kw">fun</span> u =&gt; { <span class="const token" data-verso-hover="175">enc</span> G w p u <span class="kw">with</span> <span class="const token" data-verso-hover="163">inS</span> := u ∈ (<span class="const token" data-verso-hover="191">iter</span> G ε w p).<span class="const token" data-verso-hover="117">S</span> }) v) =</span>
+<span id="L129">      <span class="const token" data-verso-hover="175">enc</span> G w (<span class="const token" data-verso-hover="191">iter</span> G ε w p) v := <span class="kw">by</span></span>
+<span id="L130">  <span class="kw">have</span> hd : (v ∈ (<span class="const token" data-verso-hover="191">iter</span> G ε w p).<span class="const token" data-verso-hover="117">S</span> ∨ ∃ t ∈ <span class="const token" data-verso-hover="181">nbrColors</span> G</span>
+<span id="L131">      (<span class="kw">fun</span> u =&gt; { <span class="const token" data-verso-hover="175">enc</span> G w p u <span class="kw">with</span> <span class="const token" data-verso-hover="163">inS</span> := u ∈ (<span class="const token" data-verso-hover="191">iter</span> G ε w p).<span class="const token" data-verso-hover="117">S</span> }) v, t.<span class="const token" data-verso-hover="163">inS</span>) ↔</span>
+<span id="L132">      v ∈ <span class="const token" data-verso-hover="80">dom</span> G (<span class="const token" data-verso-hover="191">iter</span> G ε w p).<span class="const token" data-verso-hover="117">S</span> := <span class="kw">by</span></span>
+<span id="L133">    <span class="kw">rw</span> [<span class="const token" data-verso-hover="194">exists_mem_nbrColors</span>, <span class="const token" data-verso-hover="83">mem_dom</span>]</span>
+<span id="L134">    <span class="kw">simp</span> only [<span class="const token" data-verso-hover="55">mem_cnbr</span>]</span>
+<span id="L135">    <span class="kw">constructor</span></span>
+<span id="L136">    · <span class="kw">rintro</span> (h | ⟨u, hu, h⟩)</span>
+<span id="L137">      · <span class="kw">exact</span> ⟨v, h, <span class="const token" data-verso-hover="59">Or.inl</span> <span class="const token" data-verso-hover="54">rfl</span>⟩</span>
+<span id="L138">      · <span class="kw">exact</span> ⟨u, h, <span class="const token" data-verso-hover="195">Or.inr</span> hu⟩</span>
+<span id="L139">    · <span class="kw">rintro</span> ⟨u, h, <span class="kw">rfl</span> | hu⟩</span>
+<span id="L140">      · <span class="kw">exact</span> <span class="const token" data-verso-hover="59">Or.inl</span> h</span>
+<span id="L141">      · <span class="kw">exact</span> <span class="const token" data-verso-hover="195">Or.inr</span> ⟨u, hu, h⟩</span>
+<span id="L142">  <span class="kw">simp</span> only [<span class="const token" data-verso-hover="170">stepB</span>]</span>
+<span id="L143">  <span class="kw">simp</span> only [<span class="const token" data-verso-hover="175">enc</span>]</span>
+<span id="L144">  <span class="kw">congr</span> <span class="nu">1</span></span>
+<span id="L145">  swap</span>
+<span id="L146">  · <span class="kw">exact</span> <span class="const token" data-verso-hover="33">propext</span> hd</span>
+<span id="L147">  · <span class="kw">show</span> _ = (<span class="kw">if</span> v ∈ <span class="const token" data-verso-hover="80">dom</span> G (<span class="const token" data-verso-hover="191">iter</span> G ε w p).<span class="const token" data-verso-hover="117">S</span> <span class="kw">then</span> p.<span class="const token" data-verso-hover="132">x</span> v <span class="kw">else</span> p.<span class="const token" data-verso-hover="132">x</span> v * (<span class="nu">1</span> + ε))</span>
+<span id="L148">    <span class="kw">by_cases</span> h : v ∈ <span class="const token" data-verso-hover="80">dom</span> G (<span class="const token" data-verso-hover="191">iter</span> G ε w p).<span class="const token" data-verso-hover="117">S</span></span>
+<span id="L149">    · <span class="kw">rw</span> [<span class="const token" data-verso-hover="196">ite_eq_left</span> h]; <span class="kw">exact</span> <span class="const token" data-verso-hover="196">ite_eq_left</span> (hd.<span class="const token" data-verso-hover="58">2</span> h)</span>
+<span id="L150">    · <span class="kw">rw</span> [<span class="const token" data-verso-hover="197">ite_eq_right</span> h]; <span class="kw">exact</span> <span class="const token" data-verso-hover="197">ite_eq_right</span> (<span class="kw">fun</span> h' =&gt; h (hd.<span class="const token" data-verso-hover="89">1</span> h'))</span>
+<span id="L151"></span>
+<span id="L152"><span class="dc">/-- The run of the distributed algorithm simulates the centralized procedure: after `2i+1` rounds</span></span>
+<span id="L153"><span class="dc">(`i ≤ r`) the configuration encodes the state after `i` iterations. -/</span></span>
+<span id="L154"><span class="kw">theorem</span> <span class="const token" data-verso-hover="198">run_odd</span> (w : V → <span class="const token" data-verso-hover="85">ℝ</span>) (ε : <span class="const token" data-verso-hover="85">ℝ</span>) (r : <span class="const token" data-verso-hover="115">ℕ</span>) :</span>
+<span id="L155">    ∀ i ≤ r, (<span class="const token" data-verso-hover="172">alg</span> G.<span class="const token" data-verso-hover="74">maxDegree</span> r ε).<span class="const token" data-verso-hover="199">run</span> G (<span class="const token" data-verso-hover="174">c0</span> w) (<span class="nu">2</span> * i + <span class="nu">1</span>) = <span class="const token" data-verso-hover="175">enc</span> G w (<span class="const token" data-verso-hover="182">runP</span> G ε w i) := <span class="kw">by</span></span>
+<span id="L156">  <span class="kw">intro</span> i</span>
+<span id="L157">  <span class="kw">induction</span> i <span class="kw">with</span></span>
+<span id="L158">  | <span class="const token" data-verso-hover="200">zero</span> =&gt;</span>
+<span id="L159">    <span class="kw">intro</span> _</span>
+<span id="L160">    <span class="kw">funext</span> v</span>
+<span id="L161">    <span class="kw">rw</span> [<span class="const token" data-verso-hover="201">Algorithm.run_succ_apply</span>]</span>
+<span id="L162">    <span class="kw">exact</span> <span class="const token" data-verso-hover="180">initStep_c0</span> w v</span>
+<span id="L163">  | <span class="const token" data-verso-hover="202">succ</span> i ih =&gt;</span>
+<span id="L164">    <span class="kw">intro</span> hi</span>
+<span id="L165">    <span class="kw">have</span> h1 : (<span class="const token" data-verso-hover="172">alg</span> G.<span class="const token" data-verso-hover="74">maxDegree</span> r ε).<span class="const token" data-verso-hover="199">run</span> G (<span class="const token" data-verso-hover="174">c0</span> w) (<span class="nu">2</span> * i + <span class="nu">2</span>) =</span>
+<span id="L166">        <span class="kw">fun</span> u =&gt; { <span class="const token" data-verso-hover="175">enc</span> G w (<span class="const token" data-verso-hover="182">runP</span> G ε w i) u <span class="kw">with</span> <span class="const token" data-verso-hover="163">inS</span> := u ∈ (<span class="const token" data-verso-hover="191">iter</span> G ε w (<span class="const token" data-verso-hover="182">runP</span> G ε w i)).<span class="const token" data-verso-hover="117">S</span> } := <span class="kw">by</span></span>
+<span id="L167">      <span class="kw">funext</span> v</span>
+<span id="L168">      <span class="kw">rw</span> [<span class="const token" data-verso-hover="201">Algorithm.run_succ_apply</span>, ih (<span class="kw">by</span> <span class="kw">omega</span>)]</span>
+<span id="L169">      <span class="kw">simp</span> only [<span class="const token" data-verso-hover="172">alg</span>, <span class="kw">show</span> <span class="nu">2</span> * i + <span class="nu">1</span> ≠ <span class="nu">0</span> <span class="kw">by</span> <span class="kw">omega</span>, <span class="const token" data-verso-hover="203">ite_false</span>, <span class="kw">show</span> <span class="nu">2</span> * i + <span class="nu">1</span> ≤ <span class="nu">2</span> * r <span class="kw">by</span> <span class="kw">omega</span>,</span>
+<span id="L170">        <span class="const token" data-verso-hover="204">ite_true</span>, <span class="kw">show</span> (<span class="nu">2</span> * i + <span class="nu">1</span>) % <span class="nu">2</span> = <span class="nu">1</span> <span class="kw">by</span> <span class="kw">omega</span>]</span>
+<span id="L171">      <span class="kw">exact</span> <span class="const token" data-verso-hover="190">stepA_enc</span> w _ v</span>
+<span id="L172">    <span class="kw">funext</span> v</span>
+<span id="L173">    <span class="kw">rw</span> [<span class="kw">show</span> <span class="nu">2</span> * (i + <span class="nu">1</span>) + <span class="nu">1</span> = (<span class="nu">2</span> * i + <span class="nu">2</span>) + <span class="nu">1</span> <span class="kw">by</span> <span class="kw">ring</span>, <span class="const token" data-verso-hover="201">Algorithm.run_succ_apply</span>, h1]</span>
+<span id="L174">    <span class="kw">simp</span> only [<span class="const token" data-verso-hover="172">alg</span>, <span class="kw">show</span> <span class="nu">2</span> * i + <span class="nu">2</span> ≠ <span class="nu">0</span> <span class="kw">by</span> <span class="kw">omega</span>, <span class="const token" data-verso-hover="203">ite_false</span>, <span class="kw">show</span> <span class="nu">2</span> * i + <span class="nu">2</span> ≤ <span class="nu">2</span> * r <span class="kw">by</span> <span class="kw">omega</span>,</span>
+<span id="L175">      <span class="const token" data-verso-hover="204">ite_true</span>, <span class="kw">show</span> (<span class="nu">2</span> * i + <span class="nu">2</span>) % <span class="nu">2</span> ≠ <span class="nu">1</span> <span class="kw">by</span> <span class="kw">omega</span>]</span>
+<span id="L176">    <span class="kw">rw</span> [<span class="const token" data-verso-hover="193">stepB_half</span>, <span class="const token" data-verso-hover="205">runP_succ</span>]</span>
+<span id="L177"></span>
+<span id="L178"><span class="dc">/-- After the final round `2r+1`, the nodes with `out` are exactly `S ∪ completion S`. -/</span></span>
+<span id="L179"><span class="kw">theorem</span> <span class="const token" data-verso-hover="206">run_final</span> (w : V → <span class="const token" data-verso-hover="85">ℝ</span>) (ε : <span class="const token" data-verso-hover="85">ℝ</span>) (r : <span class="const token" data-verso-hover="115">ℕ</span>) (v : V) :</span>
+<span id="L180">    ((<span class="const token" data-verso-hover="172">alg</span> G.<span class="const token" data-verso-hover="74">maxDegree</span> r ε).<span class="const token" data-verso-hover="199">run</span> G (<span class="const token" data-verso-hover="174">c0</span> w) (<span class="nu">2</span> * r + <span class="nu">2</span>) v).<span class="const token" data-verso-hover="165">out</span> ↔</span>
+<span id="L181">      v ∈ (<span class="const token" data-verso-hover="182">runP</span> G ε w r).<span class="const token" data-verso-hover="117">S</span> ∪ <span class="const token" data-verso-hover="112">completion</span> G w (<span class="const token" data-verso-hover="182">runP</span> G ε w r).<span class="const token" data-verso-hover="117">S</span> := <span class="kw">by</span></span>
+<span id="L182">  <span class="kw">rw</span> [<span class="kw">show</span> <span class="nu">2</span> * r + <span class="nu">2</span> = (<span class="nu">2</span> * r + <span class="nu">1</span>) + <span class="nu">1</span> <span class="kw">by</span> <span class="kw">ring</span>, <span class="const token" data-verso-hover="201">Algorithm.run_succ_apply</span>, <span class="const token" data-verso-hover="198">run_odd</span> w ε r r <span class="const token" data-verso-hover="207">le_rfl</span>]</span>
+<span id="L183">  <span class="kw">simp</span> only [<span class="const token" data-verso-hover="172">alg</span>, <span class="kw">show</span> <span class="nu">2</span> * r + <span class="nu">1</span> ≠ <span class="nu">0</span> <span class="kw">by</span> <span class="kw">omega</span>, <span class="const token" data-verso-hover="203">ite_false</span>, <span class="kw">show</span> ¬ <span class="nu">2</span> * r + <span class="nu">1</span> ≤ <span class="nu">2</span> * r <span class="kw">by</span> <span class="kw">omega</span>,</span>
+<span id="L184">    <span class="const token" data-verso-hover="204">ite_true</span>, <span class="const token" data-verso-hover="171">stepC</span>, <span class="const token" data-verso-hover="175">enc</span>, <span class="const token" data-verso-hover="194">exists_mem_nbrColors</span>]</span>
+<span id="L185">  <span class="kw">simp</span> only [<span class="const token" data-verso-hover="208">mem_union</span>, <span class="const token" data-verso-hover="112">completion</span>, <span class="const token" data-verso-hover="121">mem_image</span>, <span class="const token" data-verso-hover="134">mem_filter</span>, <span class="const token" data-verso-hover="209">mem_univ</span>, <span class="const token" data-verso-hover="210">true_and</span>]</span>
+<span id="L186">  <span class="kw">apply</span> <span class="const token" data-verso-hover="211">or_congr_right</span></span>
+<span id="L187">  <span class="kw">constructor</span></span>
+<span id="L188">  · <span class="kw">rintro</span> (⟨h1, h2⟩ | ⟨u, _, h1, h2⟩)</span>
+<span id="L189">    · <span class="kw">exact</span> ⟨v, h1, h2⟩</span>
+<span id="L190">    · <span class="kw">exact</span> ⟨u, h1, h2⟩</span>
+<span id="L191">  · <span class="kw">rintro</span> ⟨u, h1, <span class="kw">rfl</span>⟩</span>
+<span id="L192">    <span class="kw">rcases</span> <span class="const token" data-verso-hover="55">mem_cnbr</span>.<span class="const token" data-verso-hover="89">1</span> (<span class="const token" data-verso-hover="107">tauNode_mem</span> (G := G) w u) <span class="kw">with</span> h | h</span>
+<span id="L193">    · <span class="kw">rw</span> [h]; <span class="kw">exact</span> <span class="const token" data-verso-hover="59">Or.inl</span> ⟨h1, h⟩</span>
+<span id="L194">    · <span class="kw">exact</span> <span class="const token" data-verso-hover="195">Or.inr</span> ⟨u, h.<span class="const token" data-verso-hover="212">symm</span>, h1, <span class="const token" data-verso-hover="54">rfl</span>⟩</span>
+<span id="L195"></span>
+<span id="L196"><span class="kw">open</span> <span class="kw">scoped</span> Classical <span class="kw">in</span></span>
+<span id="L197"><span class="dc">/-- The output of the distributed algorithm after `2r+2` rounds (with `r = numIter`) is `detDS`. -/</span></span>
+<span id="L198"><span class="kw">theorem</span> <span class="const token" data-verso-hover="20">run_out_eq_detDS</span> (w : V → <span class="const token" data-verso-hover="85">ℝ</span>) (α : <span class="const token" data-verso-hover="115">ℕ</span>) (ε : <span class="const token" data-verso-hover="85">ℝ</span>) :</span>
+<span id="L199">    (<span class="const token" data-verso-hover="81">univ</span>.<span class="const token" data-verso-hover="82">filter</span> <span class="kw">fun</span> v =&gt; ((<span class="const token" data-verso-hover="172">alg</span> G.<span class="const token" data-verso-hover="74">maxDegree</span> (<span class="const token" data-verso-hover="149">numIter</span> G ε (<span class="const token" data-verso-hover="114">detLam</span> α ε)) ε).<span class="const token" data-verso-hover="199">run</span> G (<span class="const token" data-verso-hover="174">c0</span> w)</span>
+<span id="L200">      (<span class="nu">2</span> * <span class="const token" data-verso-hover="149">numIter</span> G ε (<span class="const token" data-verso-hover="114">detLam</span> α ε) + <span class="nu">2</span>) v).<span class="const token" data-verso-hover="165">out</span>) = <span class="const token" data-verso-hover="10">detDS</span> G α ε w := <span class="kw">by</span></span>
+<span id="L201">  <span class="kw">classical</span></span>
+<span id="L202">  <span class="kw">ext</span> v</span>
+<span id="L203">  <span class="kw">rw</span> [<span class="const token" data-verso-hover="134">mem_filter</span>, <span class="const token" data-verso-hover="206">run_final</span>]</span>
+<span id="L204">  <span class="kw">simp</span> [<span class="const token" data-verso-hover="10">detDS</span>, <span class="const token" data-verso-hover="116">partialDS</span>]</span>
+<span id="L205"></span>
+<span id="L206"><span class="dc">/-- The algorithm is a `(2r+2)`-round LOCAL algorithm: the output of a node only depends on the</span></span>
+<span id="L207"><span class="dc">graph and the initial states (identifiers and weights) within distance `2r+2`. -/</span></span>
+<span id="L208"><span class="kw">theorem</span> <span class="const token" data-verso-hover="43">alg_isLocal</span> (Δ r : <span class="const token" data-verso-hover="115">ℕ</span>) (ε : <span class="const token" data-verso-hover="85">ℝ</span>) :</span>
+<span id="L209">    <span class="const token" data-verso-hover="213">Cslib.Local.IsLocal</span> (<span class="nu">2</span> * r + <span class="nu">2</span>) <span class="kw">fun</span> G (s₀ : V → <span class="const token" data-verso-hover="157">NState</span> V) v =&gt;</span>
+<span id="L210">      (<span class="const token" data-verso-hover="172">alg</span> Δ r ε).<span class="const token" data-verso-hover="199">run</span> G s₀ (<span class="nu">2</span> * r + <span class="nu">2</span>) v :=</span>
+<span id="L211">  <span class="const token" data-verso-hover="214">Algorithm.run_isLocal</span> _ _</span>
+<span id="L212"></span>
+<span id="L213"><span class="kw">open</span> <span class="kw">scoped</span> Classical <span class="kw">in</span></span>
+<span id="L214"><span class="dc">/-- **Theorem 1.1** (distributed form). On a graph with an orientation of out-degree `≤ α`</span></span>
+<span id="L215"><span class="dc">(`α ≥ 1`, e.g. arboricity `≤ α`), with nonnegative weights and `0 &lt; ε ≤ 1`, the deterministic</span></span>
+<span id="L216"><span class="dc">synchronous algorithm `alg Δ r ε` with `r = numIter G ε (detLam α ε)` outputs after</span></span>
+<span id="L217"><span class="dc">`T = 2r + 2 ≤ 4 + 4 log(max 1 ((Δ+1)/(2α+1)))/ε` rounds a dominating set (`out = True`) whose</span></span>
+<span id="L218"><span class="dc">weight is at most `(2α+1)(1+ε)` times the weight of any dominating set. -/</span></span>
+<span id="L219"><span class="kw">theorem</span> <span class="const token" data-verso-hover="19">distributed_theorem_1_1</span> {α : <span class="const token" data-verso-hover="115">ℕ</span>} (o : G.<span class="const token" data-verso-hover="129">OutOrientation</span> α) (hα : <span class="nu">1</span> ≤ α) {w : V → <span class="const token" data-verso-hover="85">ℝ</span>}</span>
+<span id="L220">    (hw : ∀ v, <span class="nu">0</span> ≤ w v) {ε : <span class="const token" data-verso-hover="85">ℝ</span>} (hε : <span class="nu">0</span> &lt; ε) (hε1 : ε ≤ <span class="nu">1</span>) :</span>
+<span id="L221">    <span class="kw">let</span> r := <span class="const token" data-verso-hover="149">numIter</span> G ε (<span class="const token" data-verso-hover="114">detLam</span> α ε)</span>
+<span id="L222">    <span class="kw">let</span> D' := <span class="const token" data-verso-hover="81">univ</span>.<span class="const token" data-verso-hover="82">filter</span> <span class="kw">fun</span> v =&gt; ((<span class="const token" data-verso-hover="172">alg</span> G.<span class="const token" data-verso-hover="74">maxDegree</span> r ε).<span class="const token" data-verso-hover="199">run</span> G (<span class="const token" data-verso-hover="174">c0</span> w) (<span class="nu">2</span> * r + <span class="nu">2</span>) v).<span class="const token" data-verso-hover="165">out</span></span>
+<span id="L223">    <span class="const token" data-verso-hover="77">IsDominating</span> G D' ∧ (∀ D, <span class="const token" data-verso-hover="77">IsDominating</span> G D → <span class="const token" data-verso-hover="84">wt</span> w D' ≤ (<span class="nu">2</span> * α + <span class="nu">1</span>) * (<span class="nu">1</span> + ε) * <span class="const token" data-verso-hover="84">wt</span> w D) ∧</span>
+<span id="L224">      ((<span class="nu">2</span> * r + <span class="nu">2</span> : <span class="const token" data-verso-hover="115">ℕ</span>) : <span class="const token" data-verso-hover="85">ℝ</span>) ≤ <span class="nu">4</span> + <span class="nu">4</span> * <span class="const token" data-verso-hover="150">Real.log</span> (<span class="const token" data-verso-hover="151">max</span> <span class="nu">1</span> ((G.<span class="const token" data-verso-hover="74">maxDegree</span> + <span class="nu">1</span>) / (<span class="nu">2</span> * α + <span class="nu">1</span>))) / ε := <span class="kw">by</span></span>
+<span id="L225">  <span class="kw">intro</span> r D'</span>
+<span id="L226">  <span class="kw">have</span> hD' : D' = <span class="const token" data-verso-hover="10">detDS</span> G α ε w := <span class="const token" data-verso-hover="20">run_out_eq_detDS</span> w α ε</span>
+<span id="L227">  <span class="kw">rw</span> [hD']</span>
+<span id="L228">  <span class="kw">refine</span> ⟨(<span class="const token" data-verso-hover="15">theorem_1_1</span> o hα hw hε).<span class="const token" data-verso-hover="91">1</span>, (<span class="const token" data-verso-hover="15">theorem_1_1</span> o hα hw hε).<span class="const token" data-verso-hover="93">2</span>, ?_⟩</span>
+<span id="L229">  <span class="kw">have</span> := <span class="const token" data-verso-hover="17">numIter_detLam_le</span> (G := G) (α := α) hε hε1</span>
+<span id="L230">  <span class="kw">have</span> hr : (r : <span class="const token" data-verso-hover="85">ℝ</span>) = <span class="const token" data-verso-hover="149">numIter</span> G ε (<span class="const token" data-verso-hover="114">detLam</span> α ε) := <span class="const token" data-verso-hover="54">rfl</span></span>
+<span id="L231">  <span class="kw">have</span> h4 : <span class="nu">4</span> * <span class="const token" data-verso-hover="150">Real.log</span> (<span class="const token" data-verso-hover="151">max</span> <span class="nu">1</span> ((G.<span class="const token" data-verso-hover="74">maxDegree</span> + <span class="nu">1</span>) / (<span class="nu">2</span> * α + <span class="nu">1</span>))) / ε =</span>
+<span id="L232">      <span class="nu">2</span> * (<span class="nu">2</span> * <span class="const token" data-verso-hover="150">Real.log</span> (<span class="const token" data-verso-hover="151">max</span> <span class="nu">1</span> ((G.<span class="const token" data-verso-hover="74">maxDegree</span> + <span class="nu">1</span>) / (<span class="nu">2</span> * α + <span class="nu">1</span>))) / ε) := <span class="kw">by</span> <span class="kw">ring</span></span>
+<span id="L233">  <span class="kw">push_cast</span></span>
+<span id="L234">  <span class="kw">linarith</span></span>
+<span id="L235"></span>
+<span id="L236"><span class="kw">end</span> DominatingSetArboricity</span>
+<span id="L237"></span>
+</code></div>
+        <script>
+          window.versoHoversUrl = "PODC2022/DominatingSetArboricity/-hovers.json";</script>
+        <script src="static/lean/popper.js"></script>
+        <script src="static/lean/tippy.js"></script>
+        <script src="static/lean/marked.js"></script>
+        <script src="static/lean/highlighting.js"></script>
+        <script src="static/lean/lean.js"></script>
+        </article></main><footer class="site-footer"><div class="wrap">
+        Machine-checked formalizations of PODC papers in Lean 4. Generated with <a href="https://github.com/leanprover/verso">Verso</a> from the README files of <a href="https://github.com/vasnesterov/formal_podc">vasnesterov/formal_podc</a>.</div>
+      </footer></body>
+  </html>
+

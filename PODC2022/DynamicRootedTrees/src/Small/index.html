@@ -1,0 +1,586 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="light dark">
+    <link rel="icon" href="data:,">
+    <title>DynamicRootedTrees: Small.lean · Formal PODC</title><base href="../../../.././"><link rel="stylesheet" href="static/lean/verso-vars.css">
+    <link rel="stylesheet" href="static/lean/highlighting.css">
+    <link rel="stylesheet" href="static/lean/tippy-border.css">
+    <link rel="stylesheet" href="static/style.css">
+    <script defer="defer" src="static/site.js"></script>
+    </head>
+  <body>
+    <header class="site-header">
+      <div class="wrap">
+        <a class="brand" href=".">Formal PODC</a><nav class="top">
+          <a href=".">Search</a><a href="about/">About</a><a href="https://github.com/vasnesterov/formal_podc">GitHub</a></nav>
+        </div>
+      </header>
+    <main class="wrap"><article><nav class="breadcrumbs" aria-label="Breadcrumb">
+          <a href=".">Search</a><span class="sep">›</span><a href="PODC2022/">PODC 2022</a><span class="sep">›</span><a href="PODC2022/DynamicRootedTrees/">DynamicRootedTrees</a><span class="sep">›</span><a href="PODC2022/DynamicRootedTrees/src/">Lean source</a><span class="sep">›</span><span aria-current="page">Small</span></nav>
+        <h1>
+          <code>Small.lean</code></h1>
+        <div class="paper-links">
+          <p>
+            Source of <a href="PODC2022/DynamicRootedTrees/">Broadcasting Time in Dynamic Rooted Trees — PODC 2022</a> · <a href="https://github.com/vasnesterov/formal_podc/blob/main/Papers/PODC2022/DynamicRootedTrees/Small.lean">GitHub</a> · hover over a name for its type and documentation</p>
+          </div>
+        <div class="lean-code lean-src">
+          <code class="hl lean block" data-lean-context="Small"><span id="L1"><span class="kw">import</span> Papers.PODC2022.DynamicRootedTrees.Defs</span>
+<span id="L2"></span>
+<span id="L3"><span class="dc">/-!</span></span>
+<span id="L4"><span class="dc"># Exact broadcast times `t*(𝒯ₙ)` for small `n`, computed in the kernel</span></span>
+<span id="L5"></span>
+<span id="L6"><span class="dc">A verified exhaustive search. A relation on `Fin n` is encoded as a bit mask `m : ℕ` (bit</span></span>
+<span id="L7"><span class="dc">`x * n + y` set iff `x → y`, i.e. row `x` is the `x`-th block of width `n`); all operations</span></span>
+<span id="L8"><span class="dc">are on `ℕ` via `Nat.land`/`Nat.lor`/`Nat.shiftRight`/…, which the kernel evaluates with GMP.</span></span>
+<span id="L9"></span>
+<span id="L10"><span class="dc">* `trees n`: masks of all rooted trees with self-loops on `Fin n` (enumerated as root + parent</span></span>
+<span id="L11"><span class="dc">  list, filtered by a decidable "reaches the root within `n` steps" test, deduplicated).</span></span>
+<span id="L12"><span class="dc">  `exists_mem_trees`/`rel_mem_of_mem_trees`: it encodes exactly `treesWithLoops n`.</span></span>
+<span id="L13"><span class="dc">* `frontier n k`: `F₀ = {id} \ B`, `F_{k+1} = dedup {P ∘ E | P ∈ F_k, E ∈ trees n} \ B`, where</span></span>
+<span id="L14"><span class="dc">  `B` are the broadcast states. Composition `P ∘ E` uses a precomputed table</span></span>
+<span id="L15"><span class="dc">  `S ↦ ⋃_{z ∈ S} E(z)` of `E` (`tab`, `compT`); deduplication uses a bit set (`dedupAux`).</span></span>
+<span id="L16"><span class="dc">* `frontier_sound`: if `G₁, G₂, … ∈ 𝒯ₙ` has not broadcast after `k` rounds, then the mask of</span></span>
+<span id="L17"><span class="dc">  `G₁ ∘ ⋯ ∘ G_k` is in `frontier n k`. Hence `frontier n K = []` gives `t*(𝒯ₙ) ≤ K`</span></span>
+<span id="L18"><span class="dc">  (`advBroadcastTime_le_of_frontier`); explicit sequences give lower bounds</span></span>
+<span id="L19"><span class="dc">  (`le_advBroadcastTime_of_seq`).</span></span>
+<span id="L20"></span>
+<span id="L21"><span class="dc">## Main results</span></span>
+<span id="L22"></span>
+<span id="L23"><span class="dc">`advBroadcastTime_trees_one/two/three/four`: `t*(𝒯ₙ) = 0, 1, 2, 4` for `n = 1, 2, 3, 4`</span></span>
+<span id="L24"><span class="dc">(frontier sizes for `n = 4`: `1, 60, 528, 48, 0`; the kernel check takes ≈ 15 s).</span></span>
+<span id="L25"></span>
+<span id="L26"><span class="dc">An (unverified) Python search gives `t*(𝒯₅) = 5` (frontier sizes `620, 94380, 119640, 12360, 0`),</span></span>
+<span id="L27"><span class="dc">which is out of reach of this kernel computation (≈ 1.4 · 10⁸ compositions).</span></span>
+<span id="L28"><span class="dc">-/</span></span>
+<span id="L29"></span>
+<span id="L30"><span class="kw">namespace</span> DynamicRootedTrees</span>
+<span id="L31"></span>
+<span id="L32"><span class="kw">open</span> Cslib.DynNet Relation</span>
+<span id="L33"></span>
+<span id="L34"><span class="kw">namespace</span> FrontierSearch</span>
+<span id="L35"></span>
+<span id="L36"><span class="dc">/-- The bit mask with bits `i &lt; N` set according to `f`. -/</span></span>
+<span id="L37"><span class="kw">def</span> <span class="const token" data-verso-hover="113">mkMask</span> (f : <span class="const token" data-verso-hover="20">ℕ</span> → <span class="const token" data-verso-hover="114">Bool</span>) : <span class="const token" data-verso-hover="20">ℕ</span> → <span class="const token" data-verso-hover="20">ℕ</span></span>
+<span id="L38">  | <span class="nu">0</span> =&gt; <span class="nu">0</span></span>
+<span id="L39">  | N + <span class="nu">1</span> =&gt; <span class="const token" data-verso-hover="113">mkMask</span> f N ||| (<span class="kw">if</span> f N <span class="kw">then</span> <span class="nu">2</span> ^ N <span class="kw">else</span> <span class="nu">0</span>)</span>
+<span id="L40"></span>
+<span id="L41"><span class="kw">variable</span> (n : <span class="const token" data-verso-hover="20">ℕ</span>)</span>
+<span id="L42"></span>
+<span id="L43"><span class="dc">/-- All-ones mask of width `w`. -/</span></span>
+<span id="L44"><span class="kw">def</span> <span class="const token" data-verso-hover="115">ones</span> (w : <span class="const token" data-verso-hover="20">ℕ</span>) : <span class="const token" data-verso-hover="20">ℕ</span> := <span class="const token" data-verso-hover="116">Nat.sub</span> (<span class="const token" data-verso-hover="117">Nat.shiftLeft</span> <span class="nu">1</span> w) <span class="nu">1</span></span>
+<span id="L45"></span>
+<span id="L46"><span class="dc">/-- The `i`-th block of width `w` of `m`. -/</span></span>
+<span id="L47"><span class="kw">def</span> <span class="const token" data-verso-hover="118">blk</span> (w m i : <span class="const token" data-verso-hover="20">ℕ</span>) : <span class="const token" data-verso-hover="20">ℕ</span> := <span class="const token" data-verso-hover="119">Nat.land</span> (<span class="const token" data-verso-hover="120">Nat.shiftRight</span> m (<span class="const token" data-verso-hover="121">Nat.mul</span> i w)) (<span class="const token" data-verso-hover="115">ones</span> w)</span>
+<span id="L48"></span>
+<span id="L49"><span class="dc">/-- Pack `f 0, …, f (N-1)` (truncated to width `w`) as consecutive blocks of width `w`. -/</span></span>
+<span id="L50"><span class="kw">def</span> <span class="const token" data-verso-hover="122">pack</span> (w : <span class="const token" data-verso-hover="20">ℕ</span>) (f : <span class="const token" data-verso-hover="20">ℕ</span> → <span class="const token" data-verso-hover="20">ℕ</span>) : <span class="const token" data-verso-hover="20">ℕ</span> → <span class="const token" data-verso-hover="20">ℕ</span></span>
+<span id="L51">  | <span class="nu">0</span> =&gt; <span class="nu">0</span></span>
+<span id="L52">  | N + <span class="nu">1</span> =&gt; <span class="const token" data-verso-hover="123">Nat.lor</span> (<span class="const token" data-verso-hover="122">pack</span> w f N) (<span class="const token" data-verso-hover="117">Nat.shiftLeft</span> (<span class="const token" data-verso-hover="119">Nat.land</span> (f N) (<span class="const token" data-verso-hover="115">ones</span> w)) (<span class="const token" data-verso-hover="121">Nat.mul</span> N w))</span>
+<span id="L53"></span>
+<span id="L54"><span class="dc">/-- `∃ k' &lt; k, f k'`. -/</span></span>
+<span id="L55"><span class="kw">def</span> <span class="const token" data-verso-hover="124">anyUpTo</span> (f : <span class="const token" data-verso-hover="20">ℕ</span> → <span class="const token" data-verso-hover="114">Bool</span>) : <span class="const token" data-verso-hover="20">ℕ</span> → <span class="const token" data-verso-hover="114">Bool</span></span>
+<span id="L56">  | <span class="nu">0</span> =&gt; <span class="const token" data-verso-hover="125">false</span></span>
+<span id="L57">  | k + <span class="nu">1</span> =&gt; f k || <span class="const token" data-verso-hover="124">anyUpTo</span> f k</span>
+<span id="L58"></span>
+<span id="L59"><span class="dc">/-- Encoding of a relation on `Fin n` given by a Boolean function (row `x` = block `x`). -/</span></span>
+<span id="L60"><span class="kw">def</span> <span class="const token" data-verso-hover="126">ofRel</span> (f : <span class="const token" data-verso-hover="20">ℕ</span> → <span class="const token" data-verso-hover="20">ℕ</span> → <span class="const token" data-verso-hover="114">Bool</span>) : <span class="const token" data-verso-hover="20">ℕ</span> := <span class="const token" data-verso-hover="122">pack</span> n (<span class="kw">fun</span> x =&gt; <span class="const token" data-verso-hover="113">mkMask</span> (f x) n) n</span>
+<span id="L61"></span>
+<span id="L62"><span class="dc">/-- The identity relation. -/</span></span>
+<span id="L63"><span class="kw">def</span> <span class="const token" data-verso-hover="127">idM</span> : <span class="const token" data-verso-hover="20">ℕ</span> := <span class="const token" data-verso-hover="126">ofRel</span> n (<span class="kw">fun</span> x y =&gt; x == y)</span>
+<span id="L64"></span>
+<span id="L65"><span class="dc">/-- For a relation `E`, the table `S ↦ ⋃_{z ∈ S} E(z)` indexed by subsets `S` of `Fin n`. -/</span></span>
+<span id="L66"><span class="kw">def</span> <span class="const token" data-verso-hover="128">orRows</span> (E S : <span class="const token" data-verso-hover="20">ℕ</span>) : <span class="const token" data-verso-hover="20">ℕ</span> → <span class="const token" data-verso-hover="20">ℕ</span></span>
+<span id="L67">  | <span class="nu">0</span> =&gt; <span class="nu">0</span></span>
+<span id="L68">  | z + <span class="nu">1</span> =&gt; <span class="const token" data-verso-hover="123">Nat.lor</span> (<span class="const token" data-verso-hover="128">orRows</span> E S z) (<span class="kw">if</span> <span class="const token" data-verso-hover="129">Nat.testBit</span> S z <span class="kw">then</span> <span class="const token" data-verso-hover="118">blk</span> n E z <span class="kw">else</span> <span class="nu">0</span>)</span>
+<span id="L69"></span>
+<span id="L70"><span class="dc">/-- The table of `E`: block `S` is `⋃_{z ∈ S} E(z)`. -/</span></span>
+<span id="L71"><span class="kw">def</span> <span class="const token" data-verso-hover="130">tab</span> (E : <span class="const token" data-verso-hover="20">ℕ</span>) : <span class="const token" data-verso-hover="20">ℕ</span> := <span class="const token" data-verso-hover="122">pack</span> n (<span class="kw">fun</span> S =&gt; <span class="const token" data-verso-hover="128">orRows</span> n E S n) (<span class="nu">2</span> ^ n)</span>
+<span id="L72"></span>
+<span id="L73"><span class="dc">/-- Composition `P ∘ E`, given the table of `E`. -/</span></span>
+<span id="L74"><span class="kw">def</span> <span class="const token" data-verso-hover="131">compT</span> (T P : <span class="const token" data-verso-hover="20">ℕ</span>) : <span class="const token" data-verso-hover="20">ℕ</span> := <span class="const token" data-verso-hover="122">pack</span> n (<span class="kw">fun</span> x =&gt; <span class="const token" data-verso-hover="118">blk</span> n T (<span class="const token" data-verso-hover="118">blk</span> n P x)) n</span>
+<span id="L75"></span>
+<span id="L76"><span class="dc">/-- Some row of `m` is full: some process has reached everybody. -/</span></span>
+<span id="L77"><span class="kw">def</span> <span class="const token" data-verso-hover="132">bcM</span> (m : <span class="const token" data-verso-hover="20">ℕ</span>) : <span class="const token" data-verso-hover="114">Bool</span> := <span class="const token" data-verso-hover="124">anyUpTo</span> (<span class="kw">fun</span> x =&gt; <span class="const token" data-verso-hover="133">Nat.beq</span> (<span class="const token" data-verso-hover="118">blk</span> n m x) (<span class="const token" data-verso-hover="115">ones</span> n)) n</span>
+<span id="L78"></span>
+<span id="L79"><span class="dc">/-- The parent function of `(r, l)`, made idempotent at `r`. -/</span></span>
+<span id="L80"><span class="kw">def</span> <span class="const token" data-verso-hover="134">parentFn</span> (r : <span class="const token" data-verso-hover="20">ℕ</span>) (l : <span class="const token" data-verso-hover="135">List</span> <span class="const token" data-verso-hover="20">ℕ</span>) (v : <span class="const token" data-verso-hover="20">ℕ</span>) : <span class="const token" data-verso-hover="20">ℕ</span> := <span class="kw">if</span> v = r <span class="kw">then</span> r <span class="kw">else</span> l.<span class="const token" data-verso-hover="136">getD</span> v <span class="nu">0</span></span>
+<span id="L81"></span>
+<span id="L82"><span class="dc">/-- Every vertex reaches `r` within `n` steps. -/</span></span>
+<span id="L83"><span class="kw">def</span> <span class="const token" data-verso-hover="137">treeOK</span> (r : <span class="const token" data-verso-hover="20">ℕ</span>) (l : <span class="const token" data-verso-hover="135">List</span> <span class="const token" data-verso-hover="20">ℕ</span>) : <span class="const token" data-verso-hover="114">Bool</span> := (<span class="const token" data-verso-hover="138">List.range</span> n).<span class="const token" data-verso-hover="139">all</span> <span class="kw">fun</span> v =&gt; (<span class="const token" data-verso-hover="134">parentFn</span> r l)^[n] v == r</span>
+<span id="L84"></span>
+<span id="L85"><span class="dc">/-- The tree with self-loops with root `r` and parent list `l`. -/</span></span>
+<span id="L86"><span class="kw">def</span> <span class="const token" data-verso-hover="140">treeM</span> (r : <span class="const token" data-verso-hover="20">ℕ</span>) (l : <span class="const token" data-verso-hover="135">List</span> <span class="const token" data-verso-hover="20">ℕ</span>) : <span class="const token" data-verso-hover="20">ℕ</span> :=</span>
+<span id="L87">  <span class="const token" data-verso-hover="126">ofRel</span> n (<span class="kw">fun</span> x y =&gt; x == y || (y != r &amp;&amp; l.<span class="const token" data-verso-hover="136">getD</span> y <span class="nu">0</span> == x))</span>
+<span id="L88"></span>
+<span id="L89"><span class="dc">/-- All lists of length `k` with entries `&lt; n`. -/</span></span>
+<span id="L90"><span class="kw">def</span> <span class="const token" data-verso-hover="141">lists</span> : <span class="const token" data-verso-hover="20">ℕ</span> → <span class="const token" data-verso-hover="135">List</span> (<span class="const token" data-verso-hover="135">List</span> <span class="const token" data-verso-hover="20">ℕ</span>)</span>
+<span id="L91">  | <span class="nu">0</span> =&gt; [[]]</span>
+<span id="L92">  | k + <span class="nu">1</span> =&gt; (<span class="const token" data-verso-hover="141">lists</span> k).<span class="const token" data-verso-hover="142">flatMap</span> <span class="kw">fun</span> l =&gt; (<span class="const token" data-verso-hover="138">List.range</span> n).<span class="const token" data-verso-hover="143">map</span> (· :: l)</span>
+<span id="L93"></span>
+<span id="L94"><span class="dc">/-- Deduplication with a bit set `s` of the elements already in `acc`. -/</span></span>
+<span id="L95"><span class="kw">def</span> <span class="const token" data-verso-hover="144">dedupAux</span> : <span class="const token" data-verso-hover="135">List</span> <span class="const token" data-verso-hover="20">ℕ</span> → <span class="const token" data-verso-hover="135">List</span> <span class="const token" data-verso-hover="20">ℕ</span> → <span class="const token" data-verso-hover="20">ℕ</span> → <span class="const token" data-verso-hover="135">List</span> <span class="const token" data-verso-hover="20">ℕ</span></span>
+<span id="L96">  | [], acc, _ =&gt; acc</span>
+<span id="L97">  | m :: ms, acc, s =&gt;</span>
+<span id="L98">    <span class="kw">if</span> s.<span class="const token" data-verso-hover="129">testBit</span> m <span class="kw">then</span> <span class="const token" data-verso-hover="144">dedupAux</span> ms acc s <span class="kw">else</span> <span class="const token" data-verso-hover="144">dedupAux</span> ms (m :: acc) (s ||| <span class="nu">2</span> ^ m)</span>
+<span id="L99"></span>
+<span id="L100"><span class="dc">/-- The masks of all rooted trees with self-loops on `Fin n`. -/</span></span>
+<span id="L101"><span class="kw">def</span> <span class="const token" data-verso-hover="145">trees</span> : <span class="const token" data-verso-hover="135">List</span> <span class="const token" data-verso-hover="20">ℕ</span> :=</span>
+<span id="L102">  <span class="const token" data-verso-hover="144">dedupAux</span> ((<span class="const token" data-verso-hover="138">List.range</span> n).<span class="const token" data-verso-hover="142">flatMap</span> <span class="kw">fun</span> r =&gt; ((<span class="const token" data-verso-hover="141">lists</span> n n).<span class="const token" data-verso-hover="146">filter</span> (<span class="const token" data-verso-hover="137">treeOK</span> n r)).<span class="const token" data-verso-hover="143">map</span> (<span class="const token" data-verso-hover="140">treeM</span> n r)) [] <span class="nu">0</span></span>
+<span id="L103"></span>
+<span id="L104"><span class="dc">/-- One step of the frontier search (`TT` = tables of the trees). -/</span></span>
+<span id="L105"><span class="kw">def</span> <span class="const token" data-verso-hover="147">step</span> (TT F : <span class="const token" data-verso-hover="135">List</span> <span class="const token" data-verso-hover="20">ℕ</span>) : <span class="const token" data-verso-hover="135">List</span> <span class="const token" data-verso-hover="20">ℕ</span> :=</span>
+<span id="L106">  <span class="const token" data-verso-hover="144">dedupAux</span> ((F.<span class="const token" data-verso-hover="142">flatMap</span> <span class="kw">fun</span> P =&gt; TT.<span class="const token" data-verso-hover="143">map</span> <span class="kw">fun</span> T =&gt; <span class="const token" data-verso-hover="131">compT</span> n T P).<span class="const token" data-verso-hover="146">filter</span> (<span class="kw">fun</span> m =&gt; !<span class="const token" data-verso-hover="132">bcM</span> n m)) [] <span class="nu">0</span></span>
+<span id="L107"></span>
+<span id="L108"><span class="dc">/-- `frontier n k`: all products of `k` trees that have not broadcast (up to the soundness</span></span>
+<span id="L109"><span class="dc">theorem `frontier_sound`, which only needs `⊇`). -/</span></span>
+<span id="L110"><span class="kw">def</span> <span class="const token" data-verso-hover="148">frontier</span> : <span class="const token" data-verso-hover="20">ℕ</span> → <span class="const token" data-verso-hover="135">List</span> <span class="const token" data-verso-hover="20">ℕ</span></span>
+<span id="L111">  | <span class="nu">0</span> =&gt; [<span class="const token" data-verso-hover="127">idM</span> n].<span class="const token" data-verso-hover="146">filter</span> (<span class="kw">fun</span> m =&gt; !<span class="const token" data-verso-hover="132">bcM</span> n m)</span>
+<span id="L112">  | k + <span class="nu">1</span> =&gt; <span class="const token" data-verso-hover="147">step</span> n ((<span class="const token" data-verso-hover="145">trees</span> n).<span class="const token" data-verso-hover="143">map</span> (<span class="const token" data-verso-hover="130">tab</span> n)) (<span class="const token" data-verso-hover="148">frontier</span> k)</span>
+<span id="L113"></span>
+<span id="L114"><span class="dc">/-- The product of the masks `f 1, …, f k`. -/</span></span>
+<span id="L115"><span class="kw">def</span> <span class="const token" data-verso-hover="149">prodSeq</span> (f : <span class="const token" data-verso-hover="20">ℕ</span> → <span class="const token" data-verso-hover="20">ℕ</span>) : <span class="const token" data-verso-hover="20">ℕ</span> → <span class="const token" data-verso-hover="20">ℕ</span></span>
+<span id="L116">  | <span class="nu">0</span> =&gt; <span class="const token" data-verso-hover="127">idM</span> n</span>
+<span id="L117">  | k + <span class="nu">1</span> =&gt; <span class="const token" data-verso-hover="131">compT</span> n (<span class="const token" data-verso-hover="130">tab</span> n (f (<span class="nu">1</span> + k))) (<span class="const token" data-verso-hover="149">prodSeq</span> f k)</span>
+<span id="L118"></span>
+<span id="L119"><span class="dc">/-- The sequence `l₁, l₂, …, then d, d, …` (rounds are 1-indexed). -/</span></span>
+<span id="L120"><span class="kw">def</span> <span class="const token" data-verso-hover="150">seqF</span> (l : <span class="const token" data-verso-hover="135">List</span> <span class="const token" data-verso-hover="20">ℕ</span>) (d i : <span class="const token" data-verso-hover="20">ℕ</span>) : <span class="const token" data-verso-hover="20">ℕ</span> := l.<span class="const token" data-verso-hover="136">getD</span> (i - <span class="nu">1</span>) d</span>
+<span id="L121"></span>
+<span id="L122"><span class="dc">/-! ### Bit-level lemmas -/</span></span>
+<span id="L123"></span>
+<span id="L124"><span class="kw">theorem</span> <span class="const token" data-verso-hover="151">testBit_mkMask</span> (f : <span class="const token" data-verso-hover="20">ℕ</span> → <span class="const token" data-verso-hover="114">Bool</span>) (N i : <span class="const token" data-verso-hover="20">ℕ</span>) :</span>
+<span id="L125">    (<span class="const token" data-verso-hover="113">mkMask</span> f N).<span class="const token" data-verso-hover="129">testBit</span> i = (<span class="const token" data-verso-hover="19">decide</span> (i &lt; N) &amp;&amp; f i) := <span class="kw">by</span></span>
+<span id="L126">  <span class="kw">induction</span> N <span class="kw">with</span></span>
+<span id="L127">  | <span class="const token" data-verso-hover="31">zero</span> =&gt; <span class="kw">simp</span> [<span class="const token" data-verso-hover="113">mkMask</span>]</span>
+<span id="L128">  | <span class="const token" data-verso-hover="35">succ</span> N ih =&gt;</span>
+<span id="L129">    <span class="kw">rw</span> [<span class="const token" data-verso-hover="113">mkMask</span>, <span class="const token" data-verso-hover="152">Nat.testBit_or</span>, ih]</span>
+<span id="L130">    <span class="kw">by_cases</span> hi : i = N</span>
+<span id="L131">    · <span class="kw">subst</span> hi; <span class="kw">cases</span> h : f i &lt;;&gt; <span class="kw">simp</span></span>
+<span id="L132">    · <span class="kw">have</span> : (<span class="kw">if</span> f N = <span class="const token" data-verso-hover="153">true</span> <span class="kw">then</span> <span class="nu">2</span> ^ N <span class="kw">else</span> <span class="nu">0</span>).<span class="const token" data-verso-hover="129">testBit</span> i = <span class="const token" data-verso-hover="125">false</span> := <span class="kw">by</span></span>
+<span id="L133">        <span class="kw">split_ifs</span> &lt;;&gt; <span class="kw">simp</span> [<span class="const token" data-verso-hover="154">Ne.symm</span> hi]</span>
+<span id="L134">      <span class="kw">rw</span> [this, <span class="const token" data-verso-hover="155">Bool.or_false</span>]</span>
+<span id="L135">      <span class="kw">by_cases</span> h : i &lt; N</span>
+<span id="L136">      · <span class="kw">simp</span> [h, <span class="kw">show</span> i &lt; N + <span class="nu">1</span> <span class="kw">by</span> <span class="kw">omega</span>]</span>
+<span id="L137">      · <span class="kw">simp</span> [h, <span class="kw">show</span> ¬ i &lt; N + <span class="nu">1</span> <span class="kw">by</span> <span class="kw">omega</span>]</span>
+<span id="L138"></span>
+<span id="L139"><span class="kw">theorem</span> <span class="const token" data-verso-hover="156">ones_eq</span> (w : <span class="const token" data-verso-hover="20">ℕ</span>) : <span class="const token" data-verso-hover="115">ones</span> w = <span class="nu">2</span> ^ w - <span class="nu">1</span> := <span class="kw">by</span></span>
+<span id="L140">  <span class="kw">show</span> <span class="nu">1</span> &lt;&lt;&lt; w - <span class="nu">1</span> = _; <span class="kw">rw</span> [<span class="const token" data-verso-hover="157">Nat.one_shiftLeft</span>]</span>
+<span id="L141"></span>
+<span id="L142"><span class="kw">theorem</span> <span class="const token" data-verso-hover="158">testBit_ones</span> (w i : <span class="const token" data-verso-hover="20">ℕ</span>) : (<span class="const token" data-verso-hover="115">ones</span> w).<span class="const token" data-verso-hover="129">testBit</span> i = <span class="const token" data-verso-hover="19">decide</span> (i &lt; w) := <span class="kw">by</span></span>
+<span id="L143">  <span class="kw">rw</span> [<span class="const token" data-verso-hover="156">ones_eq</span>, <span class="const token" data-verso-hover="159">Nat.testBit_two_pow_sub_one</span>]</span>
+<span id="L144"></span>
+<span id="L145"><span class="kw">theorem</span> <span class="const token" data-verso-hover="160">testBit_blk</span> (w m i j : <span class="const token" data-verso-hover="20">ℕ</span>) :</span>
+<span id="L146">    (<span class="const token" data-verso-hover="118">blk</span> w m i).<span class="const token" data-verso-hover="129">testBit</span> j = (<span class="const token" data-verso-hover="19">decide</span> (j &lt; w) &amp;&amp; m.<span class="const token" data-verso-hover="129">testBit</span> (i * w + j)) := <span class="kw">by</span></span>
+<span id="L147">  <span class="kw">show</span> ((m &gt;&gt;&gt; (i * w)) &amp;&amp;&amp; <span class="const token" data-verso-hover="115">ones</span> w).<span class="const token" data-verso-hover="129">testBit</span> j = _</span>
+<span id="L148">  <span class="kw">rw</span> [<span class="const token" data-verso-hover="161">Nat.testBit_and</span>, <span class="const token" data-verso-hover="162">Nat.testBit_shiftRight</span>, <span class="const token" data-verso-hover="158">testBit_ones</span>, <span class="const token" data-verso-hover="163">Bool.and_comm</span>]</span>
+<span id="L149"></span>
+<span id="L150"><span class="kw">theorem</span> <span class="const token" data-verso-hover="164">blk_lt</span> (w m i : <span class="const token" data-verso-hover="20">ℕ</span>) : <span class="const token" data-verso-hover="118">blk</span> w m i &lt; <span class="nu">2</span> ^ w := <span class="kw">by</span></span>
+<span id="L151">  <span class="kw">show</span> (m &gt;&gt;&gt; (i * w)) &amp;&amp;&amp; <span class="const token" data-verso-hover="115">ones</span> w &lt; <span class="nu">2</span> ^ w</span>
+<span id="L152">  <span class="kw">refine</span> <span class="const token" data-verso-hover="165">lt_of_le_of_lt</span> <span class="const token" data-verso-hover="166">Nat.and_le_right</span> ?_</span>
+<span id="L153">  <span class="kw">rw</span> [<span class="const token" data-verso-hover="156">ones_eq</span>]; <span class="kw">exact</span> <span class="const token" data-verso-hover="167">Nat.sub_lt</span> (<span class="const token" data-verso-hover="168">Nat.two_pow_pos</span> w) <span class="const token" data-verso-hover="169">one_pos</span></span>
+<span id="L154"></span>
+<span id="L155"><span class="kw">theorem</span> <span class="const token" data-verso-hover="170">testBit_pack</span> (w : <span class="const token" data-verso-hover="20">ℕ</span>) (f : <span class="const token" data-verso-hover="20">ℕ</span> → <span class="const token" data-verso-hover="20">ℕ</span>) (N i j : <span class="const token" data-verso-hover="20">ℕ</span>) (hj : j &lt; w) :</span>
+<span id="L156">    (<span class="const token" data-verso-hover="122">pack</span> w f N).<span class="const token" data-verso-hover="129">testBit</span> (i * w + j) = (<span class="const token" data-verso-hover="19">decide</span> (i &lt; N) &amp;&amp; (f i).<span class="const token" data-verso-hover="129">testBit</span> j) := <span class="kw">by</span></span>
+<span id="L157">  <span class="kw">induction</span> N <span class="kw">with</span></span>
+<span id="L158">  | <span class="const token" data-verso-hover="31">zero</span> =&gt; <span class="kw">simp</span> [<span class="const token" data-verso-hover="122">pack</span>]</span>
+<span id="L159">  | <span class="const token" data-verso-hover="35">succ</span> N ih =&gt;</span>
+<span id="L160">    <span class="kw">show</span> ((<span class="const token" data-verso-hover="122">pack</span> w f N) ||| ((f N &amp;&amp;&amp; <span class="const token" data-verso-hover="115">ones</span> w) &lt;&lt;&lt; (N * w))).<span class="const token" data-verso-hover="129">testBit</span> (i * w + j) = _</span>
+<span id="L161">    <span class="kw">rw</span> [<span class="const token" data-verso-hover="152">Nat.testBit_or</span>, ih, <span class="const token" data-verso-hover="171">Nat.testBit_shiftLeft</span>, <span class="const token" data-verso-hover="161">Nat.testBit_and</span>, <span class="const token" data-verso-hover="158">testBit_ones</span>]</span>
+<span id="L162">    <span class="kw">rcases</span> <span class="const token" data-verso-hover="172">lt_trichotomy</span> i N <span class="kw">with</span> h | <span class="kw">rfl</span> | h</span>
+<span id="L163">    · <span class="kw">have</span> h2 : (i + <span class="nu">1</span>) * w ≤ N * w := <span class="const token" data-verso-hover="173">Nat.mul_le_mul_right</span> _ h</span>
+<span id="L164">      <span class="kw">rw</span> [<span class="const token" data-verso-hover="174">Nat.add_mul</span>, <span class="const token" data-verso-hover="175">one_mul</span>] <span class="kw">at</span> h2</span>
+<span id="L165">      <span class="kw">have</span> h1 : ¬ (i * w + j ≥ N * w) := <span class="kw">by</span> <span class="kw">omega</span></span>
+<span id="L166">      <span class="kw">simp</span> [h, h1, <span class="kw">show</span> i &lt; N + <span class="nu">1</span> <span class="kw">by</span> <span class="kw">omega</span>]</span>
+<span id="L167">    · <span class="kw">simp</span> [hj]</span>
+<span id="L168">    · <span class="kw">have</span> h2 : (N + <span class="nu">1</span>) * w ≤ i * w := <span class="const token" data-verso-hover="173">Nat.mul_le_mul_right</span> _ h</span>
+<span id="L169">      <span class="kw">rw</span> [<span class="const token" data-verso-hover="174">Nat.add_mul</span>, <span class="const token" data-verso-hover="175">one_mul</span>] <span class="kw">at</span> h2</span>
+<span id="L170">      <span class="kw">have</span> h1 : i * w + j ≥ N * w := <span class="kw">by</span> <span class="kw">omega</span></span>
+<span id="L171">      <span class="kw">have</span> h3 : ¬ (i * w + j - N * w &lt; w) := <span class="kw">by</span> <span class="kw">omega</span></span>
+<span id="L172">      <span class="kw">simp</span> [h3, <span class="kw">show</span> ¬ i &lt; N <span class="kw">by</span> <span class="kw">omega</span>, <span class="kw">show</span> ¬ i &lt; N + <span class="nu">1</span> <span class="kw">by</span> <span class="kw">omega</span>]</span>
+<span id="L173"></span>
+<span id="L174"><span class="kw">theorem</span> <span class="const token" data-verso-hover="176">testBit_orRows</span> (E S z y : <span class="const token" data-verso-hover="20">ℕ</span>) :</span>
+<span id="L175">    (<span class="const token" data-verso-hover="128">orRows</span> n E S z).<span class="const token" data-verso-hover="129">testBit</span> y = <span class="const token" data-verso-hover="153">true</span> ↔</span>
+<span id="L176">      ∃ z' &lt; z, S.<span class="const token" data-verso-hover="129">testBit</span> z' = <span class="const token" data-verso-hover="153">true</span> ∧ (<span class="const token" data-verso-hover="118">blk</span> n E z').<span class="const token" data-verso-hover="129">testBit</span> y = <span class="const token" data-verso-hover="153">true</span> := <span class="kw">by</span></span>
+<span id="L177">  <span class="kw">induction</span> z <span class="kw">with</span></span>
+<span id="L178">  | <span class="const token" data-verso-hover="31">zero</span> =&gt; <span class="kw">simp</span> [<span class="const token" data-verso-hover="128">orRows</span>]</span>
+<span id="L179">  | <span class="const token" data-verso-hover="35">succ</span> z ih =&gt;</span>
+<span id="L180">    <span class="kw">show</span> (<span class="const token" data-verso-hover="128">orRows</span> n E S z ||| (<span class="kw">if</span> S.<span class="const token" data-verso-hover="129">testBit</span> z <span class="kw">then</span> <span class="const token" data-verso-hover="118">blk</span> n E z <span class="kw">else</span> <span class="nu">0</span>)).<span class="const token" data-verso-hover="129">testBit</span> y = <span class="const token" data-verso-hover="153">true</span> ↔ _</span>
+<span id="L181">    <span class="kw">rw</span> [<span class="const token" data-verso-hover="152">Nat.testBit_or</span>, <span class="const token" data-verso-hover="177">Bool.or_eq_true</span>, ih]</span>
+<span id="L182">    <span class="kw">constructor</span></span>
+<span id="L183">    · <span class="kw">rintro</span> (⟨z', hz', h⟩ | h)</span>
+<span id="L184">      · <span class="kw">exact</span> ⟨z', <span class="kw">by</span> <span class="kw">omega</span>, h⟩</span>
+<span id="L185">      · <span class="kw">split_ifs</span> <span class="kw">at</span> h <span class="kw">with</span> hS</span>
+<span id="L186">        · <span class="kw">exact</span> ⟨z, <span class="kw">by</span> <span class="kw">omega</span>, hS, h⟩</span>
+<span id="L187">        · <span class="kw">simp</span> <span class="kw">at</span> h</span>
+<span id="L188">    · <span class="kw">rintro</span> ⟨z', hz', h1, h2⟩</span>
+<span id="L189">      <span class="kw">rcases</span> <span class="const token" data-verso-hover="178">Nat.lt_succ_iff_lt_or_eq</span>.<span class="const token" data-verso-hover="179">1</span> hz' <span class="kw">with</span> hz' | <span class="kw">rfl</span></span>
+<span id="L190">      · <span class="kw">exact</span> <span class="const token" data-verso-hover="27">Or.inl</span> ⟨z', hz', h1, h2⟩</span>
+<span id="L191">      · <span class="kw">right</span>; <span class="kw">simpa</span> [h1] <span class="kw">using</span> h2</span>
+<span id="L192"></span>
+<span id="L193"><span class="kw">theorem</span> <span class="const token" data-verso-hover="180">anyUpTo_iff</span> (f : <span class="const token" data-verso-hover="20">ℕ</span> → <span class="const token" data-verso-hover="114">Bool</span>) (k : <span class="const token" data-verso-hover="20">ℕ</span>) : <span class="const token" data-verso-hover="124">anyUpTo</span> f k = <span class="const token" data-verso-hover="153">true</span> ↔ ∃ x &lt; k, f x = <span class="const token" data-verso-hover="153">true</span> := <span class="kw">by</span></span>
+<span id="L194">  <span class="kw">induction</span> k <span class="kw">with</span></span>
+<span id="L195">  | <span class="const token" data-verso-hover="31">zero</span> =&gt; <span class="kw">simp</span> [<span class="const token" data-verso-hover="124">anyUpTo</span>]</span>
+<span id="L196">  | <span class="const token" data-verso-hover="35">succ</span> k ih =&gt;</span>
+<span id="L197">    <span class="kw">rw</span> [<span class="const token" data-verso-hover="124">anyUpTo</span>, <span class="const token" data-verso-hover="177">Bool.or_eq_true</span>, ih]</span>
+<span id="L198">    <span class="kw">constructor</span></span>
+<span id="L199">    · <span class="kw">rintro</span> (h | ⟨x, hx, h⟩)</span>
+<span id="L200">      · <span class="kw">exact</span> ⟨k, <span class="kw">by</span> <span class="kw">omega</span>, h⟩</span>
+<span id="L201">      · <span class="kw">exact</span> ⟨x, <span class="kw">by</span> <span class="kw">omega</span>, h⟩</span>
+<span id="L202">    · <span class="kw">rintro</span> ⟨x, hx, h⟩</span>
+<span id="L203">      <span class="kw">rcases</span> <span class="const token" data-verso-hover="178">Nat.lt_succ_iff_lt_or_eq</span>.<span class="const token" data-verso-hover="179">1</span> hx <span class="kw">with</span> hx | <span class="kw">rfl</span></span>
+<span id="L204">      · <span class="kw">exact</span> <span class="const token" data-verso-hover="38">Or.inr</span> ⟨x, hx, h⟩</span>
+<span id="L205">      · <span class="kw">exact</span> <span class="const token" data-verso-hover="27">Or.inl</span> h</span>
+<span id="L206"></span>
+<span id="L207"><span class="dc">/-! ### Decoding masks as relations -/</span></span>
+<span id="L208"></span>
+<span id="L209"><span class="dc">/-- The relation on `Fin n` encoded by the mask `m`: bit `x * n + y` is `x → y`. -/</span></span>
+<span id="L210"><span class="kw">def</span> <span class="const token" data-verso-hover="181">rel</span> (m : <span class="const token" data-verso-hover="20">ℕ</span>) (x y : <span class="const token" data-verso-hover="22">Fin</span> n) : <span class="kw">Prop</span> := m.<span class="const token" data-verso-hover="129">testBit</span> (x * n + y) = <span class="const token" data-verso-hover="153">true</span></span>
+<span id="L211"></span>
+<span id="L212"><span class="kw">theorem</span> <span class="const token" data-verso-hover="182">testBit_blk_fin</span> (m x : <span class="const token" data-verso-hover="20">ℕ</span>) (y : <span class="const token" data-verso-hover="22">Fin</span> n) : (<span class="const token" data-verso-hover="118">blk</span> n m x).<span class="const token" data-verso-hover="129">testBit</span> y = m.<span class="const token" data-verso-hover="129">testBit</span> (x * n + y) := <span class="kw">by</span></span>
+<span id="L213">  <span class="kw">rw</span> [<span class="const token" data-verso-hover="160">testBit_blk</span>]; <span class="kw">simp</span> [y.<span class="const token" data-verso-hover="59">2</span>]</span>
+<span id="L214"></span>
+<span id="L215"><span class="kw">theorem</span> <span class="const token" data-verso-hover="183">rel_ofRel</span> (f : <span class="const token" data-verso-hover="20">ℕ</span> → <span class="const token" data-verso-hover="20">ℕ</span> → <span class="const token" data-verso-hover="114">Bool</span>) (x y : <span class="const token" data-verso-hover="22">Fin</span> n) : <span class="const token" data-verso-hover="181">rel</span> n (<span class="const token" data-verso-hover="126">ofRel</span> n f) x y ↔ f x y = <span class="const token" data-verso-hover="153">true</span> := <span class="kw">by</span></span>
+<span id="L216">  <span class="kw">unfold</span> <span class="const token" data-verso-hover="181">rel</span> <span class="const token" data-verso-hover="126">ofRel</span></span>
+<span id="L217">  <span class="kw">rw</span> [<span class="const token" data-verso-hover="170">testBit_pack</span> _ _ _ _ _ y.<span class="const token" data-verso-hover="59">2</span>, <span class="const token" data-verso-hover="151">testBit_mkMask</span>]; <span class="kw">simp</span> [x.<span class="const token" data-verso-hover="59">2</span>, y.<span class="const token" data-verso-hover="59">2</span>]</span>
+<span id="L218"></span>
+<span id="L219"><span class="kw">theorem</span> <span class="const token" data-verso-hover="184">rel_idM</span> : <span class="const token" data-verso-hover="181">rel</span> n (<span class="const token" data-verso-hover="127">idM</span> n) = (· = ·) := <span class="kw">by</span></span>
+<span id="L220">  <span class="kw">funext</span> x y; <span class="kw">apply</span> <span class="const token" data-verso-hover="18">propext</span></span>
+<span id="L221">  <span class="kw">rw</span> [<span class="const token" data-verso-hover="127">idM</span>, <span class="const token" data-verso-hover="183">rel_ofRel</span>]; <span class="kw">simp</span> [<span class="const token" data-verso-hover="185">Fin.ext_iff</span>]</span>
+<span id="L222"></span>
+<span id="L223"><span class="kw">theorem</span> <span class="const token" data-verso-hover="186">rel_compT</span> (E P : <span class="const token" data-verso-hover="20">ℕ</span>) : <span class="const token" data-verso-hover="181">rel</span> n (<span class="const token" data-verso-hover="131">compT</span> n (<span class="const token" data-verso-hover="130">tab</span> n E) P) = <span class="const token" data-verso-hover="77">Relation.Comp</span> (<span class="const token" data-verso-hover="181">rel</span> n P) (<span class="const token" data-verso-hover="181">rel</span> n E) := <span class="kw">by</span></span>
+<span id="L224">  <span class="kw">funext</span> x y; <span class="kw">apply</span> <span class="const token" data-verso-hover="18">propext</span></span>
+<span id="L225">  <span class="kw">unfold</span> <span class="const token" data-verso-hover="181">rel</span> <span class="const token" data-verso-hover="131">compT</span></span>
+<span id="L226">  <span class="kw">rw</span> [<span class="const token" data-verso-hover="170">testBit_pack</span> _ _ _ _ _ y.<span class="const token" data-verso-hover="59">2</span>, <span class="const token" data-verso-hover="182">testBit_blk_fin</span>, <span class="const token" data-verso-hover="130">tab</span>, <span class="const token" data-verso-hover="170">testBit_pack</span> _ _ _ _ _ y.<span class="const token" data-verso-hover="59">2</span>]</span>
+<span id="L227">  <span class="kw">simp</span> only [x.<span class="const token" data-verso-hover="59">2</span>, <span class="const token" data-verso-hover="164">blk_lt</span>, <span class="const token" data-verso-hover="187">decide_true</span>, <span class="const token" data-verso-hover="188">Bool.true_and</span>]</span>
+<span id="L228">  <span class="kw">rw</span> [<span class="const token" data-verso-hover="176">testBit_orRows</span>]</span>
+<span id="L229">  <span class="kw">constructor</span></span>
+<span id="L230">  · <span class="kw">rintro</span> ⟨z, hz, h1, h2⟩</span>
+<span id="L231">    <span class="kw">refine</span> ⟨⟨z, hz⟩, ?_, ?_⟩</span>
+<span id="L232">    · <span class="kw">rw</span> [<span class="const token" data-verso-hover="160">testBit_blk</span>] <span class="kw">at</span> h1; <span class="kw">simpa</span> [hz] <span class="kw">using</span> h1</span>
+<span id="L233">    · <span class="kw">rw</span> [<span class="const token" data-verso-hover="182">testBit_blk_fin</span>] <span class="kw">at</span> h2; <span class="kw">exact</span> h2</span>
+<span id="L234">  · <span class="kw">rintro</span> ⟨z, h1, h2⟩</span>
+<span id="L235">    <span class="kw">refine</span> ⟨z, z.<span class="const token" data-verso-hover="59">2</span>, ?_, ?_⟩</span>
+<span id="L236">    · <span class="kw">rw</span> [<span class="const token" data-verso-hover="182">testBit_blk_fin</span>]; <span class="kw">exact</span> h1</span>
+<span id="L237">    · <span class="kw">rw</span> [<span class="const token" data-verso-hover="182">testBit_blk_fin</span>]; <span class="kw">exact</span> h2</span>
+<span id="L238"></span>
+<span id="L239"><span class="kw">theorem</span> <span class="const token" data-verso-hover="189">bcM_iff</span> (m : <span class="const token" data-verso-hover="20">ℕ</span>) : <span class="const token" data-verso-hover="132">bcM</span> n m = <span class="const token" data-verso-hover="153">true</span> ↔ ∃ x : <span class="const token" data-verso-hover="22">Fin</span> n, ∀ y : <span class="const token" data-verso-hover="22">Fin</span> n, <span class="const token" data-verso-hover="181">rel</span> n m x y := <span class="kw">by</span></span>
+<span id="L240">  <span class="kw">rw</span> [<span class="const token" data-verso-hover="132">bcM</span>, <span class="const token" data-verso-hover="180">anyUpTo_iff</span>]</span>
+<span id="L241">  <span class="kw">constructor</span></span>
+<span id="L242">  · <span class="kw">rintro</span> ⟨x, hx, h⟩</span>
+<span id="L243">    <span class="kw">have</span> h := <span class="const token" data-verso-hover="190">Nat.eq_of_beq_eq_true</span> h</span>
+<span id="L244">    <span class="kw">refine</span> ⟨⟨x, hx⟩, <span class="kw">fun</span> y =&gt; ?_⟩</span>
+<span id="L245">    <span class="kw">have</span> := <span class="const token" data-verso-hover="191">congrArg</span> (<span class="kw">fun</span> a =&gt; <span class="const token" data-verso-hover="129">Nat.testBit</span> a y) h</span>
+<span id="L246">    <span class="kw">simp</span> only [<span class="const token" data-verso-hover="182">testBit_blk_fin</span>, <span class="const token" data-verso-hover="158">testBit_ones</span>, y.<span class="const token" data-verso-hover="59">2</span>, <span class="const token" data-verso-hover="187">decide_true</span>] <span class="kw">at</span> this</span>
+<span id="L247">    <span class="kw">exact</span> this</span>
+<span id="L248">  · <span class="kw">rintro</span> ⟨x, h⟩</span>
+<span id="L249">    <span class="kw">refine</span> ⟨x, x.<span class="const token" data-verso-hover="59">2</span>, ?_⟩</span>
+<span id="L250">    <span class="kw">suffices</span> hb : <span class="const token" data-verso-hover="118">blk</span> n m x = <span class="const token" data-verso-hover="115">ones</span> n <span class="kw">by</span> <span class="kw">rw</span> [hb]; <span class="kw">exact</span> <span class="const token" data-verso-hover="192">Nat.beq_refl</span> _</span>
+<span id="L251">    <span class="kw">apply</span> <span class="const token" data-verso-hover="193">Nat.eq_of_testBit_eq</span></span>
+<span id="L252">    <span class="kw">intro</span> j</span>
+<span id="L253">    <span class="kw">rw</span> [<span class="const token" data-verso-hover="160">testBit_blk</span>, <span class="const token" data-verso-hover="158">testBit_ones</span>]</span>
+<span id="L254">    <span class="kw">by_cases</span> hj : j &lt; n</span>
+<span id="L255">    · <span class="kw">have</span> h1 : m.<span class="const token" data-verso-hover="129">testBit</span> (x * n + j) = <span class="const token" data-verso-hover="153">true</span> := h ⟨j, hj⟩</span>
+<span id="L256">      <span class="kw">simpa</span> [hj] <span class="kw">using</span> h1</span>
+<span id="L257">    · <span class="kw">simp</span> [hj]</span>
+<span id="L258"></span>
+<span id="L259"><span class="dc">/-! ### Enumerating rooted trees -/</span></span>
+<span id="L260"></span>
+<span id="L261"><span class="kw">theorem</span> <span class="const token" data-verso-hover="194">mem_lists</span> {l : <span class="const token" data-verso-hover="135">List</span> <span class="const token" data-verso-hover="20">ℕ</span>} {k : <span class="const token" data-verso-hover="20">ℕ</span>} : l ∈ <span class="const token" data-verso-hover="141">lists</span> n k ↔ l.<span class="const token" data-verso-hover="195">length</span> = k ∧ ∀ a ∈ l, a &lt; n := <span class="kw">by</span></span>
+<span id="L262">  <span class="kw">induction</span> k generalizing l <span class="kw">with</span></span>
+<span id="L263">  | <span class="const token" data-verso-hover="31">zero</span> =&gt; <span class="kw">cases</span> l &lt;;&gt; <span class="kw">simp</span> [<span class="const token" data-verso-hover="141">lists</span>]</span>
+<span id="L264">  | <span class="const token" data-verso-hover="35">succ</span> k ih =&gt;</span>
+<span id="L265">    <span class="kw">cases</span> l <span class="kw">with</span></span>
+<span id="L266">    | <span class="const token" data-verso-hover="196">nil</span> =&gt; <span class="kw">simp</span> [<span class="const token" data-verso-hover="141">lists</span>]</span>
+<span id="L267">    | <span class="const token" data-verso-hover="197">cons</span> a l =&gt;</span>
+<span id="L268">      <span class="kw">simp</span> only [<span class="const token" data-verso-hover="141">lists</span>, <span class="const token" data-verso-hover="198">List.mem_flatMap</span>, <span class="const token" data-verso-hover="199">List.mem_map</span>, <span class="const token" data-verso-hover="200">List.mem_range</span>, <span class="const token" data-verso-hover="201">List.cons.injEq</span>,</span>
+<span id="L269">        <span class="const token" data-verso-hover="202">List.length_cons</span>, <span class="const token" data-verso-hover="203">List.mem_cons</span>, <span class="const token" data-verso-hover="204">forall_eq_or_imp</span>]</span>
+<span id="L270">      <span class="kw">constructor</span></span>
+<span id="L271">      · <span class="kw">rintro</span> ⟨l', hl', a', ha', <span class="kw">rfl</span>, <span class="kw">rfl</span>⟩</span>
+<span id="L272">        <span class="kw">exact</span> ⟨<span class="kw">by</span> <span class="kw">rw</span> [(ih.<span class="const token" data-verso-hover="179">1</span> hl').<span class="const token" data-verso-hover="205">1</span>], ha', (ih.<span class="const token" data-verso-hover="179">1</span> hl').<span class="const token" data-verso-hover="206">2</span>⟩</span>
+<span id="L273">      · <span class="kw">rintro</span> ⟨hlen, ha, hl⟩</span>
+<span id="L274">        <span class="kw">exact</span> ⟨l, ih.<span class="const token" data-verso-hover="99">2</span> ⟨<span class="kw">by</span> <span class="kw">omega</span>, hl⟩, a, ha, <span class="const token" data-verso-hover="28">rfl</span>, <span class="const token" data-verso-hover="28">rfl</span>⟩</span>
+<span id="L275"></span>
+<span id="L276"><span class="dc">/-- If `f r = r` and some iterate of `f` maps `v` to `r`, then already `f^[n] v = r`. -/</span></span>
+<span id="L277"><span class="kw">theorem</span> <span class="const token" data-verso-hover="207">iterate_card_eq</span> {n : <span class="const token" data-verso-hover="20">ℕ</span>} (f : <span class="const token" data-verso-hover="22">Fin</span> n → <span class="const token" data-verso-hover="22">Fin</span> n) (r : <span class="const token" data-verso-hover="22">Fin</span> n) (hr : f r = r) :</span>
+<span id="L278">    ∀ k (v : <span class="const token" data-verso-hover="22">Fin</span> n), f^[k] v = r → f^[n] v = r := <span class="kw">by</span></span>
+<span id="L279">  <span class="kw">intro</span> k</span>
+<span id="L280">  <span class="kw">induction</span> k <span class="kw">using</span> <span class="const token" data-verso-hover="52">Nat.strong_induction_on</span> <span class="kw">with</span></span>
+<span id="L281">  | _ k ih =&gt;</span>
+<span id="L282">  <span class="kw">intro</span> v hk</span>
+<span id="L283">  <span class="kw">by_cases</span> hkn : k ≤ n</span>
+<span id="L284">  · <span class="kw">obtain</span> ⟨d, <span class="kw">rfl</span>⟩ : ∃ d, n = d + k := ⟨n - k, <span class="kw">by</span> <span class="kw">omega</span>⟩</span>
+<span id="L285">    <span class="kw">rw</span> [<span class="const token" data-verso-hover="208">Function.iterate_add_apply</span>, hk, <span class="const token" data-verso-hover="209">Function.iterate_fixed</span> hr]</span>
+<span id="L286">  · <span class="kw">have</span> key : ∀ a b : <span class="const token" data-verso-hover="22">Fin</span> (n + <span class="nu">1</span>), (a : <span class="const token" data-verso-hover="20">ℕ</span>) &lt; b → f^[a] v = f^[b] v → f^[n] v = r := <span class="kw">by</span></span>
+<span id="L287">      <span class="kw">intro</span> a b hab he</span>
+<span id="L288">      <span class="kw">have</span> hb := b.<span class="const token" data-verso-hover="59">2</span></span>
+<span id="L289">      <span class="kw">apply</span> ih (k - b + a) (<span class="kw">by</span> <span class="kw">omega</span>) v</span>
+<span id="L290">      <span class="kw">have</span> : k = (k - b) + b := <span class="kw">by</span> <span class="kw">omega</span></span>
+<span id="L291">      <span class="kw">rw</span> [this, <span class="const token" data-verso-hover="208">Function.iterate_add_apply</span>] <span class="kw">at</span> hk</span>
+<span id="L292">      <span class="kw">rw</span> [<span class="const token" data-verso-hover="208">Function.iterate_add_apply</span>, he]; <span class="kw">exact</span> hk</span>
+<span id="L293">    <span class="kw">obtain</span> ⟨a, b, hab, he⟩ :=</span>
+<span id="L294">      <span class="const token" data-verso-hover="210">Fintype.exists_ne_map_eq_of_card_lt</span> (<span class="kw">fun</span> a : <span class="const token" data-verso-hover="22">Fin</span> (n + <span class="nu">1</span>) =&gt; f^[a] v) (<span class="kw">by</span> <span class="kw">simp</span>)</span>
+<span id="L295">    <span class="kw">rcases</span> <span class="const token" data-verso-hover="211">lt_or_gt_of_ne</span> hab <span class="kw">with</span> h | h</span>
+<span id="L296">    · <span class="kw">exact</span> key a b h he</span>
+<span id="L297">    · <span class="kw">exact</span> key b a h he.<span class="const token" data-verso-hover="212">symm</span></span>
+<span id="L298"></span>
+<span id="L299"><span class="dc">/-- The parent function made idempotent at the root. -/</span></span>
+<span id="L300"><span class="kw">def</span> <span class="const token" data-verso-hover="213">qfn</span> {n : <span class="const token" data-verso-hover="20">ℕ</span>} (T : <span class="const token" data-verso-hover="5">RootedTree</span> n) (v : <span class="const token" data-verso-hover="22">Fin</span> n) : <span class="const token" data-verso-hover="22">Fin</span> n := <span class="kw">if</span> v = T.<span class="const token" data-verso-hover="21">root</span> <span class="kw">then</span> T.<span class="const token" data-verso-hover="21">root</span> <span class="kw">else</span> T.<span class="const token" data-verso-hover="23">parent</span> v</span>
+<span id="L301"></span>
+<span id="L302"><span class="kw">theorem</span> <span class="const token" data-verso-hover="214">exists_iterate_qfn</span> {n : <span class="const token" data-verso-hover="20">ℕ</span>} (T : <span class="const token" data-verso-hover="5">RootedTree</span> n) :</span>
+<span id="L303">    ∀ k (v : <span class="const token" data-verso-hover="22">Fin</span> n), T.<span class="const token" data-verso-hover="23">parent</span>^[k] v = T.<span class="const token" data-verso-hover="21">root</span> → ∃ k', (<span class="const token" data-verso-hover="213">qfn</span> T)^[k'] v = T.<span class="const token" data-verso-hover="21">root</span> := <span class="kw">by</span></span>
+<span id="L304">  <span class="kw">intro</span> k</span>
+<span id="L305">  <span class="kw">induction</span> k <span class="kw">with</span></span>
+<span id="L306">  | <span class="const token" data-verso-hover="31">zero</span> =&gt; <span class="kw">intro</span> v h; <span class="kw">exact</span> ⟨<span class="nu">0</span>, h⟩</span>
+<span id="L307">  | <span class="const token" data-verso-hover="35">succ</span> k ih =&gt;</span>
+<span id="L308">    <span class="kw">intro</span> v h</span>
+<span id="L309">    <span class="kw">by_cases</span> hv : v = T.<span class="const token" data-verso-hover="21">root</span></span>
+<span id="L310">    · <span class="kw">exact</span> ⟨<span class="nu">0</span>, hv⟩</span>
+<span id="L311">    · <span class="kw">rw</span> [<span class="const token" data-verso-hover="36">Function.iterate_succ_apply</span>] <span class="kw">at</span> h</span>
+<span id="L312">      <span class="kw">obtain</span> ⟨k', hk'⟩ := ih _ h</span>
+<span id="L313">      <span class="kw">exact</span> ⟨k' + <span class="nu">1</span>, <span class="kw">by</span> <span class="kw">rw</span> [<span class="const token" data-verso-hover="36">Function.iterate_succ_apply</span>, <span class="const token" data-verso-hover="213">qfn</span>]; <span class="kw">simpa</span> [hv] <span class="kw">using</span> hk'⟩</span>
+<span id="L314"></span>
+<span id="L315"><span class="dc">/-- The parent list of a tree. -/</span></span>
+<span id="L316"><span class="kw">def</span> <span class="const token" data-verso-hover="215">parentList</span> {n : <span class="const token" data-verso-hover="20">ℕ</span>} (T : <span class="const token" data-verso-hover="5">RootedTree</span> n) : <span class="const token" data-verso-hover="135">List</span> <span class="const token" data-verso-hover="20">ℕ</span> := <span class="const token" data-verso-hover="216">List.ofFn</span> <span class="kw">fun</span> i =&gt; (T.<span class="const token" data-verso-hover="23">parent</span> i : <span class="const token" data-verso-hover="20">ℕ</span>)</span>
+<span id="L317"></span>
+<span id="L318"><span class="kw">theorem</span> <span class="const token" data-verso-hover="217">getD_parentList</span> {n : <span class="const token" data-verso-hover="20">ℕ</span>} (T : <span class="const token" data-verso-hover="5">RootedTree</span> n) (v : <span class="const token" data-verso-hover="22">Fin</span> n) :</span>
+<span id="L319">    (<span class="const token" data-verso-hover="215">parentList</span> T).<span class="const token" data-verso-hover="136">getD</span> v <span class="nu">0</span> = T.<span class="const token" data-verso-hover="23">parent</span> v := <span class="kw">by</span></span>
+<span id="L320">  <span class="kw">simp</span> [<span class="const token" data-verso-hover="215">parentList</span>, <span class="const token" data-verso-hover="218">List.getD_eq_getElem?_getD</span>]</span>
+<span id="L321"></span>
+<span id="L322"><span class="kw">theorem</span> <span class="const token" data-verso-hover="219">treeOK_parentList</span> (T : <span class="const token" data-verso-hover="5">RootedTree</span> n) : <span class="const token" data-verso-hover="137">treeOK</span> n T.<span class="const token" data-verso-hover="21">root</span> (<span class="const token" data-verso-hover="215">parentList</span> T) = <span class="const token" data-verso-hover="153">true</span> := <span class="kw">by</span></span>
+<span id="L323">  <span class="kw">have</span> hsemi : <span class="const token" data-verso-hover="220">Function.Semiconj</span> <span class="const token" data-verso-hover="50">Fin.val</span> (<span class="const token" data-verso-hover="213">qfn</span> T) (<span class="const token" data-verso-hover="134">parentFn</span> T.<span class="const token" data-verso-hover="21">root</span> (<span class="const token" data-verso-hover="215">parentList</span> T)) := <span class="kw">by</span></span>
+<span id="L324">    <span class="kw">intro</span> v</span>
+<span id="L325">    <span class="kw">unfold</span> <span class="const token" data-verso-hover="213">qfn</span> <span class="const token" data-verso-hover="134">parentFn</span></span>
+<span id="L326">    <span class="kw">by_cases</span> h : v = T.<span class="const token" data-verso-hover="21">root</span></span>
+<span id="L327">    · <span class="kw">simp</span> [h]</span>
+<span id="L328">    · <span class="kw">have</span> h' : (v : <span class="const token" data-verso-hover="20">ℕ</span>) ≠ T.<span class="const token" data-verso-hover="21">root</span> := <span class="kw">fun</span> e =&gt; h (<span class="const token" data-verso-hover="58">Fin.ext</span> e)</span>
+<span id="L329">      <span class="kw">simp</span> only [h, h', ↓<span class="const token" data-verso-hover="221">reduceIte</span>]; <span class="kw">rw</span> [<span class="const token" data-verso-hover="217">getD_parentList</span>]</span>
+<span id="L330">  <span class="kw">unfold</span> <span class="const token" data-verso-hover="137">treeOK</span></span>
+<span id="L331">  <span class="kw">rw</span> [<span class="const token" data-verso-hover="222">List.all_eq_true</span>]</span>
+<span id="L332">  <span class="kw">intro</span> v hv</span>
+<span id="L333">  <span class="kw">rw</span> [<span class="const token" data-verso-hover="200">List.mem_range</span>] <span class="kw">at</span> hv</span>
+<span id="L334">  <span class="kw">have</span> h := (hsemi.<span class="const token" data-verso-hover="223">iterate_right</span> n) ⟨v, hv⟩</span>
+<span id="L335">  <span class="kw">obtain</span> ⟨k, hk⟩ := T.<span class="const token" data-verso-hover="24">reach_root</span> ⟨v, hv⟩</span>
+<span id="L336">  <span class="kw">obtain</span> ⟨k', hk'⟩ := <span class="const token" data-verso-hover="214">exists_iterate_qfn</span> T k _ hk</span>
+<span id="L337">  <span class="kw">rw</span> [<span class="const token" data-verso-hover="224">beq_iff_eq</span>]</span>
+<span id="L338">  <span class="kw">simp</span> only <span class="kw">at</span> h</span>
+<span id="L339">  <span class="kw">rw</span> [← h, <span class="const token" data-verso-hover="207">iterate_card_eq</span> (<span class="const token" data-verso-hover="213">qfn</span> T) T.<span class="const token" data-verso-hover="21">root</span> (<span class="kw">by</span> <span class="kw">simp</span> [<span class="const token" data-verso-hover="213">qfn</span>]) k' _ hk']</span>
+<span id="L340"></span>
+<span id="L341"><span class="kw">theorem</span> <span class="const token" data-verso-hover="225">rel_treeM_parentList</span> (T : <span class="const token" data-verso-hover="5">RootedTree</span> n) : <span class="const token" data-verso-hover="181">rel</span> n (<span class="const token" data-verso-hover="140">treeM</span> n T.<span class="const token" data-verso-hover="21">root</span> (<span class="const token" data-verso-hover="215">parentList</span> T)) = T.<span class="const token" data-verso-hover="25">adj</span> := <span class="kw">by</span></span>
+<span id="L342">  <span class="kw">funext</span> x y; <span class="kw">apply</span> <span class="const token" data-verso-hover="18">propext</span></span>
+<span id="L343">  <span class="kw">rw</span> [<span class="const token" data-verso-hover="140">treeM</span>, <span class="const token" data-verso-hover="183">rel_ofRel</span>, <span class="const token" data-verso-hover="217">getD_parentList</span>]</span>
+<span id="L344">  <span class="kw">simp</span> [<span class="const token" data-verso-hover="25">RootedTree.adj</span>, <span class="const token" data-verso-hover="185">Fin.ext_iff</span>]</span>
+<span id="L345"></span>
+<span id="L346"><span class="kw">theorem</span> <span class="const token" data-verso-hover="226">mem_dedupAux</span> : ∀ (ms acc : <span class="const token" data-verso-hover="135">List</span> <span class="const token" data-verso-hover="20">ℕ</span>) (s : <span class="const token" data-verso-hover="20">ℕ</span>), (∀ a, s.<span class="const token" data-verso-hover="129">testBit</span> a = <span class="const token" data-verso-hover="153">true</span> → a ∈ acc) →</span>
+<span id="L347">    ∀ m, m ∈ ms ∨ m ∈ acc → m ∈ <span class="const token" data-verso-hover="144">dedupAux</span> ms acc s</span>
+<span id="L348">  | [], acc, s, _, m, h =&gt; <span class="kw">by</span> <span class="kw">simpa</span> [<span class="const token" data-verso-hover="144">dedupAux</span>] <span class="kw">using</span> h</span>
+<span id="L349">  | a :: ms, acc, s, hs, m, h =&gt; <span class="kw">by</span></span>
+<span id="L350">    <span class="kw">rw</span> [<span class="const token" data-verso-hover="144">dedupAux</span>]</span>
+<span id="L351">    <span class="kw">split_ifs</span> <span class="kw">with</span> ha</span>
+<span id="L352">    · <span class="kw">apply</span> <span class="const token" data-verso-hover="226">mem_dedupAux</span> ms acc s hs</span>
+<span id="L353">      <span class="kw">rcases</span> h <span class="kw">with</span> h | h</span>
+<span id="L354">      · <span class="kw">rcases</span> <span class="const token" data-verso-hover="203">List.mem_cons</span>.<span class="const token" data-verso-hover="179">1</span> h <span class="kw">with</span> <span class="kw">rfl</span> | h</span>
+<span id="L355">        · <span class="kw">exact</span> <span class="const token" data-verso-hover="38">Or.inr</span> (hs _ ha)</span>
+<span id="L356">        · <span class="kw">exact</span> <span class="const token" data-verso-hover="27">Or.inl</span> h</span>
+<span id="L357">      · <span class="kw">exact</span> <span class="const token" data-verso-hover="38">Or.inr</span> h</span>
+<span id="L358">    · <span class="kw">apply</span> <span class="const token" data-verso-hover="226">mem_dedupAux</span> ms (a :: acc)</span>
+<span id="L359">      · <span class="kw">intro</span> b hb</span>
+<span id="L360">        <span class="kw">rw</span> [<span class="const token" data-verso-hover="152">Nat.testBit_or</span>, <span class="const token" data-verso-hover="177">Bool.or_eq_true</span>, <span class="const token" data-verso-hover="227">Nat.testBit_two_pow</span>] <span class="kw">at</span> hb</span>
+<span id="L361">        <span class="kw">rcases</span> hb <span class="kw">with</span> hb | hb</span>
+<span id="L362">        · <span class="kw">exact</span> <span class="const token" data-verso-hover="228">List.mem_cons_of_mem</span> _ (hs _ hb)</span>
+<span id="L363">        · <span class="kw">rw</span> [<span class="const token" data-verso-hover="229">decide_eq_true_eq</span>] <span class="kw">at</span> hb; <span class="kw">subst</span> hb; <span class="kw">exact</span> <span class="const token" data-verso-hover="230">List.mem_cons_self</span></span>
+<span id="L364">      · <span class="kw">rcases</span> h <span class="kw">with</span> h | h</span>
+<span id="L365">        · <span class="kw">rcases</span> <span class="const token" data-verso-hover="203">List.mem_cons</span>.<span class="const token" data-verso-hover="179">1</span> h <span class="kw">with</span> <span class="kw">rfl</span> | h</span>
+<span id="L366">          · <span class="kw">exact</span> <span class="const token" data-verso-hover="38">Or.inr</span> <span class="const token" data-verso-hover="230">List.mem_cons_self</span></span>
+<span id="L367">          · <span class="kw">exact</span> <span class="const token" data-verso-hover="27">Or.inl</span> h</span>
+<span id="L368">        · <span class="kw">exact</span> <span class="const token" data-verso-hover="38">Or.inr</span> (<span class="const token" data-verso-hover="228">List.mem_cons_of_mem</span> _ h)</span>
+<span id="L369"></span>
+<span id="L370"><span class="kw">theorem</span> <span class="const token" data-verso-hover="231">mem_of_mem_dedupAux</span> : ∀ (ms acc : <span class="const token" data-verso-hover="135">List</span> <span class="const token" data-verso-hover="20">ℕ</span>) (s m : <span class="const token" data-verso-hover="20">ℕ</span>), m ∈ <span class="const token" data-verso-hover="144">dedupAux</span> ms acc s → m ∈ ms ∨ m ∈ acc</span>
+<span id="L371">  | [], acc, s, m, h =&gt; <span class="kw">by</span> <span class="kw">simpa</span> [<span class="const token" data-verso-hover="144">dedupAux</span>] <span class="kw">using</span> h</span>
+<span id="L372">  | a :: ms, acc, s, m, h =&gt; <span class="kw">by</span></span>
+<span id="L373">    <span class="kw">rw</span> [<span class="const token" data-verso-hover="144">dedupAux</span>] <span class="kw">at</span> h</span>
+<span id="L374">    <span class="kw">split_ifs</span> <span class="kw">at</span> h <span class="kw">with</span> ha</span>
+<span id="L375">    · <span class="kw">rcases</span> <span class="const token" data-verso-hover="231">mem_of_mem_dedupAux</span> ms acc s m h <span class="kw">with</span> h | h</span>
+<span id="L376">      · <span class="kw">exact</span> <span class="const token" data-verso-hover="27">Or.inl</span> (<span class="const token" data-verso-hover="228">List.mem_cons_of_mem</span> _ h)</span>
+<span id="L377">      · <span class="kw">exact</span> <span class="const token" data-verso-hover="38">Or.inr</span> h</span>
+<span id="L378">    · <span class="kw">rcases</span> <span class="const token" data-verso-hover="231">mem_of_mem_dedupAux</span> ms _ _ m h <span class="kw">with</span> h | h</span>
+<span id="L379">      · <span class="kw">exact</span> <span class="const token" data-verso-hover="27">Or.inl</span> (<span class="const token" data-verso-hover="228">List.mem_cons_of_mem</span> _ h)</span>
+<span id="L380">      · <span class="kw">rcases</span> <span class="const token" data-verso-hover="203">List.mem_cons</span>.<span class="const token" data-verso-hover="179">1</span> h <span class="kw">with</span> <span class="kw">rfl</span> | h</span>
+<span id="L381">        · <span class="kw">exact</span> <span class="const token" data-verso-hover="27">Or.inl</span> <span class="const token" data-verso-hover="230">List.mem_cons_self</span></span>
+<span id="L382">        · <span class="kw">exact</span> <span class="const token" data-verso-hover="38">Or.inr</span> h</span>
+<span id="L383"></span>
+<span id="L384"><span class="dc">/-- Every rooted tree (with self-loops) on `Fin n` is encoded by some mask in `trees n`. -/</span></span>
+<span id="L385"><span class="kw">theorem</span> <span class="const token" data-verso-hover="232">exists_mem_trees</span> (T : <span class="const token" data-verso-hover="5">RootedTree</span> n) : ∃ m ∈ <span class="const token" data-verso-hover="145">trees</span> n, <span class="const token" data-verso-hover="181">rel</span> n m = T.<span class="const token" data-verso-hover="25">adj</span> := <span class="kw">by</span></span>
+<span id="L386">  <span class="kw">refine</span> ⟨_, <span class="const token" data-verso-hover="226">mem_dedupAux</span> _ _ _ (<span class="kw">by</span> <span class="kw">simp</span>) _ (<span class="const token" data-verso-hover="27">Or.inl</span> ?_), <span class="const token" data-verso-hover="225">rel_treeM_parentList</span> n T⟩</span>
+<span id="L387">  <span class="kw">rw</span> [<span class="const token" data-verso-hover="198">List.mem_flatMap</span>]</span>
+<span id="L388">  <span class="kw">refine</span> ⟨T.<span class="const token" data-verso-hover="21">root</span>, <span class="const token" data-verso-hover="200">List.mem_range</span>.<span class="const token" data-verso-hover="99">2</span> T.<span class="const token" data-verso-hover="21">root</span>.<span class="const token" data-verso-hover="59">2</span>, <span class="const token" data-verso-hover="199">List.mem_map</span>.<span class="const token" data-verso-hover="99">2</span> ⟨<span class="const token" data-verso-hover="215">parentList</span> T, ?_, <span class="const token" data-verso-hover="28">rfl</span>⟩⟩</span>
+<span id="L389">  <span class="kw">rw</span> [<span class="const token" data-verso-hover="233">List.mem_filter</span>, <span class="const token" data-verso-hover="194">mem_lists</span>]</span>
+<span id="L390">  <span class="kw">refine</span> ⟨⟨<span class="kw">by</span> <span class="kw">simp</span> [<span class="const token" data-verso-hover="215">parentList</span>], ?_⟩, <span class="const token" data-verso-hover="219">treeOK_parentList</span> n T⟩</span>
+<span id="L391">  <span class="kw">intro</span> a ha</span>
+<span id="L392">  <span class="kw">obtain</span> ⟨i, <span class="kw">rfl</span>⟩ := <span class="const token" data-verso-hover="234">List.mem_ofFn</span>.<span class="const token" data-verso-hover="179">1</span> ha</span>
+<span id="L393">  <span class="kw">exact</span> (T.<span class="const token" data-verso-hover="23">parent</span> i).<span class="const token" data-verso-hover="59">2</span></span>
+<span id="L394"></span>
+<span id="L395"><span class="kw">theorem</span> <span class="const token" data-verso-hover="235">getD_lt</span> {l : <span class="const token" data-verso-hover="135">List</span> <span class="const token" data-verso-hover="20">ℕ</span>} (hl : ∀ a ∈ l, a &lt; n) (v : <span class="const token" data-verso-hover="22">Fin</span> n) : l.<span class="const token" data-verso-hover="136">getD</span> v <span class="nu">0</span> &lt; n := <span class="kw">by</span></span>
+<span id="L396">  <span class="kw">rw</span> [<span class="const token" data-verso-hover="218">List.getD_eq_getElem?_getD</span>]</span>
+<span id="L397">  <span class="kw">cases</span> h : l[(v : <span class="const token" data-verso-hover="20">ℕ</span>)]? <span class="kw">with</span></span>
+<span id="L398">  | <span class="const token" data-verso-hover="236">none</span> =&gt; <span class="kw">exact</span> <span class="const token" data-verso-hover="237">Nat.lt_of_le_of_lt</span> (<span class="const token" data-verso-hover="238">Nat.zero_le</span> _) v.<span class="const token" data-verso-hover="59">2</span></span>
+<span id="L399">  | <span class="const token" data-verso-hover="239">some</span> a =&gt; <span class="kw">exact</span> hl a (<span class="const token" data-verso-hover="240">List.mem_of_getElem?</span> h)</span>
+<span id="L400"></span>
+<span id="L401"><span class="kw">theorem</span> <span class="const token" data-verso-hover="241">exists_iterate_of_parentFn</span> {r : <span class="const token" data-verso-hover="22">Fin</span> n} {l : <span class="const token" data-verso-hover="135">List</span> <span class="const token" data-verso-hover="20">ℕ</span>} (p : <span class="const token" data-verso-hover="22">Fin</span> n → <span class="const token" data-verso-hover="22">Fin</span> n)</span>
+<span id="L402">    (hp : ∀ v, (p v : <span class="const token" data-verso-hover="20">ℕ</span>) = l.<span class="const token" data-verso-hover="136">getD</span> v <span class="nu">0</span>) :</span>
+<span id="L403">    ∀ j (v : <span class="const token" data-verso-hover="22">Fin</span> n), (<span class="const token" data-verso-hover="134">parentFn</span> r l)^[j] v = r → ∃ k, p^[k] v = r := <span class="kw">by</span></span>
+<span id="L404">  <span class="kw">intro</span> j</span>
+<span id="L405">  <span class="kw">induction</span> j <span class="kw">with</span></span>
+<span id="L406">  | <span class="const token" data-verso-hover="31">zero</span> =&gt; <span class="kw">intro</span> v h; <span class="kw">exact</span> ⟨<span class="nu">0</span>, <span class="const token" data-verso-hover="58">Fin.ext</span> h⟩</span>
+<span id="L407">  | <span class="const token" data-verso-hover="35">succ</span> j ih =&gt;</span>
+<span id="L408">    <span class="kw">intro</span> v h</span>
+<span id="L409">    <span class="kw">rw</span> [<span class="const token" data-verso-hover="36">Function.iterate_succ_apply</span>] <span class="kw">at</span> h</span>
+<span id="L410">    <span class="kw">by_cases</span> hv : (v : <span class="const token" data-verso-hover="20">ℕ</span>) = r</span>
+<span id="L411">    · <span class="kw">exact</span> ⟨<span class="nu">0</span>, <span class="const token" data-verso-hover="58">Fin.ext</span> hv⟩</span>
+<span id="L412">    · <span class="kw">simp</span> only [<span class="const token" data-verso-hover="134">parentFn</span>, hv, ↓<span class="const token" data-verso-hover="221">reduceIte</span>] <span class="kw">at</span> h; <span class="kw">rw</span> [← hp] <span class="kw">at</span> h</span>
+<span id="L413">      <span class="kw">obtain</span> ⟨k, hk⟩ := ih _ h</span>
+<span id="L414">      <span class="kw">exact</span> ⟨k + <span class="nu">1</span>, <span class="kw">by</span> <span class="kw">rw</span> [<span class="const token" data-verso-hover="36">Function.iterate_succ_apply</span>]; <span class="kw">exact</span> hk⟩</span>
+<span id="L415"></span>
+<span id="L416"><span class="dc">/-- Conversely, every mask in `trees n` encodes a rooted tree with self-loops. -/</span></span>
+<span id="L417"><span class="kw">theorem</span> <span class="const token" data-verso-hover="242">rel_mem_of_mem_trees</span> {m : <span class="const token" data-verso-hover="20">ℕ</span>} (hm : m ∈ <span class="const token" data-verso-hover="145">trees</span> n) : <span class="const token" data-verso-hover="181">rel</span> n m ∈ <span class="const token" data-verso-hover="4">treesWithLoops</span> n := <span class="kw">by</span></span>
+<span id="L418">  <span class="kw">rcases</span> <span class="const token" data-verso-hover="231">mem_of_mem_dedupAux</span> _ _ _ _ hm <span class="kw">with</span> hm | hm</span>
+<span id="L419">  · <span class="kw">obtain</span> ⟨r, hr, hm⟩ := <span class="const token" data-verso-hover="198">List.mem_flatMap</span>.<span class="const token" data-verso-hover="179">1</span> hm</span>
+<span id="L420">    <span class="kw">obtain</span> ⟨l, hl, <span class="kw">rfl</span>⟩ := <span class="const token" data-verso-hover="199">List.mem_map</span>.<span class="const token" data-verso-hover="179">1</span> hm</span>
+<span id="L421">    <span class="kw">rw</span> [<span class="const token" data-verso-hover="233">List.mem_filter</span>, <span class="const token" data-verso-hover="194">mem_lists</span>] <span class="kw">at</span> hl</span>
+<span id="L422">    <span class="kw">obtain</span> ⟨⟨-, hl⟩, hok⟩ := hl</span>
+<span id="L423">    <span class="kw">rw</span> [<span class="const token" data-verso-hover="200">List.mem_range</span>] <span class="kw">at</span> hr</span>
+<span id="L424">    <span class="kw">let</span> p : <span class="const token" data-verso-hover="22">Fin</span> n → <span class="const token" data-verso-hover="22">Fin</span> n := <span class="kw">fun</span> v =&gt; ⟨l.<span class="const token" data-verso-hover="136">getD</span> v <span class="nu">0</span>, <span class="const token" data-verso-hover="235">getD_lt</span> n hl v⟩</span>
+<span id="L425">    <span class="kw">refine</span> ⟨⟨⟨r, hr⟩, p, <span class="kw">fun</span> v =&gt; ?_⟩, ?_⟩</span>
+<span id="L426">    · <span class="kw">unfold</span> <span class="const token" data-verso-hover="137">treeOK</span> <span class="kw">at</span> hok</span>
+<span id="L427">      <span class="kw">rw</span> [<span class="const token" data-verso-hover="222">List.all_eq_true</span>] <span class="kw">at</span> hok</span>
+<span id="L428">      <span class="kw">have</span> := hok v (<span class="const token" data-verso-hover="200">List.mem_range</span>.<span class="const token" data-verso-hover="99">2</span> v.<span class="const token" data-verso-hover="59">2</span>)</span>
+<span id="L429">      <span class="kw">rw</span> [<span class="const token" data-verso-hover="224">beq_iff_eq</span>] <span class="kw">at</span> this</span>
+<span id="L430">      <span class="kw">exact</span> <span class="const token" data-verso-hover="241">exists_iterate_of_parentFn</span> n (r := ⟨r, hr⟩) p (<span class="kw">fun</span> _ =&gt; <span class="const token" data-verso-hover="28">rfl</span>) n v this</span>
+<span id="L431">    · <span class="kw">funext</span> x y; <span class="kw">apply</span> <span class="const token" data-verso-hover="18">propext</span></span>
+<span id="L432">      <span class="kw">rw</span> [<span class="const token" data-verso-hover="140">treeM</span>, <span class="const token" data-verso-hover="183">rel_ofRel</span>]</span>
+<span id="L433">      <span class="kw">simp</span> [<span class="const token" data-verso-hover="25">RootedTree.adj</span>, <span class="const token" data-verso-hover="185">Fin.ext_iff</span>, p]</span>
+<span id="L434">  · <span class="kw">simp</span> <span class="kw">at</span> hm</span>
+<span id="L435"></span>
+<span id="L436"><span class="dc">/-! ### Soundness of the frontier search -/</span></span>
+<span id="L437"></span>
+<span id="L438"><span class="dc">/-- **Soundness.** If a sequence of rooted trees has not broadcast after `k` rounds, then its</span></span>
+<span id="L439"><span class="dc">product `G₁ ∘ ⋯ ∘ G_k` is (encoded by a mask) in the `k`-th frontier. -/</span></span>
+<span id="L440"><span class="kw">theorem</span> <span class="const token" data-verso-hover="243">frontier_sound</span> {G : <span class="const token" data-verso-hover="20">ℕ</span> → <span class="const token" data-verso-hover="22">Fin</span> n → <span class="const token" data-verso-hover="22">Fin</span> n → <span class="kw">Prop</span>} (hG : ∀ i, G i ∈ <span class="const token" data-verso-hover="4">treesWithLoops</span> n) :</span>
+<span id="L441">    ∀ k, ¬ <span class="const token" data-verso-hover="70">Broadcasts</span> G k → ∃ m ∈ <span class="const token" data-verso-hover="148">frontier</span> n k, <span class="const token" data-verso-hover="181">rel</span> n m = <span class="const token" data-verso-hover="76">prod</span> G <span class="nu">1</span> k</span>
+<span id="L442">  | <span class="nu">0</span>, h =&gt; <span class="kw">by</span></span>
+<span id="L443">    <span class="kw">refine</span> ⟨<span class="const token" data-verso-hover="127">idM</span> n, ?_, <span class="kw">by</span> <span class="kw">rw</span> [<span class="const token" data-verso-hover="184">rel_idM</span>, <span class="const token" data-verso-hover="244">prod_zero</span>]⟩</span>
+<span id="L444">    <span class="kw">simp</span> only [<span class="const token" data-verso-hover="148">frontier</span>, <span class="const token" data-verso-hover="233">List.mem_filter</span>, <span class="const token" data-verso-hover="245">List.mem_singleton</span>, <span class="const token" data-verso-hover="246">true_and</span>, <span class="const token" data-verso-hover="247">Bool.not_eq_true'</span>]</span>
+<span id="L445">    <span class="kw">cases</span> hb : <span class="const token" data-verso-hover="132">bcM</span> n (<span class="const token" data-verso-hover="127">idM</span> n)</span>
+<span id="L446">    · <span class="kw">rfl</span></span>
+<span id="L447">    · <span class="kw">exfalso</span>; <span class="kw">apply</span> h</span>
+<span id="L448">      <span class="kw">obtain</span> ⟨x, hx⟩ := (<span class="const token" data-verso-hover="189">bcM_iff</span> n _).<span class="const token" data-verso-hover="179">1</span> hb</span>
+<span id="L449">      <span class="kw">exact</span> ⟨x, <span class="kw">fun</span> y =&gt; <span class="kw">by</span> <span class="kw">rw</span> [<span class="const token" data-verso-hover="244">prod_zero</span>, ← <span class="const token" data-verso-hover="184">rel_idM</span> n]; <span class="kw">exact</span> hx y⟩</span>
+<span id="L450">  | k + <span class="nu">1</span>, h =&gt; <span class="kw">by</span></span>
+<span id="L451">    <span class="kw">have</span> hk : ¬ <span class="const token" data-verso-hover="70">Broadcasts</span> G k := <span class="kw">fun</span> hb =&gt;</span>
+<span id="L452">      h (hb.<span class="const token" data-verso-hover="248">mono</span> (<span class="kw">fun</span> i =&gt; <span class="const token" data-verso-hover="46">refl_of_mem_treesWithLoops</span> (hG i)) (<span class="const token" data-verso-hover="249">Nat.le_succ</span> k))</span>
+<span id="L453">    <span class="kw">obtain</span> ⟨m, hm, hmr⟩ := <span class="const token" data-verso-hover="243">frontier_sound</span> hG k hk</span>
+<span id="L454">    <span class="kw">obtain</span> ⟨T, hT⟩ := hG (<span class="nu">1</span> + k)</span>
+<span id="L455">    <span class="kw">obtain</span> ⟨e, he, her⟩ := <span class="const token" data-verso-hover="232">exists_mem_trees</span> n T</span>
+<span id="L456">    <span class="kw">have</span> hrel : <span class="const token" data-verso-hover="181">rel</span> n (<span class="const token" data-verso-hover="131">compT</span> n (<span class="const token" data-verso-hover="130">tab</span> n e) m) = <span class="const token" data-verso-hover="76">prod</span> G <span class="nu">1</span> (k + <span class="nu">1</span>) := <span class="kw">by</span></span>
+<span id="L457">      <span class="kw">rw</span> [<span class="const token" data-verso-hover="186">rel_compT</span>, hmr, her, hT, <span class="const token" data-verso-hover="250">prod_succ</span>]</span>
+<span id="L458">    <span class="kw">refine</span> ⟨<span class="const token" data-verso-hover="131">compT</span> n (<span class="const token" data-verso-hover="130">tab</span> n e) m, ?_, hrel⟩</span>
+<span id="L459">    <span class="kw">apply</span> <span class="const token" data-verso-hover="226">mem_dedupAux</span> _ _ _ (<span class="kw">by</span> <span class="kw">simp</span>) _ (<span class="const token" data-verso-hover="27">Or.inl</span> _)</span>
+<span id="L460">    <span class="kw">rw</span> [<span class="const token" data-verso-hover="233">List.mem_filter</span>]</span>
+<span id="L461">    <span class="kw">refine</span> ⟨<span class="const token" data-verso-hover="198">List.mem_flatMap</span>.<span class="const token" data-verso-hover="99">2</span> ⟨m, hm, <span class="const token" data-verso-hover="199">List.mem_map</span>.<span class="const token" data-verso-hover="99">2</span> ⟨<span class="const token" data-verso-hover="130">tab</span> n e, <span class="const token" data-verso-hover="251">List.mem_map_of_mem</span> he, <span class="const token" data-verso-hover="28">rfl</span>⟩⟩, ?_⟩</span>
+<span id="L462">    <span class="kw">rw</span> [<span class="const token" data-verso-hover="247">Bool.not_eq_true'</span>]</span>
+<span id="L463">    <span class="kw">cases</span> hb : <span class="const token" data-verso-hover="132">bcM</span> n (<span class="const token" data-verso-hover="131">compT</span> n (<span class="const token" data-verso-hover="130">tab</span> n e) m)</span>
+<span id="L464">    · <span class="kw">rfl</span></span>
+<span id="L465">    · <span class="kw">exfalso</span>; <span class="kw">apply</span> h</span>
+<span id="L466">      <span class="kw">obtain</span> ⟨x, hx⟩ := (<span class="const token" data-verso-hover="189">bcM_iff</span> n _).<span class="const token" data-verso-hover="179">1</span> hb</span>
+<span id="L467">      <span class="kw">exact</span> ⟨x, <span class="kw">fun</span> y =&gt; <span class="kw">by</span> <span class="kw">rw</span> [← hrel]; <span class="kw">exact</span> hx y⟩</span>
+<span id="L468"></span>
+<span id="L469"><span class="dc">/-- An empty `K`-th frontier certifies that every sequence of rooted trees broadcasts by round</span></span>
+<span id="L470"><span class="dc">`K`. -/</span></span>
+<span id="L471"><span class="kw">theorem</span> <span class="const token" data-verso-hover="252">broadcasts_of_frontier_eq_nil</span> {K : <span class="const token" data-verso-hover="20">ℕ</span>} (h : <span class="const token" data-verso-hover="148">frontier</span> n K = [])</span>
+<span id="L472">    (G : <span class="const token" data-verso-hover="20">ℕ</span> → <span class="const token" data-verso-hover="22">Fin</span> n → <span class="const token" data-verso-hover="22">Fin</span> n → <span class="kw">Prop</span>) (hG : ∀ i, G i ∈ <span class="const token" data-verso-hover="4">treesWithLoops</span> n) : <span class="const token" data-verso-hover="70">Broadcasts</span> G K := <span class="kw">by</span></span>
+<span id="L473">  <span class="kw">by_contra</span> hb</span>
+<span id="L474">  <span class="kw">obtain</span> ⟨m, hm, -⟩ := <span class="const token" data-verso-hover="243">frontier_sound</span> n hG K hb</span>
+<span id="L475">  <span class="kw">simp</span> [h] <span class="kw">at</span> hm</span>
+<span id="L476"></span>
+<span id="L477"><span class="kw">theorem</span> <span class="const token" data-verso-hover="253">advBroadcastTime_le_of_frontier</span> {K : <span class="const token" data-verso-hover="20">ℕ</span>} (h : <span class="const token" data-verso-hover="148">frontier</span> n K = []) :</span>
+<span id="L478">    <span class="const token" data-verso-hover="8">advBroadcastTime</span> (<span class="const token" data-verso-hover="4">treesWithLoops</span> n) ≤ K :=</span>
+<span id="L479">  <span class="const token" data-verso-hover="105">advBroadcastTime_le</span> (<span class="const token" data-verso-hover="252">broadcasts_of_frontier_eq_nil</span> n h)</span>
+<span id="L480"></span>
+<span id="L481"><span class="dc">/-! ### Explicit sequences (lower bounds) -/</span></span>
+<span id="L482"></span>
+<span id="L483"><span class="kw">theorem</span> <span class="const token" data-verso-hover="254">rel_prodSeq</span> (f : <span class="const token" data-verso-hover="20">ℕ</span> → <span class="const token" data-verso-hover="20">ℕ</span>) : ∀ k, <span class="const token" data-verso-hover="181">rel</span> n (<span class="const token" data-verso-hover="149">prodSeq</span> n f k) = <span class="const token" data-verso-hover="76">prod</span> (<span class="kw">fun</span> i =&gt; <span class="const token" data-verso-hover="181">rel</span> n (f i)) <span class="nu">1</span> k</span>
+<span id="L484">  | <span class="nu">0</span> =&gt; <span class="const token" data-verso-hover="184">rel_idM</span> n</span>
+<span id="L485">  | k + <span class="nu">1</span> =&gt; <span class="kw">by</span> <span class="kw">rw</span> [<span class="const token" data-verso-hover="149">prodSeq</span>, <span class="const token" data-verso-hover="186">rel_compT</span>, <span class="const token" data-verso-hover="254">rel_prodSeq</span> f k, <span class="const token" data-verso-hover="250">prod_succ</span>]</span>
+<span id="L486"></span>
+<span id="L487"><span class="kw">theorem</span> <span class="const token" data-verso-hover="255">le_advBroadcastTime_of_seq</span> {K t : <span class="const token" data-verso-hover="20">ℕ</span>} (hK : <span class="const token" data-verso-hover="148">frontier</span> n K = []) (f : <span class="const token" data-verso-hover="20">ℕ</span> → <span class="const token" data-verso-hover="20">ℕ</span>)</span>
+<span id="L488">    (hf : ∀ i, f i ∈ <span class="const token" data-verso-hover="145">trees</span> n) (ht : ∀ s &lt; t, <span class="const token" data-verso-hover="132">bcM</span> n (<span class="const token" data-verso-hover="149">prodSeq</span> n f s) = <span class="const token" data-verso-hover="125">false</span>) :</span>
+<span id="L489">    t ≤ <span class="const token" data-verso-hover="8">advBroadcastTime</span> (<span class="const token" data-verso-hover="4">treesWithLoops</span> n) := <span class="kw">by</span></span>
+<span id="L490">  <span class="kw">refine</span> <span class="const token" data-verso-hover="112">le_advBroadcastTime</span> (<span class="const token" data-verso-hover="252">broadcasts_of_frontier_eq_nil</span> n hK) (G := <span class="kw">fun</span> i =&gt; <span class="const token" data-verso-hover="181">rel</span> n (f i))</span>
+<span id="L491">    (<span class="kw">fun</span> i =&gt; <span class="const token" data-verso-hover="242">rel_mem_of_mem_trees</span> n (hf i)) (<span class="kw">fun</span> s hs hb =&gt; ?_)</span>
+<span id="L492">  <span class="kw">obtain</span> ⟨x, hx⟩ := hb</span>
+<span id="L493">  <span class="kw">have</span> := ht s hs</span>
+<span id="L494">  <span class="kw">rw</span> [← <span class="const token" data-verso-hover="256">Bool.not_eq_true</span>, <span class="const token" data-verso-hover="189">bcM_iff</span>] <span class="kw">at</span> this</span>
+<span id="L495">  <span class="kw">exact</span> this ⟨x, <span class="kw">fun</span> y =&gt; <span class="kw">by</span> <span class="kw">rw</span> [<span class="const token" data-verso-hover="254">rel_prodSeq</span>]; <span class="kw">exact</span> hx y⟩</span>
+<span id="L496"></span>
+<span id="L497"><span class="kw">theorem</span> <span class="const token" data-verso-hover="257">seqF_mem</span> {l : <span class="const token" data-verso-hover="135">List</span> <span class="const token" data-verso-hover="20">ℕ</span>} {d : <span class="const token" data-verso-hover="20">ℕ</span>} (h : ∀ m ∈ d :: l, m ∈ <span class="const token" data-verso-hover="145">trees</span> n) (i : <span class="const token" data-verso-hover="20">ℕ</span>) :</span>
+<span id="L498">    <span class="const token" data-verso-hover="150">seqF</span> l d i ∈ <span class="const token" data-verso-hover="145">trees</span> n := <span class="kw">by</span></span>
+<span id="L499">  <span class="kw">unfold</span> <span class="const token" data-verso-hover="150">seqF</span></span>
+<span id="L500">  <span class="kw">rw</span> [<span class="const token" data-verso-hover="218">List.getD_eq_getElem?_getD</span>]</span>
+<span id="L501">  <span class="kw">cases</span> hi : l[i - <span class="nu">1</span>]? <span class="kw">with</span></span>
+<span id="L502">  | <span class="const token" data-verso-hover="236">none</span> =&gt; <span class="kw">exact</span> h d <span class="const token" data-verso-hover="230">List.mem_cons_self</span></span>
+<span id="L503">  | <span class="const token" data-verso-hover="239">some</span> a =&gt; <span class="kw">exact</span> h a (<span class="const token" data-verso-hover="228">List.mem_cons_of_mem</span> _ (<span class="const token" data-verso-hover="240">List.mem_of_getElem?</span> hi))</span>
+<span id="L504"></span>
+<span id="L505"><span class="dc">/-! ### Kernel computations -/</span></span>
+<span id="L506"></span>
+<span id="L507"><span class="kw">theorem</span> <span class="const token" data-verso-hover="258">frontier_one</span> : <span class="const token" data-verso-hover="148">frontier</span> <span class="nu">1</span> <span class="nu">0</span> = [] := <span class="kw">by</span> <span class="kw">decide</span> +<span class="const token" data-verso-hover="259">kernel</span></span>
+<span id="L508"></span>
+<span id="L509"><span class="kw">theorem</span> <span class="const token" data-verso-hover="260">frontier_two</span> : <span class="const token" data-verso-hover="148">frontier</span> <span class="nu">2</span> <span class="nu">1</span> = [] := <span class="kw">by</span> <span class="kw">decide</span> +<span class="const token" data-verso-hover="259">kernel</span></span>
+<span id="L510"></span>
+<span id="L511"><span class="kw">theorem</span> <span class="const token" data-verso-hover="261">frontier_three</span> : <span class="const token" data-verso-hover="148">frontier</span> <span class="nu">3</span> <span class="nu">2</span> = [] := <span class="kw">by</span> <span class="kw">decide</span> +<span class="const token" data-verso-hover="259">kernel</span></span>
+<span id="L512"></span>
+<span id="L513"><span class="dc">/-- The frontiers for `n = 4` have sizes `1, 60, 528, 48, 0`; checking this takes ≈ 15 s in</span></span>
+<span id="L514"><span class="dc">the kernel. -/</span></span>
+<span id="L515"><span class="kw">theorem</span> <span class="const token" data-verso-hover="262">frontier_four</span> : <span class="const token" data-verso-hover="148">frontier</span> <span class="nu">4</span> <span class="nu">4</span> = [] := <span class="kw">by</span> <span class="kw">decide</span> +<span class="const token" data-verso-hover="259">kernel</span></span>
+<span id="L516"></span>
+<span id="L517"><span class="kw">end</span> FrontierSearch</span>
+<span id="L518"></span>
+<span id="L519"><span class="kw">open</span> FrontierSearch</span>
+<span id="L520"></span>
+<span id="L521"><span class="dc">/-- `t*(𝒯₁) = 0`. -/</span></span>
+<span id="L522"><span class="kw">theorem</span> <span class="const token" data-verso-hover="15">advBroadcastTime_trees_one</span> : <span class="const token" data-verso-hover="8">advBroadcastTime</span> (<span class="const token" data-verso-hover="4">treesWithLoops</span> <span class="nu">1</span>) = <span class="nu">0</span> :=</span>
+<span id="L523">  <span class="const token" data-verso-hover="263">Nat.le_zero</span>.<span class="const token" data-verso-hover="179">1</span> (<span class="const token" data-verso-hover="253">advBroadcastTime_le_of_frontier</span> <span class="nu">1</span> <span class="const token" data-verso-hover="258">frontier_one</span>)</span>
+<span id="L524"></span>
+<span id="L525"><span class="dc">/-- `t*(𝒯₂) = 1`. -/</span></span>
+<span id="L526"><span class="kw">theorem</span> <span class="const token" data-verso-hover="264">advBroadcastTime_trees_two</span> : <span class="const token" data-verso-hover="8">advBroadcastTime</span> (<span class="const token" data-verso-hover="4">treesWithLoops</span> <span class="nu">2</span>) = <span class="nu">1</span> :=</span>
+<span id="L527">  <span class="const token" data-verso-hover="265">le_antisymm</span> (<span class="const token" data-verso-hover="253">advBroadcastTime_le_of_frontier</span> <span class="nu">2</span> <span class="const token" data-verso-hover="260">frontier_two</span>)</span>
+<span id="L528">    (<span class="const token" data-verso-hover="255">le_advBroadcastTime_of_seq</span> <span class="nu">2</span> <span class="const token" data-verso-hover="260">frontier_two</span> (<span class="const token" data-verso-hover="150">seqF</span> [] <span class="nu">13</span>) (<span class="const token" data-verso-hover="257">seqF_mem</span> <span class="nu">2</span> (<span class="kw">by</span> <span class="kw">decide</span> +<span class="const token" data-verso-hover="259">kernel</span>))</span>
+<span id="L529">      (<span class="kw">by</span> <span class="kw">decide</span> +<span class="const token" data-verso-hover="259">kernel</span>))</span>
+<span id="L530"></span>
+<span id="L531"><span class="dc">/-- `t*(𝒯₃) = 2`: a path rooted at an endpoint does not broadcast in one round. -/</span></span>
+<span id="L532"><span class="kw">theorem</span> <span class="const token" data-verso-hover="266">advBroadcastTime_trees_three</span> : <span class="const token" data-verso-hover="8">advBroadcastTime</span> (<span class="const token" data-verso-hover="4">treesWithLoops</span> <span class="nu">3</span>) = <span class="nu">2</span> :=</span>
+<span id="L533">  <span class="const token" data-verso-hover="265">le_antisymm</span> (<span class="const token" data-verso-hover="253">advBroadcastTime_le_of_frontier</span> <span class="nu">3</span> <span class="const token" data-verso-hover="261">frontier_three</span>)</span>
+<span id="L534">    (<span class="const token" data-verso-hover="255">le_advBroadcastTime_of_seq</span> <span class="nu">3</span> <span class="const token" data-verso-hover="261">frontier_three</span> (<span class="const token" data-verso-hover="150">seqF</span> [] <span class="nu">409</span>) (<span class="const token" data-verso-hover="257">seqF_mem</span> <span class="nu">3</span> (<span class="kw">by</span> <span class="kw">decide</span> +<span class="const token" data-verso-hover="259">kernel</span>))</span>
+<span id="L535">      (<span class="kw">by</span> <span class="kw">decide</span> +<span class="const token" data-verso-hover="259">kernel</span>))</span>
+<span id="L536"></span>
+<span id="L537"><span class="dc">/-- `t*(𝒯₄) = 4`. -/</span></span>
+<span id="L538"><span class="kw">theorem</span> <span class="const token" data-verso-hover="16">advBroadcastTime_trees_four</span> : <span class="const token" data-verso-hover="8">advBroadcastTime</span> (<span class="const token" data-verso-hover="4">treesWithLoops</span> <span class="nu">4</span>) = <span class="nu">4</span> :=</span>
+<span id="L539">  <span class="const token" data-verso-hover="265">le_antisymm</span> (<span class="const token" data-verso-hover="253">advBroadcastTime_le_of_frontier</span> <span class="nu">4</span> <span class="const token" data-verso-hover="262">frontier_four</span>)</span>
+<span id="L540">    (<span class="const token" data-verso-hover="255">le_advBroadcastTime_of_seq</span> <span class="nu">4</span> <span class="const token" data-verso-hover="262">frontier_four</span> (<span class="const token" data-verso-hover="150">seqF</span> [<span class="nu">50737</span>, <span class="nu">54307</span>, <span class="nu">40033</span>] <span class="nu">50737</span>)</span>
+<span id="L541">      (<span class="const token" data-verso-hover="257">seqF_mem</span> <span class="nu">4</span> (<span class="kw">by</span> <span class="kw">decide</span> +<span class="const token" data-verso-hover="259">kernel</span>)) (<span class="kw">by</span> <span class="kw">decide</span> +<span class="const token" data-verso-hover="259">kernel</span>))</span>
+<span id="L542"></span>
+<span id="L543"><span class="kw">end</span> DynamicRootedTrees</span>
+<span id="L544"></span>
+</code></div>
+        <script>
+          window.versoHoversUrl = "PODC2022/DynamicRootedTrees/-hovers.json";</script>
+        <script src="static/lean/popper.js"></script>
+        <script src="static/lean/tippy.js"></script>
+        <script src="static/lean/marked.js"></script>
+        <script src="static/lean/highlighting.js"></script>
+        <script src="static/lean/lean.js"></script>
+        </article></main><footer class="site-footer"><div class="wrap">
+        Machine-checked formalizations of PODC papers in Lean 4. Generated with <a href="https://github.com/leanprover/verso">Verso</a> from the README files of <a href="https://github.com/vasnesterov/formal_podc">vasnesterov/formal_podc</a>.</div>
+      </footer></body>
+  </html>
+

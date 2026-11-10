@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="light dark">
+    <link rel="icon" href="data:,">
+    <title>ModularConsensus: Basic.lean · Formal PODC</title><base href="../../../.././"><link rel="stylesheet" href="static/lean/verso-vars.css">
+    <link rel="stylesheet" href="static/lean/highlighting.css">
+    <link rel="stylesheet" href="static/lean/tippy-border.css">
+    <link rel="stylesheet" href="static/style.css">
+    <script defer="defer" src="static/site.js"></script>
+    </head>
+  <body>
+    <header class="site-header">
+      <div class="wrap">
+        <a class="brand" href=".">Formal PODC</a><nav class="top">
+          <a href=".">Search</a><a href="about/">About</a><a href="https://github.com/vasnesterov/formal_podc">GitHub</a></nav>
+        </div>
+      </header>
+    <main class="wrap"><article><nav class="breadcrumbs" aria-label="Breadcrumb">
+          <a href=".">Search</a><span class="sep">›</span><a href="PODC2010/">PODC 2010</a><span class="sep">›</span><a href="PODC2010/ModularConsensus/">ModularConsensus</a><span class="sep">›</span><a href="PODC2010/ModularConsensus/src/">Lean source</a><span class="sep">›</span><span aria-current="page">Basic</span></nav>
+        <h1>
+          <code>Basic.lean</code></h1>
+        <div class="paper-links">
+          <p>
+            Source of <a href="PODC2010/ModularConsensus/">A Modular Approach to Shared-Memory Consensus — PODC 2010</a> · <a href="https://github.com/vasnesterov/formal_podc/blob/main/Papers/PODC2010/ModularConsensus/Basic.lean">GitHub</a> · hover over a name for its type and documentation</p>
+          </div>
+        <div class="lean-code lean-src">
+          <code class="hl lean block" data-lean-context="Basic"><span id="L1"><span class="kw">import</span> Cslib.Computability.Distributed.SharedMemory.Task</span>
+<span id="L2"><span class="kw">import</span> Mathlib.Data.Finset.Basic</span>
+<span id="L3"><span class="kw">import</span> Mathlib.Tactic.FinCases</span>
+<span id="L4"><span class="kw">import</span> Mathlib.Data.Fin.Basic</span>
+<span id="L5"></span>
+<span id="L6"><span class="dc">/-!</span></span>
+<span id="L7"><span class="dc"># Deciding objects and their composition (Section 3 of Aspnes, PODC 2010)</span></span>
+<span id="L8"></span>
+<span id="L9"><span class="dc">J. Aspnes, *A modular approach to shared-memory consensus, with applications to the</span></span>
+<span id="L10"><span class="dc">probabilistic-write model*, PODC 2010 (full version of May 14, 2011).</span></span>
+<span id="L11"></span>
+<span id="L12"><span class="dc">A *deciding object* is a one-shot object whose inputs are values `v : V` and whose outputs are</span></span>
+<span id="L13"><span class="dc">pairs `(d, v)` with a *decision bit* `d ∈ {adopt, commit}`. The properties of Section 3 only</span></span>
+<span id="L14"><span class="dc">mention the inputs and outputs of an execution, so we describe an object by the set of</span></span>
+<span id="L15"><span class="dc">input/output pairs its executions can produce:</span></span>
+<span id="L16"></span>
+<span id="L17"><span class="dc">* `inp : P → Option V` — `some v` iff `p` invoked the object with input `v`;</span></span>
+<span id="L18"><span class="dc">* `out : P → Option (Decision × V)` — `some (d, v)` iff `p` returned `(d, v)`.</span></span>
+<span id="L19"></span>
+<span id="L20"><span class="dc">Executions may be partial (processes may crash or not yet have returned). This is exactly the</span></span>
+<span id="L21"><span class="dc">shape of CSLib's task relation `Task.Δ` (`Cslib.SharedMemory.Task`), so the predicates below are</span></span>
+<span id="L22"><span class="dc">also used as task specifications for concrete implementations (`adoptCommitTask`).</span></span>
+<span id="L23"></span>
+<span id="L24"><span class="dc">## Main definitions</span></span>
+<span id="L25"></span>
+<span id="L26"><span class="dc">* `Decision`, `Validity`, `Coherence`, `Convergence`, `Agreement`;</span></span>
+<span id="L27"><span class="dc">* `DObj P V`: a deciding object (the input/output pairs of its executions);</span></span>
+<span id="L28"><span class="dc">* `DObj.seq X Y` — the composition `(X; Y)` of Procedure Composition;</span></span>
+<span id="L29"><span class="dc">* `DObj.IsWeakConsensus`, `DObj.IsAdoptCommit`.</span></span>
+<span id="L30"></span>
+<span id="L31"><span class="dc">## Main results</span></span>
+<span id="L32"></span>
+<span id="L33"><span class="dc">* `DObj.validity_seq` — **Lemma 1**: validity is preserved by composition;</span></span>
+<span id="L34"><span class="dc">* `DObj.coherence_seq` — **Lemma 3**: `X` coherent, `Y` valid and coherent ⇒ `(X; Y)` coherent;</span></span>
+<span id="L35"><span class="dc">* `DObj.isWeakConsensus_seq` — **Theorem 4** (safety part; termination, Lemma 2, is</span></span>
+<span id="L36"><span class="dc">  `Cslib.SharedMemory.Impl.seqComp_waitFree`, `SeqCompose.lean`);</span></span>
+<span id="L37"><span class="dc">* `DObj.validity_seq_converse_false` — the remark after Lemma 1 (the converse fails);</span></span>
+<span id="L38"><span class="dc">* `DObj.coherence_seq_needs_validity` — the validity hypothesis of Lemma 3 is needed.</span></span>
+<span id="L39"><span class="dc">-/</span></span>
+<span id="L40"></span>
+<span id="L41"><span class="kw">namespace</span> Podc.ModularConsensus</span>
+<span id="L42"></span>
+<span id="L43"><span class="dc">/-- The decision bit of a deciding object. -/</span></span>
+<span id="L44"><span class="kw">inductive</span> <span class="const token" data-verso-hover="62">Decision</span> <span class="kw">where</span></span>
+<span id="L45">  | <span class="const token" data-verso-hover="97">adopt</span></span>
+<span id="L46">  | <span class="const token" data-verso-hover="106">commit</span></span>
+<span id="L47">  <span class="kw">deriving</span> <span class="const token" data-verso-hover="54">DecidableEq</span>, <span class="const token" data-verso-hover="55">Inhabited</span>, <span class="const token" data-verso-hover="231">Repr</span></span>
+<span id="L48"></span>
+<span id="L49"><span class="kw">variable</span> {P V : <span class="kw">Type</span>}</span>
+<span id="L50"></span>
+<span id="L51"><span class="dc">/-- **Validity.** Every output value equals some process's input. -/</span></span>
+<span id="L52"><span class="kw">def</span> <span class="const token" data-verso-hover="213">Validity</span> (inp : P → <span class="const token" data-verso-hover="71">Option</span> V) (out : P → <span class="const token" data-verso-hover="71">Option</span> (<span class="const token" data-verso-hover="62">Decision</span> × V)) : <span class="kw">Prop</span> :=</span>
+<span id="L53">  ∀ p d v, out p = <span class="const token" data-verso-hover="74">some</span> (d, v) → ∃ q, inp q = <span class="const token" data-verso-hover="74">some</span> v</span>
+<span id="L54"></span>
+<span id="L55"><span class="dc">/-- **Coherence.** If any process outputs `(commit, v)`, then no process outputs `(d, v')` with</span></span>
+<span id="L56"><span class="dc">`v' ≠ v`. -/</span></span>
+<span id="L57"><span class="kw">def</span> <span class="const token" data-verso-hover="214">Coherence</span> (out : P → <span class="const token" data-verso-hover="71">Option</span> (<span class="const token" data-verso-hover="62">Decision</span> × V)) : <span class="kw">Prop</span> :=</span>
+<span id="L58">  ∀ p q v d w, out p = <span class="const token" data-verso-hover="74">some</span> (<span class="const token" data-verso-hover="106">.</span>commit, v) → out q = <span class="const token" data-verso-hover="74">some</span> (d, w) → w = v</span>
+<span id="L59"></span>
+<span id="L60"><span class="dc">/-- **Convergence.** If all inputs are equal to `v`, all outputs are `(commit, v)`. -/</span></span>
+<span id="L61"><span class="kw">def</span> <span class="const token" data-verso-hover="215">Convergence</span> (inp : P → <span class="const token" data-verso-hover="71">Option</span> V) (out : P → <span class="const token" data-verso-hover="71">Option</span> (<span class="const token" data-verso-hover="62">Decision</span> × V)) : <span class="kw">Prop</span> :=</span>
+<span id="L62">  ∀ v, (∀ p x, inp p = <span class="const token" data-verso-hover="74">some</span> x → x = v) → ∀ p d w, out p = <span class="const token" data-verso-hover="74">some</span> (d, w) → d = <span class="const token" data-verso-hover="106">.</span>commit ∧ w = v</span>
+<span id="L63"></span>
+<span id="L64"><span class="dc">/-- **Agreement** (of a deciding object): all output values are equal. -/</span></span>
+<span id="L65"><span class="kw">def</span> <span class="const token" data-verso-hover="232">Agreement</span> (out : P → <span class="const token" data-verso-hover="71">Option</span> (<span class="const token" data-verso-hover="62">Decision</span> × V)) : <span class="kw">Prop</span> :=</span>
+<span id="L66">  ∀ p q d e v w, out p = <span class="const token" data-verso-hover="74">some</span> (d, v) → out q = <span class="const token" data-verso-hover="74">some</span> (e, w) → v = w</span>
+<span id="L67"></span>
+<span id="L68"><span class="dc">/-- A deciding object, described by the input/output pairs of its (possibly partial)</span></span>
+<span id="L69"><span class="dc">executions. -/</span></span>
+<span id="L70"><span class="kw">def</span> <span class="const token" data-verso-hover="4">DObj</span> (P V : <span class="kw">Type</span>) := (P → <span class="const token" data-verso-hover="71">Option</span> V) → (P → <span class="const token" data-verso-hover="71">Option</span> (<span class="const token" data-verso-hover="62">Decision</span> × V)) → <span class="kw">Prop</span></span>
+<span id="L71"></span>
+<span id="L72"><span class="kw">namespace</span> DObj</span>
+<span id="L73"></span>
+<span id="L74"><span class="dc">/-- The object satisfies validity in all its executions. -/</span></span>
+<span id="L75"><span class="kw">def</span> <span class="const token" data-verso-hover="233">Valid</span> (X : <span class="const token" data-verso-hover="4">DObj</span> P V) : <span class="kw">Prop</span> := ∀ inp out, X inp out → <span class="const token" data-verso-hover="213">Validity</span> inp out</span>
+<span id="L76"></span>
+<span id="L77"><span class="dc">/-- The object satisfies coherence in all its executions. -/</span></span>
+<span id="L78"><span class="kw">def</span> <span class="const token" data-verso-hover="234">Coherent</span> (X : <span class="const token" data-verso-hover="4">DObj</span> P V) : <span class="kw">Prop</span> := ∀ inp out, X inp out → <span class="const token" data-verso-hover="214">Coherence</span> out</span>
+<span id="L79"></span>
+<span id="L80"><span class="dc">/-- The object satisfies convergence in all its executions. -/</span></span>
+<span id="L81"><span class="kw">def</span> <span class="const token" data-verso-hover="235">Convergent</span> (X : <span class="const token" data-verso-hover="4">DObj</span> P V) : <span class="kw">Prop</span> := ∀ inp out, X inp out → <span class="const token" data-verso-hover="215">Convergence</span> inp out</span>
+<span id="L82"></span>
+<span id="L83"><span class="dc">/-- The safety part of a weak consensus object (validity and coherence); termination is a</span></span>
+<span id="L84"><span class="dc">property of implementations (`Cslib.SharedMemory.Impl.WaitFree`, see `SeqCompose.lean`). -/</span></span>
+<span id="L85"><span class="kw">def</span> <span class="const token" data-verso-hover="236">IsWeakConsensus</span> (X : <span class="const token" data-verso-hover="4">DObj</span> P V) : <span class="kw">Prop</span> := X.<span class="const token" data-verso-hover="233">Valid</span> ∧ X.<span class="const token" data-verso-hover="234">Coherent</span></span>
+<span id="L86"></span>
+<span id="L87"><span class="dc">/-- The safety part of an adopt-commit object: validity, coherence and convergence. -/</span></span>
+<span id="L88"><span class="kw">def</span> <span class="const token" data-verso-hover="237">IsAdoptCommit</span> (X : <span class="const token" data-verso-hover="4">DObj</span> P V) : <span class="kw">Prop</span> := X.<span class="const token" data-verso-hover="233">Valid</span> ∧ X.<span class="const token" data-verso-hover="234">Coherent</span> ∧ X.<span class="const token" data-verso-hover="235">Convergent</span></span>
+<span id="L89"></span>
+<span id="L90"><span class="dc">/-- The output of the composition for a process, given its outputs from `X` and `Y`: a commit</span></span>
+<span id="L91"><span class="dc">from `X` is returned immediately, otherwise the output from `Y` (if any). -/</span></span>
+<span id="L92"><span class="kw">def</span> <span class="const token" data-verso-hover="238">seqOut</span> (oX oY : <span class="const token" data-verso-hover="71">Option</span> (<span class="const token" data-verso-hover="62">Decision</span> × V)) : <span class="const token" data-verso-hover="71">Option</span> (<span class="const token" data-verso-hover="62">Decision</span> × V) :=</span>
+<span id="L93">  <span class="kw">match</span> oX <span class="kw">with</span></span>
+<span id="L94">  | <span class="const token" data-verso-hover="74">some</span> (<span class="const token" data-verso-hover="106">.</span>commit, v) =&gt; <span class="const token" data-verso-hover="74">some</span> (<span class="const token" data-verso-hover="106">.</span>commit, v)</span>
+<span id="L95">  | _ =&gt; oY</span>
+<span id="L96"></span>
+<span id="L97"><span class="dc">/-- **Procedure Composition.** `(X; Y)`: run `X`; on `(commit, v)` return it, on `(adopt, v)`</span></span>
+<span id="L98"><span class="dc">invoke `Y` with input `v` and return its output. An execution of `(X; Y)` consists of an</span></span>
+<span id="L99"><span class="dc">execution of `X` (same inputs) and an execution of `Y` whose participants are processes that</span></span>
+<span id="L100"><span class="dc">adopted from `X`, with the adopted value as input (a process that adopted from `X` may not have</span></span>
+<span id="L101"><span class="dc">invoked `Y` yet, or crash in between); -/</span></span>
+<span id="L102"><span class="kw">def</span> <span class="const token" data-verso-hover="6">seq</span> (X Y : <span class="const token" data-verso-hover="4">DObj</span> P V) : <span class="const token" data-verso-hover="4">DObj</span> P V := <span class="kw">fun</span> inp out =&gt;</span>
+<span id="L103">  ∃ outX inpY outY, X inp outX ∧ Y inpY outY ∧</span>
+<span id="L104">    (∀ p v, inpY p = <span class="const token" data-verso-hover="74">some</span> v → outX p = <span class="const token" data-verso-hover="74">some</span> (<span class="const token" data-verso-hover="97">.</span>adopt, v)) ∧</span>
+<span id="L105">    (∀ p, out p = <span class="const token" data-verso-hover="238">seqOut</span> (outX p) (outY p))</span>
+<span id="L106"></span>
+<span id="L107">@[inherit_doc] <span class="kw">scoped</span> <span class="kw">infixl</span>:<span class="nu">65</span> <span class="st">" ⨾ "</span> =&gt; <span class="const token" data-verso-hover="6">DObj.seq</span></span>
+<span id="L108"></span>
+<span id="L109"><span class="kw">lemma</span> <span class="const token" data-verso-hover="239">seqOut_eq_some</span> {oX oY : <span class="const token" data-verso-hover="71">Option</span> (<span class="const token" data-verso-hover="62">Decision</span> × V)} {d : <span class="const token" data-verso-hover="62">Decision</span>} {v : V}</span>
+<span id="L110">    (h : <span class="const token" data-verso-hover="238">seqOut</span> oX oY = <span class="const token" data-verso-hover="74">some</span> (d, v)) :</span>
+<span id="L111">    (oX = <span class="const token" data-verso-hover="74">some</span> (<span class="const token" data-verso-hover="106">.</span>commit, v) ∧ d = <span class="const token" data-verso-hover="106">.</span>commit) ∨ ((∀ w, oX ≠ <span class="const token" data-verso-hover="74">some</span> (<span class="const token" data-verso-hover="106">.</span>commit, w)) ∧ oY = <span class="const token" data-verso-hover="74">some</span> (d, v)) := <span class="kw">by</span></span>
+<span id="L112">  <span class="kw">unfold</span> <span class="const token" data-verso-hover="238">seqOut</span> <span class="kw">at</span> h</span>
+<span id="L113">  <span class="kw">rcases</span> oX <span class="kw">with</span> _ | ⟨_ | _, w⟩</span>
+<span id="L114">  · <span class="kw">exact</span> <span class="const token" data-verso-hover="121">Or.inr</span> ⟨<span class="kw">by</span> <span class="kw">simp</span>, h⟩</span>
+<span id="L115">  · <span class="kw">exact</span> <span class="const token" data-verso-hover="121">Or.inr</span> ⟨<span class="kw">by</span> <span class="kw">simp</span>, h⟩</span>
+<span id="L116">  · <span class="kw">simp</span> only [<span class="const token" data-verso-hover="163">Option.some.injEq</span>, <span class="const token" data-verso-hover="216">Prod.mk.injEq</span>] <span class="kw">at</span> h</span>
+<span id="L117">    <span class="kw">obtain</span> ⟨<span class="kw">rfl</span>, <span class="kw">rfl</span>⟩ := h</span>
+<span id="L118">    <span class="kw">exact</span> <span class="const token" data-verso-hover="119">Or.inl</span> ⟨<span class="const token" data-verso-hover="69">rfl</span>, <span class="const token" data-verso-hover="69">rfl</span>⟩</span>
+<span id="L119"></span>
+<span id="L120"><span class="dc">/-- **Lemma 1.** Validity is preserved by composition. -/</span></span>
+<span id="L121"><span class="kw">theorem</span> <span class="const token" data-verso-hover="5">validity_seq</span> {X Y : <span class="const token" data-verso-hover="4">DObj</span> P V} (hX : X.<span class="const token" data-verso-hover="233">Valid</span>) (hY : Y.<span class="const token" data-verso-hover="233">Valid</span>) : (X ⨾ Y).<span class="const token" data-verso-hover="233">Valid</span> := <span class="kw">by</span></span>
+<span id="L122">  <span class="kw">rintro</span> inp out ⟨outX, inpY, outY, hx, hy, hlink, hout⟩ p d v hp</span>
+<span id="L123">  <span class="kw">rw</span> [hout] <span class="kw">at</span> hp</span>
+<span id="L124">  <span class="kw">rcases</span> <span class="const token" data-verso-hover="239">seqOut_eq_some</span> hp <span class="kw">with</span> ⟨h1, -⟩ | ⟨-, h2⟩</span>
+<span id="L125">  · <span class="kw">exact</span> hX _ _ hx p _ _ h1</span>
+<span id="L126">  · <span class="kw">obtain</span> ⟨q, hq⟩ := hY _ _ hy p d v h2</span>
+<span id="L127">    <span class="kw">exact</span> hX _ _ hx q _ _ (hlink q v hq)</span>
+<span id="L128"></span>
+<span id="L129"><span class="dc">/-- **Lemma 3.** If `X` satisfies coherence and `Y` satisfies validity and coherence, then</span></span>
+<span id="L130"><span class="dc">`(X; Y)` satisfies coherence. -/</span></span>
+<span id="L131"><span class="kw">theorem</span> <span class="const token" data-verso-hover="10">coherence_seq</span> {X Y : <span class="const token" data-verso-hover="4">DObj</span> P V} (hX : X.<span class="const token" data-verso-hover="234">Coherent</span>) (hYv : Y.<span class="const token" data-verso-hover="233">Valid</span>) (hYc : Y.<span class="const token" data-verso-hover="234">Coherent</span>) :</span>
+<span id="L132">    (X ⨾ Y).<span class="const token" data-verso-hover="234">Coherent</span> := <span class="kw">by</span></span>
+<span id="L133">  <span class="kw">rintro</span> inp out ⟨outX, inpY, outY, hx, hy, hlink, hout⟩</span>
+<span id="L134">  <span class="cm">--</span><span class="cm"> Case 1 of the paper: some process commits in `X`; then every output has its value.</span></span>
+<span id="L135">  <span class="kw">have</span> case1 : ∀ p u, outX p = <span class="const token" data-verso-hover="74">some</span> (<span class="const token" data-verso-hover="106">.</span>commit, u) → ∀ q d w, out q = <span class="const token" data-verso-hover="74">some</span> (d, w) → w = u := <span class="kw">by</span></span>
+<span id="L136">    <span class="kw">intro</span> p u hp q d w hq</span>
+<span id="L137">    <span class="kw">rw</span> [hout] <span class="kw">at</span> hq</span>
+<span id="L138">    <span class="kw">rcases</span> <span class="const token" data-verso-hover="239">seqOut_eq_some</span> hq <span class="kw">with</span> ⟨h1, -⟩ | ⟨-, h2⟩</span>
+<span id="L139">    · <span class="kw">exact</span> hX _ _ hx p q u _ w hp h1</span>
+<span id="L140">    · <span class="kw">obtain</span> ⟨q', hq'⟩ := hYv _ _ hy q d w h2</span>
+<span id="L141">      <span class="kw">exact</span> hX _ _ hx p q' u _ w hp (hlink q' w hq')</span>
+<span id="L142">  <span class="kw">intro</span> p q v d w hp hq</span>
+<span id="L143">  <span class="kw">rw</span> [hout] <span class="kw">at</span> hp</span>
+<span id="L144">  <span class="kw">rcases</span> <span class="const token" data-verso-hover="239">seqOut_eq_some</span> hp <span class="kw">with</span> ⟨h1, -⟩ | ⟨-, hpY⟩</span>
+<span id="L145">  · <span class="kw">exact</span> case1 p v h1 q d w hq</span>
+<span id="L146">  · <span class="cm">--</span><span class="cm"> `p` committed in `Y`.</span></span>
+<span id="L147">    <span class="kw">have</span> hq' := hq</span>
+<span id="L148">    <span class="kw">rw</span> [hout] <span class="kw">at</span> hq'</span>
+<span id="L149">    <span class="kw">rcases</span> <span class="const token" data-verso-hover="239">seqOut_eq_some</span> hq' <span class="kw">with</span> ⟨h1, -⟩ | ⟨-, hqY⟩</span>
+<span id="L150">    · <span class="cm">--</span><span class="cm"> `q` committed in `X` (Case 1 applied to `q`).</span></span>
+<span id="L151">      <span class="kw">have</span> hv := case1 q w h1 p <span class="const token" data-verso-hover="106">.</span>commit v (<span class="kw">by</span> <span class="kw">rw</span> [hout]; <span class="kw">exact</span> hp)</span>
+<span id="L152">      <span class="kw">exact</span> hv.<span class="const token" data-verso-hover="240">symm</span></span>
+<span id="L153">    · <span class="cm">--</span><span class="cm"> Case 2: both outputs come from `Y`.</span></span>
+<span id="L154">      <span class="kw">exact</span> hYc _ _ hy p q v d w hpY hqY</span>
+<span id="L155"></span>
+<span id="L156"><span class="dc">/-- **Theorem 4** (safety part). The property of being a weak consensus object (validity and</span></span>
+<span id="L157"><span class="dc">coherence) is preserved by composition. Termination (Lemma 2) is a property of the</span></span>
+<span id="L158"><span class="dc">implementations, see `Cslib.SharedMemory.Impl.seqComp_waitFree` (`SeqCompose.lean`). -/</span></span>
+<span id="L159"><span class="kw">theorem</span> <span class="const token" data-verso-hover="11">isWeakConsensus_seq</span> {X Y : <span class="const token" data-verso-hover="4">DObj</span> P V} (hX : X.<span class="const token" data-verso-hover="236">IsWeakConsensus</span>) (hY : Y.<span class="const token" data-verso-hover="236">IsWeakConsensus</span>) :</span>
+<span id="L160">    (X ⨾ Y).<span class="const token" data-verso-hover="236">IsWeakConsensus</span> :=</span>
+<span id="L161">  ⟨<span class="const token" data-verso-hover="5">validity_seq</span> hX.<span class="const token" data-verso-hover="117">1</span> hY.<span class="const token" data-verso-hover="117">1</span>, <span class="const token" data-verso-hover="10">coherence_seq</span> hX.<span class="const token" data-verso-hover="166">2</span> hY.<span class="const token" data-verso-hover="117">1</span> hY.<span class="const token" data-verso-hover="166">2</span>⟩</span>
+<span id="L162"></span>
+<span id="L163"><span class="dc">/-- Only processes that invoked the object get an output from it. -/</span></span>
+<span id="L164"><span class="kw">def</span> <span class="const token" data-verso-hover="241">WellFormed</span> (X : <span class="const token" data-verso-hover="4">DObj</span> P V) : <span class="kw">Prop</span> := ∀ inp out, X inp out → ∀ p, out p ≠ <span class="const token" data-verso-hover="72">none</span> → inp p ≠ <span class="const token" data-verso-hover="72">none</span></span>
+<span id="L165"></span>
+<span id="L166"><span class="kw">lemma</span> <span class="const token" data-verso-hover="242">seqOut_assoc</span> (a b c : <span class="const token" data-verso-hover="71">Option</span> (<span class="const token" data-verso-hover="62">Decision</span> × V)) :</span>
+<span id="L167">    <span class="const token" data-verso-hover="238">seqOut</span> (<span class="const token" data-verso-hover="238">seqOut</span> a b) c = <span class="const token" data-verso-hover="238">seqOut</span> a (<span class="const token" data-verso-hover="238">seqOut</span> b c) := <span class="kw">by</span></span>
+<span id="L168">  <span class="kw">rcases</span> a <span class="kw">with</span> _ | ⟨_ | _, w⟩ &lt;;&gt; <span class="kw">rfl</span></span>
+<span id="L169"></span>
+<span id="L170"><span class="dc">/-- Composition is associative (on input/output behaviours): `((X; Y); Z) = (X; (Y; Z))`, for</span></span>
+<span id="L171"><span class="dc">a well-formed middle object `Y`. -/</span></span>
+<span id="L172"><span class="kw">theorem</span> <span class="const token" data-verso-hover="12">seq_assoc</span> (X Y Z : <span class="const token" data-verso-hover="4">DObj</span> P V) (hY : Y.<span class="const token" data-verso-hover="241">WellFormed</span>) : ((X ⨾ Y) ⨾ Z) = (X ⨾ (Y ⨾ Z)) := <span class="kw">by</span></span>
+<span id="L173">  <span class="kw">funext</span> inp out</span>
+<span id="L174">  <span class="kw">apply</span> <span class="const token" data-verso-hover="46">propext</span></span>
+<span id="L175">  <span class="kw">constructor</span></span>
+<span id="L176">  · <span class="kw">rintro</span> ⟨oXY, iZ, oZ, ⟨oX, iY, oY, hx, hy, hlXY, hoXY⟩, hz, hlZ, ho⟩</span>
+<span id="L177">    <span class="kw">refine</span> ⟨oX, iY, <span class="kw">fun</span> p =&gt; <span class="const token" data-verso-hover="238">seqOut</span> (oY p) (oZ p), hx, ⟨oY, iZ, oZ, hy, hz, ?_, <span class="kw">fun</span> _ =&gt; <span class="const token" data-verso-hover="69">rfl</span>⟩,</span>
+<span id="L178">      hlXY, ?_⟩</span>
+<span id="L179">    · <span class="kw">intro</span> p v hp</span>
+<span id="L180">      <span class="kw">have</span> := hlZ p v hp</span>
+<span id="L181">      <span class="kw">rw</span> [hoXY] <span class="kw">at</span> this</span>
+<span id="L182">      <span class="kw">rcases</span> <span class="const token" data-verso-hover="239">seqOut_eq_some</span> this <span class="kw">with</span> ⟨-, h⟩ | ⟨-, h⟩</span>
+<span id="L183">      · <span class="kw">cases</span> h</span>
+<span id="L184">      · <span class="kw">exact</span> h</span>
+<span id="L185">    · <span class="kw">intro</span> p</span>
+<span id="L186">      <span class="kw">rw</span> [ho, hoXY, <span class="const token" data-verso-hover="242">seqOut_assoc</span>]</span>
+<span id="L187">  · <span class="kw">rintro</span> ⟨oX, iY, oYZ, hx, ⟨oY, iZ, oZ, hy, hz, hlYZ, hoYZ⟩, hlX, ho⟩</span>
+<span id="L188">    <span class="kw">refine</span> ⟨<span class="kw">fun</span> p =&gt; <span class="const token" data-verso-hover="238">seqOut</span> (oX p) (oY p), iZ, oZ, ⟨oX, iY, oY, hx, hy, hlX, <span class="kw">fun</span> _ =&gt; <span class="const token" data-verso-hover="69">rfl</span>⟩, hz,</span>
+<span id="L189">      ?_, ?_⟩</span>
+<span id="L190">    · <span class="kw">intro</span> p v hp</span>
+<span id="L191">      <span class="kw">have</span> h1 := hlYZ p v hp</span>
+<span id="L192">      <span class="kw">obtain</span> ⟨u, hu⟩ := <span class="const token" data-verso-hover="243">Option.ne_none_iff_exists'</span>.<span class="const token" data-verso-hover="174">1</span> (hY _ _ hy p (<span class="kw">by</span> <span class="kw">simp</span> [h1]))</span>
+<span id="L193">      <span class="kw">have</span> h2 := hlX p u hu</span>
+<span id="L194">      <span class="kw">simp</span> [<span class="const token" data-verso-hover="238">seqOut</span>, h2, h1]</span>
+<span id="L195">    · <span class="kw">intro</span> p</span>
+<span id="L196">      <span class="kw">rw</span> [ho, hoYZ, <span class="const token" data-verso-hover="242">seqOut_assoc</span>]</span>
+<span id="L197"></span>
+<span id="L198"><span class="dc">/-! ### Remarks after Lemmas 1 and 3 -/</span></span>
+<span id="L199"></span>
+<span id="L200"><span class="dc">/-- The scrambling object over `Bool`: every process adopts the negation of its input. -/</span></span>
+<span id="L201"><span class="kw">def</span> <span class="const token" data-verso-hover="244">scramble</span> : <span class="const token" data-verso-hover="4">DObj</span> P <span class="const token" data-verso-hover="149">Bool</span> := <span class="kw">fun</span> inp out =&gt; ∀ p, out p = (inp p).<span class="const token" data-verso-hover="245">map</span> <span class="kw">fun</span> v =&gt; (<span class="const token" data-verso-hover="97">.</span>adopt, !v)</span>
+<span id="L202"></span>
+<span id="L203"><span class="dc">/-- Remark after Lemma 1: the converse of Lemma 1 fails. `(scramble; scramble)` is valid (it is</span></span>
+<span id="L204"><span class="dc">the identity with decision `adopt`), but `scramble` is not. -/</span></span>
+<span id="L205"><span class="kw">theorem</span> <span class="const token" data-verso-hover="13">validity_seq_converse_false</span> [<span class="const token" data-verso-hover="246">Nonempty</span> P] :</span>
+<span id="L206">    (<span class="const token" data-verso-hover="244">scramble</span> (P := P) ⨾ <span class="const token" data-verso-hover="244">scramble</span>).<span class="const token" data-verso-hover="233">Valid</span> ∧ ¬ (<span class="const token" data-verso-hover="244">scramble</span> (P := P)).<span class="const token" data-verso-hover="233">Valid</span> := <span class="kw">by</span></span>
+<span id="L207">  <span class="kw">constructor</span></span>
+<span id="L208">  · <span class="kw">rintro</span> inp out ⟨oX, iY, oY, hx, hy, hl, ho⟩ p d v hp</span>
+<span id="L209">    <span class="kw">rw</span> [ho, hy p] <span class="kw">at</span> hp</span>
+<span id="L210">    <span class="kw">rcases</span> hX : oX p <span class="kw">with</span> _ | ⟨_ | _, w⟩ &lt;;&gt; <span class="kw">rw</span> [hX] <span class="kw">at</span> hp</span>
+<span id="L211">    · <span class="kw">rcases</span> hi : iY p <span class="kw">with</span> _ | u &lt;;&gt; <span class="kw">simp</span> [<span class="const token" data-verso-hover="238">seqOut</span>, hi] <span class="kw">at</span> hp</span>
+<span id="L212">      <span class="kw">have</span> := hl p u hi</span>
+<span id="L213">      <span class="kw">rw</span> [hx p] <span class="kw">at</span> this</span>
+<span id="L214">      <span class="kw">rcases</span> hip : inp p <span class="kw">with</span> _ | z &lt;;&gt; <span class="kw">simp</span> [hip] <span class="kw">at</span> this</span>
+<span id="L215">      <span class="kw">obtain</span> ⟨<span class="kw">rfl</span>, <span class="kw">rfl</span>⟩ := hp</span>
+<span id="L216">      <span class="kw">exact</span> ⟨p, <span class="kw">by</span> <span class="kw">rw</span> [hip, this]; <span class="kw">simp</span>⟩</span>
+<span id="L217">    · <span class="kw">rcases</span> hi : iY p <span class="kw">with</span> _ | u &lt;;&gt; <span class="kw">simp</span> [<span class="const token" data-verso-hover="238">seqOut</span>, hi] <span class="kw">at</span> hp</span>
+<span id="L218">      <span class="kw">have</span> := hl p u hi</span>
+<span id="L219">      <span class="kw">rw</span> [hx p] <span class="kw">at</span> this</span>
+<span id="L220">      <span class="kw">rcases</span> hip : inp p <span class="kw">with</span> _ | z &lt;;&gt; <span class="kw">simp</span> [hip] <span class="kw">at</span> this</span>
+<span id="L221">      <span class="kw">obtain</span> ⟨<span class="kw">rfl</span>, <span class="kw">rfl</span>⟩ := hp</span>
+<span id="L222">      <span class="kw">exact</span> ⟨p, <span class="kw">by</span> <span class="kw">rw</span> [hip, this]; <span class="kw">simp</span>⟩</span>
+<span id="L223">    · <span class="kw">rw</span> [hx p] <span class="kw">at</span> hX</span>
+<span id="L224">      <span class="kw">rcases</span> hip : inp p <span class="kw">with</span> _ | z &lt;;&gt; <span class="kw">simp</span> [hip] <span class="kw">at</span> hX</span>
+<span id="L225">  · <span class="kw">intro</span> h</span>
+<span id="L226">    <span class="kw">obtain</span> ⟨p⟩ := ‹<span class="const token" data-verso-hover="246">Nonempty</span> P›</span>
+<span id="L227">    <span class="kw">obtain</span> ⟨q, hq⟩ := h (<span class="kw">fun</span> _ =&gt; <span class="const token" data-verso-hover="74">some</span> <span class="const token" data-verso-hover="103">true</span>) (<span class="kw">fun</span> _ =&gt; <span class="const token" data-verso-hover="74">some</span> (<span class="const token" data-verso-hover="97">.</span>adopt, <span class="const token" data-verso-hover="76">false</span>)) (<span class="kw">fun</span> _ =&gt; <span class="const token" data-verso-hover="69">rfl</span>) p</span>
+<span id="L228">      <span class="const token" data-verso-hover="97">.</span>adopt <span class="const token" data-verso-hover="76">false</span> <span class="const token" data-verso-hover="69">rfl</span></span>
+<span id="L229">    <span class="kw">simp</span> <span class="kw">at</span> hq</span>
+<span id="L230"></span>
+<span id="L231"><span class="dc">/-- Remark on Lemma 3: the validity hypothesis on `Y` is needed. With two processes, `X`</span></span>
+<span id="L232"><span class="dc">commits `true` for process `0` and adopts `true` for process `1` (coherent), `Y` always adopts</span></span>
+<span id="L233"><span class="dc">`false` (coherent, not valid); then `(X; Y)` is not coherent. -/</span></span>
+<span id="L234"><span class="kw">theorem</span> <span class="const token" data-verso-hover="14">coherence_seq_needs_validity</span> :</span>
+<span id="L235">    ∃ X Y : <span class="const token" data-verso-hover="4">DObj</span> (<span class="const token" data-verso-hover="247">Fin</span> <span class="nu">2</span>) <span class="const token" data-verso-hover="149">Bool</span>, X.<span class="const token" data-verso-hover="234">Coherent</span> ∧ Y.<span class="const token" data-verso-hover="234">Coherent</span> ∧ ¬ (X ⨾ Y).<span class="const token" data-verso-hover="234">Coherent</span> := <span class="kw">by</span></span>
+<span id="L236">  <span class="kw">let</span> oX : <span class="const token" data-verso-hover="247">Fin</span> <span class="nu">2</span> → <span class="const token" data-verso-hover="71">Option</span> (<span class="const token" data-verso-hover="62">Decision</span> × <span class="const token" data-verso-hover="149">Bool</span>) := <span class="kw">fun</span> p =&gt; <span class="kw">if</span> p = <span class="nu">0</span> <span class="kw">then</span> <span class="const token" data-verso-hover="74">some</span> (<span class="const token" data-verso-hover="106">.</span>commit, <span class="const token" data-verso-hover="103">true</span>)</span>
+<span id="L237">    <span class="kw">else</span> <span class="const token" data-verso-hover="74">some</span> (<span class="const token" data-verso-hover="97">.</span>adopt, <span class="const token" data-verso-hover="103">true</span>)</span>
+<span id="L238">  <span class="kw">refine</span> ⟨<span class="kw">fun</span> _ out =&gt; out = oX, <span class="kw">fun</span> _ out =&gt; ∀ p, out p = <span class="const token" data-verso-hover="74">some</span> (<span class="const token" data-verso-hover="97">.</span>adopt, <span class="const token" data-verso-hover="76">false</span>), ?_, ?_, ?_⟩</span>
+<span id="L239">  · <span class="kw">rintro</span> inp out <span class="kw">rfl</span> p q v d w hp hq</span>
+<span id="L240">    <span class="kw">fin_cases</span> p &lt;;&gt; <span class="kw">fin_cases</span> q &lt;;&gt; <span class="kw">simp_all</span> [oX]</span>
+<span id="L241">  · <span class="kw">intro</span> inp out h p q v d w hp _</span>
+<span id="L242">    <span class="kw">rw</span> [h p] <span class="kw">at</span> hp; <span class="kw">cases</span> hp</span>
+<span id="L243">  · <span class="kw">intro</span> h</span>
+<span id="L244">    <span class="kw">have</span> := h (<span class="kw">fun</span> _ =&gt; <span class="const token" data-verso-hover="74">some</span> <span class="const token" data-verso-hover="103">true</span>) (<span class="kw">fun</span> p =&gt; <span class="kw">if</span> p = <span class="nu">0</span> <span class="kw">then</span> <span class="const token" data-verso-hover="74">some</span> (<span class="const token" data-verso-hover="106">.</span>commit, <span class="const token" data-verso-hover="103">true</span>)</span>
+<span id="L245">      <span class="kw">else</span> <span class="const token" data-verso-hover="74">some</span> (<span class="const token" data-verso-hover="97">.</span>adopt, <span class="const token" data-verso-hover="76">false</span>))</span>
+<span id="L246">      ⟨oX, <span class="kw">fun</span> p =&gt; <span class="kw">if</span> p = <span class="nu">0</span> <span class="kw">then</span> <span class="const token" data-verso-hover="72">none</span> <span class="kw">else</span> <span class="const token" data-verso-hover="74">some</span> <span class="const token" data-verso-hover="103">true</span>, <span class="kw">fun</span> _ =&gt; <span class="const token" data-verso-hover="74">some</span> (<span class="const token" data-verso-hover="97">.</span>adopt, <span class="const token" data-verso-hover="76">false</span>), <span class="const token" data-verso-hover="69">rfl</span>,</span>
+<span id="L247">        <span class="kw">fun</span> _ =&gt; <span class="const token" data-verso-hover="69">rfl</span>, ?_, ?_⟩ <span class="nu">0</span> <span class="nu">1</span> <span class="const token" data-verso-hover="103">true</span> <span class="const token" data-verso-hover="97">.</span>adopt <span class="const token" data-verso-hover="76">false</span> (<span class="kw">by</span> <span class="kw">simp</span>) (<span class="kw">by</span> <span class="kw">simp</span>)</span>
+<span id="L248">    · <span class="kw">exact</span> <span class="const token" data-verso-hover="161">absurd</span> this (<span class="kw">by</span> <span class="kw">simp</span>)</span>
+<span id="L249">    · <span class="kw">intro</span> p v hp</span>
+<span id="L250">      <span class="kw">fin_cases</span> p &lt;;&gt; <span class="kw">simp_all</span> [oX]</span>
+<span id="L251">    · <span class="kw">intro</span> p</span>
+<span id="L252">      <span class="kw">fin_cases</span> p &lt;;&gt; <span class="kw">simp</span> [oX, <span class="const token" data-verso-hover="238">seqOut</span>]</span>
+<span id="L253"></span>
+<span id="L254"><span class="kw">end</span> DObj</span>
+<span id="L255"></span>
+<span id="L256"><span class="dc">/-- The adopt-commit task for processes `P` and values `V` (as a CSLib task): validity,</span></span>
+<span id="L257"><span class="dc">coherence and convergence of the inputs and outputs of every (partial) one-shot execution. -/</span></span>
+<span id="L258"><span class="kw">abbrev</span> <span class="const token" data-verso-hover="217">adoptCommitTask</span> (P V : <span class="kw">Type</span>) : <span class="const token" data-verso-hover="49">Cslib.SharedMemory.Task</span> P <span class="kw">where</span></span>
+<span id="L259">  <span class="const token" data-verso-hover="248">In</span> := V</span>
+<span id="L260">  <span class="const token" data-verso-hover="249">Out</span> := <span class="const token" data-verso-hover="62">Decision</span> × V</span>
+<span id="L261">  <span class="const token" data-verso-hover="250">Δ</span> inp out := <span class="const token" data-verso-hover="213">Validity</span> inp out ∧ <span class="const token" data-verso-hover="214">Coherence</span> out ∧ <span class="const token" data-verso-hover="215">Convergence</span> inp out</span>
+<span id="L262"></span>
+<span id="L263"><span class="kw">end</span> Podc.ModularConsensus</span>
+<span id="L264"></span>
+</code></div>
+        <script>
+          window.versoHoversUrl = "PODC2010/ModularConsensus/-hovers.json";</script>
+        <script src="static/lean/popper.js"></script>
+        <script src="static/lean/tippy.js"></script>
+        <script src="static/lean/marked.js"></script>
+        <script src="static/lean/highlighting.js"></script>
+        <script src="static/lean/lean.js"></script>
+        </article></main><footer class="site-footer"><div class="wrap">
+        Machine-checked formalizations of PODC papers in Lean 4. Generated with <a href="https://github.com/leanprover/verso">Verso</a> from the README files of <a href="https://github.com/vasnesterov/formal_podc">vasnesterov/formal_podc</a>.</div>
+      </footer></body>
+  </html>
+

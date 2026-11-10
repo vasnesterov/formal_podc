@@ -1,0 +1,629 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="light dark">
+    <link rel="icon" href="data:,">
+    <title>RedundantOptimization: CGC.lean · Formal PODC</title><base href="../../../.././"><link rel="stylesheet" href="static/lean/verso-vars.css">
+    <link rel="stylesheet" href="static/lean/highlighting.css">
+    <link rel="stylesheet" href="static/lean/tippy-border.css">
+    <link rel="stylesheet" href="static/style.css">
+    <script defer="defer" src="static/site.js"></script>
+    </head>
+  <body>
+    <header class="site-header">
+      <div class="wrap">
+        <a class="brand" href=".">Formal PODC</a><nav class="top">
+          <a href=".">Search</a><a href="about/">About</a><a href="https://github.com/vasnesterov/formal_podc">GitHub</a></nav>
+        </div>
+      </header>
+    <main class="wrap"><article><nav class="breadcrumbs" aria-label="Breadcrumb">
+          <a href=".">Search</a><span class="sep">›</span><a href="PODC2020/">PODC 2020</a><span class="sep">›</span><a href="PODC2020/RedundantOptimization/">RedundantOptimization</a><span class="sep">›</span><a href="PODC2020/RedundantOptimization/src/">Lean source</a><span class="sep">›</span><span aria-current="page">CGC</span></nav>
+        <h1>
+          <code>CGC.lean</code></h1>
+        <div class="paper-links">
+          <p>
+            Source of <a href="PODC2020/RedundantOptimization/">Fault-Tolerance in Distributed Optimization: The Case of Redundancy — PODC 2020</a> · <a href="https://github.com/vasnesterov/formal_podc/blob/main/Papers/PODC2020/RedundantOptimization/CGC.lean">GitHub</a> · hover over a name for its type and documentation</p>
+          </div>
+        <div class="lean-code lean-src">
+          <code class="hl lean block" data-lean-context="CGC"><span id="L1"><span class="cm">/-</span></span>
+<span id="L2"><span class="cm">Copyright (c) 2026. All rights reserved.</span></span>
+<span id="L3"><span class="cm">Released under Apache 2.0 license as described in the file LICENSE.</span></span>
+<span id="L4"><span class="cm">-/</span></span>
+<span id="L5"><span class="kw">import</span> Papers.PODC2020.RedundantOptimization.Convex</span>
+<span id="L6"></span>
+<span id="L7"><span class="dc">/-!</span></span>
+<span id="L8"><span class="dc"># The CGC algorithm and Theorem 2</span></span>
+<span id="L9"></span>
+<span id="L10"><span class="dc">Section 4 of the paper: the server keeps an estimate `w t`; in iteration `t` it receives one vector</span></span>
+<span id="L11"><span class="dc">from every agent (honest agent `i` sends `∇Q_i(w t)`, a faulty agent sends anything; a missing</span></span>
+<span id="L12"><span class="dc">gradient counts as `0`, which is one of the faulty choices), applies the *comparative gradient</span></span>
+<span id="L13"><span class="dc">clipping* (CGC) filter and moves against the sum of the filtered vectors:</span></span>
+<span id="L14"></span>
+<span id="L15"><span class="dc">* `threshold f g` — the `(n-f)`-th smallest norm `‖g_{i_{n-f}}‖` (`threshold_spec`);</span></span>
+<span id="L16"><span class="dc">* `cgc f g j = min 1 (threshold / ‖g j‖) • g j` — the `f` largest vectors are scaled down to the</span></span>
+<span id="L17"><span class="dc">  threshold norm, the others are unchanged (this is exactly (16), ties included);</span></span>
+<span id="L18"><span class="dc">* `IsRun` — the iteration (17) against an arbitrary adaptive Byzantine adversary.</span></span>
+<span id="L19"></span>
+<span id="L20"><span class="dc">`Assumptions` bundles Assumptions 2–4 and 2f-redundancy; Assumption 1 (synchrony) is the run model.</span></span>
+<span id="L21"><span class="dc">Results:</span></span>
+<span id="L22"></span>
+<span id="L23"><span class="dc">* `theorem2` — Theorem 2 (ii): `‖w t - [w t]‖² ≤ ρ^t ‖w 0 - [w 0]‖²`, and `ρ &lt; 1`;</span></span>
+<span id="L24"><span class="dc">* `theorem2_rho_nonneg` — Theorem 2 (i) `0 ≤ ρ`, which needs `W* ≠ E`;</span></span>
+<span id="L25"><span class="dc">* `theorem2_rho_nonneg_false` — (i) fails when `W* = E` (degenerate case);</span></span>
+<span id="L26"><span class="dc">* `theorem2_tendsto` — convergence of `w t` to `W*`;</span></span>
+<span id="L27"><span class="dc">* `mem_Wstar_of_threshold_eq_zero` — the stopping rule of Step S2 is correct;</span></span>
+<span id="L28"><span class="dc">* `exists_proj` — the Euclidean projection onto `W*` exists (`W*` is closed and convex);</span></span>
+<span id="L29"><span class="dc">* `example_assumptions` — the hypotheses are satisfiable with `f ≥ 1` (non-vacuity).</span></span>
+<span id="L30"><span class="dc">-/</span></span>
+<span id="L31"></span>
+<span id="L32"><span class="kw">open</span> Finset InnerProductSpace</span>
+<span id="L33"><span class="kw">open</span> <span class="kw">scoped</span> RealInnerProductSpace</span>
+<span id="L34"></span>
+<span id="L35"><span class="kw">namespace</span> RedundantOptimization</span>
+<span id="L36"></span>
+<span id="L37"><span class="dc">/-! ### Convexity with gradients -/</span></span>
+<span id="L38"></span>
+<span id="L39"><span class="kw">section</span> Gradient</span>
+<span id="L40"></span>
+<span id="L41"><span class="kw">variable</span> {E : <span class="kw">Type</span>*} [<span class="const token" data-verso-hover="78">NormedAddCommGroup</span> E] [<span class="const token" data-verso-hover="79">InnerProductSpace</span> <span class="const token" data-verso-hover="35">ℝ</span> E] [<span class="const token" data-verso-hover="80">CompleteSpace</span> E]</span>
+<span id="L42"></span>
+<span id="L43"><span class="kw">lemma</span> <span class="const token" data-verso-hover="81">mem_argmin_of_hasGradientAt_zero</span> {q : E → <span class="const token" data-verso-hover="35">ℝ</span>} (hq : <span class="const token" data-verso-hover="82">ConvexOn</span> <span class="const token" data-verso-hover="35">ℝ</span> <span class="const token" data-verso-hover="44">Set.univ</span> q) {x : E}</span>
+<span id="L44">    (hg : <span class="const token" data-verso-hover="83">HasGradientAt</span> q <span class="nu">0</span> x) : x ∈ <span class="const token" data-verso-hover="34">argmin</span> q := <span class="kw">fun</span> y =&gt; <span class="kw">by</span></span>
+<span id="L45">  <span class="kw">simpa</span> <span class="kw">using</span> <span class="const token" data-verso-hover="31">ConvexOn.add_inner_le</span> hq hg y</span>
+<span id="L46"></span>
+<span id="L47"><span class="kw">lemma</span> <span class="const token" data-verso-hover="84">hasGradientAt_eq_zero_of_mem_argmin</span> {q : E → <span class="const token" data-verso-hover="35">ℝ</span>} {g x : E} (hg : <span class="const token" data-verso-hover="83">HasGradientAt</span> q g x)</span>
+<span id="L48">    (hx : x ∈ <span class="const token" data-verso-hover="34">argmin</span> q) : g = <span class="nu">0</span> := <span class="kw">by</span></span>
+<span id="L49">  <span class="kw">have</span> := <span class="const token" data-verso-hover="85">hasFDerivAt_eq_zero_of_mem_argmin</span> (<span class="const token" data-verso-hover="86">hasGradientAt_iff_hasFDerivAt</span>.<span class="const token" data-verso-hover="50">1</span> hg) hx</span>
+<span id="L50">  <span class="kw">exact</span> (<span class="const token" data-verso-hover="87">toDual</span> <span class="const token" data-verso-hover="35">ℝ</span> E).<span class="const token" data-verso-hover="88">injective</span> (<span class="kw">by</span> <span class="kw">rw</span> [this, <span class="const token" data-verso-hover="89">map_zero</span>])</span>
+<span id="L51"></span>
+<span id="L52"><span class="kw">lemma</span> <span class="const token" data-verso-hover="90">hasGradientAt_agg</span> {ι : <span class="kw">Type</span>*} (S : <span class="const token" data-verso-hover="38">Finset</span> ι) {Q : ι → E → <span class="const token" data-verso-hover="35">ℝ</span>} {G : ι → E → E} {w : E}</span>
+<span id="L53">    (h : ∀ i ∈ S, <span class="const token" data-verso-hover="83">HasGradientAt</span> (Q i) (G i w) w) :</span>
+<span id="L54">    <span class="const token" data-verso-hover="83">HasGradientAt</span> (<span class="const token" data-verso-hover="37">agg</span> S Q) (∑ i ∈ S, G i w) w := <span class="kw">by</span></span>
+<span id="L55">  <span class="kw">rw</span> [<span class="const token" data-verso-hover="86">hasGradientAt_iff_hasFDerivAt</span>, <span class="const token" data-verso-hover="91">map_sum</span>]</span>
+<span id="L56">  <span class="kw">exact</span> <span class="const token" data-verso-hover="92">HasFDerivAt.fun_sum</span> <span class="kw">fun</span> i hi =&gt; <span class="const token" data-verso-hover="86">hasGradientAt_iff_hasFDerivAt</span>.<span class="const token" data-verso-hover="50">1</span> (h i hi)</span>
+<span id="L57"></span>
+<span id="L58"><span class="kw">omit</span> [<span class="const token" data-verso-hover="80">CompleteSpace</span> E] <span class="kw">in</span></span>
+<span id="L59"><span class="dc">/-- Finite sums of convex functions are convex (the shared `ConvexOn.fun_sum`). -/</span></span>
+<span id="L60"><span class="kw">lemma</span> <span class="const token" data-verso-hover="33">convexOn_agg</span> {ι : <span class="kw">Type</span>*} {S : <span class="const token" data-verso-hover="38">Finset</span> ι} {Q : ι → E → <span class="const token" data-verso-hover="35">ℝ</span>}</span>
+<span id="L61">    (h : ∀ i ∈ S, <span class="const token" data-verso-hover="82">ConvexOn</span> <span class="const token" data-verso-hover="35">ℝ</span> <span class="const token" data-verso-hover="44">Set.univ</span> (Q i)) : <span class="const token" data-verso-hover="82">ConvexOn</span> <span class="const token" data-verso-hover="35">ℝ</span> <span class="const token" data-verso-hover="44">Set.univ</span> (<span class="const token" data-verso-hover="37">agg</span> S Q) :=</span>
+<span id="L62">  <span class="const token" data-verso-hover="32">ConvexOn.fun_sum</span> <span class="const token" data-verso-hover="93">convex_univ</span> h</span>
+<span id="L63"></span>
+<span id="L64"><span class="kw">end</span> Gradient</span>
+<span id="L65"></span>
+<span id="L66"><span class="dc">/-! ### The CGC filter -/</span></span>
+<span id="L67"></span>
+<span id="L68"><span class="kw">section</span> Filter</span>
+<span id="L69"></span>
+<span id="L70"><span class="kw">variable</span> {E : <span class="kw">Type</span>*} [<span class="const token" data-verso-hover="78">NormedAddCommGroup</span> E] [<span class="const token" data-verso-hover="79">InnerProductSpace</span> <span class="const token" data-verso-hover="35">ℝ</span> E] {n : <span class="const token" data-verso-hover="52">ℕ</span>}</span>
+<span id="L71"></span>
+<span id="L72"><span class="dc">/-- The CGC threshold: the `(n-f)`-th smallest of the norms `‖g j‖` (`‖g_{i_{n-f}}‖` in (16)),</span></span>
+<span id="L73"><span class="dc">i.e. the least norm value `t` such that at least `n - f` norms are `≤ t`. -/</span></span>
+<span id="L74"><span class="kw">noncomputable</span> <span class="kw">def</span> <span class="const token" data-verso-hover="28">threshold</span> (f : <span class="const token" data-verso-hover="52">ℕ</span>) (g : <span class="const token" data-verso-hover="57">Fin</span> n → E) : <span class="const token" data-verso-hover="35">ℝ</span> :=</span>
+<span id="L75">  <span class="const token" data-verso-hover="94">sInf</span> {t : <span class="const token" data-verso-hover="35">ℝ</span> | (∃ j, ‖g j‖ = t) ∧ n - f ≤ #{j | ‖g j‖ ≤ t}}</span>
+<span id="L76"></span>
+<span id="L77"><span class="kw">omit</span> [<span class="const token" data-verso-hover="79">InnerProductSpace</span> <span class="const token" data-verso-hover="35">ℝ</span> E] <span class="kw">in</span></span>
+<span id="L78"><span class="dc">/-- The threshold is one of the norms, at least `n - f` norms are `≤` it and at least `f + 1` norms</span></span>
+<span id="L79"><span class="dc">are `≥` it. -/</span></span>
+<span id="L80"><span class="kw">theorem</span> <span class="const token" data-verso-hover="29">threshold_spec</span> {f : <span class="const token" data-verso-hover="52">ℕ</span>} (hf : f &lt; n) (g : <span class="const token" data-verso-hover="57">Fin</span> n → E) :</span>
+<span id="L81">    (∃ j, ‖g j‖ = <span class="const token" data-verso-hover="28">threshold</span> f g) ∧ n - f ≤ #{j | ‖g j‖ ≤ <span class="const token" data-verso-hover="28">threshold</span> f g} ∧</span>
+<span id="L82">      f + <span class="nu">1</span> ≤ #{j | <span class="const token" data-verso-hover="28">threshold</span> f g ≤ ‖g j‖} := <span class="kw">by</span></span>
+<span id="L83">  <span class="kw">classical</span></span>
+<span id="L84">  <span class="kw">set</span> A := {t : <span class="const token" data-verso-hover="35">ℝ</span> | (∃ j, ‖g j‖ = t) ∧ n - f ≤ #{j | ‖g j‖ ≤ t}} <span class="kw">with</span> hAdef</span>
+<span id="L85">  <span class="kw">have</span> hfin : A.<span class="const token" data-verso-hover="95">Finite</span> := (<span class="const token" data-verso-hover="96">Set.finite_range</span> <span class="kw">fun</span> j =&gt; ‖g j‖).<span class="const token" data-verso-hover="97">subset</span> <span class="kw">fun</span> t ht =&gt; ht.<span class="const token" data-verso-hover="74">1</span></span>
+<span id="L86">  <span class="kw">have</span> hne : A.<span class="const token" data-verso-hover="45">Nonempty</span> := <span class="kw">by</span></span>
+<span id="L87">    <span class="kw">obtain</span> ⟨j0, -, hj0⟩ := <span class="const token" data-verso-hover="98">Finset.exists_max_image</span> (<span class="const token" data-verso-hover="99">univ</span> : <span class="const token" data-verso-hover="38">Finset</span> (<span class="const token" data-verso-hover="57">Fin</span> n)) (<span class="kw">fun</span> j =&gt; ‖g j‖)</span>
+<span id="L88">      ⟨⟨<span class="nu">0</span>, <span class="kw">by</span> <span class="kw">omega</span>⟩, <span class="const token" data-verso-hover="100">mem_univ</span> _⟩</span>
+<span id="L89">    <span class="kw">refine</span> ⟨‖g j0‖, ⟨j0, <span class="const token" data-verso-hover="40">rfl</span>⟩, ?_⟩</span>
+<span id="L90">    <span class="kw">have</span> : #{j | ‖g j‖ ≤ ‖g j0‖} = n := <span class="kw">by</span></span>
+<span id="L91">      <span class="kw">rw</span> [<span class="const token" data-verso-hover="101">Finset.filter_true_of_mem</span> <span class="kw">fun</span> j _ =&gt; hj0 j (<span class="const token" data-verso-hover="100">mem_univ</span> j)]; <span class="kw">simp</span></span>
+<span id="L92">    <span class="kw">omega</span></span>
+<span id="L93">  <span class="kw">have</span> hmem : <span class="const token" data-verso-hover="28">threshold</span> f g ∈ A := hne.<span class="const token" data-verso-hover="102">csInf_mem</span> hfin</span>
+<span id="L94">  <span class="kw">refine</span> ⟨hmem.<span class="const token" data-verso-hover="74">1</span>, hmem.<span class="const token" data-verso-hover="75">2</span>, ?_⟩</span>
+<span id="L95">  <span class="kw">by_contra</span> hlt</span>
+<span id="L96">  push <span class="const token" data-verso-hover="103">Not</span> <span class="kw">at</span> hlt</span>
+<span id="L97">  <span class="kw">have</span> hsplit := <span class="const token" data-verso-hover="104">Finset.card_filter_add_card_filter_not</span> (s := (<span class="const token" data-verso-hover="99">univ</span> : <span class="const token" data-verso-hover="38">Finset</span> (<span class="const token" data-verso-hover="57">Fin</span> n)))</span>
+<span id="L98">    (<span class="kw">fun</span> j =&gt; <span class="const token" data-verso-hover="28">threshold</span> f g ≤ ‖g j‖)</span>
+<span id="L99">  <span class="kw">simp</span> only [<span class="const token" data-verso-hover="105">card_univ</span>, <span class="const token" data-verso-hover="65">Fintype.card_fin</span>, <span class="const token" data-verso-hover="106">not_le</span>] <span class="kw">at</span> hsplit</span>
+<span id="L100">  <span class="kw">set</span> L := (<span class="const token" data-verso-hover="99">univ</span> : <span class="const token" data-verso-hover="38">Finset</span> (<span class="const token" data-verso-hover="57">Fin</span> n)).<span class="const token" data-verso-hover="107">filter</span> <span class="kw">fun</span> j =&gt; ‖g j‖ &lt; <span class="const token" data-verso-hover="28">threshold</span> f g <span class="kw">with</span> hLdef</span>
+<span id="L101">  <span class="kw">have</span> hL : n - f ≤ <span class="kw">#L</span> := <span class="kw">by</span> <span class="kw">omega</span></span>
+<span id="L102">  <span class="kw">have</span> hLne : L.<span class="const token" data-verso-hover="108">Nonempty</span> := <span class="kw">by</span> <span class="kw">rw</span> [← <span class="const token" data-verso-hover="109">Finset.card_pos</span>]; <span class="kw">omega</span></span>
+<span id="L103">  <span class="kw">obtain</span> ⟨j1, hj1L, hj1⟩ := <span class="const token" data-verso-hover="98">Finset.exists_max_image</span> L (<span class="kw">fun</span> j =&gt; ‖g j‖) hLne</span>
+<span id="L104">  <span class="kw">have</span> hA : ‖g j1‖ ∈ A := <span class="kw">by</span></span>
+<span id="L105">    <span class="kw">refine</span> ⟨⟨j1, <span class="const token" data-verso-hover="40">rfl</span>⟩, <span class="const token" data-verso-hover="110">le_trans</span> hL (<span class="const token" data-verso-hover="111">Finset.card_le_card</span> ?_)⟩</span>
+<span id="L106">    <span class="kw">intro</span> j hj</span>
+<span id="L107">    <span class="kw">simp</span> only [<span class="const token" data-verso-hover="112">mem_filter</span>, <span class="const token" data-verso-hover="100">mem_univ</span>, <span class="const token" data-verso-hover="113">true_and</span>]</span>
+<span id="L108">    <span class="kw">exact</span> hj1 j hj</span>
+<span id="L109">  <span class="kw">have</span> h1 : <span class="const token" data-verso-hover="28">threshold</span> f g ≤ ‖g j1‖ := <span class="const token" data-verso-hover="114">csInf_le</span> hfin.<span class="const token" data-verso-hover="115">bddBelow</span> hA</span>
+<span id="L110">  <span class="kw">simp</span> only [hLdef, <span class="const token" data-verso-hover="112">mem_filter</span>, <span class="const token" data-verso-hover="100">mem_univ</span>, <span class="const token" data-verso-hover="113">true_and</span>] <span class="kw">at</span> hj1L</span>
+<span id="L111">  <span class="kw">linarith</span></span>
+<span id="L112"></span>
+<span id="L113"><span class="kw">omit</span> [<span class="const token" data-verso-hover="79">InnerProductSpace</span> <span class="const token" data-verso-hover="35">ℝ</span> E] <span class="kw">in</span></span>
+<span id="L114"><span class="kw">lemma</span> <span class="const token" data-verso-hover="116">threshold_nonneg</span> {f : <span class="const token" data-verso-hover="52">ℕ</span>} (hf : f &lt; n) (g : <span class="const token" data-verso-hover="57">Fin</span> n → E) : <span class="nu">0</span> ≤ <span class="const token" data-verso-hover="28">threshold</span> f g := <span class="kw">by</span></span>
+<span id="L115">  <span class="kw">obtain</span> ⟨⟨j, hj⟩, -, -⟩ := <span class="const token" data-verso-hover="29">threshold_spec</span> hf g</span>
+<span id="L116">  <span class="kw">rw</span> [← hj]; <span class="kw">exact</span> <span class="const token" data-verso-hover="117">norm_nonneg</span> _</span>
+<span id="L117"></span>
+<span id="L118"><span class="dc">/-- The CGC filter (16): `ĝ_j = min 1 (‖g_{i_{n-f}}‖ / ‖g_j‖) • g_j`. For the `n - f` smallest</span></span>
+<span id="L119"><span class="dc">vectors the factor is `1`; the `f` largest ones are scaled to norm `‖g_{i_{n-f}}‖`. -/</span></span>
+<span id="L120"><span class="kw">noncomputable</span> <span class="kw">def</span> <span class="const token" data-verso-hover="118">cgc</span> (f : <span class="const token" data-verso-hover="52">ℕ</span>) (g : <span class="const token" data-verso-hover="57">Fin</span> n → E) (j : <span class="const token" data-verso-hover="57">Fin</span> n) : E :=</span>
+<span id="L121">  <span class="const token" data-verso-hover="119">min</span> <span class="nu">1</span> (<span class="const token" data-verso-hover="28">threshold</span> f g / ‖g j‖) • g j</span>
+<span id="L122"></span>
+<span id="L123"><span class="kw">lemma</span> <span class="const token" data-verso-hover="120">norm_cgc_le</span> {f : <span class="const token" data-verso-hover="52">ℕ</span>} (hf : f &lt; n) (g : <span class="const token" data-verso-hover="57">Fin</span> n → E) (j : <span class="const token" data-verso-hover="57">Fin</span> n) :</span>
+<span id="L124">    ‖<span class="const token" data-verso-hover="118">cgc</span> f g j‖ ≤ <span class="const token" data-verso-hover="28">threshold</span> f g := <span class="kw">by</span></span>
+<span id="L125">  <span class="kw">have</span> hτ := <span class="const token" data-verso-hover="116">threshold_nonneg</span> hf g</span>
+<span id="L126">  <span class="kw">unfold</span> <span class="const token" data-verso-hover="118">cgc</span></span>
+<span id="L127">  <span class="kw">rcases</span> <span class="const token" data-verso-hover="121">eq_or_ne</span> (g j) <span class="nu">0</span> <span class="kw">with</span> h | h</span>
+<span id="L128">  · <span class="kw">simp</span> [h, hτ]</span>
+<span id="L129">  · <span class="kw">have</span> hpos : <span class="nu">0</span> &lt; ‖g j‖ := <span class="const token" data-verso-hover="122">norm_pos_iff</span>.<span class="const token" data-verso-hover="123">2</span> h</span>
+<span id="L130">    <span class="kw">rw</span> [<span class="const token" data-verso-hover="124">norm_smul</span>, <span class="const token" data-verso-hover="125">Real.norm_of_nonneg</span> (<span class="const token" data-verso-hover="126">le_min</span> <span class="const token" data-verso-hover="127">zero_le_one</span> (<span class="const token" data-verso-hover="128">div_nonneg</span> hτ hpos.<span class="const token" data-verso-hover="129">le</span>))]</span>
+<span id="L131">    <span class="kw">calc</span> <span class="const token" data-verso-hover="119">min</span> <span class="nu">1</span> (<span class="const token" data-verso-hover="28">threshold</span> f g / ‖g j‖) * ‖g j‖ ≤ <span class="const token" data-verso-hover="28">threshold</span> f g / ‖g j‖ * ‖g j‖ :=</span>
+<span id="L132">          <span class="const token" data-verso-hover="130">mul_le_mul_of_nonneg_right</span> (<span class="const token" data-verso-hover="131">min_le_right</span> _ _) hpos.<span class="const token" data-verso-hover="129">le</span></span>
+<span id="L133">      _ = <span class="const token" data-verso-hover="28">threshold</span> f g := <span class="const token" data-verso-hover="132">div_mul_cancel₀</span> _ hpos.<span class="const token" data-verso-hover="133">ne'</span></span>
+<span id="L134"></span>
+<span id="L135"><span class="kw">lemma</span> <span class="const token" data-verso-hover="134">cgc_of_le</span> {f : <span class="const token" data-verso-hover="52">ℕ</span>} {g : <span class="const token" data-verso-hover="57">Fin</span> n → E} {j : <span class="const token" data-verso-hover="57">Fin</span> n} (h : ‖g j‖ ≤ <span class="const token" data-verso-hover="28">threshold</span> f g) :</span>
+<span id="L136">    <span class="const token" data-verso-hover="118">cgc</span> f g j = g j := <span class="kw">by</span></span>
+<span id="L137">  <span class="kw">unfold</span> <span class="const token" data-verso-hover="118">cgc</span></span>
+<span id="L138">  <span class="kw">rcases</span> <span class="const token" data-verso-hover="121">eq_or_ne</span> (g j) <span class="nu">0</span> <span class="kw">with</span> h0 | h0</span>
+<span id="L139">  · <span class="kw">simp</span> [h0]</span>
+<span id="L140">  · <span class="kw">have</span> hpos := <span class="const token" data-verso-hover="122">norm_pos_iff</span>.<span class="const token" data-verso-hover="123">2</span> h0</span>
+<span id="L141">    <span class="kw">rw</span> [<span class="const token" data-verso-hover="135">min_eq_left</span> ((<span class="const token" data-verso-hover="136">one_le_div</span> hpos).<span class="const token" data-verso-hover="123">2</span> h), <span class="const token" data-verso-hover="137">one_smul</span>]</span>
+<span id="L142"></span>
+<span id="L143"><span class="kw">lemma</span> <span class="const token" data-verso-hover="138">cgc_eq_smul</span> {f : <span class="const token" data-verso-hover="52">ℕ</span>} (hf : f &lt; n) (g : <span class="const token" data-verso-hover="57">Fin</span> n → E) (j : <span class="const token" data-verso-hover="57">Fin</span> n) :</span>
+<span id="L144">    ∃ c : <span class="const token" data-verso-hover="35">ℝ</span>, <span class="nu">0</span> ≤ c ∧ <span class="const token" data-verso-hover="118">cgc</span> f g j = c • g j :=</span>
+<span id="L145">  ⟨_, <span class="const token" data-verso-hover="126">le_min</span> <span class="const token" data-verso-hover="127">zero_le_one</span> (<span class="const token" data-verso-hover="128">div_nonneg</span> (<span class="const token" data-verso-hover="116">threshold_nonneg</span> hf g) (<span class="const token" data-verso-hover="117">norm_nonneg</span> _)), <span class="const token" data-verso-hover="40">rfl</span>⟩</span>
+<span id="L146"></span>
+<span id="L147"><span class="kw">end</span> Filter</span>
+<span id="L148"></span>
+<span id="L149"><span class="dc">/-! ### Assumptions and runs -/</span></span>
+<span id="L150"></span>
+<span id="L151"><span class="dc">/-- The hypotheses of Theorem 2 for an execution with honest set `H`: Assumptions 2–4 and</span></span>
+<span id="L152"><span class="dc">2f-redundancy. (Assumption 1, synchrony, is built into `IsRun`.) -/</span></span>
+<span id="L153"><span class="kw">structure</span> <span class="const token" data-verso-hover="139">Assumptions</span> (n f : <span class="const token" data-verso-hover="52">ℕ</span>) (E : <span class="kw">Type</span>*) [<span class="const token" data-verso-hover="78">NormedAddCommGroup</span> E] [<span class="const token" data-verso-hover="79">InnerProductSpace</span> <span class="const token" data-verso-hover="35">ℝ</span> E]</span>
+<span id="L154">    [<span class="const token" data-verso-hover="80">CompleteSpace</span> E] <span class="kw">where</span></span>
+<span id="L155">  <span class="dc">/-- The honest agents; at most `f` agents are faulty. -/</span></span>
+<span id="L156">  <span class="const token" data-verso-hover="140">H</span> : <span class="const token" data-verso-hover="38">Finset</span> (<span class="const token" data-verso-hover="57">Fin</span> n)</span>
+<span id="L157">  <span class="const token" data-verso-hover="141">card_H</span> : n - f ≤ <span class="const token" data-verso-hover="140">H</span>.<span class="const token" data-verso-hover="53">card</span></span>
+<span id="L158">  <span class="dc">/-- The cost functions (only the honest ones matter). -/</span></span>
+<span id="L159">  <span class="const token" data-verso-hover="142">Q</span> : <span class="const token" data-verso-hover="57">Fin</span> n → E → <span class="const token" data-verso-hover="35">ℝ</span></span>
+<span id="L160">  <span class="dc">/-- The gradients `∇Q_i`. -/</span></span>
+<span id="L161">  <span class="const token" data-verso-hover="143">G</span> : <span class="const token" data-verso-hover="57">Fin</span> n → E → E</span>
+<span id="L162">  <span class="dc">/-- Assumption 2: convexity. -/</span></span>
+<span id="L163">  <span class="const token" data-verso-hover="144">convex</span> : ∀ i ∈ <span class="const token" data-verso-hover="140">H</span>, <span class="const token" data-verso-hover="82">ConvexOn</span> <span class="const token" data-verso-hover="35">ℝ</span> <span class="const token" data-verso-hover="44">Set.univ</span> (<span class="const token" data-verso-hover="142">Q</span> i)</span>
+<span id="L164">  <span class="dc">/-- Assumption 2: differentiability, with gradient `G i`. -/</span></span>
+<span id="L165">  <span class="const token" data-verso-hover="145">hasGradient</span> : ∀ i ∈ <span class="const token" data-verso-hover="140">H</span>, ∀ w, <span class="const token" data-verso-hover="83">HasGradientAt</span> (<span class="const token" data-verso-hover="142">Q</span> i) (<span class="const token" data-verso-hover="143">G</span> i w) w</span>
+<span id="L166">  <span class="dc">/-- Assumption 3: the Lipschitz constant `μ &gt; 0` of the honest gradients. -/</span></span>
+<span id="L167">  <span class="const token" data-verso-hover="146">μ</span> : <span class="const token" data-verso-hover="35">ℝ</span></span>
+<span id="L168">  <span class="const token" data-verso-hover="147">μ_pos</span> : <span class="nu">0</span> &lt; <span class="const token" data-verso-hover="146">μ</span></span>
+<span id="L169">  <span class="const token" data-verso-hover="148">lipschitz</span> : ∀ i ∈ <span class="const token" data-verso-hover="140">H</span>, ∀ w w', ‖<span class="const token" data-verso-hover="143">G</span> i w - <span class="const token" data-verso-hover="143">G</span> i w'‖ ≤ <span class="const token" data-verso-hover="146">μ</span> * ‖w - w'‖</span>
+<span id="L170">  <span class="dc">/-- 2f-redundancy (Definition 1). -/</span></span>
+<span id="L171">  <span class="const token" data-verso-hover="149">redundant</span> : <span class="const token" data-verso-hover="15">TwoFRedundant</span> n f <span class="const token" data-verso-hover="140">H</span> <span class="const token" data-verso-hover="142">Q</span></span>
+<span id="L172">  <span class="dc">/-- The Euclidean projection `[·]_{W*}` onto `W* = arg min ∑_{i∈H} Q_i` (any nearest-point map;</span></span>
+<span id="L173"><span class="dc">  it is unique, see `exists_proj`). -/</span></span>
+<span id="L174">  <span class="const token" data-verso-hover="150">proj</span> : E → E</span>
+<span id="L175">  <span class="const token" data-verso-hover="151">proj_mem</span> : ∀ w, <span class="const token" data-verso-hover="150">proj</span> w ∈ <span class="const token" data-verso-hover="34">argmin</span> (<span class="const token" data-verso-hover="37">agg</span> <span class="const token" data-verso-hover="140">H</span> <span class="const token" data-verso-hover="142">Q</span>)</span>
+<span id="L176">  <span class="const token" data-verso-hover="152">proj_min</span> : ∀ w, ∀ v ∈ <span class="const token" data-verso-hover="34">argmin</span> (<span class="const token" data-verso-hover="37">agg</span> <span class="const token" data-verso-hover="140">H</span> <span class="const token" data-verso-hover="142">Q</span>), ‖w - <span class="const token" data-verso-hover="150">proj</span> w‖ ≤ ‖w - v‖</span>
+<span id="L177">  <span class="dc">/-- Assumption 4 (relaxed strong convexity) with constant `lam = λ &gt; 0`. -/</span></span>
+<span id="L178">  <span class="const token" data-verso-hover="153">lam</span> : <span class="const token" data-verso-hover="35">ℝ</span></span>
+<span id="L179">  <span class="const token" data-verso-hover="154">lam_pos</span> : <span class="nu">0</span> &lt; <span class="const token" data-verso-hover="153">lam</span></span>
+<span id="L180">  <span class="const token" data-verso-hover="155">strong</span> : ∀ w, <span class="const token" data-verso-hover="153">lam</span> * ‖w - <span class="const token" data-verso-hover="150">proj</span> w‖ ^ <span class="nu">2</span> ≤ ⟪(<span class="nu">1</span> / (<span class="const token" data-verso-hover="140">H</span>.<span class="const token" data-verso-hover="53">card</span> : <span class="const token" data-verso-hover="35">ℝ</span>)) • ∑ i ∈ <span class="const token" data-verso-hover="140">H</span>, <span class="const token" data-verso-hover="143">G</span> i w, w - <span class="const token" data-verso-hover="150">proj</span> w⟫</span>
+<span id="L181"></span>
+<span id="L182"><span class="kw">namespace</span> Assumptions</span>
+<span id="L183"></span>
+<span id="L184"><span class="kw">variable</span> {E : <span class="kw">Type</span>*} [<span class="const token" data-verso-hover="78">NormedAddCommGroup</span> E] [<span class="const token" data-verso-hover="79">InnerProductSpace</span> <span class="const token" data-verso-hover="35">ℝ</span> E] [<span class="const token" data-verso-hover="80">CompleteSpace</span> E]</span>
+<span id="L185">  {n f : <span class="const token" data-verso-hover="52">ℕ</span>} (A : <span class="const token" data-verso-hover="139">Assumptions</span> n f E)</span>
+<span id="L186"></span>
+<span id="L187"><span class="dc">/-- `W* = arg min_w ∑_{i ∈ H} Q_i(w)`. -/</span></span>
+<span id="L188"><span class="kw">def</span> <span class="const token" data-verso-hover="156">Wstar</span> : <span class="const token" data-verso-hover="36">Set</span> E := <span class="const token" data-verso-hover="34">argmin</span> (<span class="const token" data-verso-hover="37">agg</span> A.<span class="const token" data-verso-hover="140">H</span> A.<span class="const token" data-verso-hover="142">Q</span>)</span>
+<span id="L189"></span>
+<span id="L190"><span class="dc">/-- The fault-tolerance margin (20): `α = λ / (3μ) - f / n`. -/</span></span>
+<span id="L191"><span class="kw">noncomputable</span> <span class="kw">def</span> <span class="const token" data-verso-hover="157">α</span> : <span class="const token" data-verso-hover="35">ℝ</span> := A.<span class="const token" data-verso-hover="153">lam</span> / (<span class="nu">3</span> * A.<span class="const token" data-verso-hover="146">μ</span>) - f / n</span>
+<span id="L192"></span>
+<span id="L193"><span class="dc">/-- The step-size bound (21): `η̄ = 6α / (nμ)`. -/</span></span>
+<span id="L194"><span class="kw">noncomputable</span> <span class="kw">def</span> <span class="const token" data-verso-hover="158">ηbar</span> : <span class="const token" data-verso-hover="35">ℝ</span> := <span class="nu">6</span> * A.<span class="const token" data-verso-hover="157">α</span> / (n * A.<span class="const token" data-verso-hover="146">μ</span>)</span>
+<span id="L195"></span>
+<span id="L196"><span class="dc">/-- The convergence rate (22): `ρ = 1 - (nμ)² η (η̄ - η)`. -/</span></span>
+<span id="L197"><span class="kw">noncomputable</span> <span class="kw">def</span> <span class="const token" data-verso-hover="159">ρ</span> (η : <span class="const token" data-verso-hover="35">ℝ</span>) : <span class="const token" data-verso-hover="35">ℝ</span> := <span class="nu">1</span> - (n * A.<span class="const token" data-verso-hover="146">μ</span>) ^ <span class="nu">2</span> * η * (A.<span class="const token" data-verso-hover="158">ηbar</span> - η)</span>
+<span id="L198"></span>
+<span id="L199"><span class="dc">/-- A run of the algorithm with step size `η` (Steps S1, S2 and (17)) against an arbitrary</span></span>
+<span id="L200"><span class="dc">(adaptive) Byzantine adversary: in every iteration the honest agents send their true gradients at</span></span>
+<span id="L201"><span class="dc">the current estimate, the faulty agents send arbitrary vectors. -/</span></span>
+<span id="L202"><span class="kw">def</span> <span class="const token" data-verso-hover="160">IsRun</span> (η : <span class="const token" data-verso-hover="35">ℝ</span>) (w : <span class="const token" data-verso-hover="52">ℕ</span> → E) : <span class="kw">Prop</span> :=</span>
+<span id="L203">  ∀ t, ∃ r : <span class="const token" data-verso-hover="57">Fin</span> n → E, (∀ i ∈ A.<span class="const token" data-verso-hover="140">H</span>, r i = A.<span class="const token" data-verso-hover="143">G</span> i (w t)) ∧ w (t + <span class="nu">1</span>) = w t - η • ∑ j, <span class="const token" data-verso-hover="118">cgc</span> f r j</span>
+<span id="L204"></span>
+<span id="L205"><span class="kw">lemma</span> <span class="const token" data-verso-hover="161">sum_grad_eq_zero</span> {S : <span class="const token" data-verso-hover="38">Finset</span> (<span class="const token" data-verso-hover="57">Fin</span> n)} (hS : S ⊆ A.<span class="const token" data-verso-hover="140">H</span>) {p : E}</span>
+<span id="L206">    (hp : p ∈ <span class="const token" data-verso-hover="34">argmin</span> (<span class="const token" data-verso-hover="37">agg</span> S A.<span class="const token" data-verso-hover="142">Q</span>)) : ∑ i ∈ S, A.<span class="const token" data-verso-hover="143">G</span> i p = <span class="nu">0</span> :=</span>
+<span id="L207">  <span class="const token" data-verso-hover="84">hasGradientAt_eq_zero_of_mem_argmin</span></span>
+<span id="L208">    (<span class="const token" data-verso-hover="90">hasGradientAt_agg</span> S <span class="kw">fun</span> i hi =&gt; A.<span class="const token" data-verso-hover="145">hasGradient</span> i (hS hi) p) hp</span>
+<span id="L209"></span>
+<span id="L210"><span class="dc">/-- Under 2f-redundancy (and `f ≥ 1`) every honest gradient vanishes on `W*` ((29) ⇒ (30)). -/</span></span>
+<span id="L211"><span class="kw">lemma</span> <span class="const token" data-verso-hover="162">grad_eq_zero</span> (hf : <span class="nu">1</span> ≤ f) {i : <span class="const token" data-verso-hover="57">Fin</span> n} (hi : i ∈ A.<span class="const token" data-verso-hover="140">H</span>) {p : E} (hp : p ∈ A.<span class="const token" data-verso-hover="156">Wstar</span>) :</span>
+<span id="L212">    A.<span class="const token" data-verso-hover="143">G</span> i p = <span class="nu">0</span> := <span class="kw">by</span></span>
+<span id="L213">  <span class="kw">have</span> hcard : n - <span class="nu">2</span> * f ≤ (A.<span class="const token" data-verso-hover="140">H</span>.<span class="const token" data-verso-hover="163">erase</span> i).<span class="const token" data-verso-hover="53">card</span> := <span class="kw">by</span></span>
+<span id="L214">    <span class="kw">rw</span> [<span class="const token" data-verso-hover="164">card_erase_of_mem</span> hi]; <span class="kw">have</span> := A.<span class="const token" data-verso-hover="141">card_H</span>; <span class="kw">omega</span></span>
+<span id="L215">  <span class="kw">have</span> h1 := A.<span class="const token" data-verso-hover="161">sum_grad_eq_zero</span> <span class="const token" data-verso-hover="165">subset_rfl</span> hp</span>
+<span id="L216">  <span class="kw">have</span> h2 := A.<span class="const token" data-verso-hover="161">sum_grad_eq_zero</span> (<span class="const token" data-verso-hover="166">erase_subset</span> i A.<span class="const token" data-verso-hover="140">H</span>)</span>
+<span id="L217">    (<span class="kw">by</span> <span class="kw">rw</span> [A.<span class="const token" data-verso-hover="149">redundant</span> _ (<span class="const token" data-verso-hover="166">erase_subset</span> i A.<span class="const token" data-verso-hover="140">H</span>) hcard]; <span class="kw">exact</span> hp)</span>
+<span id="L218">  <span class="kw">rw</span> [← <span class="const token" data-verso-hover="167">add_sum_erase</span> _ _ hi, h2, <span class="const token" data-verso-hover="168">add_zero</span>] <span class="kw">at</span> h1</span>
+<span id="L219">  <span class="kw">exact</span> h1</span>
+<span id="L220"></span>
+<span id="L221"><span class="dc">/-- (30): `‖∇Q_i(w)‖ ≤ μ ‖w - [w]‖` for honest `i` (`f ≥ 1`). -/</span></span>
+<span id="L222"><span class="kw">lemma</span> <span class="const token" data-verso-hover="169">norm_grad_le</span> (hf : <span class="nu">1</span> ≤ f) {i : <span class="const token" data-verso-hover="57">Fin</span> n} (hi : i ∈ A.<span class="const token" data-verso-hover="140">H</span>) (w : E) :</span>
+<span id="L223">    ‖A.<span class="const token" data-verso-hover="143">G</span> i w‖ ≤ A.<span class="const token" data-verso-hover="146">μ</span> * ‖w - A.<span class="const token" data-verso-hover="150">proj</span> w‖ := <span class="kw">by</span></span>
+<span id="L224">  <span class="kw">have</span> := A.<span class="const token" data-verso-hover="148">lipschitz</span> i hi w (A.<span class="const token" data-verso-hover="150">proj</span> w)</span>
+<span id="L225">  <span class="kw">rwa</span> [A.<span class="const token" data-verso-hover="162">grad_eq_zero</span> hf hi (A.<span class="const token" data-verso-hover="151">proj_mem</span> w), <span class="const token" data-verso-hover="170">sub_zero</span>] <span class="kw">at</span> this</span>
+<span id="L226"></span>
+<span id="L227"><span class="dc">/-- (48): `⟨w - [w], ∇Q_i(w)⟩ ≥ 0` for honest `i` (`f ≥ 1`). -/</span></span>
+<span id="L228"><span class="kw">lemma</span> <span class="const token" data-verso-hover="171">inner_grad_nonneg</span> (hf : <span class="nu">1</span> ≤ f) {i : <span class="const token" data-verso-hover="57">Fin</span> n} (hi : i ∈ A.<span class="const token" data-verso-hover="140">H</span>) (w : E) :</span>
+<span id="L229">    <span class="nu">0</span> ≤ ⟪w - A.<span class="const token" data-verso-hover="150">proj</span> w, A.<span class="const token" data-verso-hover="143">G</span> i w⟫ := <span class="kw">by</span></span>
+<span id="L230">  <span class="kw">set</span> p := A.<span class="const token" data-verso-hover="150">proj</span> w</span>
+<span id="L231">  <span class="kw">have</span> hmin : p ∈ <span class="const token" data-verso-hover="34">argmin</span> (A.<span class="const token" data-verso-hover="142">Q</span> i) := <span class="kw">by</span></span>
+<span id="L232">    <span class="kw">apply</span> <span class="const token" data-verso-hover="81">mem_argmin_of_hasGradientAt_zero</span> (A.<span class="const token" data-verso-hover="144">convex</span> i hi)</span>
+<span id="L233">    <span class="kw">have</span> := A.<span class="const token" data-verso-hover="145">hasGradient</span> i hi p</span>
+<span id="L234">    <span class="kw">rwa</span> [A.<span class="const token" data-verso-hover="162">grad_eq_zero</span> hf hi (A.<span class="const token" data-verso-hover="151">proj_mem</span> w)] <span class="kw">at</span> this</span>
+<span id="L235">  <span class="kw">have</span> h1 := <span class="const token" data-verso-hover="31">ConvexOn.add_inner_le</span> (A.<span class="const token" data-verso-hover="144">convex</span> i hi) (A.<span class="const token" data-verso-hover="145">hasGradient</span> i hi w) p</span>
+<span id="L236">  <span class="kw">have</span> h2 := hmin w</span>
+<span id="L237">  <span class="kw">have</span> : ⟪A.<span class="const token" data-verso-hover="143">G</span> i w, p - w⟫ = -⟪w - p, A.<span class="const token" data-verso-hover="143">G</span> i w⟫ := <span class="kw">by</span></span>
+<span id="L238">    <span class="kw">rw</span> [<span class="const token" data-verso-hover="172">real_inner_comm</span>, ← <span class="const token" data-verso-hover="173">inner_neg_left</span>, <span class="const token" data-verso-hover="174">neg_sub</span>]</span>
+<span id="L239">  <span class="kw">linarith</span></span>
+<span id="L240"></span>
+<span id="L241"><span class="kw">lemma</span> <span class="const token" data-verso-hover="175">norm_sum_grad_le</span> (w : E) :</span>
+<span id="L242">    ‖∑ i ∈ A.<span class="const token" data-verso-hover="140">H</span>, A.<span class="const token" data-verso-hover="143">G</span> i w‖ ≤ A.<span class="const token" data-verso-hover="140">H</span>.<span class="const token" data-verso-hover="53">card</span> * A.<span class="const token" data-verso-hover="146">μ</span> * ‖w - A.<span class="const token" data-verso-hover="150">proj</span> w‖ := <span class="kw">by</span></span>
+<span id="L243">  <span class="kw">have</span> h0 := A.<span class="const token" data-verso-hover="161">sum_grad_eq_zero</span> <span class="const token" data-verso-hover="165">subset_rfl</span> (A.<span class="const token" data-verso-hover="151">proj_mem</span> w)</span>
+<span id="L244">  <span class="kw">calc</span> ‖∑ i ∈ A.<span class="const token" data-verso-hover="140">H</span>, A.<span class="const token" data-verso-hover="143">G</span> i w‖ = ‖∑ i ∈ A.<span class="const token" data-verso-hover="140">H</span>, (A.<span class="const token" data-verso-hover="143">G</span> i w - A.<span class="const token" data-verso-hover="143">G</span> i (A.<span class="const token" data-verso-hover="150">proj</span> w))‖ := <span class="kw">by</span></span>
+<span id="L245">        <span class="kw">rw</span> [<span class="const token" data-verso-hover="176">sum_sub_distrib</span>, h0, <span class="const token" data-verso-hover="170">sub_zero</span>]</span>
+<span id="L246">    _ ≤ ∑ i ∈ A.<span class="const token" data-verso-hover="140">H</span>, ‖A.<span class="const token" data-verso-hover="143">G</span> i w - A.<span class="const token" data-verso-hover="143">G</span> i (A.<span class="const token" data-verso-hover="150">proj</span> w)‖ := <span class="const token" data-verso-hover="177">norm_sum_le</span> _ _</span>
+<span id="L247">    _ ≤ ∑ i ∈ A.<span class="const token" data-verso-hover="140">H</span>, A.<span class="const token" data-verso-hover="146">μ</span> * ‖w - A.<span class="const token" data-verso-hover="150">proj</span> w‖ := <span class="const token" data-verso-hover="48">sum_le_sum</span> <span class="kw">fun</span> i hi =&gt; A.<span class="const token" data-verso-hover="148">lipschitz</span> i hi _ _</span>
+<span id="L248">    _ = A.<span class="const token" data-verso-hover="140">H</span>.<span class="const token" data-verso-hover="53">card</span> * A.<span class="const token" data-verso-hover="146">μ</span> * ‖w - A.<span class="const token" data-verso-hover="150">proj</span> w‖ := <span class="kw">by</span> <span class="kw">rw</span> [<span class="const token" data-verso-hover="178">sum_const</span>, <span class="const token" data-verso-hover="179">nsmul_eq_mul</span>]; <span class="kw">ring</span></span>
+<span id="L249"></span>
+<span id="L250"><span class="kw">lemma</span> <span class="const token" data-verso-hover="180">card_H_pos</span> (hn : <span class="nu">2</span> * f &lt; n) : <span class="nu">0</span> &lt; A.<span class="const token" data-verso-hover="140">H</span>.<span class="const token" data-verso-hover="53">card</span> := <span class="kw">by</span></span>
+<span id="L251">  <span class="kw">have</span> := A.<span class="const token" data-verso-hover="141">card_H</span>; <span class="kw">omega</span></span>
+<span id="L252"></span>
+<span id="L253"><span class="dc">/-- Assumption 4 in summed form: `|H| λ ‖w - [w]‖² ≤ ∑_{i∈H} ⟨w - [w], ∇Q_i(w)⟩`. -/</span></span>
+<span id="L254"><span class="kw">lemma</span> <span class="const token" data-verso-hover="181">inner_sum_grad_ge</span> (hn : <span class="nu">2</span> * f &lt; n) (w : E) :</span>
+<span id="L255">    A.<span class="const token" data-verso-hover="140">H</span>.<span class="const token" data-verso-hover="53">card</span> * A.<span class="const token" data-verso-hover="153">lam</span> * ‖w - A.<span class="const token" data-verso-hover="150">proj</span> w‖ ^ <span class="nu">2</span> ≤ ⟪w - A.<span class="const token" data-verso-hover="150">proj</span> w, ∑ i ∈ A.<span class="const token" data-verso-hover="140">H</span>, A.<span class="const token" data-verso-hover="143">G</span> i w⟫ := <span class="kw">by</span></span>
+<span id="L256">  <span class="kw">have</span> h := A.<span class="const token" data-verso-hover="155">strong</span> w</span>
+<span id="L257">  <span class="kw">rw</span> [<span class="const token" data-verso-hover="182">real_inner_smul_left</span>, <span class="const token" data-verso-hover="172">real_inner_comm</span>] <span class="kw">at</span> h</span>
+<span id="L258">  <span class="kw">have</span> hc : (<span class="nu">0</span> : <span class="const token" data-verso-hover="35">ℝ</span>) &lt; A.<span class="const token" data-verso-hover="140">H</span>.<span class="const token" data-verso-hover="53">card</span> := <span class="kw">by</span> <span class="kw">exact_mod_cast</span> A.<span class="const token" data-verso-hover="180">card_H_pos</span> hn</span>
+<span id="L259">  <span class="kw">have</span> h2 : (A.<span class="const token" data-verso-hover="140">H</span>.<span class="const token" data-verso-hover="53">card</span> : <span class="const token" data-verso-hover="35">ℝ</span>) * (<span class="nu">1</span> / A.<span class="const token" data-verso-hover="140">H</span>.<span class="const token" data-verso-hover="53">card</span> * ⟪w - A.<span class="const token" data-verso-hover="150">proj</span> w, ∑ i ∈ A.<span class="const token" data-verso-hover="140">H</span>, A.<span class="const token" data-verso-hover="143">G</span> i w⟫) =</span>
+<span id="L260">      ⟪w - A.<span class="const token" data-verso-hover="150">proj</span> w, ∑ i ∈ A.<span class="const token" data-verso-hover="140">H</span>, A.<span class="const token" data-verso-hover="143">G</span> i w⟫ := <span class="kw">by</span> <span class="kw">field_simp</span></span>
+<span id="L261">  <span class="kw">calc</span> (A.<span class="const token" data-verso-hover="140">H</span>.<span class="const token" data-verso-hover="53">card</span> : <span class="const token" data-verso-hover="35">ℝ</span>) * A.<span class="const token" data-verso-hover="153">lam</span> * ‖w - A.<span class="const token" data-verso-hover="150">proj</span> w‖ ^ <span class="nu">2</span></span>
+<span id="L262">      = A.<span class="const token" data-verso-hover="140">H</span>.<span class="const token" data-verso-hover="53">card</span> * (A.<span class="const token" data-verso-hover="153">lam</span> * ‖w - A.<span class="const token" data-verso-hover="150">proj</span> w‖ ^ <span class="nu">2</span>) := <span class="kw">by</span> <span class="kw">ring</span></span>
+<span id="L263">    _ ≤ A.<span class="const token" data-verso-hover="140">H</span>.<span class="const token" data-verso-hover="53">card</span> * (<span class="nu">1</span> / A.<span class="const token" data-verso-hover="140">H</span>.<span class="const token" data-verso-hover="53">card</span> * ⟪w - A.<span class="const token" data-verso-hover="150">proj</span> w, ∑ i ∈ A.<span class="const token" data-verso-hover="140">H</span>, A.<span class="const token" data-verso-hover="143">G</span> i w⟫) :=</span>
+<span id="L264">        <span class="const token" data-verso-hover="183">mul_le_mul_of_nonneg_left</span> h hc.<span class="const token" data-verso-hover="129">le</span></span>
+<span id="L265">    _ = _ := h2</span>
+<span id="L266"></span>
+<span id="L267"><span class="dc">/-- Appendix B: `λ ≤ μ` as soon as `W* ≠ E` (witnessed by a point off `W*`). -/</span></span>
+<span id="L268"><span class="kw">lemma</span> <span class="const token" data-verso-hover="23">lam_le_μ</span> (hn : <span class="nu">2</span> * f &lt; n) {w : E} (hw : w ≠ A.<span class="const token" data-verso-hover="150">proj</span> w) : A.<span class="const token" data-verso-hover="153">lam</span> ≤ A.<span class="const token" data-verso-hover="146">μ</span> := <span class="kw">by</span></span>
+<span id="L269">  <span class="kw">have</span> hD : <span class="nu">0</span> &lt; ‖w - A.<span class="const token" data-verso-hover="150">proj</span> w‖ := <span class="const token" data-verso-hover="122">norm_pos_iff</span>.<span class="const token" data-verso-hover="123">2</span> (<span class="const token" data-verso-hover="184">sub_ne_zero</span>.<span class="const token" data-verso-hover="123">2</span> hw)</span>
+<span id="L270">  <span class="kw">have</span> hc : (<span class="nu">0</span> : <span class="const token" data-verso-hover="35">ℝ</span>) &lt; A.<span class="const token" data-verso-hover="140">H</span>.<span class="const token" data-verso-hover="53">card</span> := <span class="kw">by</span> <span class="kw">exact_mod_cast</span> A.<span class="const token" data-verso-hover="180">card_H_pos</span> hn</span>
+<span id="L271">  <span class="kw">have</span> h1 := A.<span class="const token" data-verso-hover="181">inner_sum_grad_ge</span> hn w</span>
+<span id="L272">  <span class="kw">have</span> h2 := <span class="const token" data-verso-hover="185">real_inner_le_norm</span> (w - A.<span class="const token" data-verso-hover="150">proj</span> w) (∑ i ∈ A.<span class="const token" data-verso-hover="140">H</span>, A.<span class="const token" data-verso-hover="143">G</span> i w)</span>
+<span id="L273">  <span class="kw">have</span> h3 := A.<span class="const token" data-verso-hover="175">norm_sum_grad_le</span> w</span>
+<span id="L274">  <span class="kw">have</span> h4 : A.<span class="const token" data-verso-hover="140">H</span>.<span class="const token" data-verso-hover="53">card</span> * A.<span class="const token" data-verso-hover="153">lam</span> * ‖w - A.<span class="const token" data-verso-hover="150">proj</span> w‖ ^ <span class="nu">2</span> ≤ A.<span class="const token" data-verso-hover="140">H</span>.<span class="const token" data-verso-hover="53">card</span> * A.<span class="const token" data-verso-hover="146">μ</span> * ‖w - A.<span class="const token" data-verso-hover="150">proj</span> w‖ ^ <span class="nu">2</span> := <span class="kw">by</span></span>
+<span id="L275">    <span class="kw">calc</span> _ ≤ _ := h1</span>
+<span id="L276">      _ ≤ _ := h2</span>
+<span id="L277">      _ ≤ ‖w - A.<span class="const token" data-verso-hover="150">proj</span> w‖ * (A.<span class="const token" data-verso-hover="140">H</span>.<span class="const token" data-verso-hover="53">card</span> * A.<span class="const token" data-verso-hover="146">μ</span> * ‖w - A.<span class="const token" data-verso-hover="150">proj</span> w‖) :=</span>
+<span id="L278">          <span class="const token" data-verso-hover="183">mul_le_mul_of_nonneg_left</span> h3 (<span class="const token" data-verso-hover="117">norm_nonneg</span> _)</span>
+<span id="L279">      _ = _ := <span class="kw">by</span> <span class="kw">ring</span></span>
+<span id="L280">  <span class="kw">have</span> hpos : <span class="nu">0</span> &lt; (A.<span class="const token" data-verso-hover="140">H</span>.<span class="const token" data-verso-hover="53">card</span> : <span class="const token" data-verso-hover="35">ℝ</span>) * ‖w - A.<span class="const token" data-verso-hover="150">proj</span> w‖ ^ <span class="nu">2</span> := <span class="kw">by</span> <span class="kw">positivity</span></span>
+<span id="L281">  <span class="kw">nlinarith</span></span>
+<span id="L282"></span>
+<span id="L283"><span class="dc">/-- (45): at least `n - 2f` honest agents are among the `n - f` smallest received vectors. -/</span></span>
+<span id="L284"><span class="kw">lemma</span> <span class="const token" data-verso-hover="186">exists_H1</span> (hn : <span class="nu">2</span> * f &lt; n) (r : <span class="const token" data-verso-hover="57">Fin</span> n → E) :</span>
+<span id="L285">    ∃ H1 ⊆ A.<span class="const token" data-verso-hover="140">H</span>, H1.<span class="const token" data-verso-hover="53">card</span> + <span class="nu">2</span> * f = n ∧ ∀ j ∈ H1, ‖r j‖ ≤ <span class="const token" data-verso-hover="28">threshold</span> f r := <span class="kw">by</span></span>
+<span id="L286">  <span class="kw">classical</span></span>
+<span id="L287">  <span class="kw">obtain</span> ⟨-, hL, -⟩ := <span class="const token" data-verso-hover="29">threshold_spec</span> (<span class="kw">by</span> <span class="kw">omega</span> : f &lt; n) r</span>
+<span id="L288">  <span class="kw">have</span> hc := <span class="const token" data-verso-hover="63">card_inter_ge</span> hL A.<span class="const token" data-verso-hover="141">card_H</span></span>
+<span id="L289">  <span class="kw">obtain</span> ⟨H1, hsub, hcard⟩ := <span class="const token" data-verso-hover="187">Finset.exists_subset_card_eq</span> hc</span>
+<span id="L290">  <span class="kw">refine</span> ⟨H1, <span class="kw">fun</span> j hj =&gt; (<span class="const token" data-verso-hover="73">Finset.mem_inter</span>.<span class="const token" data-verso-hover="50">1</span> (hsub hj)).<span class="const token" data-verso-hover="75">2</span>, <span class="kw">by</span> <span class="kw">omega</span>, <span class="kw">fun</span> j hj =&gt; ?_⟩</span>
+<span id="L291">  <span class="kw">have</span> := (<span class="const token" data-verso-hover="73">Finset.mem_inter</span>.<span class="const token" data-verso-hover="50">1</span> (hsub hj)).<span class="const token" data-verso-hover="74">1</span></span>
+<span id="L292">  <span class="kw">simpa</span> <span class="kw">using</span> this</span>
+<span id="L293"></span>
+<span id="L294"><span class="dc">/-- (39): one of the `f + 1` largest received vectors comes from an honest agent. -/</span></span>
+<span id="L295"><span class="kw">lemma</span> <span class="const token" data-verso-hover="188">exists_honest_ge</span> (hn : <span class="nu">2</span> * f &lt; n) (r : <span class="const token" data-verso-hover="57">Fin</span> n → E) :</span>
+<span id="L296">    ∃ σ ∈ A.<span class="const token" data-verso-hover="140">H</span>, <span class="const token" data-verso-hover="28">threshold</span> f r ≤ ‖r σ‖ := <span class="kw">by</span></span>
+<span id="L297">  <span class="kw">classical</span></span>
+<span id="L298">  <span class="kw">obtain</span> ⟨-, -, hU⟩ := <span class="const token" data-verso-hover="29">threshold_spec</span> (<span class="kw">by</span> <span class="kw">omega</span> : f &lt; n) r</span>
+<span id="L299">  <span class="kw">have</span> hHc : <span class="kw">#A</span>.<span class="const token" data-verso-hover="140">H</span>ᶜ ≤ f := <span class="kw">by</span></span>
+<span id="L300">    <span class="kw">rw</span> [<span class="const token" data-verso-hover="189">card_compl</span>, <span class="const token" data-verso-hover="65">Fintype.card_fin</span>]; <span class="kw">have</span> := A.<span class="const token" data-verso-hover="141">card_H</span>; <span class="kw">omega</span></span>
+<span id="L301">  <span class="kw">obtain</span> ⟨σ, hσ, hσH⟩ := <span class="const token" data-verso-hover="190">exists_mem_notMem_of_card_le_of_lt</span> hHc hU</span>
+<span id="L302">  <span class="kw">exact</span> ⟨σ, <span class="kw">by</span> <span class="kw">simpa</span> <span class="kw">using</span> hσH, <span class="kw">by</span> <span class="kw">simpa</span> <span class="kw">using</span> hσ⟩</span>
+<span id="L303"></span>
+<span id="L304"><span class="dc">/-- The stopping rule of Step S2: if `‖g_{i_{n-f}}‖ = 0` then the current estimate is in `W*`. -/</span></span>
+<span id="L305"><span class="kw">theorem</span> <span class="const token" data-verso-hover="22">mem_Wstar_of_threshold_eq_zero</span> (hn : <span class="nu">2</span> * f &lt; n) (w : E) (r : <span class="const token" data-verso-hover="57">Fin</span> n → E)</span>
+<span id="L306">    (hr : ∀ i ∈ A.<span class="const token" data-verso-hover="140">H</span>, r i = A.<span class="const token" data-verso-hover="143">G</span> i w) (h0 : <span class="const token" data-verso-hover="28">threshold</span> f r = <span class="nu">0</span>) : w ∈ A.<span class="const token" data-verso-hover="156">Wstar</span> := <span class="kw">by</span></span>
+<span id="L307">  <span class="kw">obtain</span> ⟨H1, hH1, hcard, hle⟩ := A.<span class="const token" data-verso-hover="186">exists_H1</span> hn r</span>
+<span id="L308">  <span class="kw">have</span> hz : ∀ j ∈ H1, A.<span class="const token" data-verso-hover="143">G</span> j w = <span class="nu">0</span> := <span class="kw">by</span></span>
+<span id="L309">    <span class="kw">intro</span> j hj</span>
+<span id="L310">    <span class="kw">have</span> := hle j hj</span>
+<span id="L311">    <span class="kw">rw</span> [h0, hr j (hH1 hj)] <span class="kw">at</span> this</span>
+<span id="L312">    <span class="kw">exact</span> <span class="const token" data-verso-hover="191">norm_le_zero_iff</span>.<span class="const token" data-verso-hover="50">1</span> this</span>
+<span id="L313">  <span class="kw">have</span> hgrad : <span class="const token" data-verso-hover="83">HasGradientAt</span> (<span class="const token" data-verso-hover="37">agg</span> H1 A.<span class="const token" data-verso-hover="142">Q</span>) <span class="nu">0</span> w := <span class="kw">by</span></span>
+<span id="L314">    <span class="kw">have</span> := <span class="const token" data-verso-hover="90">hasGradientAt_agg</span> H1 (G := A.<span class="const token" data-verso-hover="143">G</span>) (w := w) <span class="kw">fun</span> i hi =&gt; A.<span class="const token" data-verso-hover="145">hasGradient</span> i (hH1 hi) w</span>
+<span id="L315">    <span class="kw">rwa</span> [<span class="const token" data-verso-hover="192">Finset.sum_eq_zero</span> hz] <span class="kw">at</span> this</span>
+<span id="L316">  <span class="kw">have</span> hmin := <span class="const token" data-verso-hover="81">mem_argmin_of_hasGradientAt_zero</span> (<span class="const token" data-verso-hover="33">convexOn_agg</span> <span class="kw">fun</span> i hi =&gt; A.<span class="const token" data-verso-hover="144">convex</span> i (hH1 hi)) hgrad</span>
+<span id="L317">  <span class="kw">unfold</span> <span class="const token" data-verso-hover="156">Wstar</span></span>
+<span id="L318">  <span class="kw">rwa</span> [← A.<span class="const token" data-verso-hover="149">redundant</span> H1 hH1 (<span class="kw">by</span> <span class="kw">omega</span>)]</span>
+<span id="L319"></span>
+<span id="L320"><span class="dc">/-- The two key estimates of Appendix C for one iteration: (42) `‖g‖ ≤ nμ‖w - [w]‖` and (56)</span></span>
+<span id="L321"><span class="dc">`φ = ⟨w - [w], g⟩ ≥ (nλ - 3μf)‖w - [w]‖²`, where `g` is the sum of the filtered vectors. -/</span></span>
+<span id="L322"><span class="kw">lemma</span> <span class="const token" data-verso-hover="10">key_estimates</span> (hn : <span class="nu">2</span> * f &lt; n) (w : E) (r : <span class="const token" data-verso-hover="57">Fin</span> n → E) (hr : ∀ i ∈ A.<span class="const token" data-verso-hover="140">H</span>, r i = A.<span class="const token" data-verso-hover="143">G</span> i w) :</span>
+<span id="L323">    ‖∑ j, <span class="const token" data-verso-hover="118">cgc</span> f r j‖ ≤ n * A.<span class="const token" data-verso-hover="146">μ</span> * ‖w - A.<span class="const token" data-verso-hover="150">proj</span> w‖ ∧</span>
+<span id="L324">      (n * A.<span class="const token" data-verso-hover="153">lam</span> - <span class="nu">3</span> * f * A.<span class="const token" data-verso-hover="146">μ</span>) * ‖w - A.<span class="const token" data-verso-hover="150">proj</span> w‖ ^ <span class="nu">2</span> ≤ ⟪w - A.<span class="const token" data-verso-hover="150">proj</span> w, ∑ j, <span class="const token" data-verso-hover="118">cgc</span> f r j⟫ := <span class="kw">by</span></span>
+<span id="L325">  <span class="kw">classical</span></span>
+<span id="L326">  <span class="kw">set</span> e := w - A.<span class="const token" data-verso-hover="150">proj</span> w <span class="kw">with</span> he</span>
+<span id="L327">  <span class="kw">set</span> D := ‖e‖ <span class="kw">with</span> hDdef</span>
+<span id="L328">  <span class="kw">have</span> hfn : f &lt; n := <span class="kw">by</span> <span class="kw">omega</span></span>
+<span id="L329">  <span class="kw">rcases</span> <span class="const token" data-verso-hover="193">Nat.eq_zero_or_pos</span> f <span class="kw">with</span> <span class="kw">rfl</span> | hf</span>
+<span id="L330">  · <span class="cm">--</span><span class="cm"> `f = 0`: no faulty agent and no clipping; plain gradient descent</span></span>
+<span id="L331">    <span class="kw">have</span> hHuniv : A.<span class="const token" data-verso-hover="140">H</span> = <span class="const token" data-verso-hover="99">univ</span> := <span class="kw">by</span></span>
+<span id="L332">      <span class="kw">have</span> h1 := <span class="const token" data-verso-hover="194">Finset.card_le_univ</span> A.<span class="const token" data-verso-hover="140">H</span></span>
+<span id="L333">      <span class="kw">have</span> h2 := A.<span class="const token" data-verso-hover="141">card_H</span></span>
+<span id="L334">      <span class="kw">simp</span> only [<span class="const token" data-verso-hover="65">Fintype.card_fin</span>, <span class="const token" data-verso-hover="195">Nat.sub_zero</span>] <span class="kw">at</span> h1 h2</span>
+<span id="L335">      <span class="kw">exact</span> <span class="const token" data-verso-hover="196">Finset.eq_univ_of_card</span> _ (<span class="kw">by</span> <span class="kw">simp</span> only [<span class="const token" data-verso-hover="65">Fintype.card_fin</span>]; <span class="kw">omega</span>)</span>
+<span id="L336">    <span class="kw">obtain</span> ⟨-, hL, -⟩ := <span class="const token" data-verso-hover="29">threshold_spec</span> hfn r</span>
+<span id="L337">    <span class="kw">have</span> hall : ∀ j, ‖r j‖ ≤ <span class="const token" data-verso-hover="28">threshold</span> <span class="nu">0</span> r := <span class="kw">by</span></span>
+<span id="L338">      <span class="kw">intro</span> j</span>
+<span id="L339">      <span class="kw">by_contra</span> hj</span>
+<span id="L340">      <span class="kw">have</span> hlt := <span class="const token" data-verso-hover="197">Finset.card_lt_card</span></span>
+<span id="L341">        ((<span class="const token" data-verso-hover="198">Finset.filter_ssubset</span> (p := <span class="kw">fun</span> j =&gt; ‖r j‖ ≤ <span class="const token" data-verso-hover="28">threshold</span> <span class="nu">0</span> r)).<span class="const token" data-verso-hover="123">2</span> ⟨j, <span class="const token" data-verso-hover="100">mem_univ</span> j, hj⟩)</span>
+<span id="L342">      <span class="kw">simp</span> only [<span class="const token" data-verso-hover="105">card_univ</span>, <span class="const token" data-verso-hover="65">Fintype.card_fin</span>] <span class="kw">at</span> hlt</span>
+<span id="L343">      <span class="kw">omega</span></span>
+<span id="L344">    <span class="kw">have</span> hg : ∑ j, <span class="const token" data-verso-hover="118">cgc</span> <span class="nu">0</span> r j = ∑ i ∈ A.<span class="const token" data-verso-hover="140">H</span>, A.<span class="const token" data-verso-hover="143">G</span> i w := <span class="kw">by</span></span>
+<span id="L345">      <span class="kw">rw</span> [hHuniv]</span>
+<span id="L346">      <span class="kw">exact</span> <span class="const token" data-verso-hover="42">Finset.sum_congr</span> <span class="const token" data-verso-hover="40">rfl</span> <span class="kw">fun</span> j _ =&gt; <span class="kw">by</span> <span class="kw">rw</span> [<span class="const token" data-verso-hover="134">cgc_of_le</span> (hall j), hr j (<span class="kw">by</span> <span class="kw">simp</span> [hHuniv])]</span>
+<span id="L347">    <span class="kw">have</span> hcardH : (A.<span class="const token" data-verso-hover="140">H</span>.<span class="const token" data-verso-hover="53">card</span> : <span class="const token" data-verso-hover="35">ℝ</span>) = n := <span class="kw">by</span> <span class="kw">rw</span> [hHuniv]; <span class="kw">simp</span></span>
+<span id="L348">    <span class="kw">rw</span> [hg]</span>
+<span id="L349">    <span class="kw">refine</span> ⟨?_, ?_⟩</span>
+<span id="L350">    · <span class="kw">have</span> := A.<span class="const token" data-verso-hover="175">norm_sum_grad_le</span> w; <span class="kw">rwa</span> [hcardH] <span class="kw">at</span> this</span>
+<span id="L351">    · <span class="kw">have</span> := A.<span class="const token" data-verso-hover="181">inner_sum_grad_ge</span> hn w; <span class="kw">rw</span> [hcardH] <span class="kw">at</span> this; <span class="kw">simpa</span> <span class="kw">using</span> this</span>
+<span id="L352">  · <span class="cm">--</span><span class="cm"> `f ≥ 1`</span></span>
+<span id="L353">    <span class="kw">set</span> τ := <span class="const token" data-verso-hover="28">threshold</span> f r <span class="kw">with</span> hτdef</span>
+<span id="L354">    <span class="kw">have</span> hτ0 : <span class="nu">0</span> ≤ τ := <span class="const token" data-verso-hover="116">threshold_nonneg</span> hfn r</span>
+<span id="L355">    <span class="kw">obtain</span> ⟨σ, hσH, hσ⟩ := A.<span class="const token" data-verso-hover="188">exists_honest_ge</span> hn r</span>
+<span id="L356">    <span class="kw">have</span> hτμ : τ ≤ A.<span class="const token" data-verso-hover="146">μ</span> * D := <span class="kw">by</span></span>
+<span id="L357">      <span class="kw">calc</span> τ ≤ ‖r σ‖ := hσ</span>
+<span id="L358">        _ = ‖A.<span class="const token" data-verso-hover="143">G</span> σ w‖ := <span class="kw">by</span> <span class="kw">rw</span> [hr σ hσH]</span>
+<span id="L359">        _ ≤ A.<span class="const token" data-verso-hover="146">μ</span> * D := A.<span class="const token" data-verso-hover="169">norm_grad_le</span> hf hσH w</span>
+<span id="L360">    <span class="kw">have</span> hcgc : ∀ j, ‖<span class="const token" data-verso-hover="118">cgc</span> f r j‖ ≤ A.<span class="const token" data-verso-hover="146">μ</span> * D := <span class="kw">fun</span> j =&gt; (<span class="const token" data-verso-hover="120">norm_cgc_le</span> hfn r j).<span class="const token" data-verso-hover="199">trans</span> hτμ</span>
+<span id="L361">    <span class="kw">refine</span> ⟨?_, ?_⟩</span>
+<span id="L362">    · <span class="kw">calc</span> ‖∑ j, <span class="const token" data-verso-hover="118">cgc</span> f r j‖ ≤ ∑ j, ‖<span class="const token" data-verso-hover="118">cgc</span> f r j‖ := <span class="const token" data-verso-hover="177">norm_sum_le</span> _ _</span>
+<span id="L363">        _ ≤ ∑ _j : <span class="const token" data-verso-hover="57">Fin</span> n, A.<span class="const token" data-verso-hover="146">μ</span> * D := <span class="const token" data-verso-hover="48">sum_le_sum</span> <span class="kw">fun</span> j _ =&gt; hcgc j</span>
+<span id="L364">        _ = n * A.<span class="const token" data-verso-hover="146">μ</span> * D := <span class="kw">by</span> <span class="kw">simp</span> [<span class="const token" data-verso-hover="178">sum_const</span>]; <span class="kw">ring</span></span>
+<span id="L365">    · <span class="kw">rcases</span> <span class="const token" data-verso-hover="200">eq_or_lt_of_le</span> (<span class="const token" data-verso-hover="117">norm_nonneg</span> e) <span class="kw">with</span> hD0 | hDpos</span>
+<span id="L366">      · <span class="cm">--</span><span class="cm"> `w ∈ W*`</span></span>
+<span id="L367">        <span class="kw">have</span> he0 : e = <span class="nu">0</span> := <span class="const token" data-verso-hover="201">norm_eq_zero</span>.<span class="const token" data-verso-hover="50">1</span> hD0.<span class="const token" data-verso-hover="55">symm</span></span>
+<span id="L368">        <span class="kw">have</span> hD : D = <span class="nu">0</span> := <span class="kw">by</span> <span class="kw">rw</span> [hDdef]; <span class="kw">exact</span> hD0.<span class="const token" data-verso-hover="55">symm</span></span>
+<span id="L369">        <span class="kw">rw</span> [hD, he0]; <span class="kw">simp</span></span>
+<span id="L370">      <span class="kw">have</span> hne : w ≠ A.<span class="const token" data-verso-hover="150">proj</span> w := <span class="kw">by</span></span>
+<span id="L371">        <span class="kw">intro</span> h</span>
+<span id="L372">        <span class="kw">have</span> : e = <span class="nu">0</span> := <span class="kw">by</span> <span class="kw">rw</span> [he, ← h, <span class="const token" data-verso-hover="202">sub_self</span>]</span>
+<span id="L373">        <span class="kw">rw</span> [this, <span class="const token" data-verso-hover="203">norm_zero</span>] <span class="kw">at</span> hDpos</span>
+<span id="L374">        <span class="kw">exact</span> <span class="const token" data-verso-hover="204">lt_irrefl</span> _ hDpos</span>
+<span id="L375">      <span class="kw">have</span> hlm : A.<span class="const token" data-verso-hover="153">lam</span> ≤ A.<span class="const token" data-verso-hover="146">μ</span> := A.<span class="const token" data-verso-hover="23">lam_le_μ</span> hn hne</span>
+<span id="L376">      <span class="kw">obtain</span> ⟨H1, hH1, hcard1, hle1⟩ := A.<span class="const token" data-verso-hover="186">exists_H1</span> hn r</span>
+<span id="L377">      <span class="cm">--</span><span class="cm"> split the sum over `H1`, `H \ H1` and `Hᶜ`</span></span>
+<span id="L378">      <span class="kw">have</span> hsplit : ⟪e, ∑ j, <span class="const token" data-verso-hover="118">cgc</span> f r j⟫ =</span>
+<span id="L379">          ∑ j ∈ H1, ⟪e, A.<span class="const token" data-verso-hover="143">G</span> j w⟫ + ∑ j ∈ A.<span class="const token" data-verso-hover="140">H</span> \ H1, ⟪e, <span class="const token" data-verso-hover="118">cgc</span> f r j⟫ + ∑ j ∈ A.<span class="const token" data-verso-hover="140">H</span>ᶜ, ⟪e, <span class="const token" data-verso-hover="118">cgc</span> f r j⟫ := <span class="kw">by</span></span>
+<span id="L380">        <span class="kw">rw</span> [<span class="const token" data-verso-hover="205">inner_sum</span>, ← <span class="const token" data-verso-hover="206">Finset.sum_add_sum_compl</span> A.<span class="const token" data-verso-hover="140">H</span>, ← <span class="const token" data-verso-hover="207">Finset.sum_sdiff</span> hH1]</span>
+<span id="L381">        <span class="kw">have</span> : ∑ j ∈ H1, ⟪e, <span class="const token" data-verso-hover="118">cgc</span> f r j⟫ = ∑ j ∈ H1, ⟪e, A.<span class="const token" data-verso-hover="143">G</span> j w⟫ :=</span>
+<span id="L382">          <span class="const token" data-verso-hover="42">Finset.sum_congr</span> <span class="const token" data-verso-hover="40">rfl</span> <span class="kw">fun</span> j hj =&gt; <span class="kw">by</span> <span class="kw">rw</span> [<span class="const token" data-verso-hover="134">cgc_of_le</span> (hle1 j hj), hr j (hH1 hj)]</span>
+<span id="L383">        <span class="kw">rw</span> [this]; <span class="kw">ring</span></span>
+<span id="L384">      <span class="cm">--</span><span class="cm"> (47)-(49): the clipped honest terms are nonnegative</span></span>
+<span id="L385">      <span class="kw">have</span> hmid : <span class="nu">0</span> ≤ ∑ j ∈ A.<span class="const token" data-verso-hover="140">H</span> \ H1, ⟪e, <span class="const token" data-verso-hover="118">cgc</span> f r j⟫ := <span class="kw">by</span></span>
+<span id="L386">        <span class="kw">apply</span> <span class="const token" data-verso-hover="208">Finset.sum_nonneg</span></span>
+<span id="L387">        <span class="kw">intro</span> j hj</span>
+<span id="L388">        <span class="kw">have</span> hjH := (<span class="const token" data-verso-hover="209">Finset.mem_sdiff</span>.<span class="const token" data-verso-hover="50">1</span> hj).<span class="const token" data-verso-hover="74">1</span></span>
+<span id="L389">        <span class="kw">obtain</span> ⟨c, hc, hcj⟩ := <span class="const token" data-verso-hover="138">cgc_eq_smul</span> hfn r j</span>
+<span id="L390">        <span class="kw">rw</span> [hcj, hr j hjH, <span class="const token" data-verso-hover="210">real_inner_smul_right</span>]</span>
+<span id="L391">        <span class="kw">exact</span> <span class="const token" data-verso-hover="211">mul_nonneg</span> hc (A.<span class="const token" data-verso-hover="171">inner_grad_nonneg</span> hf hjH w)</span>
+<span id="L392">      <span class="cm">--</span><span class="cm"> (50): the faulty terms are `≥ -μ‖w - [w]‖²` each</span></span>
+<span id="L393">      <span class="kw">have</span> hbad : -(A.<span class="const token" data-verso-hover="140">H</span>ᶜ.<span class="const token" data-verso-hover="53">card</span> * (A.<span class="const token" data-verso-hover="146">μ</span> * D ^ <span class="nu">2</span>)) ≤ ∑ j ∈ A.<span class="const token" data-verso-hover="140">H</span>ᶜ, ⟪e, <span class="const token" data-verso-hover="118">cgc</span> f r j⟫ := <span class="kw">by</span></span>
+<span id="L394">        <span class="kw">have</span> : ∀ j ∈ A.<span class="const token" data-verso-hover="140">H</span>ᶜ, -(A.<span class="const token" data-verso-hover="146">μ</span> * D ^ <span class="nu">2</span>) ≤ ⟪e, <span class="const token" data-verso-hover="118">cgc</span> f r j⟫ := <span class="kw">by</span></span>
+<span id="L395">          <span class="kw">intro</span> j _</span>
+<span id="L396">          <span class="kw">have</span> h1 := <span class="const token" data-verso-hover="212">abs_real_inner_le_norm</span> e (<span class="const token" data-verso-hover="118">cgc</span> f r j)</span>
+<span id="L397">          <span class="kw">have</span> h2 := <span class="const token" data-verso-hover="183">mul_le_mul_of_nonneg_left</span> (hcgc j) (<span class="const token" data-verso-hover="117">norm_nonneg</span> e)</span>
+<span id="L398">          <span class="kw">have</span> h3 := <span class="const token" data-verso-hover="213">neg_abs_le</span> ⟪e, <span class="const token" data-verso-hover="118">cgc</span> f r j⟫</span>
+<span id="L399">          <span class="kw">nlinarith</span></span>
+<span id="L400">        <span class="kw">have</span> := <span class="const token" data-verso-hover="48">Finset.sum_le_sum</span> this</span>
+<span id="L401">        <span class="kw">simpa</span> [<span class="const token" data-verso-hover="178">sum_const</span>, <span class="const token" data-verso-hover="179">nsmul_eq_mul</span>] <span class="kw">using</span> this</span>
+<span id="L402">      <span class="cm">--</span><span class="cm"> (52)-(54): the unclipped honest terms</span></span>
+<span id="L403">      <span class="kw">have</span> hgood : A.<span class="const token" data-verso-hover="140">H</span>.<span class="const token" data-verso-hover="53">card</span> * A.<span class="const token" data-verso-hover="153">lam</span> * D ^ <span class="nu">2</span> - (A.<span class="const token" data-verso-hover="140">H</span> \ H1).<span class="const token" data-verso-hover="53">card</span> * (A.<span class="const token" data-verso-hover="146">μ</span> * D ^ <span class="nu">2</span>) ≤</span>
+<span id="L404">          ∑ j ∈ H1, ⟪e, A.<span class="const token" data-verso-hover="143">G</span> j w⟫ := <span class="kw">by</span></span>
+<span id="L405">        <span class="kw">have</span> hall := A.<span class="const token" data-verso-hover="181">inner_sum_grad_ge</span> hn w</span>
+<span id="L406">        <span class="kw">rw</span> [<span class="const token" data-verso-hover="205">inner_sum</span>, ← <span class="const token" data-verso-hover="207">Finset.sum_sdiff</span> hH1] <span class="kw">at</span> hall</span>
+<span id="L407">        <span class="kw">have</span> hup : ∑ j ∈ A.<span class="const token" data-verso-hover="140">H</span> \ H1, ⟪e, A.<span class="const token" data-verso-hover="143">G</span> j w⟫ ≤ (A.<span class="const token" data-verso-hover="140">H</span> \ H1).<span class="const token" data-verso-hover="53">card</span> * (A.<span class="const token" data-verso-hover="146">μ</span> * D ^ <span class="nu">2</span>) := <span class="kw">by</span></span>
+<span id="L408">          <span class="kw">have</span> : ∀ j ∈ A.<span class="const token" data-verso-hover="140">H</span> \ H1, ⟪e, A.<span class="const token" data-verso-hover="143">G</span> j w⟫ ≤ A.<span class="const token" data-verso-hover="146">μ</span> * D ^ <span class="nu">2</span> := <span class="kw">by</span></span>
+<span id="L409">            <span class="kw">intro</span> j hj</span>
+<span id="L410">            <span class="kw">have</span> h1 := <span class="const token" data-verso-hover="185">real_inner_le_norm</span> e (A.<span class="const token" data-verso-hover="143">G</span> j w)</span>
+<span id="L411">            <span class="kw">have</span> h2 := <span class="const token" data-verso-hover="183">mul_le_mul_of_nonneg_left</span></span>
+<span id="L412">              (A.<span class="const token" data-verso-hover="169">norm_grad_le</span> hf (<span class="const token" data-verso-hover="209">Finset.mem_sdiff</span>.<span class="const token" data-verso-hover="50">1</span> hj).<span class="const token" data-verso-hover="74">1</span> w) (<span class="const token" data-verso-hover="117">norm_nonneg</span> e)</span>
+<span id="L413">            <span class="kw">nlinarith</span></span>
+<span id="L414">          <span class="kw">have</span> := <span class="const token" data-verso-hover="48">Finset.sum_le_sum</span> this</span>
+<span id="L415">          <span class="kw">simpa</span> [<span class="const token" data-verso-hover="178">sum_const</span>, <span class="const token" data-verso-hover="179">nsmul_eq_mul</span>] <span class="kw">using</span> this</span>
+<span id="L416">        <span class="kw">linarith</span></span>
+<span id="L417">      <span class="cm">--</span><span class="cm"> counting</span></span>
+<span id="L418">      <span class="kw">have</span> hc1 : (A.<span class="const token" data-verso-hover="140">H</span> \ H1).<span class="const token" data-verso-hover="53">card</span> + H1.<span class="const token" data-verso-hover="53">card</span> = A.<span class="const token" data-verso-hover="140">H</span>.<span class="const token" data-verso-hover="53">card</span> := <span class="const token" data-verso-hover="214">Finset.card_sdiff_add_card_eq_card</span> hH1</span>
+<span id="L419">      <span class="kw">have</span> hc2 : A.<span class="const token" data-verso-hover="140">H</span>.<span class="const token" data-verso-hover="53">card</span> + A.<span class="const token" data-verso-hover="140">H</span>ᶜ.<span class="const token" data-verso-hover="53">card</span> = n := <span class="kw">by</span> <span class="kw">simp</span></span>
+<span id="L420">      <span class="kw">have</span> hc3 : A.<span class="const token" data-verso-hover="140">H</span>ᶜ.<span class="const token" data-verso-hover="53">card</span> ≤ f := <span class="kw">by</span> <span class="kw">have</span> := A.<span class="const token" data-verso-hover="141">card_H</span>; <span class="kw">omega</span></span>
+<span id="L421">      <span class="kw">have</span> hc1' : ((A.<span class="const token" data-verso-hover="140">H</span> \ H1).<span class="const token" data-verso-hover="53">card</span> : <span class="const token" data-verso-hover="35">ℝ</span>) + H1.<span class="const token" data-verso-hover="53">card</span> = A.<span class="const token" data-verso-hover="140">H</span>.<span class="const token" data-verso-hover="53">card</span> := <span class="kw">by</span> <span class="kw">exact_mod_cast</span> hc1</span>
+<span id="L422">      <span class="kw">have</span> hc2' : (A.<span class="const token" data-verso-hover="140">H</span>.<span class="const token" data-verso-hover="53">card</span> : <span class="const token" data-verso-hover="35">ℝ</span>) + A.<span class="const token" data-verso-hover="140">H</span>ᶜ.<span class="const token" data-verso-hover="53">card</span> = n := <span class="kw">by</span> <span class="kw">exact_mod_cast</span> hc2</span>
+<span id="L423">      <span class="kw">have</span> hc3' : (A.<span class="const token" data-verso-hover="140">H</span>ᶜ.<span class="const token" data-verso-hover="53">card</span> : <span class="const token" data-verso-hover="35">ℝ</span>) ≤ f := <span class="kw">by</span> <span class="kw">exact_mod_cast</span> hc3</span>
+<span id="L424">      <span class="kw">have</span> hcard1' : (H1.<span class="const token" data-verso-hover="53">card</span> : <span class="const token" data-verso-hover="35">ℝ</span>) + <span class="nu">2</span> * f = n := <span class="kw">by</span> <span class="kw">exact_mod_cast</span> hcard1</span>
+<span id="L425">      <span class="kw">have</span> hD2 : <span class="nu">0</span> ≤ D ^ <span class="nu">2</span> := <span class="const token" data-verso-hover="215">sq_nonneg</span> D</span>
+<span id="L426">      <span class="kw">have</span> hlam := A.<span class="const token" data-verso-hover="154">lam_pos</span></span>
+<span id="L427">      <span class="cm">--</span><span class="cm"> `(n - |H|) λ ≤ f μ`</span></span>
+<span id="L428">      <span class="kw">have</span> hkey : (A.<span class="const token" data-verso-hover="140">H</span>ᶜ.<span class="const token" data-verso-hover="53">card</span> : <span class="const token" data-verso-hover="35">ℝ</span>) * A.<span class="const token" data-verso-hover="153">lam</span> * D ^ <span class="nu">2</span> ≤ f * A.<span class="const token" data-verso-hover="146">μ</span> * D ^ <span class="nu">2</span> := <span class="kw">by</span></span>
+<span id="L429">        <span class="kw">apply</span> <span class="const token" data-verso-hover="130">mul_le_mul_of_nonneg_right</span> _ hD2</span>
+<span id="L430">        <span class="kw">exact</span> <span class="const token" data-verso-hover="216">mul_le_mul</span> hc3' hlm hlam.<span class="const token" data-verso-hover="129">le</span> (<span class="kw">by</span> <span class="kw">positivity</span>)</span>
+<span id="L431">      <span class="kw">have</span> e1 : (((A.<span class="const token" data-verso-hover="140">H</span> \ H1).<span class="const token" data-verso-hover="53">card</span> : <span class="const token" data-verso-hover="35">ℝ</span>) + A.<span class="const token" data-verso-hover="140">H</span>ᶜ.<span class="const token" data-verso-hover="53">card</span>) * (A.<span class="const token" data-verso-hover="146">μ</span> * D ^ <span class="nu">2</span>) = <span class="nu">2</span> * f * (A.<span class="const token" data-verso-hover="146">μ</span> * D ^ <span class="nu">2</span>) := <span class="kw">by</span></span>
+<span id="L432">        <span class="kw">rw</span> [<span class="kw">show</span> (((A.<span class="const token" data-verso-hover="140">H</span> \ H1).<span class="const token" data-verso-hover="53">card</span> : <span class="const token" data-verso-hover="35">ℝ</span>) + A.<span class="const token" data-verso-hover="140">H</span>ᶜ.<span class="const token" data-verso-hover="53">card</span>) = <span class="nu">2</span> * f <span class="kw">by</span> <span class="kw">linarith</span>]</span>
+<span id="L433">      <span class="kw">have</span> e2 : (A.<span class="const token" data-verso-hover="140">H</span>.<span class="const token" data-verso-hover="53">card</span> : <span class="const token" data-verso-hover="35">ℝ</span>) * A.<span class="const token" data-verso-hover="153">lam</span> * D ^ <span class="nu">2</span> = n * A.<span class="const token" data-verso-hover="153">lam</span> * D ^ <span class="nu">2</span> - A.<span class="const token" data-verso-hover="140">H</span>ᶜ.<span class="const token" data-verso-hover="53">card</span> * A.<span class="const token" data-verso-hover="153">lam</span> * D ^ <span class="nu">2</span> := <span class="kw">by</span></span>
+<span id="L434">        <span class="kw">rw</span> [← hc2']; <span class="kw">ring</span></span>
+<span id="L435">      <span class="kw">rw</span> [hsplit]</span>
+<span id="L436">      <span class="kw">nlinarith</span></span>
+<span id="L437"></span>
+<span id="L438"><span class="dc">/-- One iteration contracts the squared distance to `W*` ((57)). -/</span></span>
+<span id="L439"><span class="kw">theorem</span> <span class="const token" data-verso-hover="24">step</span> (hn : <span class="nu">2</span> * f &lt; n) {η : <span class="const token" data-verso-hover="35">ℝ</span>} (hη : <span class="nu">0</span> ≤ η) (w : E) (r : <span class="const token" data-verso-hover="57">Fin</span> n → E)</span>
+<span id="L440">    (hr : ∀ i ∈ A.<span class="const token" data-verso-hover="140">H</span>, r i = A.<span class="const token" data-verso-hover="143">G</span> i w) :</span>
+<span id="L441">    ‖(w - η • ∑ j, <span class="const token" data-verso-hover="118">cgc</span> f r j) - A.<span class="const token" data-verso-hover="150">proj</span> (w - η • ∑ j, <span class="const token" data-verso-hover="118">cgc</span> f r j)‖ ^ <span class="nu">2</span> ≤</span>
+<span id="L442">      (<span class="nu">1</span> - <span class="nu">2</span> * η * (n * A.<span class="const token" data-verso-hover="153">lam</span> - <span class="nu">3</span> * f * A.<span class="const token" data-verso-hover="146">μ</span>) + η ^ <span class="nu">2</span> * (n * A.<span class="const token" data-verso-hover="146">μ</span>) ^ <span class="nu">2</span>) * ‖w - A.<span class="const token" data-verso-hover="150">proj</span> w‖ ^ <span class="nu">2</span> := <span class="kw">by</span></span>
+<span id="L443">  <span class="kw">set</span> g := ∑ j, <span class="const token" data-verso-hover="118">cgc</span> f r j</span>
+<span id="L444">  <span class="kw">set</span> p := A.<span class="const token" data-verso-hover="150">proj</span> w</span>
+<span id="L445">  <span class="kw">set</span> e := w - p</span>
+<span id="L446">  <span class="kw">obtain</span> ⟨hg, hφ⟩ := A.<span class="const token" data-verso-hover="10">key_estimates</span> hn w r hr</span>
+<span id="L447">  <span class="kw">have</span> h1 : ‖(w - η • g) - A.<span class="const token" data-verso-hover="150">proj</span> (w - η • g)‖ ≤ ‖(w - η • g) - p‖ :=</span>
+<span id="L448">    A.<span class="const token" data-verso-hover="152">proj_min</span> _ p (A.<span class="const token" data-verso-hover="151">proj_mem</span> w)</span>
+<span id="L449">  <span class="kw">have</span> h2 : (w - η • g) - p = e - η • g := <span class="kw">by</span> <span class="kw">simp</span> only [e]; abel</span>
+<span id="L450">  <span class="kw">have</span> h3 : ‖e - η • g‖ ^ <span class="nu">2</span> = ‖e‖ ^ <span class="nu">2</span> - <span class="nu">2</span> * (η * ⟪e, g⟫) + η ^ <span class="nu">2</span> * ‖g‖ ^ <span class="nu">2</span> := <span class="kw">by</span></span>
+<span id="L451">    <span class="kw">rw</span> [<span class="const token" data-verso-hover="217">norm_sub_sq_real</span>, <span class="const token" data-verso-hover="210">real_inner_smul_right</span>, <span class="const token" data-verso-hover="124">norm_smul</span>, <span class="const token" data-verso-hover="125">Real.norm_of_nonneg</span> hη]; <span class="kw">ring</span></span>
+<span id="L452">  <span class="kw">have</span> h4 : ‖(w - η • g) - A.<span class="const token" data-verso-hover="150">proj</span> (w - η • g)‖ ^ <span class="nu">2</span> ≤ ‖e - η • g‖ ^ <span class="nu">2</span> := <span class="kw">by</span></span>
+<span id="L453">    <span class="kw">rw</span> [← h2]; <span class="kw">exact</span> <span class="const token" data-verso-hover="218">pow_le_pow_left₀</span> (<span class="const token" data-verso-hover="117">norm_nonneg</span> _) h1 <span class="nu">2</span></span>
+<span id="L454">  <span class="kw">have</span> h5 : ‖g‖ ^ <span class="nu">2</span> ≤ (n * A.<span class="const token" data-verso-hover="146">μ</span> * ‖e‖) ^ <span class="nu">2</span> := <span class="const token" data-verso-hover="218">pow_le_pow_left₀</span> (<span class="const token" data-verso-hover="117">norm_nonneg</span> _) hg <span class="nu">2</span></span>
+<span id="L455">  <span class="kw">have</span> h6 : η * ((n * A.<span class="const token" data-verso-hover="153">lam</span> - <span class="nu">3</span> * f * A.<span class="const token" data-verso-hover="146">μ</span>) * ‖e‖ ^ <span class="nu">2</span>) ≤ η * ⟪e, g⟫ :=</span>
+<span id="L456">    <span class="const token" data-verso-hover="183">mul_le_mul_of_nonneg_left</span> hφ hη</span>
+<span id="L457">  <span class="kw">have</span> h7 : η ^ <span class="nu">2</span> * ‖g‖ ^ <span class="nu">2</span> ≤ η ^ <span class="nu">2</span> * (n * A.<span class="const token" data-verso-hover="146">μ</span> * ‖e‖) ^ <span class="nu">2</span> :=</span>
+<span id="L458">    <span class="const token" data-verso-hover="183">mul_le_mul_of_nonneg_left</span> h5 (<span class="const token" data-verso-hover="215">sq_nonneg</span> η)</span>
+<span id="L459">  <span class="kw">calc</span> _ ≤ ‖e - η • g‖ ^ <span class="nu">2</span> := h4</span>
+<span id="L460">    _ = ‖e‖ ^ <span class="nu">2</span> - <span class="nu">2</span> * (η * ⟪e, g⟫) + η ^ <span class="nu">2</span> * ‖g‖ ^ <span class="nu">2</span> := h3</span>
+<span id="L461">    _ ≤ _ := <span class="kw">by</span> <span class="kw">nlinarith</span></span>
+<span id="L462"></span>
+<span id="L463"><span class="kw">lemma</span> <span class="const token" data-verso-hover="219">ρ_eq</span> (hn : <span class="nu">2</span> * f &lt; n) (η : <span class="const token" data-verso-hover="35">ℝ</span>) :</span>
+<span id="L464">    A.<span class="const token" data-verso-hover="159">ρ</span> η = <span class="nu">1</span> - <span class="nu">2</span> * η * (n * A.<span class="const token" data-verso-hover="153">lam</span> - <span class="nu">3</span> * f * A.<span class="const token" data-verso-hover="146">μ</span>) + η ^ <span class="nu">2</span> * (n * A.<span class="const token" data-verso-hover="146">μ</span>) ^ <span class="nu">2</span> := <span class="kw">by</span></span>
+<span id="L465">  <span class="kw">have</span> hμ := A.<span class="const token" data-verso-hover="147">μ_pos</span></span>
+<span id="L466">  <span class="kw">have</span> hn' : (<span class="nu">0</span> : <span class="const token" data-verso-hover="35">ℝ</span>) &lt; n := <span class="kw">by</span> <span class="kw">exact_mod_cast</span> (<span class="kw">by</span> <span class="kw">omega</span> : <span class="nu">0</span> &lt; n)</span>
+<span id="L467">  <span class="kw">unfold</span> <span class="const token" data-verso-hover="159">ρ</span> <span class="const token" data-verso-hover="158">ηbar</span> <span class="const token" data-verso-hover="157">α</span></span>
+<span id="L468">  <span class="kw">field_simp</span></span>
+<span id="L469">  <span class="kw">ring</span></span>
+<span id="L470"></span>
+<span id="L471"><span class="dc">/-- **Theorem 2 (ii)** (and `ρ &lt; 1`). Under 2f-redundancy and Assumptions 1–4, if `α &gt; 0` and</span></span>
+<span id="L472"><span class="dc">`0 &lt; η &lt; η̄`, every run satisfies `‖w t - [w t]‖² ≤ ρ^t ‖w 0 - [w 0]‖²`. (The paper's hypothesis</span></span>
+<span id="L473"><span class="dc">`α &gt; 0` is implied by `0 &lt; η &lt; η̄ = 6α/(nμ)` and is therefore omitted.) -/</span></span>
+<span id="L474"><span class="kw">theorem</span> <span class="const token" data-verso-hover="20">theorem2</span> (hn : <span class="nu">2</span> * f &lt; n) {η : <span class="const token" data-verso-hover="35">ℝ</span>} (hη0 : <span class="nu">0</span> &lt; η) (hη1 : η &lt; A.<span class="const token" data-verso-hover="158">ηbar</span>)</span>
+<span id="L475">    {w : <span class="const token" data-verso-hover="52">ℕ</span> → E} (hw : A.<span class="const token" data-verso-hover="160">IsRun</span> η w) :</span>
+<span id="L476">    A.<span class="const token" data-verso-hover="159">ρ</span> η &lt; <span class="nu">1</span> ∧ ∀ t, ‖w t - A.<span class="const token" data-verso-hover="150">proj</span> (w t)‖ ^ <span class="nu">2</span> ≤ A.<span class="const token" data-verso-hover="159">ρ</span> η ^ t * ‖w <span class="nu">0</span> - A.<span class="const token" data-verso-hover="150">proj</span> (w <span class="nu">0</span>)‖ ^ <span class="nu">2</span> := <span class="kw">by</span></span>
+<span id="L477">  <span class="kw">have</span> hμ := A.<span class="const token" data-verso-hover="147">μ_pos</span></span>
+<span id="L478">  <span class="kw">have</span> hn' : (<span class="nu">0</span> : <span class="const token" data-verso-hover="35">ℝ</span>) &lt; n := <span class="kw">by</span> <span class="kw">exact_mod_cast</span> (<span class="kw">by</span> <span class="kw">omega</span> : <span class="nu">0</span> &lt; n)</span>
+<span id="L479">  <span class="kw">have</span> hρ1 : A.<span class="const token" data-verso-hover="159">ρ</span> η &lt; <span class="nu">1</span> := <span class="kw">by</span></span>
+<span id="L480">    <span class="kw">unfold</span> <span class="const token" data-verso-hover="159">ρ</span></span>
+<span id="L481">    <span class="kw">have</span> : <span class="nu">0</span> &lt; (n * A.<span class="const token" data-verso-hover="146">μ</span>) ^ <span class="nu">2</span> * η * (A.<span class="const token" data-verso-hover="158">ηbar</span> - η) := <span class="kw">by</span></span>
+<span id="L482">      <span class="kw">have</span> : <span class="nu">0</span> &lt; A.<span class="const token" data-verso-hover="158">ηbar</span> - η := <span class="kw">by</span> <span class="kw">linarith</span></span>
+<span id="L483">      <span class="kw">positivity</span></span>
+<span id="L484">    <span class="kw">linarith</span></span>
+<span id="L485">  <span class="kw">refine</span> ⟨hρ1, ?_⟩</span>
+<span id="L486">  <span class="cm">--</span><span class="cm"> one step</span></span>
+<span id="L487">  <span class="kw">have</span> hstep : ∀ t, ‖w (t + <span class="nu">1</span>) - A.<span class="const token" data-verso-hover="150">proj</span> (w (t + <span class="nu">1</span>))‖ ^ <span class="nu">2</span> ≤ A.<span class="const token" data-verso-hover="159">ρ</span> η * ‖w t - A.<span class="const token" data-verso-hover="150">proj</span> (w t)‖ ^ <span class="nu">2</span> := <span class="kw">by</span></span>
+<span id="L488">    <span class="kw">intro</span> t</span>
+<span id="L489">    <span class="kw">obtain</span> ⟨r, hr, hwt⟩ := hw t</span>
+<span id="L490">    <span class="kw">rw</span> [hwt, A.<span class="const token" data-verso-hover="219">ρ_eq</span> hn]</span>
+<span id="L491">    <span class="kw">exact</span> A.<span class="const token" data-verso-hover="24">step</span> hn hη0.<span class="const token" data-verso-hover="129">le</span> (w t) r hr</span>
+<span id="L492">  <span class="kw">rcases</span> <span class="const token" data-verso-hover="220">le_or_gt</span> <span class="nu">0</span> (A.<span class="const token" data-verso-hover="159">ρ</span> η) <span class="kw">with</span> hρ0 | hρ0</span>
+<span id="L493">  · <span class="kw">intro</span> t</span>
+<span id="L494">    <span class="kw">induction</span> t <span class="kw">with</span></span>
+<span id="L495">    | <span class="const token" data-verso-hover="221">zero</span> =&gt; <span class="kw">simp</span></span>
+<span id="L496">    | <span class="const token" data-verso-hover="222">succ</span> t ih =&gt;</span>
+<span id="L497">      <span class="kw">calc</span> _ ≤ A.<span class="const token" data-verso-hover="159">ρ</span> η * ‖w t - A.<span class="const token" data-verso-hover="150">proj</span> (w t)‖ ^ <span class="nu">2</span> := hstep t</span>
+<span id="L498">        _ ≤ A.<span class="const token" data-verso-hover="159">ρ</span> η * (A.<span class="const token" data-verso-hover="159">ρ</span> η ^ t * ‖w <span class="nu">0</span> - A.<span class="const token" data-verso-hover="150">proj</span> (w <span class="nu">0</span>)‖ ^ <span class="nu">2</span>) :=</span>
+<span id="L499">            <span class="const token" data-verso-hover="183">mul_le_mul_of_nonneg_left</span> ih hρ0</span>
+<span id="L500">        _ = _ := <span class="kw">by</span> <span class="kw">ring</span></span>
+<span id="L501">  · <span class="cm">--</span><span class="cm"> `ρ &lt; 0` forces all distances to vanish</span></span>
+<span id="L502">    <span class="kw">have</span> hz : ∀ t, ‖w t - A.<span class="const token" data-verso-hover="150">proj</span> (w t)‖ ^ <span class="nu">2</span> = <span class="nu">0</span> := <span class="kw">by</span></span>
+<span id="L503">      <span class="kw">intro</span> t</span>
+<span id="L504">      <span class="kw">have</span> h1 := hstep t</span>
+<span id="L505">      <span class="kw">have</span> h2 : <span class="nu">0</span> ≤ ‖w (t + <span class="nu">1</span>) - A.<span class="const token" data-verso-hover="150">proj</span> (w (t + <span class="nu">1</span>))‖ ^ <span class="nu">2</span> := <span class="const token" data-verso-hover="215">sq_nonneg</span> _</span>
+<span id="L506">      <span class="kw">have</span> h3 : <span class="nu">0</span> ≤ ‖w t - A.<span class="const token" data-verso-hover="150">proj</span> (w t)‖ ^ <span class="nu">2</span> := <span class="const token" data-verso-hover="215">sq_nonneg</span> _</span>
+<span id="L507">      <span class="kw">nlinarith</span></span>
+<span id="L508">    <span class="kw">intro</span> t</span>
+<span id="L509">    <span class="kw">rw</span> [hz t, hz <span class="nu">0</span>, <span class="const token" data-verso-hover="223">mul_zero</span>]</span>
+<span id="L510"></span>
+<span id="L511"><span class="dc">/-- **Theorem 2 (i)**, `0 ≤ ρ`: true as soon as `W* ≠ E` (Appendix B shows `λ ≤ μ`, hence</span></span>
+<span id="L512"><span class="dc">`α ≤ 1/3` and `ρ ≥ 1 - 9α² ≥ 0`). See `theorem2_rho_nonneg_false` for the degenerate case. -/</span></span>
+<span id="L513"><span class="kw">theorem</span> <span class="const token" data-verso-hover="9">theorem2_rho_nonneg</span> (hn : <span class="nu">2</span> * f &lt; n) (hα : <span class="nu">0</span> &lt; A.<span class="const token" data-verso-hover="157">α</span>) {η : <span class="const token" data-verso-hover="35">ℝ</span>} (hnd : ∃ w, w ∉ A.<span class="const token" data-verso-hover="156">Wstar</span>) :</span>
+<span id="L514">    <span class="nu">0</span> ≤ A.<span class="const token" data-verso-hover="159">ρ</span> η := <span class="kw">by</span></span>
+<span id="L515">  <span class="kw">obtain</span> ⟨w, hw⟩ := hnd</span>
+<span id="L516">  <span class="kw">have</span> hne : w ≠ A.<span class="const token" data-verso-hover="150">proj</span> w := <span class="kw">fun</span> h =&gt; hw (h ▸ A.<span class="const token" data-verso-hover="151">proj_mem</span> w)</span>
+<span id="L517">  <span class="kw">have</span> hlm := A.<span class="const token" data-verso-hover="23">lam_le_μ</span> hn hne</span>
+<span id="L518">  <span class="kw">have</span> hμ := A.<span class="const token" data-verso-hover="147">μ_pos</span></span>
+<span id="L519">  <span class="kw">have</span> hn' : (<span class="nu">0</span> : <span class="const token" data-verso-hover="35">ℝ</span>) &lt; n := <span class="kw">by</span> <span class="kw">exact_mod_cast</span> (<span class="kw">by</span> <span class="kw">omega</span> : <span class="nu">0</span> &lt; n)</span>
+<span id="L520">  <span class="kw">have</span> hα3 : A.<span class="const token" data-verso-hover="157">α</span> ≤ <span class="nu">1</span> / <span class="nu">3</span> := <span class="kw">by</span></span>
+<span id="L521">    <span class="kw">unfold</span> <span class="const token" data-verso-hover="157">α</span></span>
+<span id="L522">    <span class="kw">have</span> : A.<span class="const token" data-verso-hover="153">lam</span> / (<span class="nu">3</span> * A.<span class="const token" data-verso-hover="146">μ</span>) ≤ <span class="nu">1</span> / <span class="nu">3</span> := <span class="kw">by</span></span>
+<span id="L523">      <span class="kw">rw</span> [<span class="const token" data-verso-hover="224">div_le_div_iff₀</span> (<span class="kw">by</span> <span class="kw">positivity</span>) (<span class="kw">by</span> <span class="kw">norm_num</span>)]; <span class="kw">linarith</span></span>
+<span id="L524">    <span class="kw">have</span> : (<span class="nu">0</span> : <span class="const token" data-verso-hover="35">ℝ</span>) ≤ f / n := <span class="kw">by</span> <span class="kw">positivity</span></span>
+<span id="L525">    <span class="kw">linarith</span></span>
+<span id="L526">  <span class="cm">--</span><span class="cm"> `ρ = 1 - 9α² + (nμη - 3α)² ≥ 1 - 9α²`</span></span>
+<span id="L527">  <span class="kw">have</span> hρ : A.<span class="const token" data-verso-hover="159">ρ</span> η = <span class="nu">1</span> - <span class="nu">9</span> * A.<span class="const token" data-verso-hover="157">α</span> ^ <span class="nu">2</span> + (n * A.<span class="const token" data-verso-hover="146">μ</span> * η - <span class="nu">3</span> * A.<span class="const token" data-verso-hover="157">α</span>) ^ <span class="nu">2</span> := <span class="kw">by</span></span>
+<span id="L528">    <span class="kw">unfold</span> <span class="const token" data-verso-hover="159">ρ</span> <span class="const token" data-verso-hover="158">ηbar</span></span>
+<span id="L529">    <span class="kw">field_simp</span></span>
+<span id="L530">    <span class="kw">ring</span></span>
+<span id="L531">  <span class="kw">rw</span> [hρ]</span>
+<span id="L532">  <span class="kw">nlinarith</span> [<span class="const token" data-verso-hover="215">sq_nonneg</span> (n * A.<span class="const token" data-verso-hover="146">μ</span> * η - <span class="nu">3</span> * A.<span class="const token" data-verso-hover="157">α</span>)]</span>
+<span id="L533"></span>
+<span id="L534"><span class="dc">/-- Convergence: under the hypotheses of Theorem 2 and `W* ≠ E`, the distance from `w t` to `W*`</span></span>
+<span id="L535"><span class="dc">tends to `0`. -/</span></span>
+<span id="L536"><span class="kw">theorem</span> <span class="const token" data-verso-hover="21">theorem2_tendsto</span> (hn : <span class="nu">2</span> * f &lt; n) (hα : <span class="nu">0</span> &lt; A.<span class="const token" data-verso-hover="157">α</span>) {η : <span class="const token" data-verso-hover="35">ℝ</span>} (hη0 : <span class="nu">0</span> &lt; η)</span>
+<span id="L537">    (hη1 : η &lt; A.<span class="const token" data-verso-hover="158">ηbar</span>) {w : <span class="const token" data-verso-hover="52">ℕ</span> → E} (hw : A.<span class="const token" data-verso-hover="160">IsRun</span> η w) (hnd : ∃ v, v ∉ A.<span class="const token" data-verso-hover="156">Wstar</span>) :</span>
+<span id="L538">    <span class="const token" data-verso-hover="225">Filter.Tendsto</span> (<span class="kw">fun</span> t =&gt; ‖w t - A.<span class="const token" data-verso-hover="150">proj</span> (w t)‖) <span class="const token" data-verso-hover="226">Filter.atTop</span> (<span class="const token" data-verso-hover="227">nhds</span> <span class="nu">0</span>) := <span class="kw">by</span></span>
+<span id="L539">  <span class="kw">obtain</span> ⟨hρ1, hbound⟩ := A.<span class="const token" data-verso-hover="20">theorem2</span> hn hη0 hη1 hw</span>
+<span id="L540">  <span class="kw">have</span> hρ0 := A.<span class="const token" data-verso-hover="9">theorem2_rho_nonneg</span> (η := η) hn hα hnd</span>
+<span id="L541">  <span class="kw">have</span> hlim : <span class="const token" data-verso-hover="225">Filter.Tendsto</span> (<span class="kw">fun</span> t =&gt; A.<span class="const token" data-verso-hover="159">ρ</span> η ^ t * ‖w <span class="nu">0</span> - A.<span class="const token" data-verso-hover="150">proj</span> (w <span class="nu">0</span>)‖ ^ <span class="nu">2</span>) <span class="const token" data-verso-hover="226">Filter.atTop</span></span>
+<span id="L542">      (<span class="const token" data-verso-hover="227">nhds</span> <span class="nu">0</span>) := <span class="kw">by</span></span>
+<span id="L543">    <span class="kw">simpa</span> <span class="kw">using</span> (<span class="const token" data-verso-hover="228">tendsto_pow_atTop_nhds_zero_of_lt_one</span> hρ0 hρ1).<span class="const token" data-verso-hover="229">mul_const</span></span>
+<span id="L544">      (‖w <span class="nu">0</span> - A.<span class="const token" data-verso-hover="150">proj</span> (w <span class="nu">0</span>)‖ ^ <span class="nu">2</span>)</span>
+<span id="L545">  <span class="kw">have</span> hsq : <span class="const token" data-verso-hover="225">Filter.Tendsto</span> (<span class="kw">fun</span> t =&gt; ‖w t - A.<span class="const token" data-verso-hover="150">proj</span> (w t)‖ ^ <span class="nu">2</span>) <span class="const token" data-verso-hover="226">Filter.atTop</span> (<span class="const token" data-verso-hover="227">nhds</span> <span class="nu">0</span>) :=</span>
+<span id="L546">    <span class="const token" data-verso-hover="230">squeeze_zero</span> (<span class="kw">fun</span> t =&gt; <span class="const token" data-verso-hover="215">sq_nonneg</span> _) hbound hlim</span>
+<span id="L547">  <span class="kw">have</span> := hsq.<span class="const token" data-verso-hover="231">sqrt</span></span>
+<span id="L548">  <span class="kw">simpa</span> [<span class="const token" data-verso-hover="232">Real.sqrt_sq</span> (<span class="const token" data-verso-hover="117">norm_nonneg</span> _)] <span class="kw">using</span> this</span>
+<span id="L549"></span>
+<span id="L550"><span class="kw">end</span> Assumptions</span>
+<span id="L551"></span>
+<span id="L552"><span class="dc">/-! ### Existence of the projection -/</span></span>
+<span id="L553"></span>
+<span id="L554"><span class="kw">section</span> Projection</span>
+<span id="L555"></span>
+<span id="L556"><span class="kw">variable</span> {E : <span class="kw">Type</span>*} [<span class="const token" data-verso-hover="78">NormedAddCommGroup</span> E] [<span class="const token" data-verso-hover="79">InnerProductSpace</span> <span class="const token" data-verso-hover="35">ℝ</span> E] [<span class="const token" data-verso-hover="80">CompleteSpace</span> E]</span>
+<span id="L557"></span>
+<span id="L558"><span class="dc">/-- `W*` is closed and convex, so if it is non-empty the Euclidean projection onto it exists.</span></span>
+<span id="L559"><span class="dc">(Hence the field `proj` of `Assumptions` can always be filled when `W* ≠ ∅`.) -/</span></span>
+<span id="L560"><span class="kw">theorem</span> <span class="const token" data-verso-hover="26">exists_proj</span> {n : <span class="const token" data-verso-hover="52">ℕ</span>} (H : <span class="const token" data-verso-hover="38">Finset</span> (<span class="const token" data-verso-hover="57">Fin</span> n)) (Q : <span class="const token" data-verso-hover="57">Fin</span> n → E → <span class="const token" data-verso-hover="35">ℝ</span>)</span>
+<span id="L561">    (hconv : ∀ i ∈ H, <span class="const token" data-verso-hover="82">ConvexOn</span> <span class="const token" data-verso-hover="35">ℝ</span> <span class="const token" data-verso-hover="44">Set.univ</span> (Q i)) (hcont : ∀ i ∈ H, <span class="const token" data-verso-hover="233">Continuous</span> (Q i))</span>
+<span id="L562">    (hne : (<span class="const token" data-verso-hover="34">argmin</span> (<span class="const token" data-verso-hover="37">agg</span> H Q)).<span class="const token" data-verso-hover="45">Nonempty</span>) :</span>
+<span id="L563">    ∃ P : E → E, ∀ w, P w ∈ <span class="const token" data-verso-hover="34">argmin</span> (<span class="const token" data-verso-hover="37">agg</span> H Q) ∧ ∀ v ∈ <span class="const token" data-verso-hover="34">argmin</span> (<span class="const token" data-verso-hover="37">agg</span> H Q), ‖w - P w‖ ≤ ‖w - v‖ := <span class="kw">by</span></span>
+<span id="L564">  <span class="kw">set</span> K := <span class="const token" data-verso-hover="34">argmin</span> (<span class="const token" data-verso-hover="37">agg</span> H Q)</span>
+<span id="L565">  <span class="kw">have</span> hc : <span class="const token" data-verso-hover="233">Continuous</span> (<span class="const token" data-verso-hover="37">agg</span> H Q) := <span class="kw">by</span></span>
+<span id="L566">    <span class="kw">have</span> : <span class="const token" data-verso-hover="37">agg</span> H Q = <span class="kw">fun</span> w =&gt; ∑ i ∈ H, Q i w := <span class="const token" data-verso-hover="40">rfl</span></span>
+<span id="L567">    <span class="kw">rw</span> [this]; <span class="kw">exact</span> <span class="const token" data-verso-hover="234">continuous_finsetSum</span> _ <span class="kw">fun</span> i hi =&gt; hcont i hi</span>
+<span id="L568">  <span class="kw">have</span> hK : K = ⋂ v, {w | <span class="const token" data-verso-hover="37">agg</span> H Q w ≤ <span class="const token" data-verso-hover="37">agg</span> H Q v} := <span class="kw">by</span> <span class="kw">ext</span>; <span class="kw">simp</span> [K, <span class="const token" data-verso-hover="34">argmin</span>]</span>
+<span id="L569">  <span class="kw">have</span> hclosed : <span class="const token" data-verso-hover="235">IsClosed</span> K := <span class="kw">by</span></span>
+<span id="L570">    <span class="kw">rw</span> [hK]; <span class="kw">exact</span> <span class="const token" data-verso-hover="236">isClosed_iInter</span> <span class="kw">fun</span> v =&gt; <span class="const token" data-verso-hover="237">isClosed_le</span> hc <span class="const token" data-verso-hover="238">continuous_const</span></span>
+<span id="L571">  <span class="kw">have</span> hconvK : <span class="const token" data-verso-hover="239">Convex</span> <span class="const token" data-verso-hover="35">ℝ</span> K := <span class="kw">by</span></span>
+<span id="L572">    <span class="kw">rw</span> [hK]</span>
+<span id="L573">    <span class="kw">exact</span> <span class="const token" data-verso-hover="240">convex_iInter</span> <span class="kw">fun</span> v =&gt; (<span class="const token" data-verso-hover="33">convexOn_agg</span> hconv).<span class="const token" data-verso-hover="241">convex_le</span> (<span class="const token" data-verso-hover="37">agg</span> H Q v) |&gt;.<span class="const token" data-verso-hover="242">inter</span></span>
+<span id="L574">      <span class="const token" data-verso-hover="93">convex_univ</span> |&gt; <span class="kw">fun</span> h =&gt; <span class="kw">by</span> <span class="kw">simpa</span> <span class="kw">using</span> h</span>
+<span id="L575">  <span class="kw">have</span> hex : ∀ u, ∃ v ∈ K, ∀ v' ∈ K, ‖u - v‖ ≤ ‖u - v'‖ := <span class="kw">by</span></span>
+<span id="L576">    <span class="kw">intro</span> u</span>
+<span id="L577">    <span class="kw">obtain</span> ⟨v, hv, hmin⟩ := <span class="const token" data-verso-hover="243">exists_norm_eq_iInf_of_complete_convex</span> hne hclosed.<span class="const token" data-verso-hover="244">isComplete</span> hconvK u</span>
+<span id="L578">    <span class="kw">refine</span> ⟨v, hv, <span class="kw">fun</span> v' hv' =&gt; ?_⟩</span>
+<span id="L579">    <span class="kw">rw</span> [hmin]</span>
+<span id="L580">    <span class="kw">exact</span> <span class="const token" data-verso-hover="245">ciInf_le</span> ⟨<span class="nu">0</span>, <span class="kw">fun</span> _ ⟨_, h⟩ =&gt; h ▸ <span class="const token" data-verso-hover="117">norm_nonneg</span> _⟩ (⟨v', hv'⟩ : K)</span>
+<span id="L581">  <span class="kw">choose</span> P hP <span class="kw">using</span> hex</span>
+<span id="L582">  <span class="kw">exact</span> ⟨P, <span class="kw">fun</span> w =&gt; ⟨(hP w).<span class="const token" data-verso-hover="74">1</span>, (hP w).<span class="const token" data-verso-hover="75">2</span>⟩⟩</span>
+<span id="L583"></span>
+<span id="L584"><span class="kw">end</span> Projection</span>
+<span id="L585"></span>
+<span id="L586"><span class="kw">end</span> RedundantOptimization</span>
+<span id="L587"></span>
+</code></div>
+        <script>
+          window.versoHoversUrl = "PODC2020/RedundantOptimization/-hovers.json";</script>
+        <script src="static/lean/popper.js"></script>
+        <script src="static/lean/tippy.js"></script>
+        <script src="static/lean/marked.js"></script>
+        <script src="static/lean/highlighting.js"></script>
+        <script src="static/lean/lean.js"></script>
+        </article></main><footer class="site-footer"><div class="wrap">
+        Machine-checked formalizations of PODC papers in Lean 4. Generated with <a href="https://github.com/leanprover/verso">Verso</a> from the README files of <a href="https://github.com/vasnesterov/formal_podc">vasnesterov/formal_podc</a>.</div>
+      </footer></body>
+  </html>
+

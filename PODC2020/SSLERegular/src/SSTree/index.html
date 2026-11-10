@@ -1,0 +1,585 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="light dark">
+    <link rel="icon" href="data:,">
+    <title>SSLERegular: SSTree.lean · Formal PODC</title><base href="../../../.././"><link rel="stylesheet" href="static/lean/verso-vars.css">
+    <link rel="stylesheet" href="static/lean/highlighting.css">
+    <link rel="stylesheet" href="static/lean/tippy-border.css">
+    <link rel="stylesheet" href="static/style.css">
+    <script defer="defer" src="static/site.js"></script>
+    </head>
+  <body>
+    <header class="site-header">
+      <div class="wrap">
+        <a class="brand" href=".">Formal PODC</a><nav class="top">
+          <a href=".">Search</a><a href="about/">About</a><a href="https://github.com/vasnesterov/formal_podc">GitHub</a></nav>
+        </div>
+      </header>
+    <main class="wrap"><article><nav class="breadcrumbs" aria-label="Breadcrumb">
+          <a href=".">Search</a><span class="sep">›</span><a href="PODC2020/">PODC 2020</a><span class="sep">›</span><a href="PODC2020/SSLERegular/">SSLERegular</a><span class="sep">›</span><a href="PODC2020/SSLERegular/src/">Lean source</a><span class="sep">›</span><span aria-current="page">SSTree</span></nav>
+        <h1>
+          <code>SSTree.lean</code></h1>
+        <div class="paper-links">
+          <p>
+            Source of <a href="PODC2020/SSLERegular/">Self-Stabilizing Leader Election in Regular Graphs — PODC 2020</a> · <a href="https://github.com/vasnesterov/formal_podc/blob/main/Papers/PODC2020/SSLERegular/SSTree.lean">GitHub</a> · hover over a name for its type and documentation</p>
+          </div>
+        <div class="lean-code lean-src">
+          <code class="hl lean block" data-lean-context="SSTree"><span id="L1"><span class="kw">import</span> Papers.PODC2020.SSLERegular.Model</span>
+<span id="L2"><span class="kw">import</span> Mathlib.Tactic.DeriveFintype</span>
+<span id="L3"></span>
+<span id="L4"><span class="dc">/-!</span></span>
+<span id="L5"><span class="dc"># Protocol SS-Tree (Section 4) and a counterexample to Theorem 4.3</span></span>
+<span id="L6"></span>
+<span id="L7"><span class="dc">Chen–Chen, *Self-Stabilizing Leader Election in Regular Graphs*, PODC 2020, Section 4</span></span>
+<span id="L8"><span class="dc">(Protocols 2, 4, 5, 6).</span></span>
+<span id="L9"></span>
+<span id="L10"><span class="dc">We transcribe SS-Tree (with its sub-protocols SS-TwoHop, CycleDetector and MultipleRootDetector)</span></span>
+<span id="L11"><span class="dc">as a nondeterministic population protocol `ssTree k R` for `k`-regular graphs, parameterised by an</span></span>
+<span id="L12"><span class="dc">arbitrary ring protocol `R` (the paper uses the Ring-Protocol of [11] as a black box; nothing below</span></span>
+<span id="L13"><span class="dc">depends on it). Colours `1, …, k²` are encoded as `Fin (k ^ 2)` (value `c + 1`); the colour</span></span>
+<span id="L14"><span class="dc">variables with an extra value `0` (`counterColor`, `loopColor`) are `Fin (k ^ 2 + 1)`.</span></span>
+<span id="L15"><span class="dc">Randomized rules are resolved by an explicit `TChoice` (all choices are allowed).</span></span>
+<span id="L16"></span>
+<span id="L17"><span class="dc">Interpretation choices (see `differencies.md`): the SS-TwoHop guard is read as</span></span>
+<span id="L18"><span class="dc">`u.prevColor = v.color ∧ v.prevColor = u.color ∧ u.colorBit ≠ v.colorBit` (the printed tuple</span></span>
+<span id="L19"><span class="dc">equality is garbled); the cycle-detector leader test and the opposite-coin test of</span></span>
+<span id="L20"><span class="dc">MultipleRootDetector are applied to every interacting pair (outside the parent–child guard), the</span></span>
+<span id="L21"><span class="dc">reading most favourable to error detection; unqualified `errFlag ← True` means `u.errFlag`.</span></span>
+<span id="L22"></span>
+<span id="L23"><span class="dc">**Main result** (`ssTree_not_solvesSSLE`): for every `k ≥ 2`, every graph of maximum degree `≤ k`</span></span>
+<span id="L24"><span class="dc">with at least two nodes and every colouring in which the neighbours of each node have distinct</span></span>
+<span id="L25"><span class="dc">colours (what SS-TwoHop is meant to produce), there is a configuration in which **every node is a</span></span>
+<span id="L26"><span class="dc">root (a leader) forever**: all nodes are roots whose `parentColor` is the colour of no neighbour,</span></span>
+<span id="L27"><span class="dc">so no parent–child pair exists, MultipleRootDetector never moves a coin, CycleDetector never runs</span></span>
+<span id="L28"><span class="dc">the ring protocol, and no error is ever raised. Hence SS-Tree does not solve SSLE</span></span>
+<span id="L29"><span class="dc">(Theorem 4.3 and Lemma 4.2 are false), e.g. on the complete graphs `K_{k+1}`</span></span>
+<span id="L30"><span class="dc">(`ssTree_fails_on_complete`).</span></span>
+<span id="L31"><span class="dc">-/</span></span>
+<span id="L32"></span>
+<span id="L33"><span class="kw">open</span> Finset</span>
+<span id="L34"></span>
+<span id="L35"><span class="kw">namespace</span> SSLERegular</span>
+<span id="L36"></span>
+<span id="L37"><span class="dc">/-- Coin values `−2, −1, 0, 1, 2` of MultipleRootDetector. -/</span></span>
+<span id="L38"><span class="kw">inductive</span> <span class="const token" data-verso-hover="530">Coin</span> | <span class="const token" data-verso-hover="531">m2</span> | <span class="const token" data-verso-hover="532">m1</span> | <span class="const token" data-verso-hover="533">z</span> | <span class="const token" data-verso-hover="534">p1</span> | <span class="const token" data-verso-hover="535">p2</span></span>
+<span id="L39">  <span class="kw">deriving</span> <span class="const token" data-verso-hover="88">DecidableEq</span></span>
+<span id="L40"></span>
+<span id="L41"><span class="const token" data-verso-hover="536">instance</span> : <span class="const token" data-verso-hover="109">Fintype</span> <span class="const token" data-verso-hover="530">Coin</span> := ⟨{<span class="const token" data-verso-hover="531">.</span>m2, <span class="const token" data-verso-hover="532">.</span>m1, <span class="const token" data-verso-hover="533">.</span>z, <span class="const token" data-verso-hover="534">.</span>p1, <span class="const token" data-verso-hover="535">.</span>p2}, <span class="kw">by</span> <span class="kw">intro</span> x; <span class="kw">cases</span> x &lt;;&gt; <span class="kw">simp</span>⟩</span>
+<span id="L42"></span>
+<span id="L43"><span class="kw">namespace</span> Coin</span>
+<span id="L44"></span>
+<span id="L45"><span class="dc">/-- Integer value. -/</span></span>
+<span id="L46"><span class="kw">def</span> <span class="const token" data-verso-hover="537">val</span> : <span class="const token" data-verso-hover="530">Coin</span> → <span class="const token" data-verso-hover="538">ℤ</span></span>
+<span id="L47">  | <span class="const token" data-verso-hover="531">m2</span> =&gt; -<span class="nu">2</span> | <span class="const token" data-verso-hover="532">m1</span> =&gt; -<span class="nu">1</span> | <span class="const token" data-verso-hover="533">z</span> =&gt; <span class="nu">0</span> | <span class="const token" data-verso-hover="534">p1</span> =&gt; <span class="nu">1</span> | <span class="const token" data-verso-hover="535">p2</span> =&gt; <span class="nu">2</span></span>
+<span id="L48"></span>
+<span id="L49"><span class="dc">/-- `2 · c` for `|c| = 1`. -/</span></span>
+<span id="L50"><span class="kw">def</span> <span class="const token" data-verso-hover="539">dbl</span> : <span class="const token" data-verso-hover="530">Coin</span> → <span class="const token" data-verso-hover="530">Coin</span></span>
+<span id="L51">  | <span class="const token" data-verso-hover="532">m1</span> =&gt; <span class="const token" data-verso-hover="531">m2</span> | <span class="const token" data-verso-hover="534">p1</span> =&gt; <span class="const token" data-verso-hover="535">p2</span> | c =&gt; c</span>
+<span id="L52"></span>
+<span id="L53"><span class="dc">/-- A random coin. -/</span></span>
+<span id="L54"><span class="kw">def</span> <span class="const token" data-verso-hover="540">ofBool</span> : <span class="const token" data-verso-hover="43">Bool</span> → <span class="const token" data-verso-hover="530">Coin</span></span>
+<span id="L55">  | <span class="const token" data-verso-hover="56">true</span> =&gt; <span class="const token" data-verso-hover="534">p1</span> | <span class="const token" data-verso-hover="94">false</span> =&gt; <span class="const token" data-verso-hover="532">m1</span></span>
+<span id="L56"></span>
+<span id="L57"><span class="kw">end</span> Coin</span>
+<span id="L58"></span>
+<span id="L59"><span class="dc">/-- A ring protocol: a nondeterministic protocol on states `RS` with leader output `lead`. -/</span></span>
+<span id="L60"><span class="kw">structure</span> <span class="const token" data-verso-hover="52">RingProtocol</span> (RS : <span class="kw">Type</span>*) <span class="kw">extends</span> <span class="const token" data-verso-hover="15">GProtocol</span> RS <span class="kw">where</span></span>
+<span id="L61">  <span class="dc">/-- Leader output. -/</span></span>
+<span id="L62">  <span class="const token" data-verso-hover="229">lead</span> : RS → <span class="const token" data-verso-hover="43">Bool</span></span>
+<span id="L63"></span>
+<span id="L64"><span class="kw">variable</span> {RS : <span class="kw">Type</span>*}</span>
+<span id="L65"></span>
+<span id="L66"><span class="dc">/-- The state of a node in SS-Tree (Protocols 2, 4, 5, 6). -/</span></span>
+<span id="L67"><span class="kw">structure</span> <span class="const token" data-verso-hover="507">TState</span> (k : <span class="const token" data-verso-hover="39">ℕ</span>) (RS : <span class="kw">Type</span>*) <span class="kw">where</span></span>
+<span id="L68">  <span class="const token" data-verso-hover="541">color</span> : <span class="const token" data-verso-hover="82">Fin</span> (k ^ <span class="nu">2</span>)</span>
+<span id="L69">  <span class="const token" data-verso-hover="4">parentColor</span> : <span class="const token" data-verso-hover="82">Fin</span> (k ^ <span class="nu">2</span>)</span>
+<span id="L70">  <span class="const token" data-verso-hover="542">prevColor</span> : <span class="const token" data-verso-hover="82">Fin</span> (k ^ <span class="nu">2</span>)</span>
+<span id="L71">  <span class="const token" data-verso-hover="543">colorBit</span> : <span class="const token" data-verso-hover="43">Bool</span></span>
+<span id="L72">  <span class="const token" data-verso-hover="544">counterColor</span> : <span class="const token" data-verso-hover="82">Fin</span> (k ^ <span class="nu">2</span> + <span class="nu">1</span>)</span>
+<span id="L73">  <span class="const token" data-verso-hover="545">counter</span> : <span class="const token" data-verso-hover="82">Fin</span> (k + <span class="nu">1</span>)</span>
+<span id="L74">  <span class="const token" data-verso-hover="546">errFlag</span> : <span class="const token" data-verso-hover="43">Bool</span></span>
+<span id="L75">  <span class="const token" data-verso-hover="547">root</span> : <span class="const token" data-verso-hover="43">Bool</span></span>
+<span id="L76">  <span class="const token" data-verso-hover="548">ringState</span> : RS</span>
+<span id="L77">  <span class="const token" data-verso-hover="549">ringStateCopy</span> : RS</span>
+<span id="L78">  <span class="const token" data-verso-hover="550">loopMarker</span> : <span class="const token" data-verso-hover="43">Bool</span></span>
+<span id="L79">  <span class="const token" data-verso-hover="5">loopChild</span> : <span class="const token" data-verso-hover="43">Bool</span></span>
+<span id="L80">  <span class="const token" data-verso-hover="6">loopParent</span> : <span class="const token" data-verso-hover="43">Bool</span></span>
+<span id="L81">  <span class="const token" data-verso-hover="551">loopColor</span> : <span class="const token" data-verso-hover="82">Fin</span> (k ^ <span class="nu">2</span> + <span class="nu">1</span>)</span>
+<span id="L82">  <span class="const token" data-verso-hover="552">loopCounter</span> : <span class="const token" data-verso-hover="82">Fin</span> (k + <span class="nu">1</span>)</span>
+<span id="L83">  <span class="const token" data-verso-hover="553">coin</span> : <span class="const token" data-verso-hover="530">Coin</span></span>
+<span id="L84"></span>
+<span id="L85"><span class="dc">/-- Colour `c ∈ {1,…,k²}` as a value of a colour variable with an extra `0`. -/</span></span>
+<span id="L86"><span class="kw">def</span> <span class="const token" data-verso-hover="554">colSucc</span> {k : <span class="const token" data-verso-hover="39">ℕ</span>} (c : <span class="const token" data-verso-hover="82">Fin</span> (k ^ <span class="nu">2</span>)) : <span class="const token" data-verso-hover="82">Fin</span> (k ^ <span class="nu">2</span> + <span class="nu">1</span>) := ⟨c.<span class="const token" data-verso-hover="240">val</span> + <span class="nu">1</span>, <span class="kw">by</span> <span class="kw">omega</span>⟩</span>
+<span id="L87"></span>
+<span id="L88"><span class="dc">/-- Saturating increment of a counter in `{0,…,k}`. -/</span></span>
+<span id="L89"><span class="kw">def</span> <span class="const token" data-verso-hover="555">incr</span> {k : <span class="const token" data-verso-hover="39">ℕ</span>} (c : <span class="const token" data-verso-hover="82">Fin</span> (k + <span class="nu">1</span>)) : <span class="const token" data-verso-hover="82">Fin</span> (k + <span class="nu">1</span>) := ⟨<span class="const token" data-verso-hover="556">min</span> (c.<span class="const token" data-verso-hover="240">val</span> + <span class="nu">1</span>) k, <span class="kw">by</span> <span class="kw">omega</span>⟩</span>
+<span id="L90"></span>
+<span id="L91"><span class="dc">/-- The random choices of one interaction. -/</span></span>
+<span id="L92"><span class="kw">structure</span> <span class="const token" data-verso-hover="557">TChoice</span> (k : <span class="const token" data-verso-hover="39">ℕ</span>) (RS : <span class="kw">Type</span>*) <span class="kw">where</span></span>
+<span id="L93">  <span class="dc">/-- SS-TwoHop: new colours of `v` and `u` (used only on a detected conflict) and the shared bit. -/</span></span>
+<span id="L94">  <span class="const token" data-verso-hover="558">rc1</span> : <span class="const token" data-verso-hover="82">Fin</span> (k ^ <span class="nu">2</span>)</span>
+<span id="L95">  <span class="const token" data-verso-hover="559">rc2</span> : <span class="const token" data-verso-hover="82">Fin</span> (k ^ <span class="nu">2</span>)</span>
+<span id="L96">  <span class="const token" data-verso-hover="560">rb</span> : <span class="const token" data-verso-hover="43">Bool</span></span>
+<span id="L97">  <span class="dc">/-- "Randomly: `u.counter ← 0, u.counterColor ← 0`". -/</span></span>
+<span id="L98">  <span class="const token" data-verso-hover="561">resetCounter</span> : <span class="const token" data-verso-hover="43">Bool</span></span>
+<span id="L99">  <span class="dc">/-- CycleDetector: "Randomly do: `u.loopCounter ← 0, u.loopColor ← 0`". -/</span></span>
+<span id="L100">  <span class="const token" data-verso-hover="562">resetLoop</span> : <span class="const token" data-verso-hover="43">Bool</span></span>
+<span id="L101">  <span class="dc">/-- CycleDetector: "Randomly do: `u.loopMarker ← False`". -/</span></span>
+<span id="L102">  <span class="const token" data-verso-hover="563">unmark</span> : <span class="const token" data-verso-hover="43">Bool</span></span>
+<span id="L103">  <span class="dc">/-- Outcome selection of the ring protocol. -/</span></span>
+<span id="L104">  <span class="const token" data-verso-hover="564">ρ</span> : RS → RS → RS × RS</span>
+<span id="L105">  <span class="dc">/-- MultipleRootDetector: the tossed coin and "Randomly do" of the walk back. -/</span></span>
+<span id="L106">  <span class="const token" data-verso-hover="565">toss</span> : <span class="const token" data-verso-hover="43">Bool</span></span>
+<span id="L107">  <span class="const token" data-verso-hover="566">back</span> : <span class="const token" data-verso-hover="43">Bool</span></span>
+<span id="L108">  <span class="dc">/-- Detect-error-and-random-change: `RandomState`, `RandomBit1`, `RandomBit2`. -/</span></span>
+<span id="L109">  <span class="const token" data-verso-hover="567">rand</span> : <span class="const token" data-verso-hover="507">TState</span> k RS</span>
+<span id="L110">  <span class="const token" data-verso-hover="568">b1</span> : <span class="const token" data-verso-hover="43">Bool</span></span>
+<span id="L111">  <span class="const token" data-verso-hover="569">b2</span> : <span class="const token" data-verso-hover="43">Bool</span></span>
+<span id="L112"></span>
+<span id="L113"><span class="kw">variable</span> {k : <span class="const token" data-verso-hover="39">ℕ</span>}</span>
+<span id="L114"></span>
+<span id="L115"><span class="dc">/-- Protocol 2, SS-TwoHop. -/</span></span>
+<span id="L116"><span class="kw">def</span> <span class="const token" data-verso-hover="570">twoHop</span> (rc1 rc2 : <span class="const token" data-verso-hover="82">Fin</span> (k ^ <span class="nu">2</span>)) (rb : <span class="const token" data-verso-hover="43">Bool</span>) (u v : <span class="const token" data-verso-hover="507">TState</span> k RS) : <span class="const token" data-verso-hover="507">TState</span> k RS × <span class="const token" data-verso-hover="507">TState</span> k RS :=</span>
+<span id="L117">  <span class="kw">let</span> w : <span class="const token" data-verso-hover="507">TState</span> k RS × <span class="const token" data-verso-hover="507">TState</span> k RS :=</span>
+<span id="L118">    <span class="kw">if</span> u.<span class="const token" data-verso-hover="542">prevColor</span> = v.<span class="const token" data-verso-hover="541">color</span> ∧ v.<span class="const token" data-verso-hover="542">prevColor</span> = u.<span class="const token" data-verso-hover="541">color</span> ∧ u.<span class="const token" data-verso-hover="543">colorBit</span> ≠ v.<span class="const token" data-verso-hover="543">colorBit</span> <span class="kw">then</span></span>
+<span id="L119">      ({ u <span class="kw">with</span> <span class="const token" data-verso-hover="541">color</span> := rc2 }, { v <span class="kw">with</span> <span class="const token" data-verso-hover="541">color</span> := rc1 }) <span class="kw">else</span> (u, v)</span>
+<span id="L120">  ({ w.<span class="const token" data-verso-hover="58">1</span> <span class="kw">with</span> <span class="const token" data-verso-hover="542">prevColor</span> := w.<span class="const token" data-verso-hover="59">2</span>.<span class="const token" data-verso-hover="541">color</span>, <span class="const token" data-verso-hover="543">colorBit</span> := rb },</span>
+<span id="L121">    { w.<span class="const token" data-verso-hover="59">2</span> <span class="kw">with</span> <span class="const token" data-verso-hover="542">prevColor</span> := w.<span class="const token" data-verso-hover="58">1</span>.<span class="const token" data-verso-hover="541">color</span>, <span class="const token" data-verso-hover="543">colorBit</span> := rb })</span>
+<span id="L122"></span>
+<span id="L123"><span class="dc">/-! The stages of Protocol 4 (ghost-parent check), applied to the initiator `u`. -/</span></span>
+<span id="L124"></span>
+<span id="L125"><span class="dc">/-- "Randomly: `u.counter ← 0, u.counterColor ← 0`". -/</span></span>
+<span id="L126"><span class="kw">def</span> <span class="const token" data-verso-hover="571">ctrReset</span> (r : <span class="const token" data-verso-hover="43">Bool</span>) (u : <span class="const token" data-verso-hover="507">TState</span> k RS) : <span class="const token" data-verso-hover="507">TState</span> k RS :=</span>
+<span id="L127">  <span class="kw">if</span> r <span class="kw">then</span> { u <span class="kw">with</span> <span class="const token" data-verso-hover="545">counter</span> := <span class="nu">0</span>, <span class="const token" data-verso-hover="544">counterColor</span> := <span class="nu">0</span> } <span class="kw">else</span> u</span>
+<span id="L128"></span>
+<span id="L129"><span class="dc">/-- Count the next neighbour colour (non-roots only). -/</span></span>
+<span id="L130"><span class="kw">def</span> <span class="const token" data-verso-hover="572">ctrInc</span> (u v : <span class="const token" data-verso-hover="507">TState</span> k RS) : <span class="const token" data-verso-hover="507">TState</span> k RS :=</span>
+<span id="L131">  <span class="kw">if</span> u.<span class="const token" data-verso-hover="544">counterColor</span>.<span class="const token" data-verso-hover="240">val</span> &lt; v.<span class="const token" data-verso-hover="541">color</span>.<span class="const token" data-verso-hover="240">val</span> + <span class="nu">1</span> ∧ u.<span class="const token" data-verso-hover="547">root</span> = <span class="const token" data-verso-hover="94">false</span> <span class="kw">then</span></span>
+<span id="L132">    { u <span class="kw">with</span> <span class="const token" data-verso-hover="544">counterColor</span> := <span class="const token" data-verso-hover="554">colSucc</span> v.<span class="const token" data-verso-hover="541">color</span>, <span class="const token" data-verso-hover="545">counter</span> := <span class="const token" data-verso-hover="555">incr</span> u.<span class="const token" data-verso-hover="545">counter</span> } <span class="kw">else</span> u</span>
+<span id="L133"></span>
+<span id="L134"><span class="dc">/-- Reset the counter when meeting the parent. -/</span></span>
+<span id="L135"><span class="kw">def</span> <span class="const token" data-verso-hover="573">ctrParent</span> (u v : <span class="const token" data-verso-hover="507">TState</span> k RS) : <span class="const token" data-verso-hover="507">TState</span> k RS :=</span>
+<span id="L136">  <span class="kw">if</span> v.<span class="const token" data-verso-hover="541">color</span> = u.<span class="const token" data-verso-hover="4">parentColor</span> <span class="kw">then</span> { u <span class="kw">with</span> <span class="const token" data-verso-hover="545">counter</span> := <span class="nu">0</span> } <span class="kw">else</span> u</span>
+<span id="L137"></span>
+<span id="L138"><span class="dc">/-- Ghost parent detected. -/</span></span>
+<span id="L139"><span class="kw">def</span> <span class="const token" data-verso-hover="574">ctrErr</span> (u : <span class="const token" data-verso-hover="507">TState</span> k RS) : <span class="const token" data-verso-hover="507">TState</span> k RS :=</span>
+<span id="L140">  <span class="kw">if</span> u.<span class="const token" data-verso-hover="545">counter</span>.<span class="const token" data-verso-hover="240">val</span> = k <span class="kw">then</span> { u <span class="kw">with</span> <span class="const token" data-verso-hover="546">errFlag</span> := <span class="const token" data-verso-hover="56">true</span> } <span class="kw">else</span> u</span>
+<span id="L141"></span>
+<span id="L142"><span class="dc">/-! The stages of Protocol 5, CycleDetector. -/</span></span>
+<span id="L143"></span>
+<span id="L144"><span class="dc">/-- "Randomly do: `u.loopCounter ← 0, u.loopColor ← 0`". -/</span></span>
+<span id="L145"><span class="kw">def</span> <span class="const token" data-verso-hover="575">cdReset</span> (r : <span class="const token" data-verso-hover="43">Bool</span>) (u : <span class="const token" data-verso-hover="507">TState</span> k RS) : <span class="const token" data-verso-hover="507">TState</span> k RS :=</span>
+<span id="L146">  <span class="kw">if</span> r <span class="kw">then</span> { u <span class="kw">with</span> <span class="const token" data-verso-hover="552">loopCounter</span> := <span class="nu">0</span>, <span class="const token" data-verso-hover="551">loopColor</span> := <span class="nu">0</span> } <span class="kw">else</span> u</span>
+<span id="L147"></span>
+<span id="L148"><span class="dc">/-- Count the next neighbour colour. -/</span></span>
+<span id="L149"><span class="kw">def</span> <span class="const token" data-verso-hover="576">cdInc</span> (u v : <span class="const token" data-verso-hover="507">TState</span> k RS) : <span class="const token" data-verso-hover="507">TState</span> k RS :=</span>
+<span id="L150">  <span class="kw">if</span> u.<span class="const token" data-verso-hover="551">loopColor</span>.<span class="const token" data-verso-hover="240">val</span> &lt; v.<span class="const token" data-verso-hover="541">color</span>.<span class="const token" data-verso-hover="240">val</span> + <span class="nu">1</span> <span class="kw">then</span></span>
+<span id="L151">    { u <span class="kw">with</span> <span class="const token" data-verso-hover="551">loopColor</span> := <span class="const token" data-verso-hover="554">colSucc</span> v.<span class="const token" data-verso-hover="541">color</span>, <span class="const token" data-verso-hover="552">loopCounter</span> := <span class="const token" data-verso-hover="555">incr</span> u.<span class="const token" data-verso-hover="552">loopCounter</span> } <span class="kw">else</span> u</span>
+<span id="L152"></span>
+<span id="L153"><span class="dc">/-- Reset the loop counter when meeting a marked neighbour. -/</span></span>
+<span id="L154"><span class="kw">def</span> <span class="const token" data-verso-hover="577">cdMarked</span> (u v : <span class="const token" data-verso-hover="507">TState</span> k RS) : <span class="const token" data-verso-hover="507">TState</span> k RS :=</span>
+<span id="L155">  <span class="kw">if</span> v.<span class="const token" data-verso-hover="550">loopMarker</span> = <span class="const token" data-verso-hover="56">true</span> <span class="kw">then</span> { u <span class="kw">with</span> <span class="const token" data-verso-hover="552">loopCounter</span> := <span class="nu">0</span> } <span class="kw">else</span> u</span>
+<span id="L156"></span>
+<span id="L157"><span class="dc">/-- Mark a starting node of a path. -/</span></span>
+<span id="L158"><span class="kw">def</span> <span class="const token" data-verso-hover="578">cdStart</span> (u : <span class="const token" data-verso-hover="507">TState</span> k RS) : <span class="const token" data-verso-hover="507">TState</span> k RS :=</span>
+<span id="L159">  <span class="kw">if</span> u.<span class="const token" data-verso-hover="552">loopCounter</span>.<span class="const token" data-verso-hover="240">val</span> = k <span class="kw">then</span></span>
+<span id="L160">    { u <span class="kw">with</span> <span class="const token" data-verso-hover="550">loopMarker</span> := <span class="const token" data-verso-hover="56">true</span>, <span class="const token" data-verso-hover="5">loopChild</span> := <span class="const token" data-verso-hover="94">false</span>, <span class="const token" data-verso-hover="549">ringStateCopy</span> := u.<span class="const token" data-verso-hover="548">ringState</span>, <span class="const token" data-verso-hover="6">loopParent</span> := <span class="const token" data-verso-hover="94">false</span> }</span>
+<span id="L161">  <span class="kw">else</span> u</span>
+<span id="L162"></span>
+<span id="L163"><span class="dc">/-- "Randomly do: `u.loopMarker ← False`". -/</span></span>
+<span id="L164"><span class="kw">def</span> <span class="const token" data-verso-hover="579">cdUnmark</span> (r : <span class="const token" data-verso-hover="43">Bool</span>) (u : <span class="const token" data-verso-hover="507">TState</span> k RS) : <span class="const token" data-verso-hover="507">TState</span> k RS :=</span>
+<span id="L165">  <span class="kw">if</span> r <span class="kw">then</span> { u <span class="kw">with</span> <span class="const token" data-verso-hover="550">loopMarker</span> := <span class="const token" data-verso-hover="94">false</span> } <span class="kw">else</span> u</span>
+<span id="L166"></span>
+<span id="L167"><span class="dc">/-- Run the ring protocol on a marked parent–child pair. -/</span></span>
+<span id="L168"><span class="kw">def</span> <span class="const token" data-verso-hover="580">cdRing</span> (ρ : RS → RS → RS × RS) (u v : <span class="const token" data-verso-hover="507">TState</span> k RS) : <span class="const token" data-verso-hover="507">TState</span> k RS × <span class="const token" data-verso-hover="507">TState</span> k RS :=</span>
+<span id="L169">  <span class="kw">if</span> u.<span class="const token" data-verso-hover="550">loopMarker</span> = <span class="const token" data-verso-hover="56">true</span> ∧ v.<span class="const token" data-verso-hover="550">loopMarker</span> = <span class="const token" data-verso-hover="56">true</span> ∧ u.<span class="const token" data-verso-hover="5">loopChild</span> = <span class="const token" data-verso-hover="56">true</span> ∧ v.<span class="const token" data-verso-hover="6">loopParent</span> = <span class="const token" data-verso-hover="56">true</span> <span class="kw">then</span></span>
+<span id="L170">    ({ u <span class="kw">with</span> <span class="const token" data-verso-hover="549">ringStateCopy</span> := (ρ u.<span class="const token" data-verso-hover="549">ringStateCopy</span> v.<span class="const token" data-verso-hover="549">ringStateCopy</span>).<span class="const token" data-verso-hover="58">1</span> },</span>
+<span id="L171">      { v <span class="kw">with</span> <span class="const token" data-verso-hover="549">ringStateCopy</span> := (ρ u.<span class="const token" data-verso-hover="549">ringStateCopy</span> v.<span class="const token" data-verso-hover="549">ringStateCopy</span>).<span class="const token" data-verso-hover="59">2</span> }) <span class="kw">else</span> (u, v)</span>
+<span id="L172"></span>
+<span id="L173"><span class="dc">/-- Extend a path. -/</span></span>
+<span id="L174"><span class="kw">def</span> <span class="const token" data-verso-hover="581">cdExtend</span> (w : <span class="const token" data-verso-hover="507">TState</span> k RS × <span class="const token" data-verso-hover="507">TState</span> k RS) : <span class="const token" data-verso-hover="507">TState</span> k RS × <span class="const token" data-verso-hover="507">TState</span> k RS :=</span>
+<span id="L175">  <span class="kw">if</span> w.<span class="const token" data-verso-hover="58">1</span>.<span class="const token" data-verso-hover="550">loopMarker</span> = <span class="const token" data-verso-hover="94">false</span> ∧ w.<span class="const token" data-verso-hover="59">2</span>.<span class="const token" data-verso-hover="550">loopMarker</span> = <span class="const token" data-verso-hover="56">true</span> ∧ w.<span class="const token" data-verso-hover="59">2</span>.<span class="const token" data-verso-hover="6">loopParent</span> = <span class="const token" data-verso-hover="94">false</span> <span class="kw">then</span></span>
+<span id="L176">    ({ w.<span class="const token" data-verso-hover="58">1</span> <span class="kw">with</span> <span class="const token" data-verso-hover="5">loopChild</span> := <span class="const token" data-verso-hover="56">true</span>, <span class="const token" data-verso-hover="549">ringStateCopy</span> := w.<span class="const token" data-verso-hover="58">1</span>.<span class="const token" data-verso-hover="548">ringState</span>, <span class="const token" data-verso-hover="550">loopMarker</span> := <span class="const token" data-verso-hover="56">true</span> },</span>
+<span id="L177">      { w.<span class="const token" data-verso-hover="59">2</span> <span class="kw">with</span> <span class="const token" data-verso-hover="6">loopParent</span> := <span class="const token" data-verso-hover="56">true</span> }) <span class="kw">else</span> w</span>
+<span id="L178"></span>
+<span id="L179"><span class="dc">/-- Two paths form a single path or a path forms a cycle. -/</span></span>
+<span id="L180"><span class="kw">def</span> <span class="const token" data-verso-hover="582">cdJoin</span> (w : <span class="const token" data-verso-hover="507">TState</span> k RS × <span class="const token" data-verso-hover="507">TState</span> k RS) : <span class="const token" data-verso-hover="507">TState</span> k RS × <span class="const token" data-verso-hover="507">TState</span> k RS :=</span>
+<span id="L181">  <span class="kw">if</span> w.<span class="const token" data-verso-hover="58">1</span>.<span class="const token" data-verso-hover="550">loopMarker</span> = <span class="const token" data-verso-hover="56">true</span> ∧ w.<span class="const token" data-verso-hover="59">2</span>.<span class="const token" data-verso-hover="550">loopMarker</span> = <span class="const token" data-verso-hover="56">true</span> ∧ w.<span class="const token" data-verso-hover="58">1</span>.<span class="const token" data-verso-hover="5">loopChild</span> = <span class="const token" data-verso-hover="94">false</span> ∧</span>
+<span id="L182">      w.<span class="const token" data-verso-hover="59">2</span>.<span class="const token" data-verso-hover="6">loopParent</span> = <span class="const token" data-verso-hover="94">false</span> <span class="kw">then</span></span>
+<span id="L183">    ({ w.<span class="const token" data-verso-hover="58">1</span> <span class="kw">with</span> <span class="const token" data-verso-hover="5">loopChild</span> := <span class="const token" data-verso-hover="56">true</span> }, { w.<span class="const token" data-verso-hover="59">2</span> <span class="kw">with</span> <span class="const token" data-verso-hover="6">loopParent</span> := <span class="const token" data-verso-hover="56">true</span> }) <span class="kw">else</span> w</span>
+<span id="L184"></span>
+<span id="L185"><span class="dc">/-- The parent–child part of CycleDetector (`u` is the parent of `v`). -/</span></span>
+<span id="L186"><span class="kw">def</span> <span class="const token" data-verso-hover="583">cdParent</span> (ρ : RS → RS → RS × RS) (u v : <span class="const token" data-verso-hover="507">TState</span> k RS) : <span class="const token" data-verso-hover="507">TState</span> k RS × <span class="const token" data-verso-hover="507">TState</span> k RS :=</span>
+<span id="L187">  <span class="kw">if</span> u.<span class="const token" data-verso-hover="541">color</span> = v.<span class="const token" data-verso-hover="4">parentColor</span> <span class="kw">then</span> <span class="const token" data-verso-hover="582">cdJoin</span> (<span class="const token" data-verso-hover="581">cdExtend</span> (<span class="const token" data-verso-hover="580">cdRing</span> ρ u v)) <span class="kw">else</span> (u, v)</span>
+<span id="L188"></span>
+<span id="L189"><span class="dc">/-- A ring leader in the copy means a cycle was detected. -/</span></span>
+<span id="L190"><span class="kw">def</span> <span class="const token" data-verso-hover="584">cdErr</span> (R : <span class="const token" data-verso-hover="52">RingProtocol</span> RS) (u : <span class="const token" data-verso-hover="507">TState</span> k RS) : <span class="const token" data-verso-hover="507">TState</span> k RS :=</span>
+<span id="L191">  <span class="kw">if</span> R.<span class="const token" data-verso-hover="229">lead</span> u.<span class="const token" data-verso-hover="549">ringStateCopy</span> = <span class="const token" data-verso-hover="56">true</span> <span class="kw">then</span> { u <span class="kw">with</span> <span class="const token" data-verso-hover="546">errFlag</span> := <span class="const token" data-verso-hover="56">true</span> } <span class="kw">else</span> u</span>
+<span id="L192"></span>
+<span id="L193"><span class="dc">/-- Protocol 5, CycleDetector (`R.lead` is the output of the ring protocol). -/</span></span>
+<span id="L194"><span class="kw">def</span> <span class="const token" data-verso-hover="585">cycleDetector</span> (R : <span class="const token" data-verso-hover="52">RingProtocol</span> RS) (ch : <span class="const token" data-verso-hover="557">TChoice</span> k RS) (u v : <span class="const token" data-verso-hover="507">TState</span> k RS) :</span>
+<span id="L195">    <span class="const token" data-verso-hover="507">TState</span> k RS × <span class="const token" data-verso-hover="507">TState</span> k RS :=</span>
+<span id="L196">  <span class="kw">let</span> u1 := <span class="const token" data-verso-hover="579">cdUnmark</span> ch.<span class="const token" data-verso-hover="563">unmark</span> (<span class="const token" data-verso-hover="578">cdStart</span> (<span class="const token" data-verso-hover="577">cdMarked</span> (<span class="const token" data-verso-hover="576">cdInc</span> (<span class="const token" data-verso-hover="575">cdReset</span> ch.<span class="const token" data-verso-hover="562">resetLoop</span> u) v) v))</span>
+<span id="L197">  <span class="kw">let</span> w := <span class="const token" data-verso-hover="583">cdParent</span> ch.<span class="const token" data-verso-hover="564">ρ</span> u1 v</span>
+<span id="L198">  (<span class="const token" data-verso-hover="584">cdErr</span> R w.<span class="const token" data-verso-hover="58">1</span>, w.<span class="const token" data-verso-hover="59">2</span>)</span>
+<span id="L199"></span>
+<span id="L200"><span class="dc">/-- The parent–child part of Protocol 6 (`u` is the parent of `v`). -/</span></span>
+<span id="L201"><span class="kw">def</span> <span class="const token" data-verso-hover="586">mrdParent</span> (toss back : <span class="const token" data-verso-hover="43">Bool</span>) (u v : <span class="const token" data-verso-hover="507">TState</span> k RS) : <span class="const token" data-verso-hover="507">TState</span> k RS × <span class="const token" data-verso-hover="507">TState</span> k RS :=</span>
+<span id="L202">  <span class="kw">let</span> u := <span class="kw">if</span> u.<span class="const token" data-verso-hover="547">root</span> = <span class="const token" data-verso-hover="56">true</span> ∧ u.<span class="const token" data-verso-hover="553">coin</span> = <span class="const token" data-verso-hover="533">.</span>z <span class="kw">then</span> { u <span class="kw">with</span> <span class="const token" data-verso-hover="553">coin</span> := <span class="const token" data-verso-hover="540">Coin.ofBool</span> toss } <span class="kw">else</span> u</span>
+<span id="L203">  <span class="kw">let</span> w : <span class="const token" data-verso-hover="507">TState</span> k RS × <span class="const token" data-verso-hover="507">TState</span> k RS :=</span>
+<span id="L204">    <span class="kw">if</span> (u.<span class="const token" data-verso-hover="553">coin</span> = <span class="const token" data-verso-hover="534">.</span>p1 ∨ u.<span class="const token" data-verso-hover="553">coin</span> = <span class="const token" data-verso-hover="532">.</span>m1) ∧ v.<span class="const token" data-verso-hover="553">coin</span> = <span class="const token" data-verso-hover="533">.</span>z <span class="kw">then</span></span>
+<span id="L205">      ({ u <span class="kw">with</span> <span class="const token" data-verso-hover="553">coin</span> := u.<span class="const token" data-verso-hover="553">coin</span>.<span class="const token" data-verso-hover="539">dbl</span> }, { v <span class="kw">with</span> <span class="const token" data-verso-hover="553">coin</span> := u.<span class="const token" data-verso-hover="553">coin</span> }) <span class="kw">else</span> (u, v)</span>
+<span id="L206">  <span class="kw">if</span> (w.<span class="const token" data-verso-hover="58">1</span>.<span class="const token" data-verso-hover="553">coin</span> = <span class="const token" data-verso-hover="535">.</span>p2 ∨ w.<span class="const token" data-verso-hover="58">1</span>.<span class="const token" data-verso-hover="553">coin</span> = <span class="const token" data-verso-hover="531">.</span>m2) ∧ w.<span class="const token" data-verso-hover="58">1</span>.<span class="const token" data-verso-hover="553">coin</span>.<span class="const token" data-verso-hover="537">val</span> = <span class="nu">2</span> * w.<span class="const token" data-verso-hover="59">2</span>.<span class="const token" data-verso-hover="553">coin</span>.<span class="const token" data-verso-hover="537">val</span> ∧ back = <span class="const token" data-verso-hover="56">true</span> <span class="kw">then</span></span>
+<span id="L207">    ({ w.<span class="const token" data-verso-hover="58">1</span> <span class="kw">with</span> <span class="const token" data-verso-hover="553">coin</span> := w.<span class="const token" data-verso-hover="59">2</span>.<span class="const token" data-verso-hover="553">coin</span> }, { w.<span class="const token" data-verso-hover="59">2</span> <span class="kw">with</span> <span class="const token" data-verso-hover="553">coin</span> := <span class="const token" data-verso-hover="533">.</span>z }) <span class="kw">else</span> w</span>
+<span id="L208"></span>
+<span id="L209"><span class="dc">/-- Protocol 6, MultipleRootDetector. -/</span></span>
+<span id="L210"><span class="kw">def</span> <span class="const token" data-verso-hover="587">multipleRootDetector</span> (ch : <span class="const token" data-verso-hover="557">TChoice</span> k RS) (u v : <span class="const token" data-verso-hover="507">TState</span> k RS) : <span class="const token" data-verso-hover="507">TState</span> k RS × <span class="const token" data-verso-hover="507">TState</span> k RS :=</span>
+<span id="L211">  <span class="kw">let</span> w : <span class="const token" data-verso-hover="507">TState</span> k RS × <span class="const token" data-verso-hover="507">TState</span> k RS :=</span>
+<span id="L212">    <span class="kw">if</span> u.<span class="const token" data-verso-hover="541">color</span> = v.<span class="const token" data-verso-hover="4">parentColor</span> <span class="kw">then</span> <span class="const token" data-verso-hover="586">mrdParent</span> ch.<span class="const token" data-verso-hover="565">toss</span> ch.<span class="const token" data-verso-hover="566">back</span> u v <span class="kw">else</span> (u, v)</span>
+<span id="L213">  (<span class="kw">if</span> w.<span class="const token" data-verso-hover="58">1</span>.<span class="const token" data-verso-hover="553">coin</span>.<span class="const token" data-verso-hover="537">val</span> * w.<span class="const token" data-verso-hover="59">2</span>.<span class="const token" data-verso-hover="553">coin</span>.<span class="const token" data-verso-hover="537">val</span> &lt; <span class="nu">0</span> <span class="kw">then</span> { w.<span class="const token" data-verso-hover="58">1</span> <span class="kw">with</span> <span class="const token" data-verso-hover="546">errFlag</span> := <span class="const token" data-verso-hover="56">true</span> } <span class="kw">else</span> w.<span class="const token" data-verso-hover="58">1</span>, w.<span class="const token" data-verso-hover="59">2</span>)</span>
+<span id="L214"></span>
+<span id="L215"><span class="dc">/-- Detect-error-and-random-change. -/</span></span>
+<span id="L216"><span class="kw">def</span> <span class="const token" data-verso-hover="588">randChange</span> (ch : <span class="const token" data-verso-hover="557">TChoice</span> k RS) (w : <span class="const token" data-verso-hover="507">TState</span> k RS × <span class="const token" data-verso-hover="507">TState</span> k RS) : <span class="const token" data-verso-hover="507">TState</span> k RS × <span class="const token" data-verso-hover="507">TState</span> k RS :=</span>
+<span id="L217">  <span class="kw">if</span> w.<span class="const token" data-verso-hover="58">1</span>.<span class="const token" data-verso-hover="546">errFlag</span> = <span class="const token" data-verso-hover="56">true</span> <span class="kw">then</span> ({ ch.<span class="const token" data-verso-hover="567">rand</span> <span class="kw">with</span> <span class="const token" data-verso-hover="546">errFlag</span> := ch.<span class="const token" data-verso-hover="568">b1</span> }, { w.<span class="const token" data-verso-hover="59">2</span> <span class="kw">with</span> <span class="const token" data-verso-hover="546">errFlag</span> := ch.<span class="const token" data-verso-hover="569">b2</span> })</span>
+<span id="L218">  <span class="kw">else</span> w</span>
+<span id="L219"></span>
+<span id="L220"><span class="dc">/-- Protocol 4, SS-Tree: one interaction with initiator `u` and responder `v`, given the random</span></span>
+<span id="L221"><span class="dc">choices `ch`. -/</span></span>
+<span id="L222"><span class="kw">def</span> <span class="const token" data-verso-hover="589">treeStep</span> (R : <span class="const token" data-verso-hover="52">RingProtocol</span> RS) (ch : <span class="const token" data-verso-hover="557">TChoice</span> k RS) (u v : <span class="const token" data-verso-hover="507">TState</span> k RS) :</span>
+<span id="L223">    <span class="const token" data-verso-hover="507">TState</span> k RS × <span class="const token" data-verso-hover="507">TState</span> k RS :=</span>
+<span id="L224">  <span class="kw">let</span> w := <span class="const token" data-verso-hover="570">twoHop</span> ch.<span class="const token" data-verso-hover="558">rc1</span> ch.<span class="const token" data-verso-hover="559">rc2</span> ch.<span class="const token" data-verso-hover="560">rb</span> u v</span>
+<span id="L225">  <span class="kw">let</span> u1 := <span class="const token" data-verso-hover="574">ctrErr</span> (<span class="const token" data-verso-hover="573">ctrParent</span> (<span class="const token" data-verso-hover="572">ctrInc</span> (<span class="const token" data-verso-hover="571">ctrReset</span> ch.<span class="const token" data-verso-hover="561">resetCounter</span> w.<span class="const token" data-verso-hover="58">1</span>) w.<span class="const token" data-verso-hover="59">2</span>) w.<span class="const token" data-verso-hover="59">2</span>)</span>
+<span id="L226">  <span class="kw">let</span> w2 := <span class="const token" data-verso-hover="585">cycleDetector</span> R ch u1 w.<span class="const token" data-verso-hover="59">2</span></span>
+<span id="L227">  <span class="const token" data-verso-hover="588">randChange</span> ch (<span class="const token" data-verso-hover="587">multipleRootDetector</span> ch w2.<span class="const token" data-verso-hover="58">1</span> w2.<span class="const token" data-verso-hover="59">2</span>)</span>
+<span id="L228"></span>
+<span id="L229"><span class="dc">/-- A choice is admissible if the ring-protocol selection picks allowed outcomes. -/</span></span>
+<span id="L230"><span class="kw">def</span> <span class="const token" data-verso-hover="590">TChoice.Valid</span> (R : <span class="const token" data-verso-hover="52">RingProtocol</span> RS) (ch : <span class="const token" data-verso-hover="557">TChoice</span> k RS) : <span class="kw">Prop</span> :=</span>
+<span id="L231">  ∀ a b, ch.<span class="const token" data-verso-hover="564">ρ</span> a b ∈ R.<span class="const token" data-verso-hover="137">δ</span> a b</span>
+<span id="L232"></span>
+<span id="L233"><span class="dc">/-- **SS-Tree** as a nondeterministic population protocol. -/</span></span>
+<span id="L234"><span class="kw">def</span> <span class="const token" data-verso-hover="21">ssTree</span> (k : <span class="const token" data-verso-hover="39">ℕ</span>) (R : <span class="const token" data-verso-hover="52">RingProtocol</span> RS) : <span class="const token" data-verso-hover="15">GProtocol</span> (<span class="const token" data-verso-hover="507">TState</span> k RS) <span class="kw">where</span></span>
+<span id="L235">  <span class="const token" data-verso-hover="137">δ</span> p q := {o | ∃ ch : <span class="const token" data-verso-hover="557">TChoice</span> k RS, ch.<span class="const token" data-verso-hover="590">Valid</span> R ∧ o = <span class="const token" data-verso-hover="589">treeStep</span> R ch p q}</span>
+<span id="L236"></span>
+<span id="L237"><span class="dc">/-- Output: a node is a leader iff it is a root. -/</span></span>
+<span id="L238"><span class="kw">def</span> <span class="const token" data-verso-hover="508">TState.isLeader</span> (s : <span class="const token" data-verso-hover="507">TState</span> k RS) : <span class="const token" data-verso-hover="43">Bool</span> := s.<span class="const token" data-verso-hover="547">root</span></span>
+<span id="L239"></span>
+<span id="L240"><span class="dc">/-! ### The counterexample -/</span></span>
+<span id="L241"></span>
+<span id="L242"><span class="kw">section</span> Counterexample</span>
+<span id="L243"></span>
+<span id="L244"><span class="kw">variable</span> {V : <span class="kw">Type</span>*} [<span class="const token" data-verso-hover="88">DecidableEq</span> V] (G : <span class="const token" data-verso-hover="89">SimpleGraph</span> V) (R : <span class="const token" data-verso-hover="52">RingProtocol</span> RS)</span>
+<span id="L245"></span>
+<span id="L246"><span class="dc">/-- The invariant: all nodes are roots with ghost parents, coin `+1`, counter `0`, no error, no</span></span>
+<span id="L247"><span class="dc">ring leader in `ringState`/`ringStateCopy`, colours fixed to `c`, and matched pairs of SS-TwoHop</span></span>
+<span id="L248"><span class="dc">have equal bits. -/</span></span>
+<span id="L249"><span class="kw">def</span> <span class="const token" data-verso-hover="591">BadInv</span> (c g : V → <span class="const token" data-verso-hover="82">Fin</span> (k ^ <span class="nu">2</span>)) (C : V → <span class="const token" data-verso-hover="507">TState</span> k RS) : <span class="kw">Prop</span> :=</span>
+<span id="L250">  (∀ v, (C v).<span class="const token" data-verso-hover="541">color</span> = c v ∧ (C v).<span class="const token" data-verso-hover="4">parentColor</span> = g v ∧ (C v).<span class="const token" data-verso-hover="547">root</span> = <span class="const token" data-verso-hover="56">true</span> ∧</span>
+<span id="L251">    (C v).<span class="const token" data-verso-hover="546">errFlag</span> = <span class="const token" data-verso-hover="94">false</span> ∧ (C v).<span class="const token" data-verso-hover="545">counter</span> = <span class="nu">0</span> ∧ (C v).<span class="const token" data-verso-hover="553">coin</span> = <span class="const token" data-verso-hover="534">.</span>p1 ∧</span>
+<span id="L252">    R.<span class="const token" data-verso-hover="229">lead</span> (C v).<span class="const token" data-verso-hover="548">ringState</span> = <span class="const token" data-verso-hover="94">false</span> ∧ R.<span class="const token" data-verso-hover="229">lead</span> (C v).<span class="const token" data-verso-hover="549">ringStateCopy</span> = <span class="const token" data-verso-hover="94">false</span>) ∧</span>
+<span id="L253">  (∀ u v, G.<span class="const token" data-verso-hover="91">Adj</span> u v → (C u).<span class="const token" data-verso-hover="542">prevColor</span> = c v → (C v).<span class="const token" data-verso-hover="542">prevColor</span> = c u →</span>
+<span id="L254">    (C u).<span class="const token" data-verso-hover="543">colorBit</span> = (C v).<span class="const token" data-verso-hover="543">colorBit</span>)</span>
+<span id="L255"></span>
+<span id="L256"><span class="kw">variable</span> {G R}</span>
+<span id="L257"></span>
+<span id="L258"><span class="dc">/-- The node-local part of `BadInv`. -/</span></span>
+<span id="L259"><span class="kw">def</span> <span class="const token" data-verso-hover="592">NG</span> (R : <span class="const token" data-verso-hover="52">RingProtocol</span> RS) (c g : <span class="const token" data-verso-hover="82">Fin</span> (k ^ <span class="nu">2</span>)) (s : <span class="const token" data-verso-hover="507">TState</span> k RS) : <span class="kw">Prop</span> :=</span>
+<span id="L260">  s.<span class="const token" data-verso-hover="541">color</span> = c ∧ s.<span class="const token" data-verso-hover="4">parentColor</span> = g ∧ s.<span class="const token" data-verso-hover="547">root</span> = <span class="const token" data-verso-hover="56">true</span> ∧ s.<span class="const token" data-verso-hover="546">errFlag</span> = <span class="const token" data-verso-hover="94">false</span> ∧ s.<span class="const token" data-verso-hover="545">counter</span> = <span class="nu">0</span> ∧</span>
+<span id="L261">    s.<span class="const token" data-verso-hover="553">coin</span> = <span class="const token" data-verso-hover="534">.</span>p1 ∧ R.<span class="const token" data-verso-hover="229">lead</span> s.<span class="const token" data-verso-hover="548">ringState</span> = <span class="const token" data-verso-hover="94">false</span> ∧ R.<span class="const token" data-verso-hover="229">lead</span> s.<span class="const token" data-verso-hover="549">ringStateCopy</span> = <span class="const token" data-verso-hover="94">false</span></span>
+<span id="L262"></span>
+<span id="L263"><span class="dc">/-- `NG` holds and the SS-TwoHop memory is unchanged. -/</span></span>
+<span id="L264"><span class="kw">def</span> <span class="const token" data-verso-hover="593">NGF</span> (R : <span class="const token" data-verso-hover="52">RingProtocol</span> RS) (c g : <span class="const token" data-verso-hover="82">Fin</span> (k ^ <span class="nu">2</span>)) (u s : <span class="const token" data-verso-hover="507">TState</span> k RS) : <span class="kw">Prop</span> :=</span>
+<span id="L265">  <span class="const token" data-verso-hover="592">NG</span> R c g s ∧ s.<span class="const token" data-verso-hover="542">prevColor</span> = u.<span class="const token" data-verso-hover="542">prevColor</span> ∧ s.<span class="const token" data-verso-hover="543">colorBit</span> = u.<span class="const token" data-verso-hover="543">colorBit</span></span>
+<span id="L266"></span>
+<span id="L267"><span class="kw">lemma</span> <span class="const token" data-verso-hover="594">NGF.trans</span> {c g : <span class="const token" data-verso-hover="82">Fin</span> (k ^ <span class="nu">2</span>)} {u s t : <span class="const token" data-verso-hover="507">TState</span> k RS} (h1 : <span class="const token" data-verso-hover="593">NGF</span> R c g u s) (h2 : <span class="const token" data-verso-hover="593">NGF</span> R c g s t) :</span>
+<span id="L268">    <span class="const token" data-verso-hover="593">NGF</span> R c g u t :=</span>
+<span id="L269">  ⟨h2.<span class="const token" data-verso-hover="69">1</span>, h2.<span class="const token" data-verso-hover="67">2</span><span class="nu">.</span><span class="const token" data-verso-hover="69">1</span>.<span class="const token" data-verso-hover="272">trans</span> h1.<span class="const token" data-verso-hover="67">2</span><span class="nu">.</span><span class="const token" data-verso-hover="69">1</span>, h2.<span class="const token" data-verso-hover="67">2</span><span class="nu">.</span><span class="const token" data-verso-hover="67">2</span>.<span class="const token" data-verso-hover="272">trans</span> h1.<span class="const token" data-verso-hover="67">2</span><span class="nu">.</span><span class="const token" data-verso-hover="67">2</span>⟩</span>
+<span id="L270"></span>
+<span id="L271"><span class="kw">lemma</span> <span class="const token" data-verso-hover="595">NGF.refl</span> {c g : <span class="const token" data-verso-hover="82">Fin</span> (k ^ <span class="nu">2</span>)} {u : <span class="const token" data-verso-hover="507">TState</span> k RS} (h : <span class="const token" data-verso-hover="592">NG</span> R c g u) : <span class="const token" data-verso-hover="593">NGF</span> R c g u u :=</span>
+<span id="L272">  ⟨h, <span class="const token" data-verso-hover="71">rfl</span>, <span class="const token" data-verso-hover="71">rfl</span>⟩</span>
+<span id="L273"></span>
+<span id="L274"><span class="kw">section</span> Stages</span>
+<span id="L275"></span>
+<span id="L276"><span class="kw">variable</span> {c g : <span class="const token" data-verso-hover="82">Fin</span> (k ^ <span class="nu">2</span>)} {u v : <span class="const token" data-verso-hover="507">TState</span> k RS} (h : <span class="const token" data-verso-hover="592">NG</span> R c g u)</span>
+<span id="L277"><span class="kw">include</span> h</span>
+<span id="L278"></span>
+<span id="L279"><span class="kw">lemma</span> <span class="const token" data-verso-hover="596">ng_ctrReset</span> (r : <span class="const token" data-verso-hover="43">Bool</span>) : <span class="const token" data-verso-hover="593">NGF</span> R c g u (<span class="const token" data-verso-hover="571">ctrReset</span> r u) := <span class="kw">by</span></span>
+<span id="L280">  <span class="kw">obtain</span> ⟨h1, h2, h3, h4, h5, h6, h7, h8⟩ := h</span>
+<span id="L281">  <span class="kw">unfold</span> <span class="const token" data-verso-hover="571">ctrReset</span>; <span class="kw">split_ifs</span> &lt;;&gt; <span class="kw">simp_all</span> [<span class="const token" data-verso-hover="593">NGF</span>, <span class="const token" data-verso-hover="592">NG</span>]</span>
+<span id="L282"></span>
+<span id="L283"><span class="kw">lemma</span> <span class="const token" data-verso-hover="597">ng_ctrInc</span> : <span class="const token" data-verso-hover="593">NGF</span> R c g u (<span class="const token" data-verso-hover="572">ctrInc</span> u v) := <span class="kw">by</span></span>
+<span id="L284">  <span class="kw">obtain</span> ⟨h1, h2, h3, h4, h5, h6, h7, h8⟩ := h</span>
+<span id="L285">  <span class="kw">unfold</span> <span class="const token" data-verso-hover="572">ctrInc</span>; <span class="kw">split_ifs</span> &lt;;&gt; <span class="kw">simp_all</span> [<span class="const token" data-verso-hover="593">NGF</span>, <span class="const token" data-verso-hover="592">NG</span>]</span>
+<span id="L286"></span>
+<span id="L287"><span class="kw">lemma</span> <span class="const token" data-verso-hover="598">ng_ctrParent</span> : <span class="const token" data-verso-hover="593">NGF</span> R c g u (<span class="const token" data-verso-hover="573">ctrParent</span> u v) := <span class="kw">by</span></span>
+<span id="L288">  <span class="kw">obtain</span> ⟨h1, h2, h3, h4, h5, h6, h7, h8⟩ := h</span>
+<span id="L289">  <span class="kw">unfold</span> <span class="const token" data-verso-hover="573">ctrParent</span>; <span class="kw">split_ifs</span> &lt;;&gt; <span class="kw">simp_all</span> [<span class="const token" data-verso-hover="593">NGF</span>, <span class="const token" data-verso-hover="592">NG</span>]</span>
+<span id="L290"></span>
+<span id="L291"><span class="kw">lemma</span> <span class="const token" data-verso-hover="599">ng_ctrErr</span> (hk : <span class="nu">1</span> ≤ k) : <span class="const token" data-verso-hover="593">NGF</span> R c g u (<span class="const token" data-verso-hover="574">ctrErr</span> u) := <span class="kw">by</span></span>
+<span id="L292">  <span class="kw">obtain</span> ⟨h1, h2, h3, h4, h5, h6, h7, h8⟩ := h</span>
+<span id="L293">  <span class="kw">unfold</span> <span class="const token" data-verso-hover="574">ctrErr</span>; <span class="kw">split_ifs</span> <span class="kw">with</span> hc</span>
+<span id="L294">  · <span class="kw">rw</span> [h5] <span class="kw">at</span> hc; <span class="kw">simp</span> <span class="kw">at</span> hc; <span class="kw">omega</span></span>
+<span id="L295">  · <span class="kw">exact</span> <span class="const token" data-verso-hover="595">NGF.refl</span> ⟨h1, h2, h3, h4, h5, h6, h7, h8⟩</span>
+<span id="L296"></span>
+<span id="L297"><span class="kw">lemma</span> <span class="const token" data-verso-hover="600">ng_cdReset</span> (r : <span class="const token" data-verso-hover="43">Bool</span>) : <span class="const token" data-verso-hover="593">NGF</span> R c g u (<span class="const token" data-verso-hover="575">cdReset</span> r u) := <span class="kw">by</span></span>
+<span id="L298">  <span class="kw">obtain</span> ⟨h1, h2, h3, h4, h5, h6, h7, h8⟩ := h</span>
+<span id="L299">  <span class="kw">unfold</span> <span class="const token" data-verso-hover="575">cdReset</span>; <span class="kw">split_ifs</span> &lt;;&gt; <span class="kw">simp_all</span> [<span class="const token" data-verso-hover="593">NGF</span>, <span class="const token" data-verso-hover="592">NG</span>]</span>
+<span id="L300"></span>
+<span id="L301"><span class="kw">lemma</span> <span class="const token" data-verso-hover="601">ng_cdInc</span> : <span class="const token" data-verso-hover="593">NGF</span> R c g u (<span class="const token" data-verso-hover="576">cdInc</span> u v) := <span class="kw">by</span></span>
+<span id="L302">  <span class="kw">obtain</span> ⟨h1, h2, h3, h4, h5, h6, h7, h8⟩ := h</span>
+<span id="L303">  <span class="kw">unfold</span> <span class="const token" data-verso-hover="576">cdInc</span>; <span class="kw">split_ifs</span> &lt;;&gt; <span class="kw">simp_all</span> [<span class="const token" data-verso-hover="593">NGF</span>, <span class="const token" data-verso-hover="592">NG</span>]</span>
+<span id="L304"></span>
+<span id="L305"><span class="kw">lemma</span> <span class="const token" data-verso-hover="602">ng_cdMarked</span> : <span class="const token" data-verso-hover="593">NGF</span> R c g u (<span class="const token" data-verso-hover="577">cdMarked</span> u v) := <span class="kw">by</span></span>
+<span id="L306">  <span class="kw">obtain</span> ⟨h1, h2, h3, h4, h5, h6, h7, h8⟩ := h</span>
+<span id="L307">  <span class="kw">unfold</span> <span class="const token" data-verso-hover="577">cdMarked</span>; <span class="kw">split_ifs</span> &lt;;&gt; <span class="kw">simp_all</span> [<span class="const token" data-verso-hover="593">NGF</span>, <span class="const token" data-verso-hover="592">NG</span>]</span>
+<span id="L308"></span>
+<span id="L309"><span class="kw">lemma</span> <span class="const token" data-verso-hover="603">ng_cdStart</span> : <span class="const token" data-verso-hover="593">NGF</span> R c g u (<span class="const token" data-verso-hover="578">cdStart</span> u) := <span class="kw">by</span></span>
+<span id="L310">  <span class="kw">obtain</span> ⟨h1, h2, h3, h4, h5, h6, h7, h8⟩ := h</span>
+<span id="L311">  <span class="kw">unfold</span> <span class="const token" data-verso-hover="578">cdStart</span>; <span class="kw">split_ifs</span> &lt;;&gt; <span class="kw">simp_all</span> [<span class="const token" data-verso-hover="593">NGF</span>, <span class="const token" data-verso-hover="592">NG</span>]</span>
+<span id="L312"></span>
+<span id="L313"><span class="kw">lemma</span> <span class="const token" data-verso-hover="604">ng_cdUnmark</span> (r : <span class="const token" data-verso-hover="43">Bool</span>) : <span class="const token" data-verso-hover="593">NGF</span> R c g u (<span class="const token" data-verso-hover="579">cdUnmark</span> r u) := <span class="kw">by</span></span>
+<span id="L314">  <span class="kw">obtain</span> ⟨h1, h2, h3, h4, h5, h6, h7, h8⟩ := h</span>
+<span id="L315">  <span class="kw">unfold</span> <span class="const token" data-verso-hover="579">cdUnmark</span>; <span class="kw">split_ifs</span> &lt;;&gt; <span class="kw">simp_all</span> [<span class="const token" data-verso-hover="593">NGF</span>, <span class="const token" data-verso-hover="592">NG</span>]</span>
+<span id="L316"></span>
+<span id="L317"><span class="kw">lemma</span> <span class="const token" data-verso-hover="605">ng_cdErr</span> : <span class="const token" data-verso-hover="593">NGF</span> R c g u (<span class="const token" data-verso-hover="584">cdErr</span> R u) := <span class="kw">by</span></span>
+<span id="L318">  <span class="kw">obtain</span> ⟨h1, h2, h3, h4, h5, h6, h7, h8⟩ := h</span>
+<span id="L319">  <span class="kw">unfold</span> <span class="const token" data-verso-hover="584">cdErr</span>; <span class="kw">split_ifs</span> &lt;;&gt; <span class="kw">simp_all</span> [<span class="const token" data-verso-hover="593">NGF</span>, <span class="const token" data-verso-hover="592">NG</span>]</span>
+<span id="L320"></span>
+<span id="L321"><span class="kw">end</span> Stages</span>
+<span id="L322"></span>
+<span id="L323"><span class="kw">lemma</span> <span class="const token" data-verso-hover="606">twoHop_noConflict</span> (rc1 rc2 : <span class="const token" data-verso-hover="82">Fin</span> (k ^ <span class="nu">2</span>)) (rb : <span class="const token" data-verso-hover="43">Bool</span>) {u v : <span class="const token" data-verso-hover="507">TState</span> k RS}</span>
+<span id="L324">    (h : ¬ (u.<span class="const token" data-verso-hover="542">prevColor</span> = v.<span class="const token" data-verso-hover="541">color</span> ∧ v.<span class="const token" data-verso-hover="542">prevColor</span> = u.<span class="const token" data-verso-hover="541">color</span> ∧ u.<span class="const token" data-verso-hover="543">colorBit</span> ≠ v.<span class="const token" data-verso-hover="543">colorBit</span>)) :</span>
+<span id="L325">    <span class="const token" data-verso-hover="570">twoHop</span> rc1 rc2 rb u v = ({ u <span class="kw">with</span> <span class="const token" data-verso-hover="542">prevColor</span> := v.<span class="const token" data-verso-hover="541">color</span>, <span class="const token" data-verso-hover="543">colorBit</span> := rb },</span>
+<span id="L326">      { v <span class="kw">with</span> <span class="const token" data-verso-hover="542">prevColor</span> := u.<span class="const token" data-verso-hover="541">color</span>, <span class="const token" data-verso-hover="543">colorBit</span> := rb }) := <span class="kw">by</span></span>
+<span id="L327">  <span class="kw">simp</span> only [<span class="const token" data-verso-hover="570">twoHop</span>, <span class="const token" data-verso-hover="255">if_neg</span> h]</span>
+<span id="L328"></span>
+<span id="L329"><span class="dc">/-- One interaction of two invariant nodes with ghost parents keeps them invariant. -/</span></span>
+<span id="L330"><span class="kw">lemma</span> <span class="const token" data-verso-hover="607">treeStep_good</span> (hk : <span class="nu">1</span> ≤ k) (ch : <span class="const token" data-verso-hover="557">TChoice</span> k RS) {p q : <span class="const token" data-verso-hover="507">TState</span> k RS}</span>
+<span id="L331">    {cp cq gp gq : <span class="const token" data-verso-hover="82">Fin</span> (k ^ <span class="nu">2</span>)} (hp : <span class="const token" data-verso-hover="592">NG</span> R cp gp p) (hq : <span class="const token" data-verso-hover="592">NG</span> R cq gq q)</span>
+<span id="L332">    (hgq : cp ≠ gq)</span>
+<span id="L333">    (hbit : p.<span class="const token" data-verso-hover="542">prevColor</span> = cq → q.<span class="const token" data-verso-hover="542">prevColor</span> = cp → p.<span class="const token" data-verso-hover="543">colorBit</span> = q.<span class="const token" data-verso-hover="543">colorBit</span>) :</span>
+<span id="L334">    <span class="const token" data-verso-hover="592">NG</span> R cp gp (<span class="const token" data-verso-hover="589">treeStep</span> R ch p q).<span class="const token" data-verso-hover="58">1</span> ∧ <span class="const token" data-verso-hover="592">NG</span> R cq gq (<span class="const token" data-verso-hover="589">treeStep</span> R ch p q).<span class="const token" data-verso-hover="59">2</span> ∧</span>
+<span id="L335">      (<span class="const token" data-verso-hover="589">treeStep</span> R ch p q).<span class="const token" data-verso-hover="58">1</span>.<span class="const token" data-verso-hover="542">prevColor</span> = cq ∧ (<span class="const token" data-verso-hover="589">treeStep</span> R ch p q).<span class="const token" data-verso-hover="59">2</span>.<span class="const token" data-verso-hover="542">prevColor</span> = cp ∧</span>
+<span id="L336">      (<span class="const token" data-verso-hover="589">treeStep</span> R ch p q).<span class="const token" data-verso-hover="58">1</span>.<span class="const token" data-verso-hover="543">colorBit</span> = (<span class="const token" data-verso-hover="589">treeStep</span> R ch p q).<span class="const token" data-verso-hover="59">2</span>.<span class="const token" data-verso-hover="543">colorBit</span> := <span class="kw">by</span></span>
+<span id="L337">  <span class="kw">have</span> hnc : ¬ (p.<span class="const token" data-verso-hover="542">prevColor</span> = q.<span class="const token" data-verso-hover="541">color</span> ∧ q.<span class="const token" data-verso-hover="542">prevColor</span> = p.<span class="const token" data-verso-hover="541">color</span> ∧ p.<span class="const token" data-verso-hover="543">colorBit</span> ≠ q.<span class="const token" data-verso-hover="543">colorBit</span>) := <span class="kw">by</span></span>
+<span id="L338">    <span class="kw">rintro</span> ⟨h1, h2, h3⟩</span>
+<span id="L339">    <span class="kw">exact</span> h3 (hbit (hq.<span class="const token" data-verso-hover="69">1</span> ▸ h1) (hp.<span class="const token" data-verso-hover="69">1</span> ▸ h2))</span>
+<span id="L340">  <span class="cm">--</span><span class="cm"> after SS-TwoHop</span></span>
+<span id="L341">  <span class="kw">set</span> p1 : <span class="const token" data-verso-hover="507">TState</span> k RS := { p <span class="kw">with</span> <span class="const token" data-verso-hover="542">prevColor</span> := q.<span class="const token" data-verso-hover="541">color</span>, <span class="const token" data-verso-hover="543">colorBit</span> := ch.<span class="const token" data-verso-hover="560">rb</span> } <span class="kw">with</span> hp1</span>
+<span id="L342">  <span class="kw">set</span> q1 : <span class="const token" data-verso-hover="507">TState</span> k RS := { q <span class="kw">with</span> <span class="const token" data-verso-hover="542">prevColor</span> := p.<span class="const token" data-verso-hover="541">color</span>, <span class="const token" data-verso-hover="543">colorBit</span> := ch.<span class="const token" data-verso-hover="560">rb</span> } <span class="kw">with</span> hq1</span>
+<span id="L343">  <span class="kw">have</span> hp1g : <span class="const token" data-verso-hover="592">NG</span> R cp gp p1 := <span class="kw">by</span></span>
+<span id="L344">    <span class="kw">obtain</span> ⟨h1, h2, h3, h4, h5, h6, h7, h8⟩ := hp; <span class="kw">exact</span> ⟨h1, h2, h3, h4, h5, h6, h7, h8⟩</span>
+<span id="L345">  <span class="kw">have</span> hq1g : <span class="const token" data-verso-hover="592">NG</span> R cq gq q1 := <span class="kw">by</span></span>
+<span id="L346">    <span class="kw">obtain</span> ⟨h1, h2, h3, h4, h5, h6, h7, h8⟩ := hq; <span class="kw">exact</span> ⟨h1, h2, h3, h4, h5, h6, h7, h8⟩</span>
+<span id="L347">  <span class="kw">have</span> hq1c : q1.<span class="const token" data-verso-hover="541">color</span> = cq := hq.<span class="const token" data-verso-hover="69">1</span></span>
+<span id="L348">  <span class="cm">--</span><span class="cm"> ghost-parent stages</span></span>
+<span id="L349">  <span class="kw">set</span> p2 := <span class="const token" data-verso-hover="574">ctrErr</span> (<span class="const token" data-verso-hover="573">ctrParent</span> (<span class="const token" data-verso-hover="572">ctrInc</span> (<span class="const token" data-verso-hover="571">ctrReset</span> ch.<span class="const token" data-verso-hover="561">resetCounter</span> p1) q1) q1) <span class="kw">with</span> hp2</span>
+<span id="L350">  <span class="kw">have</span> hp2g : <span class="const token" data-verso-hover="593">NGF</span> R cp gp p1 p2 := <span class="kw">by</span></span>
+<span id="L351">    <span class="kw">have</span> a1 := <span class="const token" data-verso-hover="596">ng_ctrReset</span> hp1g ch.<span class="const token" data-verso-hover="561">resetCounter</span></span>
+<span id="L352">    <span class="kw">have</span> a2 := <span class="const token" data-verso-hover="597">ng_ctrInc</span> (v := q1) a1.<span class="const token" data-verso-hover="69">1</span></span>
+<span id="L353">    <span class="kw">have</span> a3 := <span class="const token" data-verso-hover="598">ng_ctrParent</span> (v := q1) a2.<span class="const token" data-verso-hover="69">1</span></span>
+<span id="L354">    <span class="kw">have</span> a4 := <span class="const token" data-verso-hover="599">ng_ctrErr</span> a3.<span class="const token" data-verso-hover="69">1</span> hk</span>
+<span id="L355">    <span class="kw">exact</span> a1.<span class="const token" data-verso-hover="594">trans</span> (a2.<span class="const token" data-verso-hover="594">trans</span> (a3.<span class="const token" data-verso-hover="594">trans</span> a4))</span>
+<span id="L356">  <span class="cm">--</span><span class="cm"> cycle detector</span></span>
+<span id="L357">  <span class="kw">set</span> p3 := <span class="const token" data-verso-hover="579">cdUnmark</span> ch.<span class="const token" data-verso-hover="563">unmark</span> (<span class="const token" data-verso-hover="578">cdStart</span> (<span class="const token" data-verso-hover="577">cdMarked</span> (<span class="const token" data-verso-hover="576">cdInc</span> (<span class="const token" data-verso-hover="575">cdReset</span> ch.<span class="const token" data-verso-hover="562">resetLoop</span> p2) q1) q1))</span>
+<span id="L358">    <span class="kw">with</span> hp3</span>
+<span id="L359">  <span class="kw">have</span> hp3g : <span class="const token" data-verso-hover="593">NGF</span> R cp gp p2 p3 := <span class="kw">by</span></span>
+<span id="L360">    <span class="kw">have</span> a1 := <span class="const token" data-verso-hover="600">ng_cdReset</span> hp2g.<span class="const token" data-verso-hover="69">1</span> ch.<span class="const token" data-verso-hover="562">resetLoop</span></span>
+<span id="L361">    <span class="kw">have</span> a2 := <span class="const token" data-verso-hover="601">ng_cdInc</span> (v := q1) a1.<span class="const token" data-verso-hover="69">1</span></span>
+<span id="L362">    <span class="kw">have</span> a3 := <span class="const token" data-verso-hover="602">ng_cdMarked</span> (v := q1) a2.<span class="const token" data-verso-hover="69">1</span></span>
+<span id="L363">    <span class="kw">have</span> a4 := <span class="const token" data-verso-hover="603">ng_cdStart</span> a3.<span class="const token" data-verso-hover="69">1</span></span>
+<span id="L364">    <span class="kw">have</span> a5 := <span class="const token" data-verso-hover="604">ng_cdUnmark</span> a4.<span class="const token" data-verso-hover="69">1</span> ch.<span class="const token" data-verso-hover="563">unmark</span></span>
+<span id="L365">    <span class="kw">exact</span> a1.<span class="const token" data-verso-hover="594">trans</span> (a2.<span class="const token" data-verso-hover="594">trans</span> (a3.<span class="const token" data-verso-hover="594">trans</span> (a4.<span class="const token" data-verso-hover="594">trans</span> a5)))</span>
+<span id="L366">  <span class="kw">have</span> hguard : ¬ p3.<span class="const token" data-verso-hover="541">color</span> = q1.<span class="const token" data-verso-hover="4">parentColor</span> := <span class="kw">by</span></span>
+<span id="L367">    <span class="kw">rw</span> [hp3g.<span class="const token" data-verso-hover="69">1</span><span class="nu">.</span><span class="const token" data-verso-hover="69">1</span>, hq1g.<span class="const token" data-verso-hover="67">2</span><span class="nu">.</span><span class="const token" data-verso-hover="69">1</span>]; <span class="kw">exact</span> hgq</span>
+<span id="L368">  <span class="kw">have</span> hcd : <span class="const token" data-verso-hover="585">cycleDetector</span> R ch p2 q1 = (<span class="const token" data-verso-hover="584">cdErr</span> R p3, q1) := <span class="kw">by</span></span>
+<span id="L369">    <span class="kw">unfold</span> <span class="const token" data-verso-hover="585">cycleDetector</span> <span class="const token" data-verso-hover="583">cdParent</span></span>
+<span id="L370">    <span class="kw">dsimp</span> only</span>
+<span id="L371">    <span class="kw">rw</span> [← hp3, <span class="const token" data-verso-hover="255">if_neg</span> hguard]</span>
+<span id="L372">  <span class="kw">have</span> hp4g : <span class="const token" data-verso-hover="593">NGF</span> R cp gp p3 (<span class="const token" data-verso-hover="584">cdErr</span> R p3) := <span class="const token" data-verso-hover="605">ng_cdErr</span> hp3g.<span class="const token" data-verso-hover="69">1</span></span>
+<span id="L373">  <span class="kw">have</span> hguard' : ¬ (<span class="const token" data-verso-hover="584">cdErr</span> R p3).<span class="const token" data-verso-hover="541">color</span> = q1.<span class="const token" data-verso-hover="4">parentColor</span> := <span class="kw">by</span></span>
+<span id="L374">    <span class="kw">rw</span> [hp4g.<span class="const token" data-verso-hover="69">1</span><span class="nu">.</span><span class="const token" data-verso-hover="69">1</span>, hq1g.<span class="const token" data-verso-hover="67">2</span><span class="nu">.</span><span class="const token" data-verso-hover="69">1</span>]; <span class="kw">exact</span> hgq</span>
+<span id="L375">  <span class="kw">have</span> hmrd : <span class="const token" data-verso-hover="587">multipleRootDetector</span> ch (<span class="const token" data-verso-hover="584">cdErr</span> R p3) q1 = (<span class="const token" data-verso-hover="584">cdErr</span> R p3, q1) := <span class="kw">by</span></span>
+<span id="L376">    <span class="kw">simp</span> only [<span class="const token" data-verso-hover="587">multipleRootDetector</span>, <span class="const token" data-verso-hover="255">if_neg</span> hguard', hp4g.<span class="const token" data-verso-hover="69">1</span><span class="nu">.</span><span class="const token" data-verso-hover="67">2</span><span class="nu">.</span><span class="const token" data-verso-hover="67">2</span><span class="nu">.</span><span class="const token" data-verso-hover="67">2</span><span class="nu">.</span><span class="const token" data-verso-hover="67">2</span><span class="nu">.</span><span class="const token" data-verso-hover="67">2</span><span class="nu">.</span><span class="const token" data-verso-hover="69">1</span>, hq1g.<span class="const token" data-verso-hover="67">2</span><span class="nu">.</span><span class="const token" data-verso-hover="67">2</span><span class="nu">.</span><span class="const token" data-verso-hover="67">2</span><span class="nu">.</span><span class="const token" data-verso-hover="67">2</span><span class="nu">.</span><span class="const token" data-verso-hover="67">2</span><span class="nu">.</span><span class="const token" data-verso-hover="69">1</span>,</span>
+<span id="L377">      <span class="const token" data-verso-hover="537">Coin.val</span>]</span>
+<span id="L378">    <span class="kw">norm_num</span></span>
+<span id="L379">  <span class="kw">have</span> hfin : <span class="const token" data-verso-hover="589">treeStep</span> R ch p q = (<span class="const token" data-verso-hover="584">cdErr</span> R p3, q1) := <span class="kw">by</span></span>
+<span id="L380">    <span class="kw">simp</span> only [<span class="const token" data-verso-hover="589">treeStep</span>, <span class="const token" data-verso-hover="606">twoHop_noConflict</span> _ _ _ hnc]</span>
+<span id="L381">    <span class="kw">rw</span> [← hp1, ← hq1, ← hp2, hcd, hmrd]</span>
+<span id="L382">    <span class="kw">simp</span> only [<span class="const token" data-verso-hover="588">randChange</span>, hp4g.<span class="const token" data-verso-hover="69">1</span><span class="nu">.</span><span class="const token" data-verso-hover="67">2</span><span class="nu">.</span><span class="const token" data-verso-hover="67">2</span><span class="nu">.</span><span class="const token" data-verso-hover="67">2</span><span class="nu">.</span><span class="const token" data-verso-hover="69">1</span>]</span>
+<span id="L383">    <span class="kw">simp</span></span>
+<span id="L384">  <span class="kw">have</span> hall := hp2g.<span class="const token" data-verso-hover="594">trans</span> (hp3g.<span class="const token" data-verso-hover="594">trans</span> hp4g)</span>
+<span id="L385">  <span class="kw">rw</span> [hfin]</span>
+<span id="L386">  <span class="kw">refine</span> ⟨hall.<span class="const token" data-verso-hover="69">1</span>, hq1g, ?_, ?_, ?_⟩</span>
+<span id="L387">  · <span class="kw">rw</span> [hall.<span class="const token" data-verso-hover="67">2</span><span class="nu">.</span><span class="const token" data-verso-hover="69">1</span>]; <span class="kw">exact</span> hq.<span class="const token" data-verso-hover="69">1</span></span>
+<span id="L388">  · <span class="kw">exact</span> hp.<span class="const token" data-verso-hover="69">1</span></span>
+<span id="L389">  · <span class="kw">rw</span> [hall.<span class="const token" data-verso-hover="67">2</span><span class="nu">.</span><span class="const token" data-verso-hover="67">2</span>]</span>
+<span id="L390"></span>
+<span id="L391"><span class="kw">lemma</span> <span class="const token" data-verso-hover="608">badInv_closed</span> (hk : <span class="nu">1</span> ≤ k) {c g : V → <span class="const token" data-verso-hover="82">Fin</span> (k ^ <span class="nu">2</span>)}</span>
+<span id="L392">    (hinj : ∀ x u v, G.<span class="const token" data-verso-hover="91">Adj</span> x u → G.<span class="const token" data-verso-hover="91">Adj</span> x v → c u = c v → u = v)</span>
+<span id="L393">    (hghost : ∀ u v, G.<span class="const token" data-verso-hover="91">Adj</span> u v → c u ≠ g v) :</span>
+<span id="L394">    <span class="const token" data-verso-hover="511">TS.IsTrap</span> ((<span class="const token" data-verso-hover="21">ssTree</span> k R).<span class="const token" data-verso-hover="93">Step</span> G) (<span class="const token" data-verso-hover="591">BadInv</span> G R c g) := <span class="kw">by</span></span>
+<span id="L395">  <span class="kw">rintro</span> C D ⟨hng, hbit⟩ ⟨u, v, huv, o, ⟨ch, -, <span class="kw">rfl</span>⟩, <span class="kw">rfl</span>⟩</span>
+<span id="L396">  <span class="kw">have</span> hne : u ≠ v := G.<span class="const token" data-verso-hover="98">ne_of_adj</span> huv</span>
+<span id="L397">  <span class="kw">obtain</span> ⟨h1, h2, h3, h4, h5⟩ := <span class="const token" data-verso-hover="607">treeStep_good</span> (R := R) hk ch (hng u) (hng v) (hghost u v huv)</span>
+<span id="L398">    (hbit u v huv)</span>
+<span id="L399">  <span class="kw">have</span> hD : ∀ x, <span class="const token" data-verso-hover="592">NG</span> R (c x) (g x) (<span class="const token" data-verso-hover="143">upd</span> C u v (<span class="const token" data-verso-hover="589">treeStep</span> R ch (C u) (C v)) x) := <span class="kw">by</span></span>
+<span id="L400">    <span class="kw">intro</span> x</span>
+<span id="L401">    <span class="kw">by_cases</span> hxv : x = v</span>
+<span id="L402">    · <span class="kw">subst</span> hxv; <span class="kw">simpa</span> <span class="kw">using</span> h2</span>
+<span id="L403">    · <span class="kw">by_cases</span> hxu : x = u</span>
+<span id="L404">      · <span class="kw">subst</span> hxu; <span class="kw">rw</span> [<span class="const token" data-verso-hover="97">upd_left</span> _ hne]; <span class="kw">exact</span> h1</span>
+<span id="L405">      · <span class="kw">rw</span> [<span class="const token" data-verso-hover="99">upd_other</span> _ hxu hxv]; <span class="kw">exact</span> hng x</span>
+<span id="L406">  <span class="kw">refine</span> ⟨hD, ?_⟩</span>
+<span id="L407">  <span class="kw">intro</span> x y hxy hx hy</span>
+<span id="L408">  <span class="kw">set</span> D := <span class="const token" data-verso-hover="143">upd</span> C u v (<span class="const token" data-verso-hover="589">treeStep</span> R ch (C u) (C v))</span>
+<span id="L409">  <span class="kw">have</span> hDu : D u = (<span class="const token" data-verso-hover="589">treeStep</span> R ch (C u) (C v)).<span class="const token" data-verso-hover="58">1</span> := <span class="const token" data-verso-hover="97">upd_left</span> _ hne _</span>
+<span id="L410">  <span class="kw">have</span> hDv : D v = (<span class="const token" data-verso-hover="589">treeStep</span> R ch (C u) (C v)).<span class="const token" data-verso-hover="59">2</span> := <span class="const token" data-verso-hover="96">upd_right</span> _ _ _ _</span>
+<span id="L411">  <span class="kw">have</span> hDo : ∀ z, z ≠ u → z ≠ v → D z = C z := <span class="kw">fun</span> z hzu hzv =&gt; <span class="const token" data-verso-hover="99">upd_other</span> _ hzu hzv _</span>
+<span id="L412">  <span class="kw">by_cases</span> hxu : x = u</span>
+<span id="L413">  · <span class="kw">subst</span> hxu</span>
+<span id="L414">    <span class="kw">by_cases</span> hyv : y = v</span>
+<span id="L415">    · <span class="kw">subst</span> hyv; <span class="kw">rw</span> [hDu, hDv]; <span class="kw">exact</span> h5</span>
+<span id="L416">    · <span class="kw">exfalso</span>; <span class="kw">rw</span> [hDu, h3] <span class="kw">at</span> hx; <span class="kw">exact</span> hyv (hinj x v y huv hxy hx).<span class="const token" data-verso-hover="258">symm</span></span>
+<span id="L417">  <span class="kw">by_cases</span> hxv : x = v</span>
+<span id="L418">  · <span class="kw">subst</span> hxv</span>
+<span id="L419">    <span class="kw">by_cases</span> hyu : y = u</span>
+<span id="L420">    · <span class="kw">subst</span> hyu; <span class="kw">rw</span> [hDu, hDv]; <span class="kw">exact</span> h5.<span class="const token" data-verso-hover="258">symm</span></span>
+<span id="L421">    · <span class="kw">exfalso</span>; <span class="kw">rw</span> [hDv, h4] <span class="kw">at</span> hx; <span class="kw">exact</span> hyu (hinj x u y huv.<span class="const token" data-verso-hover="106">symm</span> hxy hx).<span class="const token" data-verso-hover="258">symm</span></span>
+<span id="L422">  <span class="kw">by_cases</span> hyu : y = u</span>
+<span id="L423">  · <span class="kw">subst</span> hyu; <span class="kw">exfalso</span>; <span class="kw">rw</span> [hDu, h3] <span class="kw">at</span> hy; <span class="kw">exact</span> hxv (hinj y v x huv hxy.<span class="const token" data-verso-hover="106">symm</span> hy).<span class="const token" data-verso-hover="258">symm</span></span>
+<span id="L424">  <span class="kw">by_cases</span> hyv : y = v</span>
+<span id="L425">  · <span class="kw">subst</span> hyv; <span class="kw">exfalso</span>; <span class="kw">rw</span> [hDv, h4] <span class="kw">at</span> hy</span>
+<span id="L426">    <span class="kw">exact</span> hxu (hinj y u x huv.<span class="const token" data-verso-hover="106">symm</span> hxy.<span class="const token" data-verso-hover="106">symm</span> hy).<span class="const token" data-verso-hover="258">symm</span></span>
+<span id="L427">  <span class="kw">rw</span> [hDo x hxu hxv, hDo y hyu hyv] <span class="kw">at</span> *</span>
+<span id="L428">  <span class="kw">exact</span> hbit x y hxy hx hy</span>
+<span id="L429"></span>
+<span id="L430"><span class="kw">lemma</span> <span class="const token" data-verso-hover="609">exists_ghost</span> [<span class="const token" data-verso-hover="109">Fintype</span> V] [<span class="const token" data-verso-hover="135">DecidableRel</span> G.<span class="const token" data-verso-hover="91">Adj</span>] (hk : <span class="nu">2</span> ≤ k) (hdeg : ∀ v, G.<span class="const token" data-verso-hover="147">degree</span> v ≤ k)</span>
+<span id="L431">    (c : V → <span class="const token" data-verso-hover="82">Fin</span> (k ^ <span class="nu">2</span>)) : ∃ g : V → <span class="const token" data-verso-hover="82">Fin</span> (k ^ <span class="nu">2</span>), ∀ u v, G.<span class="const token" data-verso-hover="91">Adj</span> u v → c u ≠ g v := <span class="kw">by</span></span>
+<span id="L432">  <span class="kw">have</span> : ∀ v, ∃ x : <span class="const token" data-verso-hover="82">Fin</span> (k ^ <span class="nu">2</span>), x ∉ (G.<span class="const token" data-verso-hover="447">neighborFinset</span> v).<span class="const token" data-verso-hover="285">image</span> c := <span class="kw">by</span></span>
+<span id="L433">    <span class="kw">intro</span> v</span>
+<span id="L434">    <span class="kw">by_contra</span> h</span>
+<span id="L435">    push <span class="const token" data-verso-hover="284">Not</span> <span class="kw">at</span> h</span>
+<span id="L436">    <span class="kw">have</span> hsub : (<span class="const token" data-verso-hover="118">Finset.univ</span> : <span class="const token" data-verso-hover="111">Finset</span> (<span class="const token" data-verso-hover="82">Fin</span> (k ^ <span class="nu">2</span>))) ⊆ (G.<span class="const token" data-verso-hover="447">neighborFinset</span> v).<span class="const token" data-verso-hover="285">image</span> c :=</span>
+<span id="L437">      <span class="kw">fun</span> x _ =&gt; h x</span>
+<span id="L438">    <span class="kw">have</span> h1 := <span class="const token" data-verso-hover="289">Finset.card_le_card</span> hsub</span>
+<span id="L439">    <span class="kw">have</span> h2 := <span class="const token" data-verso-hover="292">Finset.card_image_le</span> (s := G.<span class="const token" data-verso-hover="447">neighborFinset</span> v) (f := c)</span>
+<span id="L440">    <span class="kw">rw</span> [<span class="const token" data-verso-hover="293">Finset.card_univ</span>, <span class="const token" data-verso-hover="142">Fintype.card_fin</span>, <span class="const token" data-verso-hover="451">SimpleGraph.card_neighborFinset_eq_degree</span>] <span class="kw">at</span> *</span>
+<span id="L441">    <span class="kw">have</span> := hdeg v</span>
+<span id="L442">    <span class="kw">have</span> : k &lt; k ^ <span class="nu">2</span> := <span class="kw">by</span> <span class="kw">nlinarith</span></span>
+<span id="L443">    <span class="kw">omega</span></span>
+<span id="L444">  <span class="kw">choose</span> g hg <span class="kw">using</span> this</span>
+<span id="L445">  <span class="kw">refine</span> ⟨g, <span class="kw">fun</span> u v huv h =&gt; hg v ?_⟩</span>
+<span id="L446">  <span class="kw">rw</span> [← h]</span>
+<span id="L447">  <span class="kw">exact</span> <span class="const token" data-verso-hover="287">Finset.mem_image</span>.<span class="const token" data-verso-hover="133">2</span> ⟨u, (G.<span class="const token" data-verso-hover="453">mem_neighborFinset</span> v u).<span class="const token" data-verso-hover="133">2</span> huv.<span class="const token" data-verso-hover="106">symm</span>, <span class="const token" data-verso-hover="71">rfl</span>⟩</span>
+<span id="L448"></span>
+<span id="L449"><span class="dc">/-- The bad configuration: every node is a root with a ghost parent. -/</span></span>
+<span id="L450"><span class="kw">def</span> <span class="const token" data-verso-hover="610">badConfig</span> (c g : V → <span class="const token" data-verso-hover="82">Fin</span> (k ^ <span class="nu">2</span>)) (r0 : RS) (v : V) : <span class="const token" data-verso-hover="507">TState</span> k RS <span class="kw">where</span></span>
+<span id="L451">  <span class="const token" data-verso-hover="541">color</span> := c v</span>
+<span id="L452">  <span class="const token" data-verso-hover="4">parentColor</span> := g v</span>
+<span id="L453">  <span class="const token" data-verso-hover="542">prevColor</span> := c v</span>
+<span id="L454">  <span class="const token" data-verso-hover="543">colorBit</span> := <span class="const token" data-verso-hover="94">false</span></span>
+<span id="L455">  <span class="const token" data-verso-hover="544">counterColor</span> := <span class="nu">0</span></span>
+<span id="L456">  <span class="const token" data-verso-hover="545">counter</span> := <span class="nu">0</span></span>
+<span id="L457">  <span class="const token" data-verso-hover="546">errFlag</span> := <span class="const token" data-verso-hover="94">false</span></span>
+<span id="L458">  <span class="const token" data-verso-hover="547">root</span> := <span class="const token" data-verso-hover="56">true</span></span>
+<span id="L459">  <span class="const token" data-verso-hover="548">ringState</span> := r0</span>
+<span id="L460">  <span class="const token" data-verso-hover="549">ringStateCopy</span> := r0</span>
+<span id="L461">  <span class="const token" data-verso-hover="550">loopMarker</span> := <span class="const token" data-verso-hover="94">false</span></span>
+<span id="L462">  <span class="const token" data-verso-hover="5">loopChild</span> := <span class="const token" data-verso-hover="94">false</span></span>
+<span id="L463">  <span class="const token" data-verso-hover="6">loopParent</span> := <span class="const token" data-verso-hover="94">false</span></span>
+<span id="L464">  <span class="const token" data-verso-hover="551">loopColor</span> := <span class="nu">0</span></span>
+<span id="L465">  <span class="const token" data-verso-hover="552">loopCounter</span> := <span class="nu">0</span></span>
+<span id="L466">  <span class="const token" data-verso-hover="553">coin</span> := <span class="const token" data-verso-hover="534">.</span>p1</span>
+<span id="L467"></span>
+<span id="L468"><span class="dc">/-- **Every node stays a leader forever.** For `k ≥ 2`, any graph of maximum degree `≤ k`, any</span></span>
+<span id="L469"><span class="dc">colouring in which the neighbours of every node have distinct colours (the output SS-TwoHop is</span></span>
+<span id="L470"><span class="dc">designed to produce), and any ring protocol with a non-leader state, there is a configuration of</span></span>
+<span id="L471"><span class="dc">SS-Tree from which every reachable configuration has *all* nodes as roots (leaders). -/</span></span>
+<span id="L472"><span class="kw">theorem</span> <span class="const token" data-verso-hover="0">ssTree_all_roots_forever</span> [<span class="const token" data-verso-hover="109">Fintype</span> V] [<span class="const token" data-verso-hover="135">DecidableRel</span> G.<span class="const token" data-verso-hover="91">Adj</span>] (hk : <span class="nu">2</span> ≤ k)</span>
+<span id="L473">    (hdeg : ∀ v, G.<span class="const token" data-verso-hover="147">degree</span> v ≤ k) (c : V → <span class="const token" data-verso-hover="82">Fin</span> (k ^ <span class="nu">2</span>))</span>
+<span id="L474">    (hinj : ∀ x u v, G.<span class="const token" data-verso-hover="91">Adj</span> x u → G.<span class="const token" data-verso-hover="91">Adj</span> x v → c u = c v → u = v) {r0 : RS} (hr0 : R.<span class="const token" data-verso-hover="229">lead</span> r0 = <span class="const token" data-verso-hover="94">false</span>) :</span>
+<span id="L475">    ∃ C0 : V → <span class="const token" data-verso-hover="507">TState</span> k RS, ∀ D, (<span class="const token" data-verso-hover="21">ssTree</span> k R).<span class="const token" data-verso-hover="102">Reachable</span> G C0 D → ∀ v, (D v).<span class="const token" data-verso-hover="508">isLeader</span> = <span class="const token" data-verso-hover="56">true</span> := <span class="kw">by</span></span>
+<span id="L476">  <span class="kw">obtain</span> ⟨g, hg⟩ := <span class="const token" data-verso-hover="609">exists_ghost</span> (G := G) hk hdeg c</span>
+<span id="L477">  <span class="kw">refine</span> ⟨<span class="const token" data-verso-hover="610">badConfig</span> c g r0, <span class="kw">fun</span> D hD v =&gt; ?_⟩</span>
+<span id="L478">  <span class="kw">have</span> h0 : <span class="const token" data-verso-hover="591">BadInv</span> G R c g (<span class="const token" data-verso-hover="610">badConfig</span> c g r0) :=</span>
+<span id="L479">    ⟨<span class="kw">fun</span> v =&gt; ⟨<span class="const token" data-verso-hover="71">rfl</span>, <span class="const token" data-verso-hover="71">rfl</span>, <span class="const token" data-verso-hover="71">rfl</span>, <span class="const token" data-verso-hover="71">rfl</span>, <span class="const token" data-verso-hover="71">rfl</span>, <span class="const token" data-verso-hover="71">rfl</span>, hr0, hr0⟩, <span class="kw">fun</span> _ _ _ _ _ =&gt; <span class="const token" data-verso-hover="71">rfl</span>⟩</span>
+<span id="L480">  <span class="kw">exact</span> ((<span class="const token" data-verso-hover="608">badInv_closed</span> (<span class="kw">by</span> <span class="kw">omega</span>) hinj hg).<span class="const token" data-verso-hover="611">reach</span> h0 hD).<span class="const token" data-verso-hover="69">1</span> v |&gt;.<span class="const token" data-verso-hover="67">2</span><span class="nu">.</span><span class="const token" data-verso-hover="67">2</span><span class="nu">.</span><span class="const token" data-verso-hover="69">1</span></span>
+<span id="L481"></span>
+<span id="L482"><span class="kw">lemma</span> <span class="const token" data-verso-hover="612">TState.finite</span> [<span class="const token" data-verso-hover="237">Finite</span> RS] : <span class="const token" data-verso-hover="237">Finite</span> (<span class="const token" data-verso-hover="507">TState</span> k RS) := <span class="kw">by</span></span>
+<span id="L483">  <span class="kw">refine</span> <span class="const token" data-verso-hover="238">Finite.of_injective</span> (<span class="kw">fun</span> s : <span class="const token" data-verso-hover="507">TState</span> k RS =&gt; (s.<span class="const token" data-verso-hover="541">color</span>, s.<span class="const token" data-verso-hover="4">parentColor</span>, s.<span class="const token" data-verso-hover="542">prevColor</span>,</span>
+<span id="L484">    s.<span class="const token" data-verso-hover="543">colorBit</span>, s.<span class="const token" data-verso-hover="544">counterColor</span>, s.<span class="const token" data-verso-hover="545">counter</span>, s.<span class="const token" data-verso-hover="546">errFlag</span>, s.<span class="const token" data-verso-hover="547">root</span>, s.<span class="const token" data-verso-hover="548">ringState</span>, s.<span class="const token" data-verso-hover="549">ringStateCopy</span>,</span>
+<span id="L485">    s.<span class="const token" data-verso-hover="550">loopMarker</span>, s.<span class="const token" data-verso-hover="5">loopChild</span>, s.<span class="const token" data-verso-hover="6">loopParent</span>, s.<span class="const token" data-verso-hover="551">loopColor</span>, s.<span class="const token" data-verso-hover="552">loopCounter</span>, s.<span class="const token" data-verso-hover="553">coin</span>)) ?_</span>
+<span id="L486">  <span class="kw">intro</span> a b h</span>
+<span id="L487">  <span class="kw">cases</span> a; <span class="kw">cases</span> b</span>
+<span id="L488">  <span class="kw">simp</span> only [<span class="const token" data-verso-hover="78">Prod.mk.injEq</span>] <span class="kw">at</span> h</span>
+<span id="L489">  <span class="kw">obtain</span> ⟨h1, h2, h3, h4, h5, h6, h7, h8, h9, h10, h11, h12, h13, h14, h15, h16⟩ := h</span>
+<span id="L490">  <span class="kw">subst</span> h1 h2 h3 h4 h5 h6 h7 h8 h9 h10 h11 h12 h13 h14 h15 h16</span>
+<span id="L491">  <span class="kw">rfl</span></span>
+<span id="L492"></span>
+<span id="L493"><span class="kw">lemma</span> <span class="const token" data-verso-hover="613">ssTree_nonempty</span> (hR : ∀ a b, (R.<span class="const token" data-verso-hover="137">δ</span> a b).<span class="const token" data-verso-hover="138">Nonempty</span>) (p q : <span class="const token" data-verso-hover="507">TState</span> k RS) :</span>
+<span id="L494">    ((<span class="const token" data-verso-hover="21">ssTree</span> k R).<span class="const token" data-verso-hover="137">δ</span> p q).<span class="const token" data-verso-hover="138">Nonempty</span> := <span class="kw">by</span></span>
+<span id="L495">  <span class="kw">choose</span> ρ hρ <span class="kw">using</span> hR</span>
+<span id="L496">  <span class="kw">exact</span> ⟨_, ⟨⟨p.<span class="const token" data-verso-hover="541">color</span>, p.<span class="const token" data-verso-hover="541">color</span>, <span class="const token" data-verso-hover="94">false</span>, <span class="const token" data-verso-hover="94">false</span>, <span class="const token" data-verso-hover="94">false</span>, <span class="const token" data-verso-hover="94">false</span>, ρ, <span class="const token" data-verso-hover="94">false</span>, <span class="const token" data-verso-hover="94">false</span>, p, <span class="const token" data-verso-hover="94">false</span>, <span class="const token" data-verso-hover="94">false</span>⟩, hρ, <span class="const token" data-verso-hover="71">rfl</span>⟩⟩</span>
+<span id="L497"></span>
+<span id="L498"><span class="dc">/-- **Theorem 4.3 is false.** For every `k ≥ 2`, every graph with at least two nodes and maximum</span></span>
+<span id="L499"><span class="dc">degree `≤ k` (e.g. any `k`-regular graph), and every colouring with distinct colours on each</span></span>
+<span id="L500"><span class="dc">neighbourhood, SS-Tree does not solve SSLE: there is a globally fair execution in which every node</span></span>
+<span id="L501"><span class="dc">is a leader at all times. This holds for every finite ring protocol with a non-leader state, in</span></span>
+<span id="L502"><span class="dc">particular for the Ring-Protocol of [11]. -/</span></span>
+<span id="L503"><span class="kw">theorem</span> <span class="const token" data-verso-hover="1">ssTree_not_solvesSSLE</span> [<span class="const token" data-verso-hover="109">Fintype</span> V] [<span class="const token" data-verso-hover="135">DecidableRel</span> G.<span class="const token" data-verso-hover="91">Adj</span>] [<span class="const token" data-verso-hover="237">Finite</span> RS] (hk : <span class="nu">2</span> ≤ k)</span>
+<span id="L504">    (hV : <span class="nu">2</span> ≤ <span class="const token" data-verso-hover="136">Fintype.card</span> V) (hedge : ∃ u v, G.<span class="const token" data-verso-hover="91">Adj</span> u v)</span>
+<span id="L505">    (hdeg : ∀ v, G.<span class="const token" data-verso-hover="147">degree</span> v ≤ k) (c : V → <span class="const token" data-verso-hover="82">Fin</span> (k ^ <span class="nu">2</span>))</span>
+<span id="L506">    (hinj : ∀ x u v, G.<span class="const token" data-verso-hover="91">Adj</span> x u → G.<span class="const token" data-verso-hover="91">Adj</span> x v → c u = c v → u = v)</span>
+<span id="L507">    (hR : ∀ a b, (R.<span class="const token" data-verso-hover="137">δ</span> a b).<span class="const token" data-verso-hover="138">Nonempty</span>) {r0 : RS} (hr0 : R.<span class="const token" data-verso-hover="229">lead</span> r0 = <span class="const token" data-verso-hover="94">false</span>) :</span>
+<span id="L508">    ¬ (<span class="const token" data-verso-hover="21">ssTree</span> k R).<span class="const token" data-verso-hover="16">SolvesSSLE</span> G <span class="const token" data-verso-hover="508">TState.isLeader</span> ∧</span>
+<span id="L509">    ∃ C0, ∃ E : <span class="const token" data-verso-hover="510">TS.Run</span> ((<span class="const token" data-verso-hover="21">ssTree</span> k R).<span class="const token" data-verso-hover="93">Step</span> G), E.<span class="const token" data-verso-hover="518">st</span> <span class="nu">0</span> = C0 ∧ E.<span class="const token" data-verso-hover="517">GloballyFair</span> ∧</span>
+<span id="L510">      ∀ t, <span class="const token" data-verso-hover="382">GProtocol.numLeaders</span> <span class="const token" data-verso-hover="508">TState.isLeader</span> (E.<span class="const token" data-verso-hover="518">st</span> t) = <span class="const token" data-verso-hover="136">Fintype.card</span> V := <span class="kw">by</span></span>
+<span id="L511">  <span class="kw">have</span> := <span class="const token" data-verso-hover="612">TState.finite</span> (k := k) (RS := RS)</span>
+<span id="L512">  <span class="kw">obtain</span> ⟨C0, hC0⟩ := <span class="const token" data-verso-hover="0">ssTree_all_roots_forever</span> (G := G) (R := R) hk hdeg c hinj hr0</span>
+<span id="L513">  <span class="kw">have</span> hall : ∀ D, (<span class="const token" data-verso-hover="21">ssTree</span> k R).<span class="const token" data-verso-hover="102">Reachable</span> G C0 D →</span>
+<span id="L514">      <span class="const token" data-verso-hover="382">GProtocol.numLeaders</span> <span class="const token" data-verso-hover="508">TState.isLeader</span> D = <span class="const token" data-verso-hover="136">Fintype.card</span> V := <span class="kw">by</span></span>
+<span id="L515">    <span class="kw">intro</span> D hD</span>
+<span id="L516">    <span class="kw">unfold</span> <span class="const token" data-verso-hover="382">GProtocol.numLeaders</span></span>
+<span id="L517">    <span class="kw">rw</span> [<span class="const token" data-verso-hover="509">Finset.filter_true_of_mem</span> (<span class="kw">fun</span> v _ =&gt; hC0 D hD v), <span class="const token" data-verso-hover="293">Finset.card_univ</span>]</span>
+<span id="L518">  <span class="kw">have</span> hnot : ∀ D, (<span class="const token" data-verso-hover="21">ssTree</span> k R).<span class="const token" data-verso-hover="102">Reachable</span> G C0 D → ¬ (<span class="const token" data-verso-hover="21">ssTree</span> k R).<span class="const token" data-verso-hover="334">ValidStable</span> G <span class="const token" data-verso-hover="508">TState.isLeader</span> D :=</span>
+<span id="L519">    <span class="kw">fun</span> D hD h =&gt; <span class="kw">by</span> <span class="kw">have</span> := h.<span class="const token" data-verso-hover="67">2</span>; <span class="kw">rw</span> [hall D hD] <span class="kw">at</span> this; <span class="kw">omega</span></span>
+<span id="L520">  <span class="kw">obtain</span> ⟨E, hE0, hE, -⟩ := <span class="const token" data-verso-hover="528">GProtocol.not_solvesSSLE_of</span> hedge (<span class="const token" data-verso-hover="613">ssTree_nonempty</span> hR) C0 hnot</span>
+<span id="L521">  <span class="kw">refine</span> ⟨<span class="kw">fun</span> hsol =&gt; ?_, C0, E, hE0, hE, <span class="kw">fun</span> t =&gt; hall _ (hE0 ▸ E.<span class="const token" data-verso-hover="614">reach_of_le</span> (<span class="const token" data-verso-hover="443">Nat.zero_le</span> t))⟩</span>
+<span id="L522">  <span class="kw">obtain</span> ⟨T, hT⟩ := hsol E hE</span>
+<span id="L523">  <span class="kw">exact</span> hnot _ (hE0 ▸ E.<span class="const token" data-verso-hover="614">reach_of_le</span> (<span class="const token" data-verso-hover="443">Nat.zero_le</span> T)) hT</span>
+<span id="L524"></span>
+<span id="L525"><span class="kw">end</span> Counterexample</span>
+<span id="L526"></span>
+<span id="L527"><span class="dc">/-- **Concrete instance.** For every `k ≥ 2`, SS-Tree fails on the complete graph `K_{k+1}`, which</span></span>
+<span id="L528"><span class="dc">is connected and `k`-regular, with the Ring-Protocol replaced by any finite ring protocol with a</span></span>
+<span id="L529"><span class="dc">non-leader state. -/</span></span>
+<span id="L530"><span class="kw">theorem</span> <span class="const token" data-verso-hover="2">ssTree_fails_on_complete</span> {RS : <span class="kw">Type</span>*} [<span class="const token" data-verso-hover="237">Finite</span> RS] (R : <span class="const token" data-verso-hover="52">RingProtocol</span> RS) {k : <span class="const token" data-verso-hover="39">ℕ</span>}</span>
+<span id="L531">    (hk : <span class="nu">2</span> ≤ k) (hR : ∀ a b, (R.<span class="const token" data-verso-hover="137">δ</span> a b).<span class="const token" data-verso-hover="138">Nonempty</span>) {r0 : RS} (hr0 : R.<span class="const token" data-verso-hover="229">lead</span> r0 = <span class="const token" data-verso-hover="94">false</span>) :</span>
+<span id="L532">    (⊤ : <span class="const token" data-verso-hover="89">SimpleGraph</span> (<span class="const token" data-verso-hover="82">Fin</span> (k + <span class="nu">1</span>))).<span class="const token" data-verso-hover="497">IsRegularOfDegree</span> k ∧</span>
+<span id="L533">    ¬ (<span class="const token" data-verso-hover="21">ssTree</span> k R).<span class="const token" data-verso-hover="16">SolvesSSLE</span> (⊤ : <span class="const token" data-verso-hover="89">SimpleGraph</span> (<span class="const token" data-verso-hover="82">Fin</span> (k + <span class="nu">1</span>))) <span class="const token" data-verso-hover="508">TState.isLeader</span> := <span class="kw">by</span></span>
+<span id="L534">  <span class="kw">have</span> hreg : (⊤ : <span class="const token" data-verso-hover="89">SimpleGraph</span> (<span class="const token" data-verso-hover="82">Fin</span> (k + <span class="nu">1</span>))).<span class="const token" data-verso-hover="497">IsRegularOfDegree</span> k := <span class="kw">by</span></span>
+<span id="L535">    <span class="kw">intro</span> v; <span class="kw">rw</span> [<span class="const token" data-verso-hover="498">SimpleGraph.complete_graph_degree</span>]; <span class="kw">simp</span></span>
+<span id="L536">  <span class="kw">have</span> hle : k + <span class="nu">1</span> ≤ k ^ <span class="nu">2</span> := <span class="kw">by</span> <span class="kw">nlinarith</span></span>
+<span id="L537">  <span class="kw">refine</span> ⟨hreg, (<span class="const token" data-verso-hover="1">ssTree_not_solvesSSLE</span> (G := ⊤) (R := R) hk (<span class="kw">by</span> <span class="kw">simp</span>; <span class="kw">omega</span>) ⟨<span class="nu">0</span>, <span class="nu">1</span>, <span class="kw">by</span> <span class="kw">simp</span>; <span class="kw">omega</span>⟩</span>
+<span id="L538">    (<span class="kw">fun</span> v =&gt; (hreg v).<span class="const token" data-verso-hover="615">le</span>) (<span class="const token" data-verso-hover="616">Fin.castLE</span> hle) ?_ hR hr0).<span class="const token" data-verso-hover="69">1</span>⟩</span>
+<span id="L539">  <span class="kw">intro</span> x u v _ _ h</span>
+<span id="L540">  <span class="kw">exact</span> <span class="const token" data-verso-hover="617">Fin.castLE_injective</span> hle h</span>
+<span id="L541"></span>
+<span id="L542"><span class="kw">end</span> SSLERegular</span>
+<span id="L543"></span>
+</code></div>
+        <script>
+          window.versoHoversUrl = "PODC2020/SSLERegular/-hovers.json";</script>
+        <script src="static/lean/popper.js"></script>
+        <script src="static/lean/tippy.js"></script>
+        <script src="static/lean/marked.js"></script>
+        <script src="static/lean/highlighting.js"></script>
+        <script src="static/lean/lean.js"></script>
+        </article></main><footer class="site-footer"><div class="wrap">
+        Machine-checked formalizations of PODC papers in Lean 4. Generated with <a href="https://github.com/leanprover/verso">Verso</a> from the README files of <a href="https://github.com/vasnesterov/formal_podc">vasnesterov/formal_podc</a>.</div>
+      </footer></body>
+  </html>
+

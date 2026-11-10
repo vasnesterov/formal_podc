@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="light dark">
+    <link rel="icon" href="data:,">
+    <title>CrashConsensusDigraph: MinMaxCore.lean · Formal PODC</title><base href="../../../.././"><link rel="stylesheet" href="static/lean/verso-vars.css">
+    <link rel="stylesheet" href="static/lean/highlighting.css">
+    <link rel="stylesheet" href="static/lean/tippy-border.css">
+    <link rel="stylesheet" href="static/style.css">
+    <script defer="defer" src="static/site.js"></script>
+    </head>
+  <body>
+    <header class="site-header">
+      <div class="wrap">
+        <a class="brand" href=".">Formal PODC</a><nav class="top">
+          <a href=".">Search</a><a href="about/">About</a><a href="https://github.com/vasnesterov/formal_podc">GitHub</a></nav>
+        </div>
+      </header>
+    <main class="wrap"><article><nav class="breadcrumbs" aria-label="Breadcrumb">
+          <a href=".">Search</a><span class="sep">›</span><a href="PODC2015/">PODC 2015</a><span class="sep">›</span><a href="PODC2015/CrashConsensusDigraph/">CrashConsensusDigraph</a><span class="sep">›</span><a href="PODC2015/CrashConsensusDigraph/src/">Lean source</a><span class="sep">›</span><span aria-current="page">MinMaxCore</span></nav>
+        <h1>
+          <code>MinMaxCore.lean</code></h1>
+        <div class="paper-links">
+          <p>
+            Source of <a href="PODC2015/CrashConsensusDigraph/">Crash-Tolerant Consensus in Directed Graphs — PODC 2015</a> · <a href="https://github.com/vasnesterov/formal_podc/blob/main/Papers/PODC2015/CrashConsensusDigraph/MinMaxCore.lean">GitHub</a> · hover over a name for its type and documentation</p>
+          </div>
+        <div class="lean-code lean-src">
+          <code class="hl lean block" data-lean-context="MinMaxCore"><span id="L1"><span class="kw">import</span> Papers.PODC2015.CrashConsensusDigraph.SyncModel</span>
+<span id="L2"></span>
+<span id="L3"><span class="dc">/-!</span></span>
+<span id="L4"><span class="dc"># The agreement argument of Algorithm Min-Max (proof of Theorem 3), abstractly</span></span>
+<span id="L5"></span>
+<span id="L6"><span class="dc">We analyse an arbitrary binary trajectory `x : ℕ → V → Bool` (`x r u` = value of `u` after `r`</span></span>
+<span id="L7"><span class="dc">rounds) that follows the Min/Max update rule in a window of `(2f + 2)·D` rounds, split into</span></span>
+<span id="L8"><span class="dc">`2f + 2` phases of `D` rounds; even phases (`0, 2, …`, the paper's phases `p = 1, 3, …`) are Max</span></span>
+<span id="L9"><span class="dc">phases, odd ones are Min phases. This is used both for Algorithm Min-Max (`MinMax.lean`) and for</span></span>
+<span id="L10"><span class="dc">the INNER-LOOP of Algorithm MVC (`MVC.lean`, Claim 2), which carries extra data.</span></span>
+<span id="L11"></span>
+<span id="L12"><span class="dc">For binary values, "set `v` to the maximum (minimum) of the received values, including one's</span></span>
+<span id="L13"><span class="dc">own" is the *absorbing rule* `AbsStep … a` with absorbing value `a = true` (`a = false`): the new</span></span>
+<span id="L14"><span class="dc">value is `a` iff the node or some node whose message it received had `a`.</span></span>
+<span id="L15"></span>
+<span id="L16"><span class="dc">Main result (`minmax_core`): if `G` satisfies `f` CT node connectivity and `D` bounds the</span></span>
+<span id="L17"><span class="dc">fault-tolerant diameter, then after the window all nodes that have not crashed hold the same</span></span>
+<span id="L18"><span class="dc">value. Proof as in the paper: some pair of consecutive phases `2k, 2k + 1` contains no crash</span></span>
+<span id="L19"><span class="dc">(`exists_clean_pair`, pigeonhole over the `f + 1` disjoint pairs — so the clean pair is always a</span></span>
+<span id="L20"><span class="dc">Max phase followed by a Min phase, no "WLOG" needed); let `F` be the nodes crashed before it.</span></span>
+<span id="L21"><span class="dc">Case I: some root of `G_F` holds `1` — it floods `1` in the Max phase (`spread`). Case II: all</span></span>
+<span id="L22"><span class="dc">roots hold `0` — they keep `0` during the Max phase (`roots_keep`; the roots form the source</span></span>
+<span id="L23"><span class="dc">component, which has no incoming edges in `G_F`) and flood `0` in the Min phase. Afterwards</span></span>
+<span id="L24"><span class="dc">agreement is preserved (`unanimity`).</span></span>
+<span id="L25"><span class="dc">-/</span></span>
+<span id="L26"></span>
+<span id="L27"><span class="kw">open</span> Finset</span>
+<span id="L28"></span>
+<span id="L29"><span class="cm">--</span><span class="cm"> CSLib candidate (synchronous crash-prone message passing on digraphs)</span></span>
+<span id="L30"></span>
+<span id="L31"><span class="kw">set_option</span> <span class="const token" data-verso-hover="30">linter.unusedSectionVars</span> false</span>
+<span id="L32"></span>
+<span id="L33"><span class="kw">namespace</span> CrashConsensusDigraph</span>
+<span id="L34"></span>
+<span id="L35"><span class="kw">open</span> Cslib.ApproxConsensus</span>
+<span id="L36"></span>
+<span id="L37"><span class="kw">variable</span> {V : <span class="kw">Type</span>*} [<span class="const token" data-verso-hover="31">DecidableEq</span> V] {G : <span class="const token" data-verso-hover="33">Digraph</span> V} {adv : <span class="const token" data-verso-hover="133">Adversary</span> V}</span>
+<span id="L38"></span>
+<span id="L39"><span class="dc">/-- Round `r` of the trajectory `x` follows the absorbing rule with absorbing value `a`</span></span>
+<span id="L40"><span class="dc">(a Max round for `a = true`, a Min round for `a = false`). -/</span></span>
+<span id="L41"><span class="kw">def</span> <span class="const token" data-verso-hover="335">AbsStep</span> (G : <span class="const token" data-verso-hover="33">Digraph</span> V) (adv : <span class="const token" data-verso-hover="133">Adversary</span> V) (x : <span class="const token" data-verso-hover="39">ℕ</span> → V → <span class="const token" data-verso-hover="137">Bool</span>) (r : <span class="const token" data-verso-hover="39">ℕ</span>) (a : <span class="const token" data-verso-hover="137">Bool</span>) : <span class="kw">Prop</span> :=</span>
+<span id="L42">  ∀ w, x (r + <span class="nu">1</span>) w = a ↔ (x r w = a ∨ ∃ u, <span class="const token" data-verso-hover="134">Delivers</span> G adv r u w ∧ x r u = a)</span>
+<span id="L43"></span>
+<span id="L44"><span class="dc">/-- The type of the phase containing round `r` of a window starting at `r₀` with phases of</span></span>
+<span id="L45"><span class="dc">length `D`: `true` (Max) for even phases, `false` (Min) for odd phases. -/</span></span>
+<span id="L46"><span class="kw">def</span> <span class="const token" data-verso-hover="301">phaseVal</span> (D r₀ r : <span class="const token" data-verso-hover="39">ℕ</span>) : <span class="const token" data-verso-hover="137">Bool</span> := (r - r₀) / D % <span class="nu">2</span> == <span class="nu">0</span></span>
+<span id="L47"></span>
+<span id="L48"><span class="kw">theorem</span> <span class="const token" data-verso-hover="402">phaseVal_even</span> {D r₀ k j : <span class="const token" data-verso-hover="39">ℕ</span>} (hj : j &lt; D) : <span class="const token" data-verso-hover="301">phaseVal</span> D r₀ (r₀ + <span class="nu">2</span> * k * D + j) = <span class="const token" data-verso-hover="234">true</span> := <span class="kw">by</span></span>
+<span id="L49">  <span class="kw">have</span> hD : <span class="nu">0</span> &lt; D := <span class="kw">by</span> <span class="kw">omega</span></span>
+<span id="L50">  <span class="kw">simp</span> only [<span class="const token" data-verso-hover="301">phaseVal</span>, <span class="const token" data-verso-hover="281">beq_iff_eq</span>]</span>
+<span id="L51">  <span class="kw">rw</span> [<span class="kw">show</span> r₀ + <span class="nu">2</span> * k * D + j - r₀ = D * (<span class="nu">2</span> * k) + j <span class="kw">by</span> <span class="kw">ring_nf</span>; <span class="kw">omega</span>, <span class="const token" data-verso-hover="327">Nat.mul_add_div</span> hD,</span>
+<span id="L52">    <span class="const token" data-verso-hover="328">Nat.div_eq_of_lt</span> hj]</span>
+<span id="L53">  <span class="kw">omega</span></span>
+<span id="L54"></span>
+<span id="L55"><span class="kw">theorem</span> <span class="const token" data-verso-hover="403">phaseVal_odd</span> {D r₀ k j : <span class="const token" data-verso-hover="39">ℕ</span>} (hj : j &lt; D) :</span>
+<span id="L56">    <span class="const token" data-verso-hover="301">phaseVal</span> D r₀ (r₀ + <span class="nu">2</span> * k * D + D + j) = <span class="const token" data-verso-hover="233">false</span> := <span class="kw">by</span></span>
+<span id="L57">  <span class="kw">have</span> hD : <span class="nu">0</span> &lt; D := <span class="kw">by</span> <span class="kw">omega</span></span>
+<span id="L58">  <span class="kw">simp</span> only [<span class="const token" data-verso-hover="301">phaseVal</span>, <span class="const token" data-verso-hover="404">beq_eq_false_iff_ne</span>, <span class="const token" data-verso-hover="197">ne_eq</span>]</span>
+<span id="L59">  <span class="kw">rw</span> [<span class="kw">show</span> r₀ + <span class="nu">2</span> * k * D + D + j - r₀ = D * (<span class="nu">2</span> * k + <span class="nu">1</span>) + j <span class="kw">by</span> <span class="kw">ring_nf</span>; <span class="kw">omega</span>,</span>
+<span id="L60">    <span class="const token" data-verso-hover="327">Nat.mul_add_div</span> hD, <span class="const token" data-verso-hover="328">Nat.div_eq_of_lt</span> hj]</span>
+<span id="L61">  <span class="kw">omega</span></span>
+<span id="L62"></span>
+<span id="L63"><span class="kw">variable</span> {x : <span class="const token" data-verso-hover="39">ℕ</span> → V → <span class="const token" data-verso-hover="137">Bool</span>}</span>
+<span id="L64"></span>
+<span id="L65"><span class="kw">theorem</span> <span class="const token" data-verso-hover="405">AbsStep.sticky</span> {r : <span class="const token" data-verso-hover="39">ℕ</span>} {a : <span class="const token" data-verso-hover="137">Bool</span>} (h : <span class="const token" data-verso-hover="335">AbsStep</span> G adv x r a) {w : V} (hw : x r w = a) :</span>
+<span id="L66">    x (r + <span class="nu">1</span>) w = a := (h w).<span class="const token" data-verso-hover="57">mpr</span> (<span class="const token" data-verso-hover="117">Or.inl</span> hw)</span>
+<span id="L67"></span>
+<span id="L68"><span class="dc">/-- **Agreement is preserved**: if all nodes alive at `r₁` hold `c`, they keep holding `c`. -/</span></span>
+<span id="L69"><span class="kw">theorem</span> <span class="const token" data-verso-hover="340">unanimity</span> {r₁ r₂ : <span class="const token" data-verso-hover="39">ℕ</span>} (hstep : ∀ r, r₁ ≤ r → r &lt; r₂ → ∃ a, <span class="const token" data-verso-hover="335">AbsStep</span> G adv x r a)</span>
+<span id="L70">    {c : <span class="const token" data-verso-hover="137">Bool</span>} (h : ∀ u, adv.<span class="const token" data-verso-hover="337">Alive</span> r₁ u → x r₁ u = c) :</span>
+<span id="L71">    ∀ r, r₁ ≤ r → r ≤ r₂ → ∀ u, adv.<span class="const token" data-verso-hover="337">Alive</span> r u → x r u = c := <span class="kw">by</span></span>
+<span id="L72">  <span class="kw">intro</span> r hr</span>
+<span id="L73">  <span class="kw">induction</span> r, hr <span class="kw">using</span> <span class="const token" data-verso-hover="355">Nat.le_induction</span> <span class="kw">with</span></span>
+<span id="L74">  | base =&gt; <span class="kw">exact</span> <span class="kw">fun</span> _ =&gt; h</span>
+<span id="L75">  | <span class="const token" data-verso-hover="98">succ</span> r hr ih =&gt;</span>
+<span id="L76">    <span class="kw">intro</span> hr2 u hu</span>
+<span id="L77">    <span class="kw">obtain</span> ⟨a, ha⟩ := hstep r hr (<span class="kw">by</span> <span class="kw">omega</span>)</span>
+<span id="L78">    <span class="kw">have</span> hxu : x r u = c := ih (<span class="kw">by</span> <span class="kw">omega</span>) u hu.<span class="const token" data-verso-hover="345">of_succ</span></span>
+<span id="L79">    <span class="kw">have</span> hdel : ∀ u', <span class="const token" data-verso-hover="134">Delivers</span> G adv r u' u → x r u' = c := <span class="kw">fun</span> u' hd =&gt; ih (<span class="kw">by</span> <span class="kw">omega</span>) u' hd.<span class="const token" data-verso-hover="348">alive</span></span>
+<span id="L80">    <span class="kw">have</span> key := ha u</span>
+<span id="L81">    <span class="kw">rw</span> [hxu] <span class="kw">at</span> key</span>
+<span id="L82">    <span class="kw">by_cases</span> hca : c = a</span>
+<span id="L83">    · <span class="kw">subst</span> hca; <span class="kw">exact</span> key.<span class="const token" data-verso-hover="57">mpr</span> (<span class="const token" data-verso-hover="117">Or.inl</span> <span class="const token" data-verso-hover="87">rfl</span>)</span>
+<span id="L84">    · <span class="kw">have</span> : x (r + <span class="nu">1</span>) u ≠ a := <span class="kw">fun</span> h' =&gt; <span class="kw">by</span></span>
+<span id="L85">        <span class="kw">rcases</span> key.<span class="const token" data-verso-hover="68">mp</span> h' <span class="kw">with</span> h'' | ⟨u', hd, hu'⟩</span>
+<span id="L86">        · <span class="kw">exact</span> hca h''</span>
+<span id="L87">        · <span class="kw">exact</span> hca ((hdel u' hd).<span class="const token" data-verso-hover="231">symm</span>.<span class="const token" data-verso-hover="232">trans</span> hu')</span>
+<span id="L88">      <span class="kw">cases</span> c &lt;;&gt; <span class="kw">cases</span> a</span>
+<span id="L89">      · <span class="kw">exact</span> <span class="const token" data-verso-hover="159">absurd</span> <span class="const token" data-verso-hover="87">rfl</span> hca</span>
+<span id="L90">      · <span class="kw">simpa</span> <span class="kw">using</span> this</span>
+<span id="L91">      · <span class="kw">simpa</span> <span class="kw">using</span> this</span>
+<span id="L92">      · <span class="kw">exact</span> <span class="const token" data-verso-hover="159">absurd</span> <span class="const token" data-verso-hover="87">rfl</span> hca</span>
+<span id="L93"></span>
+<span id="L94"><span class="dc">/-- **Flooding from a root** (Case I of the proof of Theorem 3): in a phase of `D` rounds with</span></span>
+<span id="L95"><span class="dc">absorbing value `a` during which no node outside `F` crashes, a root of `G_F` holding `a` at the</span></span>
+<span id="L96"><span class="dc">start makes every node of `G_F` hold `a` at the end. -/</span></span>
+<span id="L97"><span class="kw">theorem</span> <span class="const token" data-verso-hover="406">spread</span> {f D : <span class="const token" data-verso-hover="39">ℕ</span>} (hD : <span class="const token" data-verso-hover="124">FTDiamLE</span> G f D) {F : <span class="const token" data-verso-hover="40">Finset</span> V} (hF : F.<span class="const token" data-verso-hover="41">card</span> ≤ f) {s : V}</span>
+<span id="L98">    (hs : <span class="const token" data-verso-hover="99">IsRoot</span> G F s) (ps : <span class="const token" data-verso-hover="39">ℕ</span>) (a : <span class="const token" data-verso-hover="137">Bool</span>) (hstep : ∀ k &lt; D, <span class="const token" data-verso-hover="335">AbsStep</span> G adv x (ps + k) a)</span>
+<span id="L99">    (hal : ∀ u, u ∉ F → adv.<span class="const token" data-verso-hover="337">Alive</span> (ps + D) u) (hx : x ps s = a) :</span>
+<span id="L100">    ∀ v, v ∉ F → x (ps + D) v = a := <span class="kw">by</span></span>
+<span id="L101">  <span class="kw">have</span> key : ∀ k ≤ D, ∀ v, <span class="const token" data-verso-hover="104">ReachesWithin</span> G F k s v → x (ps + k) v = a := <span class="kw">by</span></span>
+<span id="L102">    <span class="kw">intro</span> k</span>
+<span id="L103">    <span class="kw">induction</span> k <span class="kw">with</span></span>
+<span id="L104">    | <span class="const token" data-verso-hover="97">zero</span> =&gt; <span class="kw">intro</span> _ v hv; <span class="kw">rw</span> [← hv.<span class="const token" data-verso-hover="69">2</span>.<span class="const token" data-verso-hover="407">zero</span>]; <span class="kw">simpa</span> <span class="kw">using</span> hx</span>
+<span id="L105">    | <span class="const token" data-verso-hover="98">succ</span> k ih =&gt;</span>
+<span id="L106">      <span class="kw">intro</span> hk v hv</span>
+<span id="L107">      <span class="kw">have</span> hst := hstep k (<span class="kw">by</span> <span class="kw">omega</span>)</span>
+<span id="L108">      <span class="kw">rw</span> [← <span class="const token" data-verso-hover="338">Nat.add_assoc</span>]</span>
+<span id="L109">      <span class="kw">rcases</span> <span class="const token" data-verso-hover="116">Relation.relatesWithinSteps_succ_iff</span>.<span class="const token" data-verso-hover="68">1</span> hv.<span class="const token" data-verso-hover="69">2</span> <span class="kw">with</span> h | ⟨b, hb, e⟩</span>
+<span id="L110">      · <span class="kw">exact</span> hst.<span class="const token" data-verso-hover="405">sticky</span> (ih (<span class="kw">by</span> <span class="kw">omega</span>) v ⟨hv.<span class="const token" data-verso-hover="62">1</span>, h⟩)</span>
+<span id="L111">      · <span class="kw">have</span> hxb := ih (<span class="kw">by</span> <span class="kw">omega</span>) b ⟨hv.<span class="const token" data-verso-hover="62">1</span>, hb⟩</span>
+<span id="L112">        <span class="kw">refine</span> (hst v).<span class="const token" data-verso-hover="57">mpr</span> (<span class="const token" data-verso-hover="118">Or.inr</span> ⟨b, <span class="const token" data-verso-hover="408">delivers_of_alive</span> ?_ e.<span class="const token" data-verso-hover="62">1</span>, hxb⟩)</span>
+<span id="L113">        <span class="kw">exact</span> (hal b e.<span class="const token" data-verso-hover="69">2</span><span class="nu">.</span><span class="const token" data-verso-hover="62">1</span>).<span class="const token" data-verso-hover="344">mono</span> (<span class="kw">by</span> <span class="kw">omega</span>)</span>
+<span id="L114">  <span class="kw">intro</span> v hv</span>
+<span id="L115">  <span class="kw">exact</span> key D <span class="const token" data-verso-hover="230">le_rfl</span> v (hD F hF s hs v hv)</span>
+<span id="L116"></span>
+<span id="L117"><span class="dc">/-- **Roots keep their value** (Case II of the proof of Theorem 3): if all roots of `G_F` hold</span></span>
+<span id="L118"><span class="dc">`!a` at the start of a phase with absorbing value `a`, and the nodes of `F` have crashed before</span></span>
+<span id="L119"><span class="dc">the phase, then the roots still hold `!a` at the end of the phase. -/</span></span>
+<span id="L120"><span class="kw">theorem</span> <span class="const token" data-verso-hover="409">roots_keep</span> {D : <span class="const token" data-verso-hover="39">ℕ</span>} {F : <span class="const token" data-verso-hover="40">Finset</span> V} (ps : <span class="const token" data-verso-hover="39">ℕ</span>) (a : <span class="const token" data-verso-hover="137">Bool</span>)</span>
+<span id="L121">    (hstep : ∀ k &lt; D, <span class="const token" data-verso-hover="335">AbsStep</span> G adv x (ps + k) a) (hdead : ∀ u ∈ F, ¬ adv.<span class="const token" data-verso-hover="337">Alive</span> ps u)</span>
+<span id="L122">    (h0 : ∀ s, <span class="const token" data-verso-hover="99">IsRoot</span> G F s → x ps s = !a) :</span>
+<span id="L123">    ∀ k ≤ D, ∀ s, <span class="const token" data-verso-hover="99">IsRoot</span> G F s → x (ps + k) s = !a := <span class="kw">by</span></span>
+<span id="L124">  <span class="kw">intro</span> k</span>
+<span id="L125">  <span class="kw">induction</span> k <span class="kw">with</span></span>
+<span id="L126">  | <span class="const token" data-verso-hover="97">zero</span> =&gt; <span class="kw">intro</span> _; <span class="kw">simpa</span> <span class="kw">using</span> h0</span>
+<span id="L127">  | <span class="const token" data-verso-hover="98">succ</span> k ih =&gt;</span>
+<span id="L128">    <span class="kw">intro</span> hk w hw</span>
+<span id="L129">    <span class="kw">have</span> hst := hstep k (<span class="kw">by</span> <span class="kw">omega</span>)</span>
+<span id="L130">    <span class="kw">have</span> hne : x (ps + (k + <span class="nu">1</span>)) w ≠ a := <span class="kw">by</span></span>
+<span id="L131">      <span class="kw">rw</span> [← <span class="const token" data-verso-hover="338">Nat.add_assoc</span>]</span>
+<span id="L132">      <span class="kw">intro</span> h'</span>
+<span id="L133">      <span class="kw">rcases</span> (hst w).<span class="const token" data-verso-hover="68">mp</span> h' <span class="kw">with</span> h'' | ⟨u, hd, hu⟩</span>
+<span id="L134">      · <span class="kw">rw</span> [ih (<span class="kw">by</span> <span class="kw">omega</span>) w hw] <span class="kw">at</span> h''; <span class="kw">cases</span> a &lt;;&gt; <span class="kw">simp</span> <span class="kw">at</span> h''</span>
+<span id="L135">      · <span class="kw">have</span> huF : u ∉ F := <span class="kw">fun</span> hu' =&gt; hdead u hu' (hd.<span class="const token" data-verso-hover="348">alive</span>.<span class="const token" data-verso-hover="344">mono</span> (<span class="kw">by</span> <span class="kw">omega</span>))</span>
+<span id="L136">        <span class="kw">rw</span> [ih (<span class="kw">by</span> <span class="kw">omega</span>) u (hw.<span class="const token" data-verso-hover="410">of_adj</span> hd.<span class="const token" data-verso-hover="178">adj</span> huF)] <span class="kw">at</span> hu</span>
+<span id="L137">        <span class="kw">cases</span> a &lt;;&gt; <span class="kw">simp</span> <span class="kw">at</span> hu</span>
+<span id="L138">    <span class="kw">cases</span> a &lt;;&gt; <span class="kw">simpa</span> <span class="kw">using</span> hne</span>
+<span id="L139"></span>
+<span id="L140"><span class="dc">/-- **Pigeonhole**: among the `f + 1` disjoint pairs of phases `(2k, 2k + 1)`, `k ≤ f`, of a</span></span>
+<span id="L141"><span class="dc">window starting at `r₀`, some pair contains no crash round. -/</span></span>
+<span id="L142"><span class="kw">theorem</span> <span class="const token" data-verso-hover="411">exists_clean_pair</span> {f : <span class="const token" data-verso-hover="39">ℕ</span>} (hadm : adv.<span class="const token" data-verso-hover="140">Admissible</span> f) (r₀ D : <span class="const token" data-verso-hover="39">ℕ</span>) :</span>
+<span id="L143">    ∃ k, k ≤ f ∧ ∀ u c, adv.<span class="const token" data-verso-hover="141">crash</span> u = <span class="const token" data-verso-hover="46">some</span> c → ¬ (r₀ + <span class="nu">2</span> * k * D ≤ c ∧ c &lt; r₀ + <span class="nu">2</span> * k * D + <span class="nu">2</span> * D) := <span class="kw">by</span></span>
+<span id="L144">  <span class="kw">classical</span></span>
+<span id="L145">  <span class="kw">obtain</span> ⟨F₀, hF₀, hmem⟩ := hadm</span>
+<span id="L146">  <span class="kw">by_contra</span> hcon</span>
+<span id="L147">  push <span class="const token" data-verso-hover="51">Not</span> <span class="kw">at</span> hcon</span>
+<span id="L148">  <span class="kw">have</span> h' : ∀ k : <span class="const token" data-verso-hover="145">Fin</span> (f + <span class="nu">1</span>), ∃ u c, adv.<span class="const token" data-verso-hover="141">crash</span> u = <span class="const token" data-verso-hover="46">some</span> c ∧ r₀ + <span class="nu">2</span> * k * D ≤ c ∧</span>
+<span id="L149">      c &lt; r₀ + <span class="nu">2</span> * k * D + <span class="nu">2</span> * D := <span class="kw">fun</span> k =&gt; hcon k (<span class="kw">by</span> <span class="kw">omega</span>)</span>
+<span id="L150">  <span class="kw">choose</span> g c hg <span class="kw">using</span> h'</span>
+<span id="L151">  <span class="kw">have</span> hinj : <span class="const token" data-verso-hover="412">Set.InjOn</span> g (<span class="const token" data-verso-hover="52">univ</span> : <span class="const token" data-verso-hover="40">Finset</span> (<span class="const token" data-verso-hover="145">Fin</span> (f + <span class="nu">1</span>))) := <span class="kw">by</span></span>
+<span id="L152">    <span class="kw">intro</span> k _ k' _ hkk</span>
+<span id="L153">    <span class="kw">have</span> hc : c k = c k' := <span class="kw">by</span></span>
+<span id="L154">      <span class="kw">have</span> h1 := (hg k).<span class="const token" data-verso-hover="62">1</span></span>
+<span id="L155">      <span class="kw">have</span> h2 := (hg k').<span class="const token" data-verso-hover="62">1</span></span>
+<span id="L156">      <span class="kw">rw</span> [hkk, h2] <span class="kw">at</span> h1</span>
+<span id="L157">      <span class="kw">exact</span> (<span class="const token" data-verso-hover="361">Option.some_injective</span> _ h1).<span class="const token" data-verso-hover="231">symm</span></span>
+<span id="L158">    <span class="kw">by_contra</span> hne</span>
+<span id="L159">    <span class="kw">have</span> hk := hg k</span>
+<span id="L160">    <span class="kw">have</span> hk' := hg k'</span>
+<span id="L161">    <span class="kw">rw</span> [hc] <span class="kw">at</span> hk</span>
+<span id="L162">    <span class="kw">rcases</span> <span class="const token" data-verso-hover="413">Nat.lt_or_gt_of_ne</span> (<span class="const token" data-verso-hover="414">Fin.val_ne_of_ne</span> hne) <span class="kw">with</span> hlt | hlt</span>
+<span id="L163">    · <span class="kw">have</span> : <span class="nu">2</span> * (k : <span class="const token" data-verso-hover="39">ℕ</span>) * D + <span class="nu">2</span> * D ≤ <span class="nu">2</span> * k' * D := <span class="kw">by</span></span>
+<span id="L164">        <span class="kw">have</span> := <span class="const token" data-verso-hover="415">Nat.mul_le_mul_right</span> D (<span class="kw">show</span> <span class="nu">2</span> * (k : <span class="const token" data-verso-hover="39">ℕ</span>) + <span class="nu">2</span> ≤ <span class="nu">2</span> * k' <span class="kw">by</span> <span class="kw">omega</span>); <span class="kw">linarith</span></span>
+<span id="L165">      <span class="kw">omega</span></span>
+<span id="L166">    · <span class="kw">have</span> : <span class="nu">2</span> * (k' : <span class="const token" data-verso-hover="39">ℕ</span>) * D + <span class="nu">2</span> * D ≤ <span class="nu">2</span> * k * D := <span class="kw">by</span></span>
+<span id="L167">        <span class="kw">have</span> := <span class="const token" data-verso-hover="415">Nat.mul_le_mul_right</span> D (<span class="kw">show</span> <span class="nu">2</span> * (k' : <span class="const token" data-verso-hover="39">ℕ</span>) + <span class="nu">2</span> ≤ <span class="nu">2</span> * k <span class="kw">by</span> <span class="kw">omega</span>); <span class="kw">linarith</span></span>
+<span id="L168">      <span class="kw">omega</span></span>
+<span id="L169">  <span class="kw">have</span> := <span class="const token" data-verso-hover="156">Finset.card_le_card_of_injOn</span> g (<span class="kw">fun</span> k _ =&gt; hmem (g k) (c k) (hg k).<span class="const token" data-verso-hover="62">1</span>) hinj</span>
+<span id="L170">  <span class="kw">simp</span> <span class="kw">at</span> this</span>
+<span id="L171">  <span class="kw">omega</span></span>
+<span id="L172"></span>
+<span id="L173"><span class="dc">/-- **Agreement of the Min/Max phases** (the core of Theorem 3 and of Claim 2): if `G` satisfies</span></span>
+<span id="L174"><span class="dc">`f` CT node connectivity, `D` bounds the fault-tolerant diameter, at most `f` nodes crash and the</span></span>
+<span id="L175"><span class="dc">trajectory `x` follows the Min/Max rule in the `2f + 2` phases of the window starting at `r₀`,</span></span>
+<span id="L176"><span class="dc">then at the end of the window all nodes that have not crashed hold the same value. -/</span></span>
+<span id="L177"><span class="kw">theorem</span> <span class="const token" data-verso-hover="24">minmax_core</span> [<span class="const token" data-verso-hover="49">Fintype</span> V] {f D : <span class="const token" data-verso-hover="39">ℕ</span>} (hG : <span class="const token" data-verso-hover="10">CTConn</span> G f) (hD : <span class="const token" data-verso-hover="124">FTDiamLE</span> G f D)</span>
+<span id="L178">    (hadm : adv.<span class="const token" data-verso-hover="140">Admissible</span> f) (r₀ : <span class="const token" data-verso-hover="39">ℕ</span>)</span>
+<span id="L179">    (hstep : ∀ r, r₀ ≤ r → r &lt; r₀ + (<span class="nu">2</span> * f + <span class="nu">2</span>) * D → <span class="const token" data-verso-hover="335">AbsStep</span> G adv x r (<span class="const token" data-verso-hover="301">phaseVal</span> D r₀ r)) :</span>
+<span id="L180">    ∃ c, ∀ u, adv.<span class="const token" data-verso-hover="337">Alive</span> (r₀ + (<span class="nu">2</span> * f + <span class="nu">2</span>) * D) u → x (r₀ + (<span class="nu">2</span> * f + <span class="nu">2</span>) * D) u = c := <span class="kw">by</span></span>
+<span id="L181">  <span class="kw">classical</span></span>
+<span id="L182">  <span class="kw">obtain</span> ⟨k, hk, hclean⟩ := <span class="const token" data-verso-hover="411">exists_clean_pair</span> hadm r₀ D</span>
+<span id="L183">  <span class="kw">set</span> ps := r₀ + <span class="nu">2</span> * k * D <span class="kw">with</span> hps</span>
+<span id="L184">  <span class="kw">set</span> E := r₀ + (<span class="nu">2</span> * f + <span class="nu">2</span>) * D <span class="kw">with</span> hE</span>
+<span id="L185">  <span class="kw">have</span> hkE : ps + <span class="nu">2</span> * D ≤ E := <span class="kw">by</span></span>
+<span id="L186">    <span class="kw">have</span> := <span class="const token" data-verso-hover="415">Nat.mul_le_mul_right</span> D (<span class="kw">show</span> <span class="nu">2</span> * k + <span class="nu">2</span> ≤ <span class="nu">2</span> * f + <span class="nu">2</span> <span class="kw">by</span> <span class="kw">omega</span>)</span>
+<span id="L187">    <span class="kw">simp</span> only [hps, hE]; <span class="kw">nlinarith</span></span>
+<span id="L188">  <span class="kw">set</span> F : <span class="const token" data-verso-hover="40">Finset</span> V := <span class="const token" data-verso-hover="52">univ</span>.<span class="const token" data-verso-hover="53">filter</span> <span class="kw">fun</span> u =&gt; ¬ adv.<span class="const token" data-verso-hover="337">Alive</span> ps u</span>
+<span id="L189">  <span class="kw">have</span> hFcard : F.<span class="const token" data-verso-hover="41">card</span> ≤ f := <span class="kw">by</span></span>
+<span id="L190">    <span class="kw">obtain</span> ⟨F₀, hF₀, hmem⟩ := hadm</span>
+<span id="L191">    <span class="kw">refine</span> <span class="const token" data-verso-hover="416">le_trans</span> (<span class="const token" data-verso-hover="417">card_le_card</span> <span class="kw">fun</span> u hu =&gt; ?_) hF₀</span>
+<span id="L192">    <span class="kw">have</span> hu' : ¬ adv.<span class="const token" data-verso-hover="337">Alive</span> ps u := (<span class="const token" data-verso-hover="58">Finset.mem_filter</span>.<span class="const token" data-verso-hover="68">mp</span> hu).<span class="const token" data-verso-hover="69">2</span></span>
+<span id="L193">    <span class="kw">simp</span> only [<span class="const token" data-verso-hover="337">Adversary.Alive</span>] <span class="kw">at</span> hu'</span>
+<span id="L194">    push <span class="const token" data-verso-hover="51">Not</span> <span class="kw">at</span> hu'</span>
+<span id="L195">    <span class="kw">obtain</span> ⟨c, hc, -⟩ := hu'</span>
+<span id="L196">    <span class="kw">exact</span> hmem u c hc</span>
+<span id="L197">  <span class="kw">have</span> hdead : ∀ u ∈ F, ¬ adv.<span class="const token" data-verso-hover="337">Alive</span> ps u := <span class="kw">fun</span> u hu =&gt; (<span class="const token" data-verso-hover="58">Finset.mem_filter</span>.<span class="const token" data-verso-hover="68">mp</span> hu).<span class="const token" data-verso-hover="69">2</span></span>
+<span id="L198">  <span class="kw">have</span> halive : ∀ u, u ∉ F → adv.<span class="const token" data-verso-hover="337">Alive</span> (ps + <span class="nu">2</span> * D) u := <span class="kw">by</span></span>
+<span id="L199">    <span class="kw">intro</span> u hu c hc</span>
+<span id="L200">    <span class="kw">have</span> h1 : ps ≤ c := <span class="kw">by</span></span>
+<span id="L201">      <span class="kw">by_contra</span> h1</span>
+<span id="L202">      <span class="kw">exact</span> hu (<span class="const token" data-verso-hover="58">Finset.mem_filter</span>.<span class="const token" data-verso-hover="57">mpr</span> ⟨<span class="const token" data-verso-hover="59">mem_univ</span> _, <span class="kw">fun</span> h2 =&gt; h1 (h2 c hc)⟩)</span>
+<span id="L203">    <span class="kw">have</span> := hclean u c hc</span>
+<span id="L204">    <span class="kw">omega</span></span>
+<span id="L205">  <span class="kw">have</span> hst : ∀ r, r₀ ≤ r → r &lt; E → ∃ a, <span class="const token" data-verso-hover="335">AbsStep</span> G adv x r a := <span class="kw">fun</span> r h1 h2 =&gt; ⟨_, hstep r h1 h2⟩</span>
+<span id="L206">  <span class="kw">by_cases</span> hne : ∃ v, v ∉ F</span>
+<span id="L207">  swap</span>
+<span id="L208">  · <span class="kw">refine</span> ⟨<span class="const token" data-verso-hover="234">true</span>, <span class="kw">fun</span> u hu =&gt; <span class="const token" data-verso-hover="159">absurd</span> (hu.<span class="const token" data-verso-hover="344">mono</span> (<span class="kw">by</span> <span class="kw">omega</span> : ps ≤ E)) ?_⟩</span>
+<span id="L209">    push <span class="const token" data-verso-hover="51">Not</span> <span class="kw">at</span> hne</span>
+<span id="L210">    <span class="kw">exact</span> hdead u (hne u)</span>
+<span id="L211">  <span class="kw">obtain</span> ⟨s, hs⟩ := hG F hFcard hne</span>
+<span id="L212">  <span class="kw">have</span> hroot : <span class="const token" data-verso-hover="99">IsRoot</span> G F s := hs</span>
+<span id="L213">  <span class="kw">have</span> hmax : ∀ j &lt; D, <span class="const token" data-verso-hover="335">AbsStep</span> G adv x (ps + j) <span class="const token" data-verso-hover="234">true</span> := <span class="kw">fun</span> j hj =&gt; <span class="kw">by</span></span>
+<span id="L214">    <span class="kw">have</span> := hstep (ps + j) (<span class="kw">by</span> <span class="kw">omega</span>) (<span class="kw">by</span> <span class="kw">omega</span>)</span>
+<span id="L215">    <span class="kw">rwa</span> [<span class="const token" data-verso-hover="402">phaseVal_even</span> hj] <span class="kw">at</span> this</span>
+<span id="L216">  <span class="kw">have</span> hmin : ∀ j &lt; D, <span class="const token" data-verso-hover="335">AbsStep</span> G adv x (ps + D + j) <span class="const token" data-verso-hover="233">false</span> := <span class="kw">fun</span> j hj =&gt; <span class="kw">by</span></span>
+<span id="L217">    <span class="kw">have</span> := hstep (ps + D + j) (<span class="kw">by</span> <span class="kw">omega</span>) (<span class="kw">by</span> <span class="kw">omega</span>)</span>
+<span id="L218">    <span class="kw">rwa</span> [<span class="const token" data-verso-hover="403">phaseVal_odd</span> hj] <span class="kw">at</span> this</span>
+<span id="L219">  <span class="kw">by_cases</span> h1 : ∃ s', <span class="const token" data-verso-hover="99">IsRoot</span> G F s' ∧ x ps s' = <span class="const token" data-verso-hover="234">true</span></span>
+<span id="L220">  · <span class="cm">--</span><span class="cm"> Case I</span></span>
+<span id="L221">    <span class="kw">obtain</span> ⟨s', hs', hxs'⟩ := h1</span>
+<span id="L222">    <span class="kw">have</span> hall := <span class="const token" data-verso-hover="406">spread</span> hD hFcard hs' ps <span class="const token" data-verso-hover="234">true</span> hmax</span>
+<span id="L223">      (<span class="kw">fun</span> u hu =&gt; (halive u hu).<span class="const token" data-verso-hover="344">mono</span> (<span class="kw">by</span> <span class="kw">omega</span>)) hxs'</span>
+<span id="L224">    <span class="kw">refine</span> ⟨<span class="const token" data-verso-hover="234">true</span>, <span class="const token" data-verso-hover="340">unanimity</span> (r₁ := ps + D) (r₂ := E) (<span class="kw">fun</span> r h1 h2 =&gt; hst r (<span class="kw">by</span> <span class="kw">omega</span>) h2) ?_ E</span>
+<span id="L225">      (<span class="kw">by</span> <span class="kw">omega</span>) <span class="const token" data-verso-hover="230">le_rfl</span>⟩</span>
+<span id="L226">    <span class="kw">intro</span> u hu</span>
+<span id="L227">    <span class="kw">exact</span> hall u <span class="kw">fun</span> huF =&gt; hdead u huF (hu.<span class="const token" data-verso-hover="344">mono</span> (<span class="kw">by</span> <span class="kw">omega</span>))</span>
+<span id="L228">  · <span class="cm">--</span><span class="cm"> Case II</span></span>
+<span id="L229">    push <span class="const token" data-verso-hover="51">Not</span> <span class="kw">at</span> h1</span>
+<span id="L230">    <span class="kw">have</span> hkeep := <span class="const token" data-verso-hover="409">roots_keep</span> (D := D) ps <span class="const token" data-verso-hover="234">true</span> hmax hdead</span>
+<span id="L231">      (<span class="kw">fun</span> s' hs' =&gt; <span class="kw">by</span> <span class="kw">simpa</span> <span class="kw">using</span> h1 s' hs')</span>
+<span id="L232">    <span class="kw">have</span> hall := <span class="const token" data-verso-hover="406">spread</span> hD hFcard hroot (ps + D) <span class="const token" data-verso-hover="233">false</span> hmin</span>
+<span id="L233">      (<span class="kw">fun</span> u hu =&gt; <span class="kw">by</span> <span class="kw">simpa</span> [<span class="const token" data-verso-hover="338">Nat.add_assoc</span>, <span class="const token" data-verso-hover="418">two_mul</span>] <span class="kw">using</span> halive u hu)</span>
+<span id="L234">      (<span class="kw">by</span> <span class="kw">simpa</span> <span class="kw">using</span> hkeep D <span class="const token" data-verso-hover="230">le_rfl</span> s hroot)</span>
+<span id="L235">    <span class="kw">refine</span> ⟨<span class="const token" data-verso-hover="233">false</span>, <span class="const token" data-verso-hover="340">unanimity</span> (r₁ := ps + D + D) (r₂ := E)</span>
+<span id="L236">      (<span class="kw">fun</span> r h1 h2 =&gt; hst r (<span class="kw">by</span> <span class="kw">omega</span>) h2) ?_ E (<span class="kw">by</span> <span class="kw">omega</span>) <span class="const token" data-verso-hover="230">le_rfl</span>⟩</span>
+<span id="L237">    <span class="kw">intro</span> u hu</span>
+<span id="L238">    <span class="kw">exact</span> hall u <span class="kw">fun</span> huF =&gt; hdead u huF (hu.<span class="const token" data-verso-hover="344">mono</span> (<span class="kw">by</span> <span class="kw">omega</span>))</span>
+<span id="L239"></span>
+<span id="L240"><span class="kw">end</span> CrashConsensusDigraph</span>
+<span id="L241"></span>
+</code></div>
+        <script>
+          window.versoHoversUrl = "PODC2015/CrashConsensusDigraph/-hovers.json";</script>
+        <script src="static/lean/popper.js"></script>
+        <script src="static/lean/tippy.js"></script>
+        <script src="static/lean/marked.js"></script>
+        <script src="static/lean/highlighting.js"></script>
+        <script src="static/lean/lean.js"></script>
+        </article></main><footer class="site-footer"><div class="wrap">
+        Machine-checked formalizations of PODC papers in Lean 4. Generated with <a href="https://github.com/leanprover/verso">Verso</a> from the README files of <a href="https://github.com/vasnesterov/formal_podc">vasnesterov/formal_podc</a>.</div>
+      </footer></body>
+  </html>
+

@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="light dark">
+    <link rel="icon" href="data:,">
+    <title>OrderStatisticsPP: BiasedMedian.lean · Formal PODC</title><base href="../../../.././"><link rel="stylesheet" href="static/lean/verso-vars.css">
+    <link rel="stylesheet" href="static/lean/highlighting.css">
+    <link rel="stylesheet" href="static/lean/tippy-border.css">
+    <link rel="stylesheet" href="static/style.css">
+    <script defer="defer" src="static/site.js"></script>
+    </head>
+  <body>
+    <header class="site-header">
+      <div class="wrap">
+        <a class="brand" href=".">Formal PODC</a><nav class="top">
+          <a href=".">Search</a><a href="about/">About</a><a href="https://github.com/vasnesterov/formal_podc">GitHub</a></nav>
+        </div>
+      </header>
+    <main class="wrap"><article><nav class="breadcrumbs" aria-label="Breadcrumb">
+          <a href=".">Search</a><span class="sep">›</span><a href="PODC2026/">PODC 2026</a><span class="sep">›</span><a href="PODC2026/OrderStatisticsPP/">OrderStatisticsPP</a><span class="sep">›</span><a href="PODC2026/OrderStatisticsPP/src/">Lean source</a><span class="sep">›</span><span aria-current="page">BiasedMedian</span></nav>
+        <h1>
+          <code>BiasedMedian.lean</code></h1>
+        <div class="paper-links">
+          <p>
+            Source of <a href="PODC2026/OrderStatisticsPP/">Order statistics in population protocols — PODC 2026</a> · <a href="https://github.com/vasnesterov/formal_podc/blob/main/Papers/PODC2026/OrderStatisticsPP/BiasedMedian.lean">GitHub</a> · hover over a name for its type and documentation</p>
+          </div>
+        <div class="lean-code lean-src">
+          <code class="hl lean block" data-lean-context="BiasedMedian"><span id="L1"><span class="kw">import</span> Papers.PODC2026.OrderStatisticsPP.CopyOrMax</span>
+<span id="L2"><span class="kw">import</span> Mathlib.Probability.Distributions.Binomial</span>
+<span id="L3"></span>
+<span id="L4"><span class="dc">/-!</span></span>
+<span id="L5"><span class="dc"># Biased-Median dynamics: binomial fixation law (Theorem 2, Corollary 3)</span></span>
+<span id="L6"></span>
+<span id="L7"><span class="dc">Section 4.5: an agent `u` is drawn uniformly at random and samples two agents `v, s`</span></span>
+<span id="L8"><span class="dc">(independently and uniformly, `v = s` and `v = u` allowed; this is what Lemma 4.8's counts</span></span>
+<span id="L9"><span class="dc">`2(n-j)+1` and `2j-1` correspond to). With `m = median(X_u, X_v, X_s)`:</span></span>
+<span id="L10"><span class="dc">* if `m &gt; X_u`, set `X_u ← m`;</span></span>
+<span id="L11"><span class="dc">* otherwise, with probability `p/(1-p)` set `X_u ← m`.</span></span>
+<span id="L12"><span class="dc">Here `p ∈ (0, 1/2]`. The Median dynamics is `p = 1/2`.</span></span>
+<span id="L13"></span>
+<span id="L14"><span class="dc">* `biasedMedian_fixation`, `biasedMedian_fixation_injective` (**Theorem 2**): fixation on the</span></span>
+<span id="L15"><span class="dc">  `k`-th smallest opinion has probability `C(n-1, k-1) p^(n-k) (1-p)^(k-1)`, i.e.</span></span>
+<span id="L16"><span class="dc">  `P[X = k - 1]` for `X ~ Bin(n-1, 1-p)` (`binomLaw_eq_binomial`).</span></span>
+<span id="L17"><span class="dc">* `twoChoices_eq_median`, `twoChoices_fixation` (**Corollary 3**): binary 2-Choices with `n₁`</span></span>
+<span id="L18"><span class="dc">  agents holding `1` (`true`) fixes on `1` with probability `P[X &lt; n₁]`, `X ~ Bin(n-1, 1/2)`.</span></span>
+<span id="L19"><span class="dc">-/</span></span>
+<span id="L20"></span>
+<span id="L21"><span class="kw">set_option</span> <span class="const token" data-verso-hover="19">linter.unusedSectionVars</span> false</span>
+<span id="L22"></span>
+<span id="L23"><span class="kw">namespace</span> OrderStatisticsPP</span>
+<span id="L24"></span>
+<span id="L25"><span class="kw">open</span> Finset Matrix Filter Topology Cslib.Probability.Markov</span>
+<span id="L26"></span>
+<span id="L27"><span class="kw">variable</span> {n : <span class="const token" data-verso-hover="21">ℕ</span>} {α : <span class="kw">Type</span>*} [<span class="const token" data-verso-hover="23">LinearOrder</span> α] [<span class="const token" data-verso-hover="152">Fintype</span> α]</span>
+<span id="L28"></span>
+<span id="L29"><span class="dc">/-! ### The binomial law -/</span></span>
+<span id="L30"></span>
+<span id="L31"><span class="dc">/-- The shifted binomial law on ranks `1, …, n`: `π_k = C(n-1, k-1) p^(n-k) (1-p)^(k-1)`. -/</span></span>
+<span id="L32"><span class="kw">noncomputable</span> <span class="kw">def</span> <span class="const token" data-verso-hover="153">binomLaw</span> (n : <span class="const token" data-verso-hover="21">ℕ</span>) (p : <span class="const token" data-verso-hover="29">ℝ</span>) (k : <span class="const token" data-verso-hover="21">ℕ</span>) : <span class="const token" data-verso-hover="29">ℝ</span> :=</span>
+<span id="L33">  (<span class="const token" data-verso-hover="106">Nat.choose</span> (n - <span class="nu">1</span>) (k - <span class="nu">1</span>) : <span class="const token" data-verso-hover="29">ℝ</span>) * p ^ (n - k) * (<span class="nu">1</span> - p) ^ (k - <span class="nu">1</span>)</span>
+<span id="L34"></span>
+<span id="L35"><span class="kw">open</span> ProbabilityTheory unitInterval <span class="kw">in</span></span>
+<span id="L36"><span class="dc">/-- `binomLaw n p k` is `P[X = k - 1]` for `X ~ Bin(n - 1, 1 - p)` (Mathlib's</span></span>
+<span id="L37"><span class="dc">`ProbabilityTheory.binomial`): the rank of the fixation opinion is `1 + Bin(n - 1, 1 - p)`. -/</span></span>
+<span id="L38"><span class="kw">lemma</span> <span class="const token" data-verso-hover="7">binomLaw_eq_binomial</span> (p : <span class="const token" data-verso-hover="154">I</span>) {k : <span class="const token" data-verso-hover="21">ℕ</span>} (hk : <span class="nu">1</span> ≤ k) :</span>
+<span id="L39">    <span class="const token" data-verso-hover="153">binomLaw</span> n p k = (<span class="const token" data-verso-hover="6">binomial</span> (n - <span class="nu">1</span>) (<span class="const token" data-verso-hover="155">σ</span> p)).<span class="const token" data-verso-hover="156">real</span> {k - <span class="nu">1</span>} := <span class="kw">by</span></span>
+<span id="L40">  <span class="kw">rw</span> [<span class="const token" data-verso-hover="157">binomial_real_singleton</span>, <span class="const token" data-verso-hover="158">coe_symm_eq</span>, <span class="const token" data-verso-hover="153">binomLaw</span>, <span class="kw">show</span> n - <span class="nu">1</span> - (k - <span class="nu">1</span>) = n - k <span class="kw">by</span> <span class="kw">omega</span>]</span>
+<span id="L41">  <span class="kw">ring</span></span>
+<span id="L42"></span>
+<span id="L43"><span class="kw">lemma</span> <span class="const token" data-verso-hover="159">cumul_binomLaw</span> (p : <span class="const token" data-verso-hover="29">ℝ</span>) (hn : <span class="nu">0</span> &lt; n) : <span class="const token" data-verso-hover="40">cumul</span> (<span class="const token" data-verso-hover="153">binomLaw</span> n p) n = <span class="nu">1</span> := <span class="kw">by</span></span>
+<span id="L44">  <span class="kw">rw</span> [<span class="const token" data-verso-hover="160">cumul_eq_sum_range</span>]</span>
+<span id="L45">  <span class="kw">obtain</span> ⟨N, <span class="kw">rfl</span>⟩ : ∃ N, n = N + <span class="nu">1</span> := ⟨n - <span class="nu">1</span>, <span class="kw">by</span> <span class="kw">omega</span>⟩</span>
+<span id="L46">  <span class="kw">have</span> h := <span class="const token" data-verso-hover="161">add_pow</span> (<span class="nu">1</span> - p) p N</span>
+<span id="L47">  <span class="kw">rw</span> [<span class="kw">show</span> (<span class="nu">1</span> - p) + p = <span class="nu">1</span> <span class="kw">by</span> <span class="kw">ring</span>, <span class="const token" data-verso-hover="162">one_pow</span>] <span class="kw">at</span> h</span>
+<span id="L48">  <span class="kw">rw</span> [h]</span>
+<span id="L49">  <span class="kw">refine</span> <span class="const token" data-verso-hover="76">Finset.sum_congr</span> <span class="const token" data-verso-hover="77">rfl</span> <span class="kw">fun</span> j hj =&gt; ?_</span>
+<span id="L50">  <span class="kw">have</span> hj := <span class="const token" data-verso-hover="126">Finset.mem_range</span>.<span class="const token" data-verso-hover="68">mp</span> hj</span>
+<span id="L51">  <span class="kw">unfold</span> <span class="const token" data-verso-hover="153">binomLaw</span></span>
+<span id="L52">  <span class="kw">simp</span> only [<span class="const token" data-verso-hover="143">Nat.add_sub_cancel</span>]</span>
+<span id="L53">  <span class="kw">rw</span> [<span class="kw">show</span> N + <span class="nu">1</span> - (j + <span class="nu">1</span>) = N - j <span class="kw">by</span> <span class="kw">omega</span>]</span>
+<span id="L54">  <span class="kw">ring</span></span>
+<span id="L55"></span>
+<span id="L56"><span class="kw">lemma</span> <span class="const token" data-verso-hover="163">binomLaw_balance</span> {p : <span class="const token" data-verso-hover="29">ℝ</span>} (hp1 : p &lt; <span class="nu">1</span>) {m : <span class="const token" data-verso-hover="21">ℕ</span>} (hm : <span class="nu">1</span> ≤ m) (hmn : m + <span class="nu">1</span> ≤ n) :</span>
+<span id="L57">    <span class="const token" data-verso-hover="153">binomLaw</span> n p (m + <span class="nu">1</span>) * (p / (<span class="nu">1</span> - p)) * m = <span class="const token" data-verso-hover="153">binomLaw</span> n p m * (n - m : <span class="const token" data-verso-hover="21">ℕ</span>) := <span class="kw">by</span></span>
+<span id="L58">  <span class="kw">unfold</span> <span class="const token" data-verso-hover="153">binomLaw</span></span>
+<span id="L59">  <span class="kw">have</span> h1p : (<span class="nu">1</span> - p) ≠ <span class="nu">0</span> := <span class="kw">by</span> <span class="kw">linarith</span></span>
+<span id="L60">  <span class="kw">obtain</span> ⟨k, <span class="kw">rfl</span>⟩ : ∃ k, m = k + <span class="nu">1</span> := ⟨m - <span class="nu">1</span>, <span class="kw">by</span> <span class="kw">omega</span>⟩</span>
+<span id="L61">  <span class="kw">have</span> hc := <span class="const token" data-verso-hover="139">Nat.choose_succ_right_eq</span> (n - <span class="nu">1</span>) k</span>
+<span id="L62">  <span class="kw">have</span> hc' : ((n - <span class="nu">1</span>).<span class="const token" data-verso-hover="106">choose</span> (k + <span class="nu">1</span>) : <span class="const token" data-verso-hover="29">ℝ</span>) * (k + <span class="nu">1</span>) = ((n - <span class="nu">1</span>).<span class="const token" data-verso-hover="106">choose</span> k : <span class="const token" data-verso-hover="29">ℝ</span>) * (n - (k + <span class="nu">1</span>) : <span class="const token" data-verso-hover="21">ℕ</span>) := <span class="kw">by</span></span>
+<span id="L63">    <span class="kw">rw</span> [<span class="kw">show</span> n - (k + <span class="nu">1</span>) = n - <span class="nu">1</span> - k <span class="kw">by</span> <span class="kw">omega</span>]</span>
+<span id="L64">    <span class="kw">exact_mod_cast</span> hc</span>
+<span id="L65">  <span class="kw">simp</span> only [<span class="const token" data-verso-hover="143">Nat.add_sub_cancel</span>]</span>
+<span id="L66">  <span class="kw">have</span> e1 : (<span class="nu">1</span> - p) ^ (k + <span class="nu">1</span>) * (p / (<span class="nu">1</span> - p)) = (<span class="nu">1</span> - p) ^ k * p := <span class="kw">by</span></span>
+<span id="L67">    <span class="kw">rw</span> [<span class="const token" data-verso-hover="164">pow_succ</span>]; <span class="kw">field_simp</span></span>
+<span id="L68">  <span class="kw">have</span> e2 : p ^ (n - (k + <span class="nu">1</span>)) = p ^ (n - (k + <span class="nu">1</span> + <span class="nu">1</span>)) * p := <span class="kw">by</span></span>
+<span id="L69">    <span class="kw">rw</span> [← <span class="const token" data-verso-hover="164">pow_succ</span>]; <span class="kw">congr</span> <span class="nu">1</span>; <span class="kw">omega</span></span>
+<span id="L70">  <span class="kw">rw</span> [e2]</span>
+<span id="L71">  <span class="kw">push_cast</span></span>
+<span id="L72">  <span class="kw">calc</span> ((n - <span class="nu">1</span>).<span class="const token" data-verso-hover="106">choose</span> (k + <span class="nu">1</span>) : <span class="const token" data-verso-hover="29">ℝ</span>) * p ^ (n - (k + <span class="nu">1</span> + <span class="nu">1</span>)) * (<span class="nu">1</span> - p) ^ (k + <span class="nu">1</span>) * (p / (<span class="nu">1</span> - p)) *</span>
+<span id="L73">        ((k : <span class="const token" data-verso-hover="29">ℝ</span>) + <span class="nu">1</span>)</span>
+<span id="L74">      = (((n - <span class="nu">1</span>).<span class="const token" data-verso-hover="106">choose</span> (k + <span class="nu">1</span>) : <span class="const token" data-verso-hover="29">ℝ</span>) * ((k : <span class="const token" data-verso-hover="29">ℝ</span>) + <span class="nu">1</span>)) *</span>
+<span id="L75">          (p ^ (n - (k + <span class="nu">1</span> + <span class="nu">1</span>)) * ((<span class="nu">1</span> - p) ^ (k + <span class="nu">1</span>) * (p / (<span class="nu">1</span> - p)))) := <span class="kw">by</span> <span class="kw">ring</span></span>
+<span id="L76">    _ = (((n - <span class="nu">1</span>).<span class="const token" data-verso-hover="106">choose</span> k : <span class="const token" data-verso-hover="29">ℝ</span>) * (n - (k + <span class="nu">1</span>) : <span class="const token" data-verso-hover="21">ℕ</span>)) *</span>
+<span id="L77">          (p ^ (n - (k + <span class="nu">1</span> + <span class="nu">1</span>)) * ((<span class="nu">1</span> - p) ^ k * p)) := <span class="kw">by</span> <span class="kw">rw</span> [hc', e1]</span>
+<span id="L78">    _ = _ := <span class="kw">by</span> <span class="kw">ring</span></span>
+<span id="L79"></span>
+<span id="L80"><span class="kw">lemma</span> <span class="const token" data-verso-hover="165">binomLaw_pos</span> {p : <span class="const token" data-verso-hover="29">ℝ</span>} (hp0 : <span class="nu">0</span> &lt; p) (hp1 : p &lt; <span class="nu">1</span>) {k : <span class="const token" data-verso-hover="21">ℕ</span>} (hk : k ≤ n) :</span>
+<span id="L81">    <span class="nu">0</span> &lt; <span class="const token" data-verso-hover="153">binomLaw</span> n p k := <span class="kw">by</span></span>
+<span id="L82">  <span class="kw">unfold</span> <span class="const token" data-verso-hover="153">binomLaw</span></span>
+<span id="L83">  <span class="kw">have</span> : <span class="nu">0</span> &lt; ((n - <span class="nu">1</span>).<span class="const token" data-verso-hover="106">choose</span> (k - <span class="nu">1</span>) : <span class="const token" data-verso-hover="29">ℝ</span>) := <span class="kw">by</span></span>
+<span id="L84">    <span class="kw">exact_mod_cast</span> <span class="const token" data-verso-hover="151">Nat.choose_pos</span> (<span class="kw">by</span> <span class="kw">omega</span>)</span>
+<span id="L85">  <span class="kw">have</span> : <span class="nu">0</span> &lt; <span class="nu">1</span> - p := <span class="kw">by</span> <span class="kw">linarith</span></span>
+<span id="L86">  <span class="kw">positivity</span></span>
+<span id="L87"></span>
+<span id="L88"><span class="dc">/-! ### The dynamics -/</span></span>
+<span id="L89"></span>
+<span id="L90"><span class="dc">/-- Weights of the random choices `(u, v, s, coin)`; `coin` succeeds with probability `p/(1-p)`. -/</span></span>
+<span id="L91"><span class="kw">noncomputable</span> <span class="kw">def</span> <span class="const token" data-verso-hover="166">bmμ</span> (n : <span class="const token" data-verso-hover="21">ℕ</span>) (p : <span class="const token" data-verso-hover="29">ℝ</span>) (ω : <span class="const token" data-verso-hover="22">Fin</span> n × <span class="const token" data-verso-hover="22">Fin</span> n × <span class="const token" data-verso-hover="22">Fin</span> n × <span class="const token" data-verso-hover="167">Bool</span>) : <span class="const token" data-verso-hover="29">ℝ</span> :=</span>
+<span id="L92">  <span class="nu">1</span> / (n : <span class="const token" data-verso-hover="29">ℝ</span>) ^ <span class="nu">3</span> * (<span class="kw">if</span> ω.<span class="const token" data-verso-hover="168">2</span><span class="nu">.</span><span class="const token" data-verso-hover="168">2</span><span class="nu">.</span><span class="const token" data-verso-hover="168">2</span> <span class="kw">then</span> p / (<span class="nu">1</span> - p) <span class="kw">else</span> <span class="nu">1</span> - p / (<span class="nu">1</span> - p))</span>
+<span id="L93"></span>
+<span id="L94"><span class="dc">/-- New opinion of the activated agent `ω.1`. -/</span></span>
+<span id="L95"><span class="kw">def</span> <span class="const token" data-verso-hover="169">bmNew</span> (c : <span class="const token" data-verso-hover="20">Config</span> n α) (ω : <span class="const token" data-verso-hover="22">Fin</span> n × <span class="const token" data-verso-hover="22">Fin</span> n × <span class="const token" data-verso-hover="22">Fin</span> n × <span class="const token" data-verso-hover="167">Bool</span>) : α :=</span>
+<span id="L96">  <span class="kw">if</span> c ω.<span class="const token" data-verso-hover="170">1</span> &lt; <span class="const token" data-verso-hover="99">med3</span> (c ω.<span class="const token" data-verso-hover="170">1</span>) (c ω.<span class="const token" data-verso-hover="168">2</span><span class="nu">.</span><span class="const token" data-verso-hover="170">1</span>) (c ω.<span class="const token" data-verso-hover="168">2</span><span class="nu">.</span><span class="const token" data-verso-hover="168">2</span><span class="nu">.</span><span class="const token" data-verso-hover="170">1</span>) ∨ ω.<span class="const token" data-verso-hover="168">2</span><span class="nu">.</span><span class="const token" data-verso-hover="168">2</span><span class="nu">.</span><span class="const token" data-verso-hover="168">2</span> <span class="kw">then</span></span>
+<span id="L97">    <span class="const token" data-verso-hover="99">med3</span> (c ω.<span class="const token" data-verso-hover="170">1</span>) (c ω.<span class="const token" data-verso-hover="168">2</span><span class="nu">.</span><span class="const token" data-verso-hover="170">1</span>) (c ω.<span class="const token" data-verso-hover="168">2</span><span class="nu">.</span><span class="const token" data-verso-hover="168">2</span><span class="nu">.</span><span class="const token" data-verso-hover="170">1</span>) <span class="kw">else</span> c ω.<span class="const token" data-verso-hover="170">1</span></span>
+<span id="L98"></span>
+<span id="L99"><span class="dc">/-- **Biased-Median dynamics** on the clique (Section 4.5). -/</span></span>
+<span id="L100"><span class="kw">noncomputable</span> <span class="kw">def</span> <span class="const token" data-verso-hover="171">biasedMedian</span> (n : <span class="const token" data-verso-hover="21">ℕ</span>) (α : <span class="kw">Type</span>*) [<span class="const token" data-verso-hover="23">LinearOrder</span> α] (p : <span class="const token" data-verso-hover="29">ℝ</span>) :</span>
+<span id="L101">    <span class="const token" data-verso-hover="172">Matrix</span> (<span class="const token" data-verso-hover="20">Config</span> n α) (<span class="const token" data-verso-hover="20">Config</span> n α) <span class="const token" data-verso-hover="29">ℝ</span> :=</span>
+<span id="L102">  <span class="const token" data-verso-hover="173">randomMap</span> (<span class="const token" data-verso-hover="166">bmμ</span> n p) (<span class="kw">fun</span> ω c =&gt; <span class="const token" data-verso-hover="71">Function.update</span> c ω.<span class="const token" data-verso-hover="170">1</span> (<span class="const token" data-verso-hover="169">bmNew</span> c ω))</span>
+<span id="L103"></span>
+<span id="L104"><span class="kw">variable</span> {p : <span class="const token" data-verso-hover="29">ℝ</span>}</span>
+<span id="L105"></span>
+<span id="L106"><span class="kw">lemma</span> <span class="const token" data-verso-hover="174">bmμ_nonneg</span> (hp0 : <span class="nu">0</span> &lt; p) (hp : p ≤ <span class="nu">1</span> / <span class="nu">2</span>) (ω : <span class="const token" data-verso-hover="22">Fin</span> n × <span class="const token" data-verso-hover="22">Fin</span> n × <span class="const token" data-verso-hover="22">Fin</span> n × <span class="const token" data-verso-hover="167">Bool</span>) :</span>
+<span id="L107">    <span class="nu">0</span> ≤ <span class="const token" data-verso-hover="166">bmμ</span> n p ω := <span class="kw">by</span></span>
+<span id="L108">  <span class="kw">unfold</span> <span class="const token" data-verso-hover="166">bmμ</span></span>
+<span id="L109">  <span class="kw">have</span> h1 : <span class="nu">0</span> &lt; <span class="nu">1</span> - p := <span class="kw">by</span> <span class="kw">linarith</span></span>
+<span id="L110">  <span class="kw">have</span> h2 : p / (<span class="nu">1</span> - p) ≤ <span class="nu">1</span> := <span class="kw">by</span> <span class="kw">rw</span> [<span class="const token" data-verso-hover="175">div_le_one</span> h1]; <span class="kw">linarith</span></span>
+<span id="L111">  <span class="kw">refine</span> <span class="const token" data-verso-hover="176">mul_nonneg</span> (<span class="kw">by</span> <span class="kw">positivity</span>) ?_</span>
+<span id="L112">  <span class="kw">split_ifs</span></span>
+<span id="L113">  · <span class="kw">exact</span> <span class="const token" data-verso-hover="177">div_nonneg</span> hp0.<span class="const token" data-verso-hover="178">le</span> h1.<span class="const token" data-verso-hover="178">le</span></span>
+<span id="L114">  · <span class="kw">linarith</span></span>
+<span id="L115"></span>
+<span id="L116"><span class="kw">lemma</span> <span class="const token" data-verso-hover="179">bmμ_sum</span> (hn : <span class="nu">0</span> &lt; n) : ∑ ω, <span class="const token" data-verso-hover="166">bmμ</span> n p ω = <span class="nu">1</span> := <span class="kw">by</span></span>
+<span id="L117">  <span class="kw">unfold</span> <span class="const token" data-verso-hover="166">bmμ</span></span>
+<span id="L118">  <span class="kw">simp</span> only [<span class="const token" data-verso-hover="180">Fintype.sum_prod_type</span>, <span class="const token" data-verso-hover="181">Fintype.sum_bool</span>, <span class="const token" data-verso-hover="182">ite_true</span>, <span class="const token" data-verso-hover="183">Bool.false_eq_true</span>, <span class="const token" data-verso-hover="184">ite_false</span>]</span>
+<span id="L119">  <span class="kw">simp</span> only [← <span class="const token" data-verso-hover="185">mul_add</span>, <span class="const token" data-verso-hover="186">add_sub_cancel</span>, <span class="const token" data-verso-hover="187">mul_one</span>, <span class="const token" data-verso-hover="188">Finset.sum_const</span>, <span class="const token" data-verso-hover="189">Finset.card_univ</span>,</span>
+<span id="L120">    <span class="const token" data-verso-hover="190">Fintype.card_fin</span>, <span class="const token" data-verso-hover="191">nsmul_eq_mul</span>]</span>
+<span id="L121">  <span class="kw">have</span> : (n : <span class="const token" data-verso-hover="29">ℝ</span>) ≠ <span class="nu">0</span> := <span class="kw">by</span> <span class="kw">exact_mod_cast</span> hn.<span class="const token" data-verso-hover="134">ne'</span></span>
+<span id="L122">  <span class="kw">field_simp</span></span>
+<span id="L123"></span>
+<span id="L124"><span class="kw">lemma</span> <span class="const token" data-verso-hover="192">biasedMedian_mem</span> (hn : <span class="nu">0</span> &lt; n) (hp0 : <span class="nu">0</span> &lt; p) (hp : p ≤ <span class="nu">1</span> / <span class="nu">2</span>) :</span>
+<span id="L125">    <span class="const token" data-verso-hover="171">biasedMedian</span> n α p ∈ <span class="const token" data-verso-hover="193">rowStochastic</span> <span class="const token" data-verso-hover="29">ℝ</span> _ :=</span>
+<span id="L126">  <span class="const token" data-verso-hover="194">randomMap_mem_rowStochastic</span> (<span class="const token" data-verso-hover="174">bmμ_nonneg</span> hp0 hp) (<span class="const token" data-verso-hover="179">bmμ_sum</span> hn) _</span>
+<span id="L127"></span>
+<span id="L128"><span class="kw">lemma</span> <span class="const token" data-verso-hover="195">biasedMedian_absorbing</span> (z : α) (s : <span class="const token" data-verso-hover="20">Config</span> n α) (hs : s ≠ <span class="const token" data-verso-hover="24">const</span> z) :</span>
+<span id="L129">    <span class="const token" data-verso-hover="171">biasedMedian</span> n α p (<span class="const token" data-verso-hover="24">const</span> z) s = <span class="nu">0</span> :=</span>
+<span id="L130">  <span class="const token" data-verso-hover="196">randomMap_eq_zero_of_fixed</span> (<span class="kw">fun</span> ω =&gt; <span class="kw">by</span></span>
+<span id="L131">    <span class="kw">funext</span> v; <span class="kw">simp</span> [<span class="const token" data-verso-hover="169">bmNew</span>, <span class="const token" data-verso-hover="24">const</span>, <span class="const token" data-verso-hover="101">med3_self</span>, <span class="const token" data-verso-hover="197">Function.update_apply</span>]) hs</span>
+<span id="L132"></span>
+<span id="L133"><span class="kw">lemma</span> <span class="const token" data-verso-hover="198">biasedMedian_reach</span> (hn : <span class="nu">0</span> &lt; n) (hp0 : <span class="nu">0</span> &lt; p) (hp : p ≤ <span class="nu">1</span> / <span class="nu">2</span>) (c : <span class="const token" data-verso-hover="20">Config</span> n α) :</span>
+<span id="L134">    ∃ z, <span class="const token" data-verso-hover="199">Relation.ReflTransGen</span> (<span class="kw">fun</span> a b =&gt; <span class="nu">0</span> &lt; <span class="const token" data-verso-hover="171">biasedMedian</span> n α p a b) c (<span class="const token" data-verso-hover="24">const</span> z) := <span class="kw">by</span></span>
+<span id="L135">  <span class="kw">refine</span> <span class="const token" data-verso-hover="200">reach_const_of_step</span> hn _ (<span class="kw">fun</span> c M hle hex hlt =&gt; ?_) c</span>
+<span id="L136">  <span class="kw">obtain</span> ⟨t, ht⟩ := hex</span>
+<span id="L137">  <span class="kw">obtain</span> ⟨u, hu⟩ := hlt</span>
+<span id="L138">  <span class="kw">refine</span> ⟨u, hu, ?_⟩</span>
+<span id="L139">  <span class="kw">have</span> h1 : <span class="nu">0</span> &lt; <span class="nu">1</span> - p := <span class="kw">by</span> <span class="kw">linarith</span></span>
+<span id="L140">  <span class="kw">have</span> := <span class="const token" data-verso-hover="201">randomMap_pos</span> (<span class="const token" data-verso-hover="174">bmμ_nonneg</span> hp0 hp)</span>
+<span id="L141">    (<span class="kw">fun</span> ω (c : <span class="const token" data-verso-hover="20">Config</span> n α) =&gt; <span class="const token" data-verso-hover="71">Function.update</span> c ω.<span class="const token" data-verso-hover="170">1</span> (<span class="const token" data-verso-hover="169">bmNew</span> c ω))</span>
+<span id="L142">    (ω := (u, t, t, <span class="const token" data-verso-hover="202">true</span>)) (<span class="kw">by</span> <span class="kw">unfold</span> <span class="const token" data-verso-hover="166">bmμ</span>; <span class="kw">simp</span> only [<span class="const token" data-verso-hover="182">ite_true</span>]; <span class="kw">positivity</span>) c</span>
+<span id="L143">  <span class="kw">unfold</span> <span class="const token" data-verso-hover="171">biasedMedian</span></span>
+<span id="L144">  <span class="kw">have</span> hm : <span class="const token" data-verso-hover="99">med3</span> (c u) (c t) (c t) = M := <span class="kw">by</span> <span class="kw">rw</span> [ht]; <span class="kw">exact</span> <span class="const token" data-verso-hover="102">med3_eq_of_eq</span> (hle u)</span>
+<span id="L145">  <span class="kw">simpa</span> [<span class="const token" data-verso-hover="169">bmNew</span>, hm, hu] <span class="kw">using</span> this</span>
+<span id="L146"></span>
+<span id="L147"><span class="dc">/-- Per-choice contributions of the Biased-Median dynamics to the up/down probabilities. -/</span></span>
+<span id="L148"><span class="kw">lemma</span> <span class="const token" data-verso-hover="203">bm_up_term</span> {D : <span class="const token" data-verso-hover="26">Set</span> α} (hD : <span class="const token" data-verso-hover="89">IsLowerSet</span> D) (c : <span class="const token" data-verso-hover="20">Config</span> n α)</span>
+<span id="L149">    (ω : <span class="const token" data-verso-hover="22">Fin</span> n × <span class="const token" data-verso-hover="22">Fin</span> n × <span class="const token" data-verso-hover="22">Fin</span> n × <span class="const token" data-verso-hover="167">Bool</span>) :</span>
+<span id="L150">    (<span class="nu">1</span> - <span class="const token" data-verso-hover="28">ind</span> D (c ω.<span class="const token" data-verso-hover="170">1</span>)) * <span class="const token" data-verso-hover="28">ind</span> D (<span class="const token" data-verso-hover="169">bmNew</span> c ω) =</span>
+<span id="L151">      (<span class="kw">if</span> ω.<span class="const token" data-verso-hover="168">2</span><span class="nu">.</span><span class="const token" data-verso-hover="168">2</span><span class="nu">.</span><span class="const token" data-verso-hover="168">2</span> <span class="kw">then</span> <span class="nu">1</span> <span class="kw">else</span> <span class="nu">0</span>) * ((<span class="nu">1</span> - <span class="const token" data-verso-hover="28">ind</span> D (c ω.<span class="const token" data-verso-hover="170">1</span>)) * (<span class="const token" data-verso-hover="28">ind</span> D (c ω.<span class="const token" data-verso-hover="168">2</span><span class="nu">.</span><span class="const token" data-verso-hover="170">1</span>) * <span class="const token" data-verso-hover="28">ind</span> D (c ω.<span class="const token" data-verso-hover="168">2</span><span class="nu">.</span><span class="const token" data-verso-hover="168">2</span><span class="nu">.</span><span class="const token" data-verso-hover="170">1</span>))) := <span class="kw">by</span></span>
+<span id="L152">  <span class="kw">obtain</span> ⟨u, v, s, b⟩ := ω</span>
+<span id="L153">  <span class="kw">simp</span> only [<span class="const token" data-verso-hover="169">bmNew</span>]</span>
+<span id="L154">  <span class="kw">by_cases</span> hu : c u ∈ D</span>
+<span id="L155">  · <span class="kw">simp</span> [<span class="const token" data-verso-hover="51">ind_mem</span> hu]</span>
+<span id="L156">  · <span class="kw">have</span> hm : <span class="const token" data-verso-hover="99">med3</span> (c u) (c v) (c s) ∈ D ↔ c v ∈ D ∧ c s ∈ D := <span class="kw">by</span></span>
+<span id="L157">      <span class="kw">rw</span> [<span class="const token" data-verso-hover="100">med3_mem_iff</span> hD]; <span class="kw">tauto</span></span>
+<span id="L158">    <span class="kw">by_cases</span> hms : <span class="const token" data-verso-hover="99">med3</span> (c u) (c v) (c s) ∈ D</span>
+<span id="L159">    · <span class="kw">have</span> hnlt : ¬ c u &lt; <span class="const token" data-verso-hover="99">med3</span> (c u) (c v) (c s) := <span class="kw">fun</span> h =&gt; hu (hD h.<span class="const token" data-verso-hover="178">le</span> hms)</span>
+<span id="L160">      <span class="kw">obtain</span> ⟨hv, hs⟩ := hm.<span class="const token" data-verso-hover="68">mp</span> hms</span>
+<span id="L161">      <span class="kw">cases</span> b &lt;;&gt; <span class="kw">simp</span> [hnlt, <span class="const token" data-verso-hover="51">ind_mem</span>, <span class="const token" data-verso-hover="52">ind_not_mem</span>, hu, hms, hv, hs]</span>
+<span id="L162">    · <span class="kw">have</span> hvs : ¬ (c v ∈ D ∧ c s ∈ D) := <span class="kw">fun</span> h =&gt; hms (hm.<span class="const token" data-verso-hover="67">mpr</span> h)</span>
+<span id="L163">      <span class="kw">have</span> : <span class="const token" data-verso-hover="28">ind</span> D (c v) * <span class="const token" data-verso-hover="28">ind</span> D (c s) = <span class="nu">0</span> := <span class="kw">by</span></span>
+<span id="L164">        <span class="kw">by_cases</span> hv : c v ∈ D</span>
+<span id="L165">        · <span class="kw">rw</span> [<span class="const token" data-verso-hover="52">ind_not_mem</span> (<span class="kw">fun</span> hs =&gt; hvs ⟨hv, hs⟩)]; <span class="kw">ring</span></span>
+<span id="L166">        · <span class="kw">rw</span> [<span class="const token" data-verso-hover="52">ind_not_mem</span> hv]; <span class="kw">ring</span></span>
+<span id="L167">      <span class="kw">rw</span> [this]</span>
+<span id="L168">      <span class="kw">split_ifs</span> &lt;;&gt; <span class="kw">simp</span> [<span class="const token" data-verso-hover="52">ind_not_mem</span>, hu, hms]</span>
+<span id="L169"></span>
+<span id="L170"><span class="kw">lemma</span> <span class="const token" data-verso-hover="204">bm_down_term</span> {D : <span class="const token" data-verso-hover="26">Set</span> α} (hD : <span class="const token" data-verso-hover="89">IsLowerSet</span> D) (c : <span class="const token" data-verso-hover="20">Config</span> n α)</span>
+<span id="L171">    (ω : <span class="const token" data-verso-hover="22">Fin</span> n × <span class="const token" data-verso-hover="22">Fin</span> n × <span class="const token" data-verso-hover="22">Fin</span> n × <span class="const token" data-verso-hover="167">Bool</span>) :</span>
+<span id="L172">    <span class="const token" data-verso-hover="28">ind</span> D (c ω.<span class="const token" data-verso-hover="170">1</span>) * (<span class="nu">1</span> - <span class="const token" data-verso-hover="28">ind</span> D (<span class="const token" data-verso-hover="169">bmNew</span> c ω)) =</span>
+<span id="L173">      <span class="const token" data-verso-hover="28">ind</span> D (c ω.<span class="const token" data-verso-hover="170">1</span>) * ((<span class="nu">1</span> - <span class="const token" data-verso-hover="28">ind</span> D (c ω.<span class="const token" data-verso-hover="168">2</span><span class="nu">.</span><span class="const token" data-verso-hover="170">1</span>)) * (<span class="nu">1</span> - <span class="const token" data-verso-hover="28">ind</span> D (c ω.<span class="const token" data-verso-hover="168">2</span><span class="nu">.</span><span class="const token" data-verso-hover="168">2</span><span class="nu">.</span><span class="const token" data-verso-hover="170">1</span>))) := <span class="kw">by</span></span>
+<span id="L174">  <span class="kw">obtain</span> ⟨u, v, s, b⟩ := ω</span>
+<span id="L175">  <span class="kw">simp</span> only [<span class="const token" data-verso-hover="169">bmNew</span>]</span>
+<span id="L176">  <span class="kw">by_cases</span> hu : c u ∈ D</span>
+<span id="L177">  · <span class="kw">have</span> hm : <span class="const token" data-verso-hover="99">med3</span> (c u) (c v) (c s) ∈ D ↔ c v ∈ D ∨ c s ∈ D := <span class="kw">by</span></span>
+<span id="L178">      <span class="kw">rw</span> [<span class="const token" data-verso-hover="100">med3_mem_iff</span> hD]; <span class="kw">tauto</span></span>
+<span id="L179">    <span class="kw">by_cases</span> hms : <span class="const token" data-verso-hover="99">med3</span> (c u) (c v) (c s) ∈ D</span>
+<span id="L180">    · <span class="kw">have</span> : (<span class="nu">1</span> - <span class="const token" data-verso-hover="28">ind</span> D (c v)) * (<span class="nu">1</span> - <span class="const token" data-verso-hover="28">ind</span> D (c s)) = <span class="nu">0</span> := <span class="kw">by</span></span>
+<span id="L181">        <span class="kw">rcases</span> hm.<span class="const token" data-verso-hover="68">mp</span> hms <span class="kw">with</span> h | h &lt;;&gt; <span class="kw">simp</span> [<span class="const token" data-verso-hover="51">ind_mem</span> h]</span>
+<span id="L182">      <span class="kw">rw</span> [this]</span>
+<span id="L183">      <span class="kw">split_ifs</span> &lt;;&gt; <span class="kw">simp</span> [<span class="const token" data-verso-hover="51">ind_mem</span>, hu, hms]</span>
+<span id="L184">    · <span class="kw">have</span> hlt : c u &lt; <span class="const token" data-verso-hover="99">med3</span> (c u) (c v) (c s) := <span class="const token" data-verso-hover="205">lt_of_not_ge</span> <span class="kw">fun</span> h =&gt; hms (hD h hu)</span>
+<span id="L185">      <span class="kw">have</span> hv : c v ∉ D := <span class="kw">fun</span> h =&gt; hms (hm.<span class="const token" data-verso-hover="67">mpr</span> (<span class="const token" data-verso-hover="83">Or.inl</span> h))</span>
+<span id="L186">      <span class="kw">have</span> hs : c s ∉ D := <span class="kw">fun</span> h =&gt; hms (hm.<span class="const token" data-verso-hover="67">mpr</span> (<span class="const token" data-verso-hover="82">Or.inr</span> h))</span>
+<span id="L187">      <span class="kw">simp</span> [hlt, <span class="const token" data-verso-hover="51">ind_mem</span> hu, <span class="const token" data-verso-hover="52">ind_not_mem</span> hms, <span class="const token" data-verso-hover="52">ind_not_mem</span> hv, <span class="const token" data-verso-hover="52">ind_not_mem</span> hs]</span>
+<span id="L188">  · <span class="kw">simp</span> [<span class="const token" data-verso-hover="52">ind_not_mem</span> hu]</span>
+<span id="L189"></span>
+<span id="L190"><span class="dc">/-- `∑_u ∑_v ∑_s f u * (g v * h s) = (∑ f) (∑ g) (∑ h)`. -/</span></span>
+<span id="L191"><span class="kw">lemma</span> <span class="const token" data-verso-hover="206">sum_triple</span> (f g h : <span class="const token" data-verso-hover="22">Fin</span> n → <span class="const token" data-verso-hover="29">ℝ</span>) :</span>
+<span id="L192">    ∑ u, ∑ v, ∑ s, f u * (g v * h s) = (∑ u, f u) * ((∑ v, g v) * (∑ s, h s)) := <span class="kw">by</span></span>
+<span id="L193">  simp_rw [<span class="const token" data-verso-hover="207">Finset.sum_mul</span>, <span class="const token" data-verso-hover="125">Finset.mul_sum</span>]</span>
+<span id="L194"></span>
+<span id="L195"><span class="kw">lemma</span> <span class="const token" data-verso-hover="208">sum_one_sub_ind</span> (D : <span class="const token" data-verso-hover="26">Set</span> α) (c : <span class="const token" data-verso-hover="20">Config</span> n α) :</span>
+<span id="L196">    ∑ u, (<span class="nu">1</span> - <span class="const token" data-verso-hover="28">ind</span> D (c u)) = (n : <span class="const token" data-verso-hover="29">ℝ</span>) - <span class="const token" data-verso-hover="25">cnt</span> D c := <span class="kw">by</span></span>
+<span id="L197">  <span class="kw">rw</span> [<span class="const token" data-verso-hover="209">Finset.sum_sub_distrib</span>, <span class="const token" data-verso-hover="54">cnt_eq_sum</span>]; <span class="kw">simp</span></span>
+<span id="L198"></span>
+<span id="L199"><span class="dc">/-- Up/down probabilities of the Biased-Median dynamics for a lower set `D`. -/</span></span>
+<span id="L200"><span class="kw">lemma</span> <span class="const token" data-verso-hover="210">bm_upMass</span> {D : <span class="const token" data-verso-hover="26">Set</span> α} (hD : <span class="const token" data-verso-hover="89">IsLowerSet</span> D) (c : <span class="const token" data-verso-hover="20">Config</span> n α) :</span>
+<span id="L201">    <span class="const token" data-verso-hover="211">upMass</span> (<span class="const token" data-verso-hover="166">bmμ</span> n p) (<span class="kw">fun</span> ω _ =&gt; ω.<span class="const token" data-verso-hover="170">1</span>) (<span class="kw">fun</span> ω c =&gt; <span class="const token" data-verso-hover="169">bmNew</span> c ω) D c =</span>
+<span id="L202">      <span class="nu">1</span> / (n : <span class="const token" data-verso-hover="29">ℝ</span>) ^ <span class="nu">3</span> * (p / (<span class="nu">1</span> - p)) * (((n : <span class="const token" data-verso-hover="29">ℝ</span>) - <span class="const token" data-verso-hover="25">cnt</span> D c) * ((<span class="const token" data-verso-hover="25">cnt</span> D c : <span class="const token" data-verso-hover="29">ℝ</span>) * <span class="const token" data-verso-hover="25">cnt</span> D c)) := <span class="kw">by</span></span>
+<span id="L203">  <span class="kw">unfold</span> <span class="const token" data-verso-hover="211">upMass</span></span>
+<span id="L204">  simp_rw [<span class="const token" data-verso-hover="203">bm_up_term</span> hD c]</span>
+<span id="L205">  <span class="kw">unfold</span> <span class="const token" data-verso-hover="166">bmμ</span></span>
+<span id="L206">  <span class="kw">simp</span> only [<span class="const token" data-verso-hover="180">Fintype.sum_prod_type</span>, <span class="const token" data-verso-hover="181">Fintype.sum_bool</span>, <span class="const token" data-verso-hover="182">ite_true</span>, <span class="const token" data-verso-hover="183">Bool.false_eq_true</span>, <span class="const token" data-verso-hover="184">ite_false</span>]</span>
+<span id="L207">  <span class="kw">rw</span> [← <span class="const token" data-verso-hover="208">sum_one_sub_ind</span>, <span class="const token" data-verso-hover="54">cnt_eq_sum</span>, ← <span class="const token" data-verso-hover="206">sum_triple</span>, <span class="const token" data-verso-hover="125">Finset.mul_sum</span>]</span>
+<span id="L208">  <span class="kw">refine</span> <span class="const token" data-verso-hover="76">Finset.sum_congr</span> <span class="const token" data-verso-hover="77">rfl</span> <span class="kw">fun</span> u _ =&gt; ?_</span>
+<span id="L209">  <span class="kw">rw</span> [<span class="const token" data-verso-hover="125">Finset.mul_sum</span>]</span>
+<span id="L210">  <span class="kw">refine</span> <span class="const token" data-verso-hover="76">Finset.sum_congr</span> <span class="const token" data-verso-hover="77">rfl</span> <span class="kw">fun</span> v _ =&gt; ?_</span>
+<span id="L211">  <span class="kw">rw</span> [<span class="const token" data-verso-hover="125">Finset.mul_sum</span>]</span>
+<span id="L212">  <span class="kw">refine</span> <span class="const token" data-verso-hover="76">Finset.sum_congr</span> <span class="const token" data-verso-hover="77">rfl</span> <span class="kw">fun</span> s _ =&gt; ?_</span>
+<span id="L213">  <span class="kw">ring</span></span>
+<span id="L214"></span>
+<span id="L215"><span class="dc">/-- Up/down probabilities of the Biased-Median dynamics for a lower set `D`. -/</span></span>
+<span id="L216"><span class="kw">lemma</span> <span class="const token" data-verso-hover="212">bm_downMass</span> {D : <span class="const token" data-verso-hover="26">Set</span> α} (hD : <span class="const token" data-verso-hover="89">IsLowerSet</span> D) (c : <span class="const token" data-verso-hover="20">Config</span> n α) :</span>
+<span id="L217">    <span class="const token" data-verso-hover="213">downMass</span> (<span class="const token" data-verso-hover="166">bmμ</span> n p) (<span class="kw">fun</span> ω _ =&gt; ω.<span class="const token" data-verso-hover="170">1</span>) (<span class="kw">fun</span> ω c =&gt; <span class="const token" data-verso-hover="169">bmNew</span> c ω) D c =</span>
+<span id="L218">      <span class="nu">1</span> / (n : <span class="const token" data-verso-hover="29">ℝ</span>) ^ <span class="nu">3</span> * ((<span class="const token" data-verso-hover="25">cnt</span> D c : <span class="const token" data-verso-hover="29">ℝ</span>) * (((n : <span class="const token" data-verso-hover="29">ℝ</span>) - <span class="const token" data-verso-hover="25">cnt</span> D c) * ((n : <span class="const token" data-verso-hover="29">ℝ</span>) - <span class="const token" data-verso-hover="25">cnt</span> D c))) := <span class="kw">by</span></span>
+<span id="L219">  <span class="kw">unfold</span> <span class="const token" data-verso-hover="213">downMass</span></span>
+<span id="L220">  simp_rw [<span class="const token" data-verso-hover="204">bm_down_term</span> hD c]</span>
+<span id="L221">  <span class="kw">unfold</span> <span class="const token" data-verso-hover="166">bmμ</span></span>
+<span id="L222">  <span class="kw">simp</span> only [<span class="const token" data-verso-hover="180">Fintype.sum_prod_type</span>, <span class="const token" data-verso-hover="181">Fintype.sum_bool</span>, <span class="const token" data-verso-hover="182">ite_true</span>, <span class="const token" data-verso-hover="183">Bool.false_eq_true</span>, <span class="const token" data-verso-hover="184">ite_false</span>]</span>
+<span id="L223">  <span class="kw">rw</span> [← <span class="const token" data-verso-hover="208">sum_one_sub_ind</span>, <span class="const token" data-verso-hover="54">cnt_eq_sum</span>, ← <span class="const token" data-verso-hover="206">sum_triple</span>, <span class="const token" data-verso-hover="125">Finset.mul_sum</span>]</span>
+<span id="L224">  <span class="kw">refine</span> <span class="const token" data-verso-hover="76">Finset.sum_congr</span> <span class="const token" data-verso-hover="77">rfl</span> <span class="kw">fun</span> u _ =&gt; ?_</span>
+<span id="L225">  <span class="kw">rw</span> [<span class="const token" data-verso-hover="125">Finset.mul_sum</span>]</span>
+<span id="L226">  <span class="kw">refine</span> <span class="const token" data-verso-hover="76">Finset.sum_congr</span> <span class="const token" data-verso-hover="77">rfl</span> <span class="kw">fun</span> v _ =&gt; ?_</span>
+<span id="L227">  <span class="kw">rw</span> [<span class="const token" data-verso-hover="125">Finset.mul_sum</span>]</span>
+<span id="L228">  <span class="kw">refine</span> <span class="const token" data-verso-hover="76">Finset.sum_congr</span> <span class="const token" data-verso-hover="77">rfl</span> <span class="kw">fun</span> s _ =&gt; ?_</span>
+<span id="L229">  <span class="kw">ring</span></span>
+<span id="L230"></span>
+<span id="L231"><span class="kw">lemma</span> <span class="const token" data-verso-hover="214">biasedMedian_harmonic</span> (hn : <span class="nu">0</span> &lt; n) (hp1 : p &lt; <span class="nu">1</span>) (D : <span class="const token" data-verso-hover="26">Set</span> α) (hD : <span class="const token" data-verso-hover="89">IsLowerSet</span> D) :</span>
+<span id="L232">    <span class="const token" data-verso-hover="171">biasedMedian</span> n α p *ᵥ (<span class="kw">fun</span> c : <span class="const token" data-verso-hover="20">Config</span> n α =&gt; <span class="const token" data-verso-hover="40">cumul</span> (<span class="const token" data-verso-hover="153">binomLaw</span> n p) (<span class="const token" data-verso-hover="25">cnt</span> D c)) =</span>
+<span id="L233">      <span class="kw">fun</span> c =&gt; <span class="const token" data-verso-hover="40">cumul</span> (<span class="const token" data-verso-hover="153">binomLaw</span> n p) (<span class="const token" data-verso-hover="25">cnt</span> D c) := <span class="kw">by</span></span>
+<span id="L234">  <span class="kw">refine</span> <span class="const token" data-verso-hover="215">harmonic_of_balance</span> (<span class="const token" data-verso-hover="166">bmμ</span> n p) (<span class="const token" data-verso-hover="179">bmμ_sum</span> hn) (<span class="kw">fun</span> ω _ =&gt; ω.<span class="const token" data-verso-hover="170">1</span>)</span>
+<span id="L235">    (<span class="kw">fun</span> ω c =&gt; <span class="const token" data-verso-hover="169">bmNew</span> c ω) _ D ?_</span>
+<span id="L236">  <span class="kw">intro</span> c</span>
+<span id="L237">  <span class="kw">rw</span> [<span class="const token" data-verso-hover="210">bm_upMass</span> hD, <span class="const token" data-verso-hover="212">bm_downMass</span> hD]</span>
+<span id="L238">  <span class="kw">set</span> m := <span class="const token" data-verso-hover="25">cnt</span> D c <span class="kw">with</span> hm</span>
+<span id="L239">  <span class="kw">have</span> hmn : m ≤ n := <span class="const token" data-verso-hover="56">cnt_le</span> D c</span>
+<span id="L240">  <span class="kw">by_cases</span> h0 : m = <span class="nu">0</span></span>
+<span id="L241">  · <span class="kw">rw</span> [h0]; <span class="kw">simp</span></span>
+<span id="L242">  <span class="kw">by_cases</span> hn' : m = n</span>
+<span id="L243">  · <span class="kw">rw</span> [hn']; <span class="kw">simp</span></span>
+<span id="L244">  <span class="kw">have</span> hb := <span class="const token" data-verso-hover="163">binomLaw_balance</span> (n := n) hp1 (m := m) (<span class="kw">by</span> <span class="kw">omega</span>) (<span class="kw">by</span> <span class="kw">omega</span>)</span>
+<span id="L245">  <span class="kw">rw</span> [<span class="const token" data-verso-hover="142">Nat.cast_sub</span> hmn] <span class="kw">at</span> hb</span>
+<span id="L246">  linear_combination (<span class="nu">1</span> / (n : <span class="const token" data-verso-hover="29">ℝ</span>) ^ <span class="nu">3</span> * ((m : <span class="const token" data-verso-hover="29">ℝ</span>) * ((n : <span class="const token" data-verso-hover="29">ℝ</span>) - m))) * hb</span>
+<span id="L247"></span>
+<span id="L248"><span class="dc">/-- **Theorem 2** (general initial configurations, ties summed): the Biased-Median dynamics with</span></span>
+<span id="L249"><span class="dc">`p ∈ (0, 1/2]` fixes on `x` with probability `∑ C(n-1, k-1) p^(n-k) (1-p)^(k-1)` over the ranks</span></span>
+<span id="L250"><span class="dc">`k` of `x`. -/</span></span>
+<span id="L251"><span class="kw">theorem</span> <span class="const token" data-verso-hover="2">biasedMedian_fixation</span> (hn : <span class="nu">0</span> &lt; n) (hp0 : <span class="nu">0</span> &lt; p) (hp : p ≤ <span class="nu">1</span> / <span class="nu">2</span>) (c : <span class="const token" data-verso-hover="20">Config</span> n α)</span>
+<span id="L252">    (x : α) :</span>
+<span id="L253">    <span class="const token" data-verso-hover="216">Tendsto</span> (<span class="kw">fun</span> t =&gt; (<span class="const token" data-verso-hover="171">biasedMedian</span> n α p ^ t) c (<span class="const token" data-verso-hover="24">const</span> x)) <span class="const token" data-verso-hover="217">atTop</span></span>
+<span id="L254">      (𝓝 (∑ k ∈ <span class="const token" data-verso-hover="41">Ioc</span> (<span class="const token" data-verso-hover="25">cnt</span> (<span class="const token" data-verso-hover="218">Set.Iio</span> x) c) (<span class="const token" data-verso-hover="25">cnt</span> (<span class="const token" data-verso-hover="39">Set.Iic</span> x) c), <span class="const token" data-verso-hover="153">binomLaw</span> n p k)) :=</span>
+<span id="L255">  <span class="const token" data-verso-hover="219">fixation_of_harmonic</span> (<span class="const token" data-verso-hover="192">biasedMedian_mem</span> hn hp0 hp) hn _ (<span class="const token" data-verso-hover="159">cumul_binomLaw</span> p hn)</span>
+<span id="L256">    <span class="const token" data-verso-hover="195">biasedMedian_absorbing</span> (<span class="const token" data-verso-hover="198">biasedMedian_reach</span> hn hp0 hp)</span>
+<span id="L257">    (<span class="kw">fun</span> D hD =&gt; <span class="const token" data-verso-hover="214">biasedMedian_harmonic</span> hn (<span class="kw">by</span> <span class="kw">linarith</span>) D hD) c x</span>
+<span id="L258"></span>
+<span id="L259"><span class="dc">/-- **Theorem 2.** The Biased-Median dynamics of parameter `p ∈ (0, 1/2]` on the clique converges</span></span>
+<span id="L260"><span class="dc">to the `k`-th smallest initial value with probability `C(n-1, k-1) p^(n-k) (1-p)^(k-1)`</span></span>
+<span id="L261"><span class="dc">(distinct initial values). For `p = 1/2` (Median dynamics): `C(n-1, k-1) 2^-(n-1)`. -/</span></span>
+<span id="L262"><span class="kw">theorem</span> <span class="const token" data-verso-hover="220">biasedMedian_fixation_injective</span> (hn : <span class="nu">0</span> &lt; n) (hp0 : <span class="nu">0</span> &lt; p) (hp : p ≤ <span class="nu">1</span> / <span class="nu">2</span>)</span>
+<span id="L263">    (c : <span class="const token" data-verso-hover="20">Config</span> n α) (hc : <span class="const token" data-verso-hover="221">Function.Injective</span> c) (u : <span class="const token" data-verso-hover="22">Fin</span> n) :</span>
+<span id="L264">    <span class="const token" data-verso-hover="216">Tendsto</span> (<span class="kw">fun</span> t =&gt; (<span class="const token" data-verso-hover="171">biasedMedian</span> n α p ^ t) c (<span class="const token" data-verso-hover="24">const</span> (c u))) <span class="const token" data-verso-hover="217">atTop</span></span>
+<span id="L265">      (𝓝 ((<span class="const token" data-verso-hover="106">Nat.choose</span> (n - <span class="nu">1</span>) (<span class="const token" data-verso-hover="38">rank</span> c (c u) - <span class="nu">1</span>) : <span class="const token" data-verso-hover="29">ℝ</span>) * p ^ (n - <span class="const token" data-verso-hover="38">rank</span> c (c u)) *</span>
+<span id="L266">        (<span class="nu">1</span> - p) ^ (<span class="const token" data-verso-hover="38">rank</span> c (c u) - <span class="nu">1</span>))) :=</span>
+<span id="L267">  <span class="const token" data-verso-hover="222">fixation_of_harmonic_injective</span> (<span class="const token" data-verso-hover="192">biasedMedian_mem</span> hn hp0 hp) hn _ (<span class="const token" data-verso-hover="159">cumul_binomLaw</span> p hn)</span>
+<span id="L268">    <span class="const token" data-verso-hover="195">biasedMedian_absorbing</span> (<span class="const token" data-verso-hover="198">biasedMedian_reach</span> hn hp0 hp)</span>
+<span id="L269">    (<span class="kw">fun</span> D hD =&gt; <span class="const token" data-verso-hover="214">biasedMedian_harmonic</span> hn (<span class="kw">by</span> <span class="kw">linarith</span>) D hD) c hc u</span>
+<span id="L270"></span>
+<span id="L271"><span class="dc">/-! ### Corollary 3: 2-Choices -/</span></span>
+<span id="L272"></span>
+<span id="L273"><span class="dc">/-- **2-Choices** on binary opinions (`Bool`, `false &lt; true`): an agent `u` drawn u.a.r. samples</span></span>
+<span id="L274"><span class="dc">two agents `v, s` u.a.r. (independently, with replacement) and adopts their opinion if they agree. -/</span></span>
+<span id="L275"><span class="kw">noncomputable</span> <span class="kw">def</span> <span class="const token" data-verso-hover="223">twoChoices</span> (n : <span class="const token" data-verso-hover="21">ℕ</span>) : <span class="const token" data-verso-hover="172">Matrix</span> (<span class="const token" data-verso-hover="20">Config</span> n <span class="const token" data-verso-hover="167">Bool</span>) (<span class="const token" data-verso-hover="20">Config</span> n <span class="const token" data-verso-hover="167">Bool</span>) <span class="const token" data-verso-hover="29">ℝ</span> :=</span>
+<span id="L276">  <span class="const token" data-verso-hover="173">randomMap</span> (<span class="kw">fun</span> _ : <span class="const token" data-verso-hover="22">Fin</span> n × <span class="const token" data-verso-hover="22">Fin</span> n × <span class="const token" data-verso-hover="22">Fin</span> n =&gt; <span class="nu">1</span> / (n : <span class="const token" data-verso-hover="29">ℝ</span>) ^ <span class="nu">3</span>)</span>
+<span id="L277">    (<span class="kw">fun</span> ω c =&gt; <span class="const token" data-verso-hover="71">Function.update</span> c ω.<span class="const token" data-verso-hover="170">1</span> (<span class="kw">if</span> c ω.<span class="const token" data-verso-hover="168">2</span><span class="nu">.</span><span class="const token" data-verso-hover="170">1</span> = c ω.<span class="const token" data-verso-hover="168">2</span><span class="nu">.</span><span class="const token" data-verso-hover="168">2</span> <span class="kw">then</span> c ω.<span class="const token" data-verso-hover="168">2</span><span class="nu">.</span><span class="const token" data-verso-hover="170">1</span> <span class="kw">else</span> c ω.<span class="const token" data-verso-hover="170">1</span>))</span>
+<span id="L278"></span>
+<span id="L279"><span class="kw">lemma</span> <span class="const token" data-verso-hover="224">med3_bool</span> (a b c : <span class="const token" data-verso-hover="167">Bool</span>) : <span class="const token" data-verso-hover="99">med3</span> a b c = <span class="kw">if</span> b = c <span class="kw">then</span> b <span class="kw">else</span> a := <span class="kw">by</span></span>
+<span id="L280">  <span class="kw">cases</span> a &lt;;&gt; <span class="kw">cases</span> b &lt;;&gt; <span class="kw">cases</span> c &lt;;&gt; <span class="kw">rfl</span></span>
+<span id="L281"></span>
+<span id="L282"><span class="dc">/-- On binary opinions, 2-Choices *is* the Median dynamics (Biased-Median with `p = 1/2`). -/</span></span>
+<span id="L283"><span class="kw">theorem</span> <span class="const token" data-verso-hover="225">twoChoices_eq_median</span> : <span class="const token" data-verso-hover="223">twoChoices</span> n = <span class="const token" data-verso-hover="171">biasedMedian</span> n <span class="const token" data-verso-hover="167">Bool</span> (<span class="nu">1</span> / <span class="nu">2</span>) := <span class="kw">by</span></span>
+<span id="L284">  <span class="kw">ext</span> c c'</span>
+<span id="L285">  <span class="kw">unfold</span> <span class="const token" data-verso-hover="223">twoChoices</span> <span class="const token" data-verso-hover="171">biasedMedian</span> <span class="const token" data-verso-hover="173">randomMap</span> <span class="const token" data-verso-hover="166">bmμ</span></span>
+<span id="L286">  <span class="kw">simp</span> only [<span class="const token" data-verso-hover="180">Fintype.sum_prod_type</span>, <span class="const token" data-verso-hover="181">Fintype.sum_bool</span>, <span class="const token" data-verso-hover="182">ite_true</span>, <span class="const token" data-verso-hover="183">Bool.false_eq_true</span>, <span class="const token" data-verso-hover="184">ite_false</span>]</span>
+<span id="L287">  <span class="kw">norm_num</span></span>
+<span id="L288">  <span class="kw">refine</span> <span class="const token" data-verso-hover="76">Finset.sum_congr</span> <span class="const token" data-verso-hover="77">rfl</span> <span class="kw">fun</span> u _ =&gt; <span class="const token" data-verso-hover="76">Finset.sum_congr</span> <span class="const token" data-verso-hover="77">rfl</span> <span class="kw">fun</span> v _ =&gt;</span>
+<span id="L289">    <span class="const token" data-verso-hover="76">Finset.sum_congr</span> <span class="const token" data-verso-hover="77">rfl</span> <span class="kw">fun</span> s _ =&gt; ?_</span>
+<span id="L290">  <span class="kw">simp</span> [<span class="const token" data-verso-hover="169">bmNew</span>, <span class="const token" data-verso-hover="224">med3_bool</span>]</span>
+<span id="L291"></span>
+<span id="L292"><span class="dc">/-- **Corollary 3.** Binary 2-Choices on the clique with `n₁` agents initially holding `1`</span></span>
+<span id="L293"><span class="dc">(`true`) converges to `1` with probability `P[X &lt; n₁]`, `X ~ Bin(n-1, 1/2)`. -/</span></span>
+<span id="L294"><span class="kw">theorem</span> <span class="const token" data-verso-hover="14">twoChoices_fixation</span> (hn : <span class="nu">0</span> &lt; n) (c : <span class="const token" data-verso-hover="20">Config</span> n <span class="const token" data-verso-hover="167">Bool</span>) :</span>
+<span id="L295">    <span class="const token" data-verso-hover="216">Tendsto</span> (<span class="kw">fun</span> t =&gt; (<span class="const token" data-verso-hover="223">twoChoices</span> n ^ t) c (<span class="const token" data-verso-hover="24">const</span> <span class="const token" data-verso-hover="202">true</span>)) <span class="const token" data-verso-hover="217">atTop</span></span>
+<span id="L296">      (𝓝 (∑ x ∈ <span class="const token" data-verso-hover="111">range</span> (<span class="const token" data-verso-hover="33">univ</span>.<span class="const token" data-verso-hover="34">filter</span> <span class="kw">fun</span> u =&gt; c u = <span class="const token" data-verso-hover="202">true</span>).<span class="const token" data-verso-hover="35">card</span>,</span>
+<span id="L297">        (<span class="const token" data-verso-hover="106">Nat.choose</span> (n - <span class="nu">1</span>) x : <span class="const token" data-verso-hover="29">ℝ</span>) * (<span class="nu">1</span> / <span class="nu">2</span>) ^ (n - <span class="nu">1</span>))) := <span class="kw">by</span></span>
+<span id="L298">  <span class="kw">rw</span> [<span class="const token" data-verso-hover="225">twoChoices_eq_median</span>]</span>
+<span id="L299">  <span class="kw">have</span> h := <span class="const token" data-verso-hover="2">biasedMedian_fixation</span> (α := <span class="const token" data-verso-hover="167">Bool</span>) hn (<span class="kw">by</span> <span class="kw">norm_num</span>) <span class="const token" data-verso-hover="226">le_rfl</span> c <span class="const token" data-verso-hover="202">true</span></span>
+<span id="L300">  <span class="kw">set</span> n₁ := (<span class="const token" data-verso-hover="33">univ</span>.<span class="const token" data-verso-hover="34">filter</span> <span class="kw">fun</span> u =&gt; c u = <span class="const token" data-verso-hover="202">true</span>).<span class="const token" data-verso-hover="35">card</span></span>
+<span id="L301">  <span class="kw">have</span> hIic : <span class="const token" data-verso-hover="25">cnt</span> (<span class="const token" data-verso-hover="39">Set.Iic</span> <span class="const token" data-verso-hover="202">true</span>) c = n := (<span class="const token" data-verso-hover="84">cnt_eq_n_iff</span> _ c).<span class="const token" data-verso-hover="67">mpr</span> <span class="kw">fun</span> u =&gt; <span class="kw">by</span> <span class="kw">simp</span></span>
+<span id="L302">  <span class="kw">have</span> hIio : <span class="const token" data-verso-hover="25">cnt</span> (<span class="const token" data-verso-hover="218">Set.Iio</span> <span class="const token" data-verso-hover="202">true</span>) c = n - n₁ := <span class="kw">by</span></span>
+<span id="L303">    <span class="kw">rw</span> [<span class="const token" data-verso-hover="31">cnt_eq_card</span>]</span>
+<span id="L304">    <span class="kw">have</span> := <span class="const token" data-verso-hover="227">Finset.card_filter_add_card_filter_not</span> (s := (<span class="const token" data-verso-hover="33">univ</span> : <span class="const token" data-verso-hover="49">Finset</span> (<span class="const token" data-verso-hover="22">Fin</span> n)))</span>
+<span id="L305">      (<span class="kw">fun</span> u =&gt; c u = <span class="const token" data-verso-hover="202">true</span>)</span>
+<span id="L306">    <span class="kw">simp</span> only [<span class="const token" data-verso-hover="189">Finset.card_univ</span>, <span class="const token" data-verso-hover="190">Fintype.card_fin</span>] <span class="kw">at</span> this</span>
+<span id="L307">    <span class="kw">have</span> e : (<span class="const token" data-verso-hover="33">univ</span>.<span class="const token" data-verso-hover="34">filter</span> <span class="kw">fun</span> u =&gt; c u ∈ <span class="const token" data-verso-hover="218">Set.Iio</span> <span class="const token" data-verso-hover="202">true</span>) = <span class="const token" data-verso-hover="33">univ</span>.<span class="const token" data-verso-hover="34">filter</span> <span class="kw">fun</span> u =&gt; ¬ c u = <span class="const token" data-verso-hover="202">true</span> := <span class="kw">by</span></span>
+<span id="L308">      <span class="kw">ext</span> u</span>
+<span id="L309">      <span class="kw">simp</span> only [<span class="const token" data-verso-hover="61">Finset.mem_filter</span>, <span class="const token" data-verso-hover="74">Finset.mem_univ</span>, <span class="const token" data-verso-hover="228">true_and</span>, <span class="const token" data-verso-hover="229">Set.mem_Iio</span>]</span>
+<span id="L310">      <span class="kw">generalize</span> c u = b</span>
+<span id="L311">      <span class="kw">cases</span> b &lt;;&gt; <span class="kw">decide</span></span>
+<span id="L312">    <span class="kw">rw</span> [e]; <span class="kw">omega</span></span>
+<span id="L313">  <span class="kw">rw</span> [hIic, hIio] <span class="kw">at</span> h</span>
+<span id="L314">  <span class="kw">convert</span> h <span class="kw">using</span> <span class="nu">2</span></span>
+<span id="L315">  <span class="kw">have</span> hn₁ : n₁ ≤ n := <span class="kw">by</span></span>
+<span id="L316">    <span class="kw">simpa</span> <span class="kw">using</span> <span class="const token" data-verso-hover="57">Finset.card_filter_le</span> (<span class="const token" data-verso-hover="33">univ</span> : <span class="const token" data-verso-hover="49">Finset</span> (<span class="const token" data-verso-hover="22">Fin</span> n)) (<span class="kw">fun</span> u =&gt; c u = <span class="const token" data-verso-hover="202">true</span>)</span>
+<span id="L317">  <span class="kw">refine</span> <span class="const token" data-verso-hover="230">Finset.sum_nbij'</span> (<span class="kw">fun</span> x =&gt; n - x) (<span class="kw">fun</span> k =&gt; n - k) ?_ ?_ ?_ ?_ ?_</span>
+<span id="L318">  · <span class="kw">intro</span> x hx; <span class="kw">simp</span> only [<span class="const token" data-verso-hover="126">Finset.mem_range</span>] <span class="kw">at</span> hx; <span class="kw">simp</span> only [<span class="const token" data-verso-hover="231">Finset.mem_Ioc</span>]; <span class="kw">omega</span></span>
+<span id="L319">  · <span class="kw">intro</span> k hk; <span class="kw">simp</span> only [<span class="const token" data-verso-hover="231">Finset.mem_Ioc</span>] <span class="kw">at</span> hk; <span class="kw">simp</span> only [<span class="const token" data-verso-hover="126">Finset.mem_range</span>]; <span class="kw">omega</span></span>
+<span id="L320">  · <span class="kw">intro</span> x hx; <span class="kw">simp</span> only [<span class="const token" data-verso-hover="126">Finset.mem_range</span>] <span class="kw">at</span> hx; <span class="kw">omega</span></span>
+<span id="L321">  · <span class="kw">intro</span> k hk; <span class="kw">simp</span> only [<span class="const token" data-verso-hover="231">Finset.mem_Ioc</span>] <span class="kw">at</span> hk; <span class="kw">omega</span></span>
+<span id="L322">  · <span class="kw">intro</span> x hx</span>
+<span id="L323">    <span class="kw">simp</span> only [<span class="const token" data-verso-hover="126">Finset.mem_range</span>] <span class="kw">at</span> hx</span>
+<span id="L324">    <span class="kw">unfold</span> <span class="const token" data-verso-hover="153">binomLaw</span></span>
+<span id="L325">    <span class="kw">rw</span> [<span class="kw">show</span> n - (n - x) = x <span class="kw">by</span> <span class="kw">omega</span>, <span class="kw">show</span> n - x - <span class="nu">1</span> = n - <span class="nu">1</span> - x <span class="kw">by</span> <span class="kw">omega</span>,</span>
+<span id="L326">      <span class="const token" data-verso-hover="136">Nat.choose_symm</span> (<span class="kw">by</span> <span class="kw">omega</span>), <span class="kw">show</span> <span class="nu">1</span> - (<span class="nu">1</span> / <span class="nu">2</span> : <span class="const token" data-verso-hover="29">ℝ</span>) = <span class="nu">1</span> / <span class="nu">2</span> <span class="kw">by</span> <span class="kw">norm_num</span>, <span class="const token" data-verso-hover="232">mul_assoc</span>, ← <span class="const token" data-verso-hover="233">pow_add</span>,</span>
+<span id="L327">      <span class="kw">show</span> x + (n - <span class="nu">1</span> - x) = n - <span class="nu">1</span> <span class="kw">by</span> <span class="kw">omega</span>]</span>
+<span id="L328"></span>
+<span id="L329"><span class="kw">end</span> OrderStatisticsPP</span>
+<span id="L330"></span>
+</code></div>
+        <script>
+          window.versoHoversUrl = "PODC2026/OrderStatisticsPP/-hovers.json";</script>
+        <script src="static/lean/popper.js"></script>
+        <script src="static/lean/tippy.js"></script>
+        <script src="static/lean/marked.js"></script>
+        <script src="static/lean/highlighting.js"></script>
+        <script src="static/lean/lean.js"></script>
+        </article></main><footer class="site-footer"><div class="wrap">
+        Machine-checked formalizations of PODC papers in Lean 4. Generated with <a href="https://github.com/leanprover/verso">Verso</a> from the README files of <a href="https://github.com/vasnesterov/formal_podc">vasnesterov/formal_podc</a>.</div>
+      </footer></body>
+  </html>
+

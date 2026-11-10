@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="light dark">
+    <link rel="icon" href="data:,">
+    <title>ConstantBarriersMutex: RMR.lean · Formal PODC</title><base href="../../../.././"><link rel="stylesheet" href="static/lean/verso-vars.css">
+    <link rel="stylesheet" href="static/lean/highlighting.css">
+    <link rel="stylesheet" href="static/lean/tippy-border.css">
+    <link rel="stylesheet" href="static/style.css">
+    <script defer="defer" src="static/site.js"></script>
+    </head>
+  <body>
+    <header class="site-header">
+      <div class="wrap">
+        <a class="brand" href=".">Formal PODC</a><nav class="top">
+          <a href=".">Search</a><a href="about/">About</a><a href="https://github.com/vasnesterov/formal_podc">GitHub</a></nav>
+        </div>
+      </header>
+    <main class="wrap"><article><nav class="breadcrumbs" aria-label="Breadcrumb">
+          <a href=".">Search</a><span class="sep">›</span><a href="PODC2013/">PODC 2013</a><span class="sep">›</span><a href="PODC2013/ConstantBarriersMutex/">ConstantBarriersMutex</a><span class="sep">›</span><a href="PODC2013/ConstantBarriersMutex/src/">Lean source</a><span class="sep">›</span><span aria-current="page">RMR</span></nav>
+        <h1>
+          <code>RMR.lean</code></h1>
+        <div class="paper-links">
+          <p>
+            Source of <a href="PODC2013/ConstantBarriersMutex/">O(1)-Barriers Optimal-RMR Mutual Exclusion — PODC 2013</a> · <a href="https://github.com/vasnesterov/formal_podc/blob/main/Papers/PODC2013/ConstantBarriersMutex/RMR.lean">GitHub</a> · hover over a name for its type and documentation</p>
+          </div>
+        <div class="lean-code lean-src">
+          <code class="hl lean block" data-lean-context="RMR"><span id="L1"><span class="kw">import</span> Papers.PODC2013.ConstantBarriersMutex.InvDefs</span>
+<span id="L2"></span>
+<span id="L3"><span class="dc">/-!</span></span>
+<span id="L4"><span class="dc"># The cache-coherent RMR cost model and barrier counting (Section 3 of the paper)</span></span>
+<span id="L5"></span>
+<span id="L6"><span class="dc">The paper (Section 3): "Each write to a shared variable incurs an RMR. A read by process `p` of a</span></span>
+<span id="L7"><span class="dc">shared variable `v` incurs an RMR if (1) it is the first read of `v` by `p`, or (2) it is</span></span>
+<span id="L8"><span class="dc">preceded by a write of another process to `v` that was performed after `p`'s previous read of</span></span>
+<span id="L9"><span class="dc">`v`."</span></span>
+<span id="L10"></span>
+<span id="L11"><span class="dc">We model this with a ghost *cache* computed along a run (`Run.cache`); the configurations of</span></span>
+<span id="L12"><span class="dc">`Model.lean` are unchanged.</span></span>
+<span id="L13"></span>
+<span id="L14"><span class="dc">* `c p v = true` means that `p` holds a valid copy of `v`. Initially no copy is valid.</span></span>
+<span id="L15"><span class="dc">* A read by `p` of `v` that is served from `p`'s own store buffer (TSO store forwarding) costs</span></span>
+<span id="L16"><span class="dc">  nothing and does not touch the cache. A read served from memory costs one RMR iff `p` has no</span></span>
+<span id="L17"><span class="dc">  valid copy, and afterwards `p` has a valid copy.</span></span>
+<span id="L18"><span class="dc">* Every *performed* write to `v` by a process `q` (the adversary flushing `q`'s buffer, a barrier</span></span>
+<span id="L19"><span class="dc">  step of `q` performing a buffered write, the writes a CAS of `q` performs first, and a</span></span>
+<span id="L20"><span class="dc">  successful CAS of `q` itself) invalidates the copies of `v` of all processes other than `q`</span></span>
+<span id="L21"><span class="dc">  (rule (2): only writes of *another* process count, so `q`'s own writes neither invalidate nor</span></span>
+<span id="L22"><span class="dc">  validate its copy). A failed CAS writes nothing and invalidates nothing.</span></span>
+<span id="L23"><span class="dc">* Every *issued* write costs one RMR (charged when it is issued, i.e. to the passage that issues</span></span>
+<span id="L24"><span class="dc">  it), and every CAS costs one RMR. Performing a buffered write costs nothing more.</span></span>
+<span id="L25"></span>
+<span id="L26"><span class="dc">`Cfg.perf s e` is the list of writes performed by the event `e` (`mem_next`: the memory after</span></span>
+<span id="L27"><span class="dc">`e` is the memory before updated by `perf`). Statement 35's `foreach`, the `enqueue`/`dequeue`</span></span>
+<span id="L28"><span class="dc">of `promQ` and `exits ← exits + 1` are modelled as in `Model.lean`: each step performs at most</span></span>
+<span id="L29"><span class="dc">one read and issues at most one write.</span></span>
+<span id="L30"><span class="dc">-/</span></span>
+<span id="L31"></span>
+<span id="L32"><span class="cm">--</span><span class="cm"> The case analyses below use generic tactic combinators; some branches do not need every</span></span>
+<span id="L33"><span class="cm">--</span><span class="cm"> simp lemma or tactic.</span></span>
+<span id="L34"><span class="kw">set_option</span> <span class="const token" data-verso-hover="703">linter.unusedSimpArgs</span> false</span>
+<span id="L35"><span class="kw">set_option</span> <span class="const token" data-verso-hover="704">linter.unusedTactic</span> false</span>
+<span id="L36"><span class="kw">set_option</span> <span class="const token" data-verso-hover="705">linter.unnecessarySeqFocus</span> false</span>
+<span id="L37"><span class="kw">set_option</span> <span class="const token" data-verso-hover="706">linter.unreachableTactic</span> false</span>
+<span id="L38"></span>
+<span id="L39"><span class="kw">namespace</span> Podc.ConstantBarriersMutex</span>
+<span id="L40"></span>
+<span id="L41"><span class="kw">open</span> Finset</span>
+<span id="L42"></span>
+<span id="L43"><span class="kw">variable</span> {h : <span class="const token" data-verso-hover="36">ℕ</span>}</span>
+<span id="L44"></span>
+<span id="L45"><span class="dc">/-- Shared variables (cache lines). -/</span></span>
+<span id="L46"><span class="kw">inductive</span> <span class="const token" data-verso-hover="707">Var</span> (h : <span class="const token" data-verso-hover="36">ℕ</span>) <span class="kw">where</span></span>
+<span id="L47">  | <span class="const token" data-verso-hover="708">node</span> (i : <span class="const token" data-verso-hover="36">ℕ</span>)</span>
+<span id="L48">  | <span class="const token" data-verso-hover="709">promQ</span></span>
+<span id="L49">  | <span class="const token" data-verso-hover="710">apply</span> (q : <span class="const token" data-verso-hover="48">Proc</span> h)</span>
+<span id="L50">  | <span class="const token" data-verso-hover="711">signal</span> (q : <span class="const token" data-verso-hover="48">Proc</span> h)</span>
+<span id="L51">  | <span class="const token" data-verso-hover="712">inPromQ</span> (q : <span class="const token" data-verso-hover="48">Proc</span> h)</span>
+<span id="L52">  | <span class="const token" data-verso-hover="713">lock</span></span>
+<span id="L53">  | <span class="const token" data-verso-hover="714">exits</span></span>
+<span id="L54">  <span class="kw">deriving</span> <span class="const token" data-verso-hover="661">DecidableEq</span></span>
+<span id="L55"></span>
+<span id="L56"><span class="dc">/-- The variable written by a write. -/</span></span>
+<span id="L57"><span class="kw">def</span> <span class="const token" data-verso-hover="715">W.var</span> : <span class="const token" data-verso-hover="38">W</span> h → <span class="const token" data-verso-hover="707">Var</span> h</span>
+<span id="L58">  | <span class="const token" data-verso-hover="56">.</span>node i _ =&gt; <span class="const token" data-verso-hover="708">.</span>node i</span>
+<span id="L59">  | <span class="const token" data-verso-hover="44">.</span>promQ _ =&gt; <span class="const token" data-verso-hover="709">.</span>promQ</span>
+<span id="L60">  | <span class="const token" data-verso-hover="52">.</span><span class="kw">apply</span> q _ =&gt; <span class="const token" data-verso-hover="710">.</span><span class="kw">apply</span> q</span>
+<span id="L61">  | <span class="const token" data-verso-hover="54">.</span>signal q _ =&gt; <span class="const token" data-verso-hover="711">.</span>signal q</span>
+<span id="L62">  | <span class="const token" data-verso-hover="49">.</span>inPromQ q _ =&gt; <span class="const token" data-verso-hover="712">.</span>inPromQ q</span>
+<span id="L63">  | <span class="const token" data-verso-hover="40">.</span>lock _ =&gt; <span class="const token" data-verso-hover="713">.</span>lock</span>
+<span id="L64">  | <span class="const token" data-verso-hover="46">.</span>exits _ =&gt; <span class="const token" data-verso-hover="714">.</span>exits</span>
+<span id="L65"></span>
+<span id="L66"><span class="dc">/-- The process taking the event. -/</span></span>
+<span id="L67"><span class="kw">def</span> <span class="const token" data-verso-hover="716">Ev.actor</span> : <span class="const token" data-verso-hover="144">Ev</span> h → <span class="const token" data-verso-hover="48">Proc</span> h</span>
+<span id="L68">  | <span class="const token" data-verso-hover="145">.</span>step p =&gt; p</span>
+<span id="L69">  | <span class="const token" data-verso-hover="146">.</span>flush p =&gt; p</span>
+<span id="L70"></span>
+<span id="L71"><span class="dc">/-- The writes *performed* (made visible in memory) by an event, in order. -/</span></span>
+<span id="L72"><span class="kw">def</span> <span class="const token" data-verso-hover="717">Cfg.perf</span> (s : <span class="const token" data-verso-hover="92">Cfg</span> h) : <span class="const token" data-verso-hover="144">Ev</span> h → <span class="const token" data-verso-hover="62">List</span> (<span class="const token" data-verso-hover="38">W</span> h)</span>
+<span id="L73">  | <span class="const token" data-verso-hover="146">.</span>flush p =&gt; (s.<span class="const token" data-verso-hover="98">buf</span> p).<span class="const token" data-verso-hover="157">take</span> <span class="nu">1</span></span>
+<span id="L74">  | <span class="const token" data-verso-hover="145">.</span>step p =&gt;</span>
+<span id="L75">    <span class="kw">match</span> s.<span class="const token" data-verso-hover="102">pc</span> p <span class="kw">with</span></span>
+<span id="L76">    | <span class="const token" data-verso-hover="263">.</span>e22 | <span class="const token" data-verso-hover="165">.</span>x50 _ =&gt; (s.<span class="const token" data-verso-hover="98">buf</span> p).<span class="const token" data-verso-hover="157">take</span> <span class="nu">1</span></span>
+<span id="L77">    | <span class="const token" data-verso-hover="215">.</span>e23 | <span class="const token" data-verso-hover="219">.</span>e26 =&gt; s.<span class="const token" data-verso-hover="98">buf</span> p ++ (<span class="kw">if</span> (s.<span class="const token" data-verso-hover="117">view</span> p).<span class="const token" data-verso-hover="67">lock</span> = <span class="const token" data-verso-hover="175">none</span> <span class="kw">then</span> [<span class="const token" data-verso-hover="40">.</span>lock (<span class="const token" data-verso-hover="82">some</span> p)] <span class="kw">else</span> [])</span>
+<span id="L78">    | _ =&gt; []</span>
+<span id="L79"></span>
+<span id="L80"><span class="dc">/-- The shared variable read by the next step of `p`, if any. -/</span></span>
+<span id="L81"><span class="kw">def</span> <span class="const token" data-verso-hover="718">Cfg.rdVar</span> (s : <span class="const token" data-verso-hover="92">Cfg</span> h) (p : <span class="const token" data-verso-hover="48">Proc</span> h) : <span class="const token" data-verso-hover="181">Option</span> (<span class="const token" data-verso-hover="707">Var</span> h) :=</span>
+<span id="L82">  <span class="kw">match</span> s.<span class="const token" data-verso-hover="102">pc</span> p <span class="kw">with</span></span>
+<span id="L83">  | <span class="const token" data-verso-hover="264">.</span>e24 | <span class="const token" data-verso-hover="265">.</span>e25a _ | <span class="const token" data-verso-hover="226">.</span>x32 =&gt; <span class="const token" data-verso-hover="82">some</span> <span class="const token" data-verso-hover="714">.</span>exits</span>
+<span id="L84">  | <span class="const token" data-verso-hover="266">.</span>e25b _ =&gt; <span class="const token" data-verso-hover="82">some</span> <span class="const token" data-verso-hover="713">.</span>lock</span>
+<span id="L85">  | <span class="const token" data-verso-hover="220">.</span>e27 =&gt; <span class="const token" data-verso-hover="82">some</span> (<span class="const token" data-verso-hover="711">.</span>signal p)</span>
+<span id="L86">  | <span class="const token" data-verso-hover="228">.</span>x34 l j _ =&gt; <span class="const token" data-verso-hover="82">some</span> (<span class="const token" data-verso-hover="708">.</span>node (<span class="const token" data-verso-hover="205">target</span> (<span class="const token" data-verso-hover="133">anc</span> p l) j))</span>
+<span id="L87">  | <span class="const token" data-verso-hover="229">.</span>x35 _ (q :: _) =&gt; <span class="const token" data-verso-hover="82">some</span> (<span class="const token" data-verso-hover="710">.</span><span class="kw">apply</span> q)</span>
+<span id="L88">  | <span class="const token" data-verso-hover="230">.</span>x36 _ q _ =&gt; <span class="const token" data-verso-hover="82">some</span> (<span class="const token" data-verso-hover="712">.</span>inPromQ q)</span>
+<span id="L89">  | <span class="const token" data-verso-hover="231">.</span>x37 _ _ _ | <span class="const token" data-verso-hover="477">.</span>x42 | <span class="const token" data-verso-hover="479">.</span>x45 =&gt; <span class="const token" data-verso-hover="82">some</span> <span class="const token" data-verso-hover="709">.</span>promQ</span>
+<span id="L90">  | _ =&gt; <span class="const token" data-verso-hover="175">none</span></span>
+<span id="L91"></span>
+<span id="L92"><span class="dc">/-- The number of writes issued or CAS operations performed by the next step of `p` (`0` or</span></span>
+<span id="L93"><span class="dc">`1`). -/</span></span>
+<span id="L94"><span class="kw">def</span> <span class="const token" data-verso-hover="719">Cfg.wcost</span> (s : <span class="const token" data-verso-hover="92">Cfg</span> h) (p : <span class="const token" data-verso-hover="48">Proc</span> h) : <span class="const token" data-verso-hover="36">ℕ</span> :=</span>
+<span id="L95">  <span class="kw">match</span> s.<span class="const token" data-verso-hover="102">pc</span> p <span class="kw">with</span></span>
+<span id="L96">  | <span class="const token" data-verso-hover="216">.</span>rem | <span class="const token" data-verso-hover="412">.</span>e18 | <span class="const token" data-verso-hover="262">.</span>e19 _ | <span class="const token" data-verso-hover="215">.</span>e23 | <span class="const token" data-verso-hover="219">.</span>e26 | <span class="const token" data-verso-hover="225">.</span>x31 | <span class="const token" data-verso-hover="226">.</span>x32 | <span class="const token" data-verso-hover="231">.</span>x37 _ _ _ | <span class="const token" data-verso-hover="232">.</span>x38 _ _ _ | <span class="const token" data-verso-hover="478">.</span>x43</span>
+<span id="L97">  | <span class="const token" data-verso-hover="336">.</span>x46 _ | <span class="const token" data-verso-hover="337">.</span>x47 _ | <span class="const token" data-verso-hover="166">.</span>x48 _ =&gt; <span class="nu">1</span></span>
+<span id="L98">  | <span class="const token" data-verso-hover="479">.</span>x45 =&gt; <span class="kw">if</span> (s.<span class="const token" data-verso-hover="117">view</span> p).<span class="const token" data-verso-hover="69">promQ</span> = [] <span class="kw">then</span> <span class="nu">0</span> <span class="kw">else</span> <span class="nu">1</span></span>
+<span id="L99">  | _ =&gt; <span class="nu">0</span></span>
+<span id="L100"></span>
+<span id="L101"><span class="dc">/-- A read of `v` by `p` is served from `p`'s own store buffer. -/</span></span>
+<span id="L102"><span class="kw">def</span> <span class="const token" data-verso-hover="720">Cfg.fromBuf</span> (s : <span class="const token" data-verso-hover="92">Cfg</span> h) (p : <span class="const token" data-verso-hover="48">Proc</span> h) (v : <span class="const token" data-verso-hover="707">Var</span> h) : <span class="kw">Prop</span> := ∃ w ∈ s.<span class="const token" data-verso-hover="98">buf</span> p, w.<span class="const token" data-verso-hover="715">var</span> = v</span>
+<span id="L103"></span>
+<span id="L104"><span class="const token" data-verso-hover="721">instance</span> (s : <span class="const token" data-verso-hover="92">Cfg</span> h) (p : <span class="const token" data-verso-hover="48">Proc</span> h) (v : <span class="const token" data-verso-hover="707">Var</span> h) : <span class="const token" data-verso-hover="414">Decidable</span> (s.<span class="const token" data-verso-hover="720">fromBuf</span> p v) := <span class="kw">by</span></span>
+<span id="L105">  <span class="kw">unfold</span> <span class="const token" data-verso-hover="720">Cfg.fromBuf</span>; <span class="kw">infer_instance</span></span>
+<span id="L106"></span>
+<span id="L107"><span class="dc">/-- Cache states: `c p v = true` iff `p` holds a valid copy of `v`. -/</span></span>
+<span id="L108"><span class="kw">abbrev</span> <span class="const token" data-verso-hover="722">Cache</span> (h : <span class="const token" data-verso-hover="36">ℕ</span>) := <span class="const token" data-verso-hover="48">Proc</span> h → <span class="const token" data-verso-hover="707">Var</span> h → <span class="const token" data-verso-hover="39">Bool</span></span>
+<span id="L109"></span>
+<span id="L110"><span class="dc">/-- The cache after the event `e` in configuration `s`: a read from memory validates the reader's</span></span>
+<span id="L111"><span class="dc">copy; a write performed by `q` invalidates the copies of all processes other than `q`. -/</span></span>
+<span id="L112"><span class="kw">def</span> <span class="const token" data-verso-hover="723">Cache.upd</span> (c : <span class="const token" data-verso-hover="722">Cache</span> h) (s : <span class="const token" data-verso-hover="92">Cfg</span> h) (e : <span class="const token" data-verso-hover="144">Ev</span> h) : <span class="const token" data-verso-hover="722">Cache</span> h := <span class="kw">fun</span> q v =&gt;</span>
+<span id="L113">  <span class="kw">if</span> e = <span class="const token" data-verso-hover="145">.</span>step q ∧ s.<span class="const token" data-verso-hover="718">rdVar</span> q = <span class="const token" data-verso-hover="82">some</span> v ∧ ¬ s.<span class="const token" data-verso-hover="720">fromBuf</span> q v <span class="kw">then</span> <span class="const token" data-verso-hover="41">true</span></span>
+<span id="L114">  <span class="kw">else</span> <span class="kw">if</span> e.<span class="const token" data-verso-hover="716">actor</span> ≠ q ∧ ∃ w ∈ s.<span class="const token" data-verso-hover="717">perf</span> e, w.<span class="const token" data-verso-hover="715">var</span> = v <span class="kw">then</span> <span class="const token" data-verso-hover="42">false</span></span>
+<span id="L115">  <span class="kw">else</span> c q v</span>
+<span id="L116"></span>
+<span id="L117"><span class="dc">/-- The RMR cost of the read of the next step of `p`: one iff it is served from memory and `p`</span></span>
+<span id="L118"><span class="dc">has no valid copy. -/</span></span>
+<span id="L119"><span class="kw">def</span> <span class="const token" data-verso-hover="724">Cfg.rcost</span> (s : <span class="const token" data-verso-hover="92">Cfg</span> h) (c : <span class="const token" data-verso-hover="722">Cache</span> h) (p : <span class="const token" data-verso-hover="48">Proc</span> h) : <span class="const token" data-verso-hover="36">ℕ</span> :=</span>
+<span id="L120">  <span class="kw">match</span> s.<span class="const token" data-verso-hover="718">rdVar</span> p <span class="kw">with</span></span>
+<span id="L121">  | <span class="const token" data-verso-hover="82">some</span> v =&gt; <span class="kw">if</span> ¬ s.<span class="const token" data-verso-hover="720">fromBuf</span> p v ∧ c p v = <span class="const token" data-verso-hover="42">false</span> <span class="kw">then</span> <span class="nu">1</span> <span class="kw">else</span> <span class="nu">0</span></span>
+<span id="L122">  | <span class="const token" data-verso-hover="175">none</span> =&gt; <span class="nu">0</span></span>
+<span id="L123"></span>
+<span id="L124"><span class="dc">/-- The number of RMRs incurred by `p` in the event `e` (from configuration `s`, cache `c`). -/</span></span>
+<span id="L125"><span class="kw">def</span> <span class="const token" data-verso-hover="725">evCost</span> (c : <span class="const token" data-verso-hover="722">Cache</span> h) (s : <span class="const token" data-verso-hover="92">Cfg</span> h) (e : <span class="const token" data-verso-hover="144">Ev</span> h) (p : <span class="const token" data-verso-hover="48">Proc</span> h) : <span class="const token" data-verso-hover="36">ℕ</span> :=</span>
+<span id="L126">  <span class="kw">if</span> e = <span class="const token" data-verso-hover="145">.</span>step p <span class="kw">then</span> s.<span class="const token" data-verso-hover="719">wcost</span> p + s.<span class="const token" data-verso-hover="724">rcost</span> c p <span class="kw">else</span> <span class="nu">0</span></span>
+<span id="L127"></span>
+<span id="L128"><span class="dc">/-- The cache state along a run (initially empty). -/</span></span>
+<span id="L129"><span class="kw">def</span> <span class="const token" data-verso-hover="726">Run.cache</span> (r : <span class="const token" data-verso-hover="119">Run</span> h) : <span class="const token" data-verso-hover="36">ℕ</span> → <span class="const token" data-verso-hover="722">Cache</span> h</span>
+<span id="L130">  | <span class="nu">0</span> =&gt; <span class="kw">fun</span> _ _ =&gt; <span class="const token" data-verso-hover="42">false</span></span>
+<span id="L131">  | t + <span class="nu">1</span> =&gt; (r.<span class="const token" data-verso-hover="726">cache</span> t).<span class="const token" data-verso-hover="723">upd</span> (r.<span class="const token" data-verso-hover="120">s</span> t) (r.<span class="const token" data-verso-hover="290">ev</span> t)</span>
+<span id="L132"></span>
+<span id="L133"><span class="dc">/-- The RMRs incurred by `p` in the event at time `t`. -/</span></span>
+<span id="L134"><span class="kw">def</span> <span class="const token" data-verso-hover="727">Run.cost</span> (r : <span class="const token" data-verso-hover="119">Run</span> h) (p : <span class="const token" data-verso-hover="48">Proc</span> h) (t : <span class="const token" data-verso-hover="36">ℕ</span>) : <span class="const token" data-verso-hover="36">ℕ</span> := <span class="const token" data-verso-hover="725">evCost</span> (r.<span class="const token" data-verso-hover="726">cache</span> t) (r.<span class="const token" data-verso-hover="120">s</span> t) (r.<span class="const token" data-verso-hover="290">ev</span> t) p</span>
+<span id="L135"></span>
+<span id="L136"><span class="dc">/-- The number of RMRs incurred by `p` in the events at times `t₁, …, t₂ − 1`. -/</span></span>
+<span id="L137"><span class="kw">def</span> <span class="const token" data-verso-hover="650">Run.rmr</span> (r : <span class="const token" data-verso-hover="119">Run</span> h) (p : <span class="const token" data-verso-hover="48">Proc</span> h) (t₁ t₂ : <span class="const token" data-verso-hover="36">ℕ</span>) : <span class="const token" data-verso-hover="36">ℕ</span> := ∑ t ∈ <span class="const token" data-verso-hover="122">Ico</span> t₁ t₂, r.<span class="const token" data-verso-hover="727">cost</span> p t</span>
+<span id="L138"></span>
+<span id="L139"><span class="dc">/-- The next step of `p` completes a barrier (statement 22 or 50): its store buffer is empty. -/</span></span>
+<span id="L140"><span class="kw">def</span> <span class="const token" data-verso-hover="728">Cfg.BarrierDone</span> (s : <span class="const token" data-verso-hover="92">Cfg</span> h) (p : <span class="const token" data-verso-hover="48">Proc</span> h) : <span class="kw">Prop</span> :=</span>
+<span id="L141">  (s.<span class="const token" data-verso-hover="102">pc</span> p = <span class="const token" data-verso-hover="263">.</span>e22 ∨ ∃ o, s.<span class="const token" data-verso-hover="102">pc</span> p = <span class="const token" data-verso-hover="165">.</span>x50 o) ∧ s.<span class="const token" data-verso-hover="98">buf</span> p = []</span>
+<span id="L142"></span>
+<span id="L143"><span class="const token" data-verso-hover="729">instance</span> (s : <span class="const token" data-verso-hover="92">Cfg</span> h) (p : <span class="const token" data-verso-hover="48">Proc</span> h) : <span class="const token" data-verso-hover="414">Decidable</span> (s.<span class="const token" data-verso-hover="728">BarrierDone</span> p) := <span class="kw">by</span></span>
+<span id="L144">  <span class="kw">unfold</span> <span class="const token" data-verso-hover="728">Cfg.BarrierDone</span>; <span class="kw">infer_instance</span></span>
+<span id="L145"></span>
+<span id="L146"><span class="dc">/-- The number of barriers completed by `p` in the events at times `t₁, …, t₂ − 1`. -/</span></span>
+<span id="L147"><span class="kw">def</span> <span class="const token" data-verso-hover="651">Run.barriers</span> (r : <span class="const token" data-verso-hover="119">Run</span> h) (p : <span class="const token" data-verso-hover="48">Proc</span> h) (t₁ t₂ : <span class="const token" data-verso-hover="36">ℕ</span>) : <span class="const token" data-verso-hover="36">ℕ</span> :=</span>
+<span id="L148">  ((<span class="const token" data-verso-hover="122">Ico</span> t₁ t₂).<span class="const token" data-verso-hover="123">filter</span> (<span class="kw">fun</span> t =&gt; r.<span class="const token" data-verso-hover="290">ev</span> t = <span class="const token" data-verso-hover="145">.</span>step p ∧ (r.<span class="const token" data-verso-hover="120">s</span> t).<span class="const token" data-verso-hover="728">BarrierDone</span> p)).<span class="const token" data-verso-hover="125">card</span></span>
+<span id="L149"></span>
+<span id="L150"><span class="dc">/-- `p` is not in the remainder section at any time strictly between `t₁` and `t₂`: the events</span></span>
+<span id="L151"><span class="dc">at times `t₁, …, t₂ − 1` belong to (a part of) a single passage of `p` (at most the event at time</span></span>
+<span id="L152"><span class="dc">`t₁` is a step of `p` in the remainder section, i.e. the start of the passage). -/</span></span>
+<span id="L153"><span class="kw">def</span> <span class="const token" data-verso-hover="649">Run.WithinPassage</span> (r : <span class="const token" data-verso-hover="119">Run</span> h) (p : <span class="const token" data-verso-hover="48">Proc</span> h) (t₁ t₂ : <span class="const token" data-verso-hover="36">ℕ</span>) : <span class="kw">Prop</span> :=</span>
+<span id="L154">  ∀ t, t₁ &lt; t → t &lt; t₂ → (r.<span class="const token" data-verso-hover="120">s</span> t).<span class="const token" data-verso-hover="102">pc</span> p ≠ <span class="const token" data-verso-hover="216">.</span>rem</span>
+<span id="L155"></span>
+<span id="L156"><span class="dc">/-! ### Semantics of events -/</span></span>
+<span id="L157"></span>
+<span id="L158"><span class="kw">lemma</span> <span class="const token" data-verso-hover="730">Cfg.mem_next_perf</span> (s : <span class="const token" data-verso-hover="92">Cfg</span> h) (e : <span class="const token" data-verso-hover="144">Ev</span> h) : (s.<span class="const token" data-verso-hover="12">next</span> e).<span class="const token" data-verso-hover="96">mem</span> = s.<span class="const token" data-verso-hover="96">mem</span>.<span class="const token" data-verso-hover="59">view</span> (s.<span class="const token" data-verso-hover="717">perf</span> e) := <span class="kw">by</span></span>
+<span id="L159">  <span class="kw">cases</span> e <span class="kw">with</span></span>
+<span id="L160">  | <span class="const token" data-verso-hover="146">flush</span> p =&gt;</span>
+<span id="L161">    <span class="kw">simp</span> only [<span class="const token" data-verso-hover="12">Cfg.next</span>, <span class="const token" data-verso-hover="717">Cfg.perf</span>, <span class="const token" data-verso-hover="24">Cfg.flush</span>]</span>
+<span id="L162">    <span class="kw">split</span> &lt;;&gt; <span class="kw">rename_i</span> hb &lt;;&gt; <span class="kw">simp</span> [hb]</span>
+<span id="L163">  | <span class="const token" data-verso-hover="145">step</span> p =&gt;</span>
+<span id="L164">    <span class="kw">simp</span> only [<span class="const token" data-verso-hover="12">Cfg.next</span>, <span class="const token" data-verso-hover="717">Cfg.perf</span>, <span class="const token" data-verso-hover="138">Cfg.stepProc</span>]</span>
+<span id="L165">    <span class="kw">split</span> &lt;;&gt; <span class="kw">rename_i</span> hpc &lt;;&gt; <span class="kw">simp</span> only [hpc]</span>
+<span id="L166">    <span class="kw">all_goals</span> <span class="kw">first</span></span>
+<span id="L167">      | <span class="kw">rfl</span></span>
+<span id="L168">      | (<span class="kw">simp</span> only [<span class="const token" data-verso-hover="114">Cfg.barrier</span>]; <span class="kw">split</span> &lt;;&gt; <span class="kw">rename_i</span> hb</span>
+<span id="L169">         · <span class="kw">simp</span> [hb]</span>
+<span id="L170">         · <span class="kw">simp</span> only [<span class="const token" data-verso-hover="24">Cfg.flush</span>]; <span class="kw">split</span> &lt;;&gt; <span class="kw">rename_i</span> hb' &lt;;&gt; <span class="kw">simp_all</span>)</span>
+<span id="L171">      | (<span class="kw">simp</span> only [<span class="const token" data-verso-hover="139">Cfg.cas</span>, <span class="const token" data-verso-hover="117">Cfg.view</span>]; <span class="kw">split</span> &lt;;&gt; <span class="kw">rename_i</span> hl &lt;;&gt; <span class="kw">simp</span> [hl, <span class="const token" data-verso-hover="63">Mem.write</span>])</span>
+<span id="L172">      | (<span class="kw">split</span> &lt;;&gt; <span class="kw">rfl</span>)</span>
+<span id="L173"></span>
+<span id="L174"><span class="kw">lemma</span> <span class="const token" data-verso-hover="731">Cfg.pc_next_of_ne_actor</span> (s : <span class="const token" data-verso-hover="92">Cfg</span> h) (e : <span class="const token" data-verso-hover="144">Ev</span> h) {q : <span class="const token" data-verso-hover="48">Proc</span> h} (hq : e.<span class="const token" data-verso-hover="716">actor</span> ≠ q) :</span>
+<span id="L175">    (s.<span class="const token" data-verso-hover="12">next</span> e).<span class="const token" data-verso-hover="102">pc</span> q = s.<span class="const token" data-verso-hover="102">pc</span> q := <span class="kw">by</span></span>
+<span id="L176">  <span class="kw">have</span> hq' : q ≠ e.<span class="const token" data-verso-hover="716">actor</span> := <span class="const token" data-verso-hover="221">Ne.symm</span> hq</span>
+<span id="L177">  <span class="kw">cases</span> e <span class="kw">with</span></span>
+<span id="L178">  | <span class="const token" data-verso-hover="146">flush</span> p =&gt; <span class="kw">simp</span> [<span class="const token" data-verso-hover="12">Cfg.next</span>]</span>
+<span id="L179">  | <span class="const token" data-verso-hover="145">step</span> p =&gt;</span>
+<span id="L180">    <span class="kw">simp</span> only [<span class="const token" data-verso-hover="716">Ev.actor</span>] <span class="kw">at</span> hq'</span>
+<span id="L181">    <span class="kw">simp</span> only [<span class="const token" data-verso-hover="12">Cfg.next</span>, <span class="const token" data-verso-hover="138">Cfg.stepProc</span>]</span>
+<span id="L182">    <span class="kw">split</span> &lt;;&gt; (<span class="kw">try</span> <span class="kw">simp</span> [<span class="const token" data-verso-hover="114">Cfg.barrier</span>, <span class="const token" data-verso-hover="139">Cfg.cas</span>, <span class="const token" data-verso-hover="364">Function.update_of_ne</span> hq']) &lt;;&gt; (<span class="kw">try</span> <span class="kw">split</span>) &lt;;&gt;</span>
+<span id="L183">      (<span class="kw">try</span> <span class="kw">split</span>) &lt;;&gt; (<span class="kw">try</span> <span class="kw">simp</span> [<span class="const token" data-verso-hover="364">Function.update_of_ne</span> hq'])</span>
+<span id="L184"></span>
+<span id="L185"><span class="kw">lemma</span> <span class="const token" data-verso-hover="732">Cfg.buf_next_of_ne_actor</span> (s : <span class="const token" data-verso-hover="92">Cfg</span> h) (e : <span class="const token" data-verso-hover="144">Ev</span> h) {q : <span class="const token" data-verso-hover="48">Proc</span> h} (hq : e.<span class="const token" data-verso-hover="716">actor</span> ≠ q) :</span>
+<span id="L186">    (s.<span class="const token" data-verso-hover="12">next</span> e).<span class="const token" data-verso-hover="98">buf</span> q = s.<span class="const token" data-verso-hover="98">buf</span> q := <span class="kw">by</span></span>
+<span id="L187">  <span class="kw">have</span> hq' : q ≠ e.<span class="const token" data-verso-hover="716">actor</span> := <span class="const token" data-verso-hover="221">Ne.symm</span> hq</span>
+<span id="L188">  <span class="kw">cases</span> e <span class="kw">with</span></span>
+<span id="L189">  | <span class="const token" data-verso-hover="146">flush</span> p =&gt;</span>
+<span id="L190">    <span class="kw">simp</span> only [<span class="const token" data-verso-hover="716">Ev.actor</span>] <span class="kw">at</span> hq'</span>
+<span id="L191">    <span class="kw">simp</span> only [<span class="const token" data-verso-hover="12">Cfg.next</span>, <span class="const token" data-verso-hover="24">Cfg.flush</span>]; <span class="kw">split</span> &lt;;&gt; <span class="kw">simp</span> [<span class="const token" data-verso-hover="364">Function.update_of_ne</span> hq']</span>
+<span id="L192">  | <span class="const token" data-verso-hover="145">step</span> p =&gt;</span>
+<span id="L193">    <span class="kw">simp</span> only [<span class="const token" data-verso-hover="716">Ev.actor</span>] <span class="kw">at</span> hq'</span>
+<span id="L194">    <span class="kw">simp</span> only [<span class="const token" data-verso-hover="12">Cfg.next</span>, <span class="const token" data-verso-hover="138">Cfg.stepProc</span>]</span>
+<span id="L195">    <span class="kw">split</span> &lt;;&gt; (<span class="kw">try</span> <span class="kw">simp</span> [<span class="const token" data-verso-hover="114">Cfg.barrier</span>, <span class="const token" data-verso-hover="139">Cfg.cas</span>, <span class="const token" data-verso-hover="24">Cfg.flush</span>, <span class="const token" data-verso-hover="364">Function.update_of_ne</span> hq']) &lt;;&gt; (<span class="kw">try</span> <span class="kw">split</span>) &lt;;&gt;</span>
+<span id="L196">      (<span class="kw">try</span> <span class="kw">split</span>) &lt;;&gt; (<span class="kw">try</span> <span class="kw">split</span>) &lt;;&gt; (<span class="kw">try</span> <span class="kw">simp</span> [<span class="const token" data-verso-hover="364">Function.update_of_ne</span> hq'])</span>
+<span id="L197"></span>
+<span id="L198"><span class="dc">/-- An event changes `ent` only when its actor enters the critical section from the entry</span></span>
+<span id="L199"><span class="dc">section. -/</span></span>
+<span id="L200"><span class="kw">lemma</span> <span class="const token" data-verso-hover="733">Cfg.ent_next_cases</span> (s : <span class="const token" data-verso-hover="92">Cfg</span> h) (e : <span class="const token" data-verso-hover="144">Ev</span> h) :</span>
+<span id="L201">    (s.<span class="const token" data-verso-hover="12">next</span> e).<span class="const token" data-verso-hover="100">ent</span> = s.<span class="const token" data-verso-hover="100">ent</span> ∨ ((s.<span class="const token" data-verso-hover="12">next</span> e).<span class="const token" data-verso-hover="100">ent</span> = s.<span class="const token" data-verso-hover="100">ent</span> + <span class="nu">1</span> ∧ (s.<span class="const token" data-verso-hover="102">pc</span> e.<span class="const token" data-verso-hover="716">actor</span>).<span class="const token" data-verso-hover="163">Entry</span> ∧</span>
+<span id="L202">      (s.<span class="const token" data-verso-hover="12">next</span> e).<span class="const token" data-verso-hover="102">pc</span> e.<span class="const token" data-verso-hover="716">actor</span> = <span class="const token" data-verso-hover="124">.</span>cs) := <span class="kw">by</span></span>
+<span id="L203">  <span class="kw">cases</span> e <span class="kw">with</span></span>
+<span id="L204">  | <span class="const token" data-verso-hover="146">flush</span> p =&gt; <span class="kw">simp</span> [<span class="const token" data-verso-hover="12">Cfg.next</span>]</span>
+<span id="L205">  | <span class="const token" data-verso-hover="145">step</span> p =&gt;</span>
+<span id="L206">    <span class="kw">simp</span> only [<span class="const token" data-verso-hover="12">Cfg.next</span>, <span class="const token" data-verso-hover="716">Ev.actor</span>]</span>
+<span id="L207">    <span class="kw">rcases</span> hpc : s.<span class="const token" data-verso-hover="102">pc</span> p &lt;;&gt; <span class="kw">simp</span> [<span class="const token" data-verso-hover="138">Cfg.stepProc</span>, hpc, <span class="const token" data-verso-hover="114">Cfg.barrier</span>, <span class="const token" data-verso-hover="163">PC.Entry</span>] &lt;;&gt;</span>
+<span id="L208">      (<span class="kw">try</span> <span class="kw">split</span>) &lt;;&gt; (<span class="kw">try</span> <span class="kw">split</span>) &lt;;&gt; <span class="kw">simp_all</span> [<span class="const token" data-verso-hover="139">Cfg.cas</span>]</span>
+<span id="L209">    <span class="kw">all_goals</span> (<span class="kw">split</span> &lt;;&gt; <span class="kw">simp</span>)</span>
+<span id="L210"></span>
+<span id="L211"><span class="dc">/-- A process leaves the entry section only by entering the critical section. -/</span></span>
+<span id="L212"><span class="kw">lemma</span> <span class="const token" data-verso-hover="734">Cfg.entry_next_cases</span> (s : <span class="const token" data-verso-hover="92">Cfg</span> h) (e : <span class="const token" data-verso-hover="144">Ev</span> h) (he : (s.<span class="const token" data-verso-hover="102">pc</span> e.<span class="const token" data-verso-hover="716">actor</span>).<span class="const token" data-verso-hover="163">Entry</span>) :</span>
+<span id="L213">    ((s.<span class="const token" data-verso-hover="12">next</span> e).<span class="const token" data-verso-hover="102">pc</span> e.<span class="const token" data-verso-hover="716">actor</span>).<span class="const token" data-verso-hover="163">Entry</span> ∨ (s.<span class="const token" data-verso-hover="12">next</span> e).<span class="const token" data-verso-hover="100">ent</span> = s.<span class="const token" data-verso-hover="100">ent</span> + <span class="nu">1</span> := <span class="kw">by</span></span>
+<span id="L214">  <span class="kw">cases</span> e <span class="kw">with</span></span>
+<span id="L215">  | <span class="const token" data-verso-hover="146">flush</span> p =&gt; <span class="kw">simp_all</span> [<span class="const token" data-verso-hover="12">Cfg.next</span>, <span class="const token" data-verso-hover="716">Ev.actor</span>]</span>
+<span id="L216">  | <span class="const token" data-verso-hover="145">step</span> p =&gt;</span>
+<span id="L217">    <span class="kw">simp</span> only [<span class="const token" data-verso-hover="12">Cfg.next</span>, <span class="const token" data-verso-hover="716">Ev.actor</span>] <span class="kw">at</span> he ⊢</span>
+<span id="L218">    <span class="kw">rcases</span> hpc : s.<span class="const token" data-verso-hover="102">pc</span> p &lt;;&gt; <span class="kw">simp</span> [hpc, <span class="const token" data-verso-hover="163">PC.Entry</span>] <span class="kw">at</span> he &lt;;&gt;</span>
+<span id="L219">      <span class="kw">simp</span> only [<span class="const token" data-verso-hover="138">Cfg.stepProc</span>, hpc, <span class="const token" data-verso-hover="114">Cfg.barrier</span>, <span class="const token" data-verso-hover="139">Cfg.cas</span>] &lt;;&gt; (<span class="kw">try</span> <span class="kw">split_ifs</span>) &lt;;&gt; <span class="kw">simp</span> [<span class="const token" data-verso-hover="163">PC.Entry</span>, hpc]</span>
+<span id="L220"></span>
+<span id="L221"><span class="kw">end</span> Podc.ConstantBarriersMutex</span>
+<span id="L222"></span>
+</code></div>
+        <script>
+          window.versoHoversUrl = "PODC2013/ConstantBarriersMutex/-hovers.json";</script>
+        <script src="static/lean/popper.js"></script>
+        <script src="static/lean/tippy.js"></script>
+        <script src="static/lean/marked.js"></script>
+        <script src="static/lean/highlighting.js"></script>
+        <script src="static/lean/lean.js"></script>
+        </article></main><footer class="site-footer"><div class="wrap">
+        Machine-checked formalizations of PODC papers in Lean 4. Generated with <a href="https://github.com/leanprover/verso">Verso</a> from the README files of <a href="https://github.com/vasnesterov/formal_podc">vasnesterov/formal_podc</a>.</div>
+      </footer></body>
+  </html>
+

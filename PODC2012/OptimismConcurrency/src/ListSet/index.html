@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="light dark">
+    <link rel="icon" href="data:,">
+    <title>OptimismConcurrency: ListSet.lean · Formal PODC</title><base href="../../../.././"><link rel="stylesheet" href="static/lean/verso-vars.css">
+    <link rel="stylesheet" href="static/lean/highlighting.css">
+    <link rel="stylesheet" href="static/lean/tippy-border.css">
+    <link rel="stylesheet" href="static/style.css">
+    <script defer="defer" src="static/site.js"></script>
+    </head>
+  <body>
+    <header class="site-header">
+      <div class="wrap">
+        <a class="brand" href=".">Formal PODC</a><nav class="top">
+          <a href=".">Search</a><a href="about/">About</a><a href="https://github.com/vasnesterov/formal_podc">GitHub</a></nav>
+        </div>
+      </header>
+    <main class="wrap"><article><nav class="breadcrumbs" aria-label="Breadcrumb">
+          <a href=".">Search</a><span class="sep">›</span><a href="PODC2012/">PODC 2012</a><span class="sep">›</span><a href="PODC2012/OptimismConcurrency/">OptimismConcurrency</a><span class="sep">›</span><a href="PODC2012/OptimismConcurrency/src/">Lean source</a><span class="sep">›</span><span aria-current="page">ListSet</span></nav>
+        <h1>
+          <code>ListSet.lean</code></h1>
+        <div class="paper-links">
+          <p>
+            Source of <a href="PODC2012/OptimismConcurrency/">From Sequential to Concurrent / Optimism for Boosting Concurrency — PODC 2012</a> · <a href="https://github.com/vasnesterov/formal_podc/blob/main/Papers/PODC2012/OptimismConcurrency/ListSet.lean">GitHub</a> · hover over a name for its type and documentation</p>
+          </div>
+        <div class="lean-code lean-src">
+          <code class="hl lean block" data-lean-context="ListSet"><span id="L1"><span class="kw">import</span> Papers.PODC2012.OptimismConcurrency.Basic</span>
+<span id="L2"><span class="kw">import</span> Cslib.Computability.Distributed.SharedMemory.HerlihyWing.Bridge</span>
+<span id="L3"></span>
+<span id="L4"><span class="dc">/-!</span></span>
+<span id="L5"><span class="dc"># The list-based set `(LL, set)` (§2, Appendix A)</span></span>
+<span id="L6"></span>
+<span id="L7"><span class="dc">* `setObj`: the type *set* (`insert`, `remove`, `contains` on finite sets of integers), as a</span></span>
+<span id="L8"><span class="dc">  deterministic CSLib object; `specSet` is its Herlihy–Wing sequential specification.</span></span>
+<span id="L9"><span class="dc">* Nodes: base objects are locations `Loc = ℕ` (`head = 0`, `tail = 1`); a node stores a key</span></span>
+<span id="L10"><span class="dc">  (`-∞`, an integer, or `+∞`) and the location of its successor (`NodeV`).</span></span>
+<span id="L11"><span class="dc">* `LL` (Algorithm 2) as a program: `St` (control state), `act` (next read/write/return),</span></span>
+<span id="L12"><span class="dc">  `onRead`, `onWrite` (effect of a response). `new-node(v, prev.next)` is modelled as a write of</span></span>
+<span id="L13"><span class="dc">  the new node to a *fresh* (never allocated) location (action `alloc`), followed by the write</span></span>
+<span id="L14"><span class="dc">  linking it.</span></span>
+<span id="L15"><span class="dc">* `seqStep`, `SigLL`: the histories of `LL` (Σ_LL), i.e. the sequential executions of `LL` from</span></span>
+<span id="L16"><span class="dc">  the empty list (`head → tail`), where reads return the current memory, possibly ending in the</span></span>
+<span id="L17"><span class="dc">  middle of an operation.</span></span>
+<span id="L18"><span class="dc">* `honStep`, `Honest`: a history is *honest* if every read returns the value of the latest write</span></span>
+<span id="L19"><span class="dc">  to the object (a write takes effect at its `ok` response); this is the strongest reasonable</span></span>
+<span id="L20"><span class="dc">  "memory" constraint and is not required by the paper (§2 only asks for obedience).</span></span>
+<span id="L21"><span class="dc">-/</span></span>
+<span id="L22"></span>
+<span id="L23"><span class="kw">namespace</span> Podc.OptimismConcurrency</span>
+<span id="L24"></span>
+<span id="L25"><span class="kw">open</span> Cslib.SharedMemory</span>
+<span id="L26"></span>
+<span id="L27"><span class="dc">/-- Locations of nodes (the base objects of `LL`). -/</span></span>
+<span id="L28"><span class="kw">abbrev</span> <span class="const token" data-verso-hover="233">Loc</span> := <span class="const token" data-verso-hover="70">ℕ</span></span>
+<span id="L29"></span>
+<span id="L30"><span class="dc">/-- The head sentinel. -/</span></span>
+<span id="L31"><span class="kw">def</span> <span class="const token" data-verso-hover="425">headL</span> : <span class="const token" data-verso-hover="233">Loc</span> := <span class="nu">0</span></span>
+<span id="L32"><span class="dc">/-- The tail sentinel. -/</span></span>
+<span id="L33"><span class="kw">def</span> <span class="const token" data-verso-hover="450">tailL</span> : <span class="const token" data-verso-hover="233">Loc</span> := <span class="nu">1</span></span>
+<span id="L34"></span>
+<span id="L35"><span class="dc">/-- Keys: `-∞`, an integer, `+∞`. -/</span></span>
+<span id="L36"><span class="kw">inductive</span> <span class="const token" data-verso-hover="506">Key</span> | <span class="const token" data-verso-hover="470">ninf</span> | <span class="const token" data-verso-hover="427">fin</span> (z : <span class="const token" data-verso-hover="509">ℤ</span>) | <span class="const token" data-verso-hover="471">pinf</span></span>
+<span id="L37">  <span class="kw">deriving</span> <span class="const token" data-verso-hover="31">DecidableEq</span>, <span class="const token" data-verso-hover="651">Repr</span></span>
+<span id="L38"></span>
+<span id="L39"><span class="dc">/-- `k &lt; v` for a key `k` and an integer `v`. -/</span></span>
+<span id="L40"><span class="kw">def</span> <span class="const token" data-verso-hover="527">Key.ltZ</span> : <span class="const token" data-verso-hover="506">Key</span> → <span class="const token" data-verso-hover="509">ℤ</span> → <span class="const token" data-verso-hover="30">Bool</span></span>
+<span id="L41">  | <span class="const token" data-verso-hover="470">.</span>ninf, _ =&gt; <span class="const token" data-verso-hover="2">true</span></span>
+<span id="L42">  | <span class="const token" data-verso-hover="427">.</span>fin z, v =&gt; <span class="const token" data-verso-hover="57">decide</span> (z &lt; v)</span>
+<span id="L43">  | <span class="const token" data-verso-hover="471">.</span>pinf, _ =&gt; <span class="const token" data-verso-hover="37">false</span></span>
+<span id="L44"></span>
+<span id="L45"><span class="dc">/-- A node: its value (`val`) and the location of its successor (`next`). -/</span></span>
+<span id="L46"><span class="kw">structure</span> <span class="const token" data-verso-hover="227">NodeV</span> <span class="kw">where</span></span>
+<span id="L47">  <span class="const token" data-verso-hover="536">key</span> : <span class="const token" data-verso-hover="506">Key</span></span>
+<span id="L48">  <span class="const token" data-verso-hover="448">next</span> : <span class="const token" data-verso-hover="233">Loc</span></span>
+<span id="L49">  <span class="kw">deriving</span> <span class="const token" data-verso-hover="31">DecidableEq</span>, <span class="const token" data-verso-hover="651">Repr</span></span>
+<span id="L50"></span>
+<span id="L51"><span class="dc">/-- Operations of the type *set*. -/</span></span>
+<span id="L52"><span class="kw">inductive</span> <span class="const token" data-verso-hover="253">SetOp</span> | <span class="const token" data-verso-hover="469">insert</span> (v : <span class="const token" data-verso-hover="509">ℤ</span>) | <span class="const token" data-verso-hover="12">remove</span> (v : <span class="const token" data-verso-hover="509">ℤ</span>) | <span class="const token" data-verso-hover="581">contains</span> (v : <span class="const token" data-verso-hover="509">ℤ</span>)</span>
+<span id="L53">  <span class="kw">deriving</span> <span class="const token" data-verso-hover="31">DecidableEq</span>, <span class="const token" data-verso-hover="651">Repr</span></span>
+<span id="L54"></span>
+<span id="L55"><span class="dc">/-- The argument of an operation. -/</span></span>
+<span id="L56"><span class="kw">def</span> <span class="const token" data-verso-hover="555">SetOp.arg</span> : <span class="const token" data-verso-hover="253">SetOp</span> → <span class="const token" data-verso-hover="509">ℤ</span></span>
+<span id="L57">  | <span class="const token" data-verso-hover="469">.</span>insert v | <span class="const token" data-verso-hover="12">.</span>remove v | <span class="const token" data-verso-hover="581">.</span>contains v =&gt; v</span>
+<span id="L58"></span>
+<span id="L59"><span class="dc">/-- The type *set* (Appendix A): states are finite sets of integers, initially empty. -/</span></span>
+<span id="L60"><span class="kw">def</span> <span class="const token" data-verso-hover="558">setδ</span> : <span class="const token" data-verso-hover="533">Finset</span> <span class="const token" data-verso-hover="509">ℤ</span> → <span class="const token" data-verso-hover="253">SetOp</span> → <span class="const token" data-verso-hover="533">Finset</span> <span class="const token" data-verso-hover="509">ℤ</span> × <span class="const token" data-verso-hover="30">Bool</span></span>
+<span id="L61">  | q, <span class="const token" data-verso-hover="581">.</span>contains v =&gt; (q, <span class="const token" data-verso-hover="57">decide</span> (v ∈ q))</span>
+<span id="L62">  | q, <span class="const token" data-verso-hover="469">.</span>insert v =&gt; (<span class="const token" data-verso-hover="652">insert</span> v q, <span class="const token" data-verso-hover="57">decide</span> (v ∉ q))</span>
+<span id="L63">  | q, <span class="const token" data-verso-hover="12">.</span>remove v =&gt; (q.<span class="const token" data-verso-hover="579">erase</span> v, <span class="const token" data-verso-hover="57">decide</span> (v ∈ q))</span>
+<span id="L64"></span>
+<span id="L65"><span class="dc">/-- The type *set* as a deterministic object. -/</span></span>
+<span id="L66"><span class="kw">def</span> <span class="const token" data-verso-hover="653">setObj</span> : <span class="const token" data-verso-hover="614">ObjSpec</span> <span class="kw">where</span></span>
+<span id="L67">  <span class="const token" data-verso-hover="619">State</span> := <span class="const token" data-verso-hover="533">Finset</span> <span class="const token" data-verso-hover="509">ℤ</span></span>
+<span id="L68">  <span class="const token" data-verso-hover="622">Op</span> := <span class="const token" data-verso-hover="253">SetOp</span></span>
+<span id="L69">  <span class="const token" data-verso-hover="615">Resp</span> := <span class="const token" data-verso-hover="30">Bool</span></span>
+<span id="L70">  <span class="const token" data-verso-hover="638">init</span> := ∅</span>
+<span id="L71">  <span class="const token" data-verso-hover="654">δ</span> := <span class="const token" data-verso-hover="558">setδ</span></span>
+<span id="L72"></span>
+<span id="L73"><span class="dc">/-- Sequential specification of *set* (Herlihy–Wing form). -/</span></span>
+<span id="L74"><span class="kw">abbrev</span> <span class="const token" data-verso-hover="655">specSet</span> (P : <span class="kw">Type</span>) : <span class="const token" data-verso-hover="86">HerlihyWing.SeqSpec</span> P <span class="const token" data-verso-hover="130">Unit</span> <span class="const token" data-verso-hover="253">SetOp</span> <span class="const token" data-verso-hover="30">Bool</span> :=</span>
+<span id="L75">  <span class="const token" data-verso-hover="647">HerlihyWing.specOf</span> (P := P) <span class="const token" data-verso-hover="653">setObj</span></span>
+<span id="L76"></span>
+<span id="L77"><span class="dc">/-- Histories of the list-based set. -/</span></span>
+<span id="L78"><span class="kw">abbrev</span> <span class="const token" data-verso-hover="157">LHist</span> (P : <span class="kw">Type</span>) := <span class="const token" data-verso-hover="32">Hist</span> P <span class="const token" data-verso-hover="130">Unit</span> <span class="const token" data-verso-hover="253">SetOp</span> <span class="const token" data-verso-hover="30">Bool</span> <span class="const token" data-verso-hover="233">Loc</span> <span class="const token" data-verso-hover="227">NodeV</span></span>
+<span id="L79"><span class="dc">/-- Events of the list-based set. -/</span></span>
+<span id="L80"><span class="kw">abbrev</span> <span class="const token" data-verso-hover="187">LEv</span> (P : <span class="kw">Type</span>) := <span class="const token" data-verso-hover="22">Ev</span> P <span class="const token" data-verso-hover="130">Unit</span> <span class="const token" data-verso-hover="253">SetOp</span> <span class="const token" data-verso-hover="30">Bool</span> <span class="const token" data-verso-hover="233">Loc</span> <span class="const token" data-verso-hover="227">NodeV</span></span>
+<span id="L81"><span class="dc">/-- Schedules of the list-based set. -/</span></span>
+<span id="L82"><span class="kw">abbrev</span> <span class="const token" data-verso-hover="396">LSched</span> (P : <span class="kw">Type</span>) := <span class="const token" data-verso-hover="33">List</span> (<span class="const token" data-verso-hover="90">SEv</span> P <span class="const token" data-verso-hover="130">Unit</span> <span class="const token" data-verso-hover="253">SetOp</span> <span class="const token" data-verso-hover="233">Loc</span> <span class="const token" data-verso-hover="227">NodeV</span>)</span>
+<span id="L83"></span>
+<span id="L84"><span class="dc">/-! ## Algorithm 2 (`LL`) as a program -/</span></span>
+<span id="L85"></span>
+<span id="L86"><span class="dc">/-- Control state of an operation of `LL`. `old` is the location of `prev`. -/</span></span>
+<span id="L87"><span class="kw">inductive</span> <span class="const token" data-verso-hover="438">St</span></span>
+<span id="L88">  <span class="dc">/-- before `prev ← read(head)` -/</span></span>
+<span id="L89">  | <span class="const token" data-verso-hover="441">start</span></span>
+<span id="L90">  <span class="dc">/-- traversing: next is `curr ← read(prev.next)` -/</span></span>
+<span id="L91">  | <span class="const token" data-verso-hover="554">trav</span> (old : <span class="const token" data-verso-hover="233">Loc</span>) (prev : <span class="const token" data-verso-hover="227">NodeV</span>)</span>
+<span id="L92">  <span class="dc">/-- `insert`: next is `X ← new-node(n)` (write of `n` to a fresh location) -/</span></span>
+<span id="L93">  | <span class="const token" data-verso-hover="556">alloc</span> (old : <span class="const token" data-verso-hover="233">Loc</span>) (prev : <span class="const token" data-verso-hover="227">NodeV</span>) (n : <span class="const token" data-verso-hover="227">NodeV</span>)</span>
+<span id="L94">  <span class="dc">/-- next is `write(old, n)`, then return `r` -/</span></span>
+<span id="L95">  | <span class="const token" data-verso-hover="557">wr</span> (old : <span class="const token" data-verso-hover="233">Loc</span>) (n : <span class="const token" data-verso-hover="227">NodeV</span>) (r : <span class="const token" data-verso-hover="30">Bool</span>)</span>
+<span id="L96">  <span class="dc">/-- next is `return r` -/</span></span>
+<span id="L97">  | <span class="const token" data-verso-hover="559">done</span> (r : <span class="const token" data-verso-hover="30">Bool</span>)</span>
+<span id="L98">  <span class="kw">deriving</span> <span class="const token" data-verso-hover="31">DecidableEq</span>, <span class="const token" data-verso-hover="651">Repr</span></span>
+<span id="L99"></span>
+<span id="L100"><span class="dc">/-- Next action of `LL`. -/</span></span>
+<span id="L101"><span class="kw">inductive</span> <span class="const token" data-verso-hover="656">Act</span></span>
+<span id="L102">  | <span class="const token" data-verso-hover="453">read</span> (y : <span class="const token" data-verso-hover="233">Loc</span>)</span>
+<span id="L103">  | <span class="const token" data-verso-hover="454">write</span> (y : <span class="const token" data-verso-hover="233">Loc</span>) (n : <span class="const token" data-verso-hover="227">NodeV</span>)</span>
+<span id="L104">  <span class="dc">/-- write `n` to a fresh location -/</span></span>
+<span id="L105">  | <span class="const token" data-verso-hover="455">alloc</span> (n : <span class="const token" data-verso-hover="227">NodeV</span>)</span>
+<span id="L106">  | <span class="const token" data-verso-hover="456">ret</span> (r : <span class="const token" data-verso-hover="30">Bool</span>)</span>
+<span id="L107">  <span class="kw">deriving</span> <span class="const token" data-verso-hover="31">DecidableEq</span>, <span class="const token" data-verso-hover="651">Repr</span></span>
+<span id="L108"></span>
+<span id="L109"><span class="dc">/-- The next action of the operation `o` in control state `s`. -/</span></span>
+<span id="L110"><span class="kw">def</span> <span class="const token" data-verso-hover="452">act</span> (_o : <span class="const token" data-verso-hover="253">SetOp</span>) : <span class="const token" data-verso-hover="438">St</span> → <span class="const token" data-verso-hover="656">Act</span></span>
+<span id="L111">  | <span class="const token" data-verso-hover="441">.</span>start =&gt; <span class="const token" data-verso-hover="453">.</span>read <span class="const token" data-verso-hover="425">headL</span></span>
+<span id="L112">  | <span class="const token" data-verso-hover="554">.</span>trav _ prev =&gt; <span class="const token" data-verso-hover="453">.</span>read prev.<span class="const token" data-verso-hover="448">next</span></span>
+<span id="L113">  | <span class="const token" data-verso-hover="556">.</span>alloc _ _ n =&gt; <span class="const token" data-verso-hover="455">.</span>alloc n</span>
+<span id="L114">  | <span class="const token" data-verso-hover="557">.</span>wr old n _ =&gt; <span class="const token" data-verso-hover="454">.</span>write old n</span>
+<span id="L115">  | <span class="const token" data-verso-hover="559">.</span>done r =&gt; <span class="const token" data-verso-hover="456">.</span>ret r</span>
+<span id="L116"></span>
+<span id="L117"><span class="dc">/-- End of the traversal: `curr.val ≥ v` (lines 13–16, 25–27, 34 of Algorithm 2). -/</span></span>
+<span id="L118"><span class="kw">def</span> <span class="const token" data-verso-hover="582">finish</span> : <span class="const token" data-verso-hover="253">SetOp</span> → <span class="const token" data-verso-hover="233">Loc</span> → <span class="const token" data-verso-hover="227">NodeV</span> → <span class="const token" data-verso-hover="227">NodeV</span> → <span class="const token" data-verso-hover="438">St</span></span>
+<span id="L119">  | <span class="const token" data-verso-hover="581">.</span>contains v, _, _, curr =&gt; <span class="const token" data-verso-hover="559">.</span>done (<span class="const token" data-verso-hover="57">decide</span> (curr.<span class="const token" data-verso-hover="536">key</span> = <span class="const token" data-verso-hover="427">.</span>fin v))</span>
+<span id="L120">  | <span class="const token" data-verso-hover="469">.</span>insert v, old, prev, curr =&gt;</span>
+<span id="L121">      <span class="kw">if</span> curr.<span class="const token" data-verso-hover="536">key</span> = <span class="const token" data-verso-hover="427">.</span>fin v <span class="kw">then</span> <span class="const token" data-verso-hover="559">.</span>done <span class="const token" data-verso-hover="37">false</span> <span class="kw">else</span> <span class="const token" data-verso-hover="556">.</span>alloc old prev ⟨<span class="const token" data-verso-hover="427">.</span>fin v, prev.<span class="const token" data-verso-hover="448">next</span>⟩</span>
+<span id="L122">  | <span class="const token" data-verso-hover="12">.</span>remove v, old, prev, curr =&gt;</span>
+<span id="L123">      <span class="kw">if</span> curr.<span class="const token" data-verso-hover="536">key</span> = <span class="const token" data-verso-hover="427">.</span>fin v <span class="kw">then</span> <span class="const token" data-verso-hover="557">.</span>wr old ⟨prev.<span class="const token" data-verso-hover="536">key</span>, curr.<span class="const token" data-verso-hover="448">next</span>⟩ <span class="const token" data-verso-hover="2">true</span> <span class="kw">else</span> <span class="const token" data-verso-hover="559">.</span>done <span class="const token" data-verso-hover="37">false</span></span>
+<span id="L124"></span>
+<span id="L125"><span class="dc">/-- Effect of a read of `y` returning `n`. -/</span></span>
+<span id="L126"><span class="kw">def</span> <span class="const token" data-verso-hover="443">onRead</span> (o : <span class="const token" data-verso-hover="253">SetOp</span>) : <span class="const token" data-verso-hover="438">St</span> → <span class="const token" data-verso-hover="233">Loc</span> → <span class="const token" data-verso-hover="227">NodeV</span> → <span class="const token" data-verso-hover="438">St</span></span>
+<span id="L127">  | <span class="const token" data-verso-hover="441">.</span>start, _, n =&gt; <span class="const token" data-verso-hover="554">.</span>trav <span class="const token" data-verso-hover="425">headL</span> n</span>
+<span id="L128">  | <span class="const token" data-verso-hover="554">.</span>trav old prev, y, curr =&gt;</span>
+<span id="L129">      <span class="kw">if</span> curr.<span class="const token" data-verso-hover="536">key</span>.<span class="const token" data-verso-hover="527">ltZ</span> o.<span class="const token" data-verso-hover="555">arg</span> <span class="kw">then</span> <span class="const token" data-verso-hover="554">.</span>trav y curr <span class="kw">else</span> <span class="const token" data-verso-hover="582">finish</span> o old prev curr</span>
+<span id="L130">  | s, _, _ =&gt; s</span>
+<span id="L131"></span>
+<span id="L132"><span class="dc">/-- Effect of the completion of a write to `y`. -/</span></span>
+<span id="L133"><span class="kw">def</span> <span class="const token" data-verso-hover="445">onWrite</span> : <span class="const token" data-verso-hover="438">St</span> → <span class="const token" data-verso-hover="233">Loc</span> → <span class="const token" data-verso-hover="438">St</span></span>
+<span id="L134">  | <span class="const token" data-verso-hover="556">.</span>alloc old prev _, y =&gt; <span class="const token" data-verso-hover="557">.</span>wr old ⟨prev.<span class="const token" data-verso-hover="536">key</span>, y⟩ <span class="const token" data-verso-hover="2">true</span></span>
+<span id="L135">  | <span class="const token" data-verso-hover="557">.</span>wr _ _ r, _ =&gt; <span class="const token" data-verso-hover="559">.</span>done r</span>
+<span id="L136">  | s, _ =&gt; s</span>
+<span id="L137"></span>
+<span id="L138"><span class="dc">/-! ## Memory -/</span></span>
+<span id="L139"></span>
+<span id="L140"><span class="dc">/-- Memory: the content of every allocated location. -/</span></span>
+<span id="L141"><span class="kw">abbrev</span> <span class="const token" data-verso-hover="529">Mem</span> := <span class="const token" data-verso-hover="233">Loc</span> → <span class="const token" data-verso-hover="27">Option</span> <span class="const token" data-verso-hover="227">NodeV</span></span>
+<span id="L142"></span>
+<span id="L143"><span class="dc">/-- Initial memory: the empty list `head → tail`. -/</span></span>
+<span id="L144"><span class="kw">def</span> <span class="const token" data-verso-hover="657">mem0</span> : <span class="const token" data-verso-hover="529">Mem</span> := <span class="kw">fun</span> l =&gt;</span>
+<span id="L145">  <span class="kw">if</span> l = <span class="const token" data-verso-hover="425">headL</span> <span class="kw">then</span> <span class="const token" data-verso-hover="79">some</span> ⟨<span class="const token" data-verso-hover="470">.</span>ninf, <span class="const token" data-verso-hover="450">tailL</span>⟩ <span class="kw">else</span> <span class="kw">if</span> l = <span class="const token" data-verso-hover="450">tailL</span> <span class="kw">then</span> <span class="const token" data-verso-hover="79">some</span> ⟨<span class="const token" data-verso-hover="471">.</span>pinf, <span class="const token" data-verso-hover="450">tailL</span>⟩ <span class="kw">else</span> <span class="const token" data-verso-hover="39">none</span></span>
+<span id="L146"></span>
+<span id="L147"><span class="dc">/-- A pending read or write. -/</span></span>
+<span id="L148"><span class="kw">inductive</span> <span class="const token" data-verso-hover="440">Pend</span></span>
+<span id="L149">  | <span class="const token" data-verso-hover="442">rd</span> (y : <span class="const token" data-verso-hover="233">Loc</span>)</span>
+<span id="L150">  | <span class="const token" data-verso-hover="444">wr</span> (y : <span class="const token" data-verso-hover="233">Loc</span>) (n : <span class="const token" data-verso-hover="227">NodeV</span>)</span>
+<span id="L151">  <span class="kw">deriving</span> <span class="const token" data-verso-hover="31">DecidableEq</span>, <span class="const token" data-verso-hover="651">Repr</span></span>
+<span id="L152"></span>
+<span id="L153"><span class="dc">/-! ## Sequential histories of `LL` (Σ_LL) -/</span></span>
+<span id="L154"></span>
+<span id="L155"><span class="dc">/-- Configuration of a sequential execution of `LL`. -/</span></span>
+<span id="L156"><span class="kw">structure</span> <span class="const token" data-verso-hover="199">SCfg</span> (P : <span class="kw">Type</span>) <span class="kw">where</span></span>
+<span id="L157">  <span class="const token" data-verso-hover="658">mem</span> : <span class="const token" data-verso-hover="529">Mem</span></span>
+<span id="L158">  <span class="dc">/-- the operation in progress: process, operation, control state -/</span></span>
+<span id="L159">  <span class="const token" data-verso-hover="659">cur</span> : <span class="const token" data-verso-hover="27">Option</span> (P × <span class="const token" data-verso-hover="253">SetOp</span> × <span class="const token" data-verso-hover="438">St</span>)</span>
+<span id="L160">  <span class="const token" data-verso-hover="660">pend</span> : <span class="const token" data-verso-hover="27">Option</span> <span class="const token" data-verso-hover="440">Pend</span></span>
+<span id="L161"></span>
+<span id="L162"><span class="dc">/-- Initial configuration. -/</span></span>
+<span id="L163"><span class="kw">def</span> <span class="const token" data-verso-hover="207">scfg0</span> {P : <span class="kw">Type</span>} : <span class="const token" data-verso-hover="199">SCfg</span> P := ⟨<span class="const token" data-verso-hover="657">mem0</span>, <span class="const token" data-verso-hover="39">none</span>, <span class="const token" data-verso-hover="39">none</span>⟩</span>
+<span id="L164"></span>
+<span id="L165"><span class="kw">variable</span> {P : <span class="kw">Type</span>} [<span class="const token" data-verso-hover="31">DecidableEq</span> P]</span>
+<span id="L166"></span>
+<span id="L167"><span class="dc">/-- One event of a sequential execution of `LL` (reads return the current memory, writes take</span></span>
+<span id="L168"><span class="dc">effect at their response, operations run one at a time). -/</span></span>
+<span id="L169"><span class="kw">def</span> <span class="const token" data-verso-hover="203">seqStep</span> (c : <span class="const token" data-verso-hover="199">SCfg</span> P) : <span class="const token" data-verso-hover="187">LEv</span> P → <span class="const token" data-verso-hover="27">Option</span> (<span class="const token" data-verso-hover="199">SCfg</span> P)</span>
+<span id="L170">  | <span class="const token" data-verso-hover="23">.</span>inv p _ o =&gt; <span class="kw">match</span> c.<span class="const token" data-verso-hover="659">cur</span> <span class="kw">with</span></span>
+<span id="L171">    | <span class="const token" data-verso-hover="39">none</span> =&gt; <span class="const token" data-verso-hover="79">some</span> { c <span class="kw">with</span> <span class="const token" data-verso-hover="659">cur</span> := <span class="const token" data-verso-hover="79">some</span> (p, o, <span class="const token" data-verso-hover="441">.</span>start) }</span>
+<span id="L172">    | <span class="const token" data-verso-hover="79">some</span> _ =&gt; <span class="const token" data-verso-hover="39">none</span></span>
+<span id="L173">  | <span class="const token" data-verso-hover="25">.</span>rinv p _ y =&gt; <span class="kw">match</span> c.<span class="const token" data-verso-hover="659">cur</span>, c.<span class="const token" data-verso-hover="660">pend</span> <span class="kw">with</span></span>
+<span id="L174">    | <span class="const token" data-verso-hover="79">some</span> (q, o, s), <span class="const token" data-verso-hover="39">none</span> =&gt; <span class="kw">if</span> q = p ∧ <span class="const token" data-verso-hover="452">act</span> o s = <span class="const token" data-verso-hover="453">.</span>read y <span class="kw">then</span> <span class="const token" data-verso-hover="79">some</span> { c <span class="kw">with</span> <span class="const token" data-verso-hover="660">pend</span> := <span class="const token" data-verso-hover="79">some</span> (<span class="const token" data-verso-hover="442">.</span>rd y) }</span>
+<span id="L175">        <span class="kw">else</span> <span class="const token" data-verso-hover="39">none</span></span>
+<span id="L176">    | _, _ =&gt; <span class="const token" data-verso-hover="39">none</span></span>
+<span id="L177">  | <span class="const token" data-verso-hover="26">.</span>rres p _ v =&gt; <span class="kw">match</span> c.<span class="const token" data-verso-hover="659">cur</span>, c.<span class="const token" data-verso-hover="660">pend</span> <span class="kw">with</span></span>
+<span id="L178">    | <span class="const token" data-verso-hover="79">some</span> (q, o, s), <span class="const token" data-verso-hover="79">some</span> (<span class="const token" data-verso-hover="442">.</span>rd y) =&gt;</span>
+<span id="L179">        <span class="kw">if</span> q = p ∧ v = c.<span class="const token" data-verso-hover="658">mem</span> y ∧ v.<span class="const token" data-verso-hover="277">isSome</span> <span class="kw">then</span></span>
+<span id="L180">          <span class="const token" data-verso-hover="79">some</span> { c <span class="kw">with</span> <span class="const token" data-verso-hover="659">cur</span> := <span class="const token" data-verso-hover="79">some</span> (q, o, <span class="const token" data-verso-hover="443">onRead</span> o s y (v.<span class="const token" data-verso-hover="194">getD</span> ⟨<span class="const token" data-verso-hover="470">.</span>ninf, <span class="nu">0</span>⟩)), <span class="const token" data-verso-hover="660">pend</span> := <span class="const token" data-verso-hover="39">none</span> }</span>
+<span id="L181">        <span class="kw">else</span> <span class="const token" data-verso-hover="39">none</span></span>
+<span id="L182">    | _, _ =&gt; <span class="const token" data-verso-hover="39">none</span></span>
+<span id="L183">  | <span class="const token" data-verso-hover="28">.</span>winv p _ y n =&gt; <span class="kw">match</span> c.<span class="const token" data-verso-hover="659">cur</span>, c.<span class="const token" data-verso-hover="660">pend</span> <span class="kw">with</span></span>
+<span id="L184">    | <span class="const token" data-verso-hover="79">some</span> (q, o, s), <span class="const token" data-verso-hover="39">none</span> =&gt;</span>
+<span id="L185">        <span class="kw">if</span> q = p ∧ (<span class="const token" data-verso-hover="452">act</span> o s = <span class="const token" data-verso-hover="454">.</span>write y n ∨ (<span class="const token" data-verso-hover="452">act</span> o s = <span class="const token" data-verso-hover="455">.</span>alloc n ∧ c.<span class="const token" data-verso-hover="658">mem</span> y = <span class="const token" data-verso-hover="39">none</span>)) <span class="kw">then</span></span>
+<span id="L186">          <span class="const token" data-verso-hover="79">some</span> { c <span class="kw">with</span> <span class="const token" data-verso-hover="660">pend</span> := <span class="const token" data-verso-hover="79">some</span> (<span class="const token" data-verso-hover="444">.</span>wr y n) }</span>
+<span id="L187">        <span class="kw">else</span> <span class="const token" data-verso-hover="39">none</span></span>
+<span id="L188">    | _, _ =&gt; <span class="const token" data-verso-hover="39">none</span></span>
+<span id="L189">  | <span class="const token" data-verso-hover="29">.</span>wres p _ ok =&gt; <span class="kw">match</span> c.<span class="const token" data-verso-hover="659">cur</span>, c.<span class="const token" data-verso-hover="660">pend</span> <span class="kw">with</span></span>
+<span id="L190">    | <span class="const token" data-verso-hover="79">some</span> (q, o, s), <span class="const token" data-verso-hover="79">some</span> (<span class="const token" data-verso-hover="444">.</span>wr y n) =&gt;</span>
+<span id="L191">        <span class="kw">if</span> q = p ∧ ok = <span class="const token" data-verso-hover="2">true</span> <span class="kw">then</span></span>
+<span id="L192">          <span class="const token" data-verso-hover="79">some</span> ⟨<span class="const token" data-verso-hover="263">Function.update</span> c.<span class="const token" data-verso-hover="658">mem</span> y (<span class="const token" data-verso-hover="79">some</span> n), <span class="const token" data-verso-hover="79">some</span> (q, o, <span class="const token" data-verso-hover="445">onWrite</span> s y), <span class="const token" data-verso-hover="39">none</span>⟩</span>
+<span id="L193">        <span class="kw">else</span> <span class="const token" data-verso-hover="39">none</span></span>
+<span id="L194">    | _, _ =&gt; <span class="const token" data-verso-hover="39">none</span></span>
+<span id="L195">  | <span class="const token" data-verso-hover="24">.</span>res p _ r =&gt; <span class="kw">match</span> c.<span class="const token" data-verso-hover="659">cur</span>, c.<span class="const token" data-verso-hover="660">pend</span> <span class="kw">with</span></span>
+<span id="L196">    | <span class="const token" data-verso-hover="79">some</span> (q, o, s), <span class="const token" data-verso-hover="39">none</span> =&gt; <span class="kw">if</span> q = p ∧ <span class="const token" data-verso-hover="452">act</span> o s = <span class="const token" data-verso-hover="456">.</span>ret r <span class="kw">then</span> <span class="const token" data-verso-hover="79">some</span> { c <span class="kw">with</span> <span class="const token" data-verso-hover="659">cur</span> := <span class="const token" data-verso-hover="39">none</span> }</span>
+<span id="L197">        <span class="kw">else</span> <span class="const token" data-verso-hover="39">none</span></span>
+<span id="L198">    | _, _ =&gt; <span class="const token" data-verso-hover="39">none</span></span>
+<span id="L199"></span>
+<span id="L200"><span class="dc">/-- Run `seqStep` along a history. -/</span></span>
+<span id="L201"><span class="kw">def</span> <span class="const token" data-verso-hover="200">seqRun</span> (c : <span class="const token" data-verso-hover="199">SCfg</span> P) : <span class="const token" data-verso-hover="157">LHist</span> P → <span class="const token" data-verso-hover="27">Option</span> (<span class="const token" data-verso-hover="199">SCfg</span> P)</span>
+<span id="L202">  | [] =&gt; <span class="const token" data-verso-hover="79">some</span> c</span>
+<span id="L203">  | e :: l =&gt; (<span class="const token" data-verso-hover="203">seqStep</span> c e).<span class="const token" data-verso-hover="201">bind</span> (<span class="kw">fun</span> c' =&gt; <span class="const token" data-verso-hover="200">seqRun</span> c' l)</span>
+<span id="L204"></span>
+<span id="L205"><span class="dc">/-- **Σ_LL**: the histories of the sequential implementation `LL` (sequential executions from</span></span>
+<span id="L206"><span class="dc">the empty list, possibly ending in the middle of an operation). -/</span></span>
+<span id="L207"><span class="kw">def</span> <span class="const token" data-verso-hover="151">SigLL</span> : <span class="const token" data-verso-hover="75">Set</span> (<span class="const token" data-verso-hover="157">LHist</span> P) := {S | (<span class="const token" data-verso-hover="200">seqRun</span> <span class="const token" data-verso-hover="207">scfg0</span> S).<span class="const token" data-verso-hover="277">isSome</span>}</span>
+<span id="L208"></span>
+<span id="L209"><span class="const token" data-verso-hover="661">instance</span> (S : <span class="const token" data-verso-hover="157">LHist</span> P) : <span class="const token" data-verso-hover="662">Decidable</span> (S ∈ (<span class="const token" data-verso-hover="151">SigLL</span> : <span class="const token" data-verso-hover="75">Set</span> (<span class="const token" data-verso-hover="157">LHist</span> P))) :=</span>
+<span id="L210">  inferInstanceAs (<span class="const token" data-verso-hover="662">Decidable</span> ((<span class="const token" data-verso-hover="200">seqRun</span> <span class="const token" data-verso-hover="207">scfg0</span> S).<span class="const token" data-verso-hover="277">isSome</span> = <span class="const token" data-verso-hover="2">true</span>))</span>
+<span id="L211"></span>
+<span id="L212"><span class="dc">/-! ## Honest histories -/</span></span>
+<span id="L213"></span>
+<span id="L214"><span class="dc">/-- Configuration for checking honesty: memory and the pending read/write of every process. -/</span></span>
+<span id="L215"><span class="kw">structure</span> <span class="const token" data-verso-hover="209">HCfg</span> (P : <span class="kw">Type</span>) <span class="kw">where</span></span>
+<span id="L216">  <span class="const token" data-verso-hover="663">mem</span> : <span class="const token" data-verso-hover="529">Mem</span></span>
+<span id="L217">  <span class="const token" data-verso-hover="664">pend</span> : P → <span class="const token" data-verso-hover="27">Option</span> <span class="const token" data-verso-hover="440">Pend</span></span>
+<span id="L218"></span>
+<span id="L219"><span class="dc">/-- Initial honesty configuration. -/</span></span>
+<span id="L220"><span class="kw">def</span> <span class="const token" data-verso-hover="665">hcfg0</span> : <span class="const token" data-verso-hover="209">HCfg</span> P := ⟨<span class="const token" data-verso-hover="657">mem0</span>, <span class="kw">fun</span> _ =&gt; <span class="const token" data-verso-hover="39">none</span>⟩</span>
+<span id="L221"></span>
+<span id="L222"><span class="dc">/-- One event: reads must return the current content, writes take effect at their `ok`. Aborted</span></span>
+<span id="L223"><span class="dc">reads and writes have no effect. High-level events are ignored. -/</span></span>
+<span id="L224"><span class="kw">def</span> <span class="const token" data-verso-hover="211">honStep</span> (c : <span class="const token" data-verso-hover="209">HCfg</span> P) : <span class="const token" data-verso-hover="187">LEv</span> P → <span class="const token" data-verso-hover="27">Option</span> (<span class="const token" data-verso-hover="209">HCfg</span> P)</span>
+<span id="L225">  | <span class="const token" data-verso-hover="25">.</span>rinv p _ y =&gt; <span class="const token" data-verso-hover="79">some</span> { c <span class="kw">with</span> <span class="const token" data-verso-hover="664">pend</span> := <span class="const token" data-verso-hover="263">Function.update</span> c.<span class="const token" data-verso-hover="664">pend</span> p (<span class="const token" data-verso-hover="79">some</span> (<span class="const token" data-verso-hover="442">.</span>rd y)) }</span>
+<span id="L226">  | <span class="const token" data-verso-hover="28">.</span>winv p _ y n =&gt; <span class="const token" data-verso-hover="79">some</span> { c <span class="kw">with</span> <span class="const token" data-verso-hover="664">pend</span> := <span class="const token" data-verso-hover="263">Function.update</span> c.<span class="const token" data-verso-hover="664">pend</span> p (<span class="const token" data-verso-hover="79">some</span> (<span class="const token" data-verso-hover="444">.</span>wr y n)) }</span>
+<span id="L227">  | <span class="const token" data-verso-hover="26">.</span>rres p _ v =&gt; <span class="kw">match</span> c.<span class="const token" data-verso-hover="664">pend</span> p <span class="kw">with</span></span>
+<span id="L228">    | <span class="const token" data-verso-hover="79">some</span> (<span class="const token" data-verso-hover="442">.</span>rd y) =&gt;</span>
+<span id="L229">        <span class="kw">if</span> v.<span class="const token" data-verso-hover="666">isNone</span> ∨ v = c.<span class="const token" data-verso-hover="663">mem</span> y <span class="kw">then</span> <span class="const token" data-verso-hover="79">some</span> { c <span class="kw">with</span> <span class="const token" data-verso-hover="664">pend</span> := <span class="const token" data-verso-hover="263">Function.update</span> c.<span class="const token" data-verso-hover="664">pend</span> p <span class="const token" data-verso-hover="39">none</span> }</span>
+<span id="L230">        <span class="kw">else</span> <span class="const token" data-verso-hover="39">none</span></span>
+<span id="L231">    | _ =&gt; <span class="const token" data-verso-hover="39">none</span></span>
+<span id="L232">  | <span class="const token" data-verso-hover="29">.</span>wres p _ ok =&gt; <span class="kw">match</span> c.<span class="const token" data-verso-hover="664">pend</span> p <span class="kw">with</span></span>
+<span id="L233">    | <span class="const token" data-verso-hover="79">some</span> (<span class="const token" data-verso-hover="444">.</span>wr y n) =&gt;</span>
+<span id="L234">        <span class="const token" data-verso-hover="79">some</span> ⟨<span class="kw">if</span> ok <span class="kw">then</span> <span class="const token" data-verso-hover="263">Function.update</span> c.<span class="const token" data-verso-hover="663">mem</span> y (<span class="const token" data-verso-hover="79">some</span> n) <span class="kw">else</span> c.<span class="const token" data-verso-hover="663">mem</span>,</span>
+<span id="L235">          <span class="const token" data-verso-hover="263">Function.update</span> c.<span class="const token" data-verso-hover="664">pend</span> p <span class="const token" data-verso-hover="39">none</span>⟩</span>
+<span id="L236">    | _ =&gt; <span class="const token" data-verso-hover="39">none</span></span>
+<span id="L237">  | _ =&gt; <span class="const token" data-verso-hover="79">some</span> c</span>
+<span id="L238"></span>
+<span id="L239"><span class="dc">/-- Run `honStep` along a history. -/</span></span>
+<span id="L240"><span class="kw">def</span> <span class="const token" data-verso-hover="210">honRun</span> (c : <span class="const token" data-verso-hover="209">HCfg</span> P) : <span class="const token" data-verso-hover="157">LHist</span> P → <span class="const token" data-verso-hover="27">Option</span> (<span class="const token" data-verso-hover="209">HCfg</span> P)</span>
+<span id="L241">  | [] =&gt; <span class="const token" data-verso-hover="79">some</span> c</span>
+<span id="L242">  | e :: l =&gt; (<span class="const token" data-verso-hover="211">honStep</span> c e).<span class="const token" data-verso-hover="201">bind</span> (<span class="kw">fun</span> c' =&gt; <span class="const token" data-verso-hover="210">honRun</span> c' l)</span>
+<span id="L243"></span>
+<span id="L244"><span class="dc">/-- `H` is honest: every successful read returns the latest value written to the object (the</span></span>
+<span id="L245"><span class="dc">memory starts as the empty list). -/</span></span>
+<span id="L246"><span class="kw">def</span> <span class="const token" data-verso-hover="158">Honest</span> (H : <span class="const token" data-verso-hover="157">LHist</span> P) : <span class="kw">Prop</span> := (<span class="const token" data-verso-hover="210">honRun</span> <span class="const token" data-verso-hover="665">hcfg0</span> H).<span class="const token" data-verso-hover="277">isSome</span></span>
+<span id="L247"></span>
+<span id="L248"><span class="const token" data-verso-hover="667">instance</span> (H : <span class="const token" data-verso-hover="157">LHist</span> P) : <span class="const token" data-verso-hover="662">Decidable</span> (<span class="const token" data-verso-hover="158">Honest</span> H) :=</span>
+<span id="L249">  inferInstanceAs (<span class="const token" data-verso-hover="662">Decidable</span> ((<span class="const token" data-verso-hover="210">honRun</span> <span class="const token" data-verso-hover="665">hcfg0</span> H).<span class="const token" data-verso-hover="277">isSome</span> = <span class="const token" data-verso-hover="2">true</span>))</span>
+<span id="L250"></span>
+<span id="L251"><span class="dc">/-- LS-linearizability of histories of the list-based set w.r.t. `(LL, set)`. -/</span></span>
+<span id="L252"><span class="kw">abbrev</span> <span class="const token" data-verso-hover="147">LSL_LL</span> (H : <span class="const token" data-verso-hover="157">LHist</span> P) : <span class="kw">Prop</span> := <span class="const token" data-verso-hover="85">LSL</span> <span class="const token" data-verso-hover="151">SigLL</span> (<span class="const token" data-verso-hover="655">specSet</span> P) H</span>
+<span id="L253"></span>
+<span id="L254"><span class="kw">end</span> Podc.OptimismConcurrency</span>
+<span id="L255"></span>
+</code></div>
+        <script>
+          window.versoHoversUrl = "PODC2012/OptimismConcurrency/-hovers.json";</script>
+        <script src="static/lean/popper.js"></script>
+        <script src="static/lean/tippy.js"></script>
+        <script src="static/lean/marked.js"></script>
+        <script src="static/lean/highlighting.js"></script>
+        <script src="static/lean/lean.js"></script>
+        </article></main><footer class="site-footer"><div class="wrap">
+        Machine-checked formalizations of PODC papers in Lean 4. Generated with <a href="https://github.com/leanprover/verso">Verso</a> from the README files of <a href="https://github.com/vasnesterov/formal_podc">vasnesterov/formal_podc</a>.</div>
+      </footer></body>
+  </html>
+

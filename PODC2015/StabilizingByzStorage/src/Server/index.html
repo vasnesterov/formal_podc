@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="light dark">
+    <link rel="icon" href="data:,">
+    <title>StabilizingByzStorage: Server.lean · Formal PODC</title><base href="../../../.././"><link rel="stylesheet" href="static/lean/verso-vars.css">
+    <link rel="stylesheet" href="static/lean/highlighting.css">
+    <link rel="stylesheet" href="static/lean/tippy-border.css">
+    <link rel="stylesheet" href="static/style.css">
+    <script defer="defer" src="static/site.js"></script>
+    </head>
+  <body>
+    <header class="site-header">
+      <div class="wrap">
+        <a class="brand" href=".">Formal PODC</a><nav class="top">
+          <a href=".">Search</a><a href="about/">About</a><a href="https://github.com/vasnesterov/formal_podc">GitHub</a></nav>
+        </div>
+      </header>
+    <main class="wrap"><article><nav class="breadcrumbs" aria-label="Breadcrumb">
+          <a href=".">Search</a><span class="sep">›</span><a href="PODC2015/">PODC 2015</a><span class="sep">›</span><a href="PODC2015/StabilizingByzStorage/">StabilizingByzStorage</a><span class="sep">›</span><a href="PODC2015/StabilizingByzStorage/src/">Lean source</a><span class="sep">›</span><span aria-current="page">Server</span></nav>
+        <h1>
+          <code>Server.lean</code></h1>
+        <div class="paper-links">
+          <p>
+            Source of <a href="PODC2015/StabilizingByzStorage/">Stabilizing Byzantine Server-Based Storage — PODC 2015</a> · <a href="https://github.com/vasnesterov/formal_podc/blob/main/Papers/PODC2015/StabilizingByzStorage/Server.lean">GitHub</a> · hover over a name for its type and documentation</p>
+          </div>
+        <div class="lean-code lean-src">
+          <code class="hl lean block" data-lean-context="Server"><span id="L1"><span class="kw">import</span> Mathlib</span>
+<span id="L2"></span>
+<span id="L3"><span class="dc">/-!</span></span>
+<span id="L4"><span class="dc"># Servers and the `ss-broadcast` abstraction</span></span>
+<span id="L5"></span>
+<span id="L6"><span class="dc">Bonomi, Dolev, Potop-Butucaru, Raynal. *Stabilizing Server-Based Storage in Byzantine Asynchronous</span></span>
+<span id="L7"><span class="dc">Message-Passing Systems.* PODC 2015 (full version arXiv:1503.00140v1).</span></span>
+<span id="L8"></span>
+<span id="L9"><span class="dc">The server code (lines 19–23) is the same in Fig. 2 (regular register) and Fig. 3 (practically atomic</span></span>
+<span id="L10"><span class="dc">register); only the payload type `D` differs (`D = V` in Fig. 2, `D = seqnum × V` in Fig. 3).</span></span>
+<span id="L11"></span>
+<span id="L12"><span class="dc">## Model of `ss-broadcast`</span></span>
+<span id="L13"></span>
+<span id="L14"><span class="dc">Every server `s` has two FIFO links, one from the writer (`wq`) and one from the reader (`rq`). Their</span></span>
+<span id="L15"><span class="dc">initial contents are arbitrary (transient failures), an `ss_broadcast` appends the message at the end</span></span>
+<span id="L16"><span class="dc">of the link of every server, and a server step `ss_deliver`s the head of one of its links.</span></span>
+<span id="L17"><span class="dc">Hence *no duplication*, *validity* (a delivered message was broadcast or was in the initial link) and</span></span>
+<span id="L18"><span class="dc">*FIFO order* hold by construction. *Synchronized delivery* is a guard of the client step that ends a</span></span>
+<span id="L19"><span class="dc">broadcast: at least `n - 2t` correct servers have delivered it (their link is empty, since the client</span></span>
+<span id="L20"><span class="dc">broadcasts one message at a time). *Termination* and *eventual delivery* are fairness properties of</span></span>
+<span id="L21"><span class="dc">infinite executions.</span></span>
+<span id="L22"></span>
+<span id="L23"><span class="dc">The paper matches acknowledgments with broadcasts by FIFO order (Remark of Section 3.1). We model this</span></span>
+<span id="L24"><span class="dc">matching *favourably to the paper*: a server's reply is recorded in a ghost slot (`wack`, `rack`) only</span></span>
+<span id="L25"><span class="dc">when it answers the client's *current* broadcast (the delivered message is the last one in the link);</span></span>
+<span id="L26"><span class="dc">the slot is cleared by every new broadcast of that client. Stale replies are thus never used.</span></span>
+<span id="L27"><span class="dc">-/</span></span>
+<span id="L28"></span>
+<span id="L29"><span class="kw">namespace</span> Podc.StabilizingByzStorage</span>
+<span id="L30"></span>
+<span id="L31"><span class="dc">/-- Messages `ss-broadcast` by the writer: `WRITE(v)` and `NEW_HELP_VAL(v)`. -/</span></span>
+<span id="L32"><span class="kw">inductive</span> <span class="const token" data-verso-hover="56">WMsg</span> (D : <span class="kw">Type</span>) <span class="kw">where</span></span>
+<span id="L33">  | <span class="const token" data-verso-hover="71">write</span> (d : D)</span>
+<span id="L34">  | <span class="const token" data-verso-hover="81">newHelp</span> (d : D)</span>
+<span id="L35">  <span class="kw">deriving</span> <span class="const token" data-verso-hover="29">DecidableEq</span>, <span class="const token" data-verso-hover="30">Repr</span></span>
+<span id="L36"></span>
+<span id="L37"><span class="dc">/-- Local state of a server: `last_val`, `helping_val` (`none` = `⊥`), the two incoming links and the</span></span>
+<span id="L38"><span class="dc">ghost reply slots for the clients' current broadcasts. -/</span></span>
+<span id="L39"><span class="kw">structure</span> <span class="const token" data-verso-hover="45">Server</span> (D : <span class="kw">Type</span>) <span class="kw">where</span></span>
+<span id="L40">  <span class="const token" data-verso-hover="276">last</span> : D</span>
+<span id="L41">  <span class="const token" data-verso-hover="183">help</span> : <span class="const token" data-verso-hover="75">Option</span> D</span>
+<span id="L42">  <span class="dc">/-- Link from the writer (pending messages, oldest first). -/</span></span>
+<span id="L43">  <span class="const token" data-verso-hover="64">wq</span> : <span class="const token" data-verso-hover="110">List</span> (<span class="const token" data-verso-hover="56">WMsg</span> D)</span>
+<span id="L44">  <span class="dc">/-- Link from the reader: pending `READ(new_read)` messages. -/</span></span>
+<span id="L45">  <span class="const token" data-verso-hover="68">rq</span> : <span class="const token" data-verso-hover="110">List</span> <span class="const token" data-verso-hover="59">Bool</span></span>
+<span id="L46">  <span class="dc">/-- `ACK_WRITE(helping_val)` sent in answer to the writer's current broadcast, if any. -/</span></span>
+<span id="L47">  <span class="const token" data-verso-hover="77">wack</span> : <span class="const token" data-verso-hover="75">Option</span> (<span class="const token" data-verso-hover="75">Option</span> D)</span>
+<span id="L48">  <span class="dc">/-- `ACK_READ(last_val, helping_val)` sent in answer to the reader's current broadcast, if any. -/</span></span>
+<span id="L49">  <span class="const token" data-verso-hover="88">rack</span> : <span class="const token" data-verso-hover="75">Option</span> (D × <span class="const token" data-verso-hover="75">Option</span> D)</span>
+<span id="L50">  <span class="kw">deriving</span> <span class="const token" data-verso-hover="29">DecidableEq</span>, <span class="const token" data-verso-hover="30">Repr</span></span>
+<span id="L51"></span>
+<span id="L52"><span class="kw">namespace</span> Server</span>
+<span id="L53"></span>
+<span id="L54"><span class="kw">variable</span> {D : <span class="kw">Type</span>}</span>
+<span id="L55"></span>
+<span id="L56"><span class="dc">/-- Lines 19–21: deliver the oldest pending message of the writer. `WRITE(v)`: `last_val ← v` and</span></span>
+<span id="L57"><span class="dc">answer `ACK_WRITE(helping_val)`; `NEW_HELP_VAL(v)`: `helping_val ← v`. -/</span></span>
+<span id="L58"><span class="kw">def</span> <span class="const token" data-verso-hover="66">deliverW</span> (s : <span class="const token" data-verso-hover="45">Server</span> D) : <span class="const token" data-verso-hover="45">Server</span> D :=</span>
+<span id="L59">  <span class="kw">match</span> s.<span class="const token" data-verso-hover="64">wq</span> <span class="kw">with</span></span>
+<span id="L60">  | [] =&gt; s</span>
+<span id="L61">  | <span class="const token" data-verso-hover="71">.</span>write d :: rest =&gt;</span>
+<span id="L62">    { s <span class="kw">with</span> <span class="const token" data-verso-hover="276">last</span> := d, <span class="const token" data-verso-hover="64">wq</span> := rest, <span class="const token" data-verso-hover="77">wack</span> := <span class="kw">if</span> rest = [] <span class="kw">then</span> <span class="const token" data-verso-hover="78">some</span> s.<span class="const token" data-verso-hover="183">help</span> <span class="kw">else</span> s.<span class="const token" data-verso-hover="77">wack</span> }</span>
+<span id="L63">  | <span class="const token" data-verso-hover="81">.</span>newHelp d :: rest =&gt; { s <span class="kw">with</span> <span class="const token" data-verso-hover="183">help</span> := <span class="const token" data-verso-hover="78">some</span> d, <span class="const token" data-verso-hover="64">wq</span> := rest }</span>
+<span id="L64"></span>
+<span id="L65"><span class="dc">/-- Lines 22–23: deliver the oldest pending `READ(new_read)`; reset `helping_val` if `new_read`, and</span></span>
+<span id="L66"><span class="dc">answer `ACK_READ(last_val, helping_val)`. -/</span></span>
+<span id="L67"><span class="kw">def</span> <span class="const token" data-verso-hover="69">deliverR</span> (s : <span class="const token" data-verso-hover="45">Server</span> D) : <span class="const token" data-verso-hover="45">Server</span> D :=</span>
+<span id="L68">  <span class="kw">match</span> s.<span class="const token" data-verso-hover="68">rq</span> <span class="kw">with</span></span>
+<span id="L69">  | [] =&gt; s</span>
+<span id="L70">  | b :: rest =&gt;</span>
+<span id="L71">    <span class="kw">let</span> h := <span class="kw">if</span> b <span class="kw">then</span> <span class="const token" data-verso-hover="106">none</span> <span class="kw">else</span> s.<span class="const token" data-verso-hover="183">help</span></span>
+<span id="L72">    { s <span class="kw">with</span> <span class="const token" data-verso-hover="183">help</span> := h, <span class="const token" data-verso-hover="68">rq</span> := rest, <span class="const token" data-verso-hover="88">rack</span> := <span class="kw">if</span> rest = [] <span class="kw">then</span> <span class="const token" data-verso-hover="78">some</span> (s.<span class="const token" data-verso-hover="276">last</span>, h) <span class="kw">else</span> s.<span class="const token" data-verso-hover="88">rack</span> }</span>
+<span id="L73"></span>
+<span id="L74"><span class="dc">/-- The writer `ss-broadcast`s `m`: append to the link, clear the reply slot. -/</span></span>
+<span id="L75"><span class="kw">def</span> <span class="const token" data-verso-hover="57">bcastW</span> (m : <span class="const token" data-verso-hover="56">WMsg</span> D) (s : <span class="const token" data-verso-hover="45">Server</span> D) : <span class="const token" data-verso-hover="45">Server</span> D := { s <span class="kw">with</span> <span class="const token" data-verso-hover="64">wq</span> := s.<span class="const token" data-verso-hover="64">wq</span> ++ [m], <span class="const token" data-verso-hover="77">wack</span> := <span class="const token" data-verso-hover="106">none</span> }</span>
+<span id="L76"></span>
+<span id="L77"><span class="dc">/-- The reader `ss-broadcast`s `READ(b)`. -/</span></span>
+<span id="L78"><span class="kw">def</span> <span class="const token" data-verso-hover="60">bcastR</span> (b : <span class="const token" data-verso-hover="59">Bool</span>) (s : <span class="const token" data-verso-hover="45">Server</span> D) : <span class="const token" data-verso-hover="45">Server</span> D := { s <span class="kw">with</span> <span class="const token" data-verso-hover="68">rq</span> := s.<span class="const token" data-verso-hover="68">rq</span> ++ [b], <span class="const token" data-verso-hover="88">rack</span> := <span class="const token" data-verso-hover="106">none</span> }</span>
+<span id="L79"></span>
+<span id="L80"><span class="kw">end</span> Server</span>
+<span id="L81"></span>
+<span id="L82"><span class="kw">variable</span> {n : <span class="const token" data-verso-hover="19">ℕ</span>}</span>
+<span id="L83"></span>
+<span id="L84"><span class="dc">/-- Number of members of `Q` whose reply `f` equals `a` (a threshold test of the pseudo-code). -/</span></span>
+<span id="L85"><span class="kw">def</span> <span class="const token" data-verso-hover="79">cnt</span> {α : <span class="kw">Type</span>} [<span class="const token" data-verso-hover="29">DecidableEq</span> α] (Q : <span class="const token" data-verso-hover="61">Finset</span> (<span class="const token" data-verso-hover="20">Fin</span> n)) (f : <span class="const token" data-verso-hover="20">Fin</span> n → α) (a : α) : <span class="const token" data-verso-hover="19">ℕ</span> :=</span>
+<span id="L86">  (Q.<span class="const token" data-verso-hover="187">filter</span> <span class="kw">fun</span> s =&gt; f s = a).<span class="const token" data-verso-hover="76">card</span></span>
+<span id="L87"></span>
+<span id="L88"><span class="dc">/-- Number of correct servers that have delivered the writer's current broadcast. -/</span></span>
+<span id="L89"><span class="kw">def</span> <span class="const token" data-verso-hover="73">syncW</span> {D : <span class="kw">Type</span>} (B : <span class="const token" data-verso-hover="61">Finset</span> (<span class="const token" data-verso-hover="20">Fin</span> n)) (srv : <span class="const token" data-verso-hover="20">Fin</span> n → <span class="const token" data-verso-hover="45">Server</span> D) : <span class="const token" data-verso-hover="19">ℕ</span> :=</span>
+<span id="L90">  (<span class="const token" data-verso-hover="186">Finset.univ</span>.<span class="const token" data-verso-hover="187">filter</span> <span class="kw">fun</span> s =&gt; s ∉ B ∧ (srv s).<span class="const token" data-verso-hover="64">wq</span> = []).<span class="const token" data-verso-hover="76">card</span></span>
+<span id="L91"></span>
+<span id="L92"><span class="dc">/-- Number of correct servers that have delivered the reader's current broadcast. -/</span></span>
+<span id="L93"><span class="kw">def</span> <span class="const token" data-verso-hover="86">syncR</span> {D : <span class="kw">Type</span>} (B : <span class="const token" data-verso-hover="61">Finset</span> (<span class="const token" data-verso-hover="20">Fin</span> n)) (srv : <span class="const token" data-verso-hover="20">Fin</span> n → <span class="const token" data-verso-hover="45">Server</span> D) : <span class="const token" data-verso-hover="19">ℕ</span> :=</span>
+<span id="L94">  (<span class="const token" data-verso-hover="186">Finset.univ</span>.<span class="const token" data-verso-hover="187">filter</span> <span class="kw">fun</span> s =&gt; s ∉ B ∧ (srv s).<span class="const token" data-verso-hover="68">rq</span> = []).<span class="const token" data-verso-hover="76">card</span></span>
+<span id="L95"></span>
+<span id="L96"><span class="kw">lemma</span> <span class="const token" data-verso-hover="158">exists_le_cnt_iff</span> {α : <span class="kw">Type</span>} [<span class="const token" data-verso-hover="29">DecidableEq</span> α] (Q : <span class="const token" data-verso-hover="61">Finset</span> (<span class="const token" data-verso-hover="20">Fin</span> n)) (f : <span class="const token" data-verso-hover="20">Fin</span> n → α) {k : <span class="const token" data-verso-hover="19">ℕ</span>}</span>
+<span id="L97">    (hk : <span class="nu">1</span> ≤ k) : (∃ a, k ≤ <span class="const token" data-verso-hover="79">cnt</span> Q f a) ↔ ∃ s ∈ Q, k ≤ <span class="const token" data-verso-hover="79">cnt</span> Q f (f s) := <span class="kw">by</span></span>
+<span id="L98">  <span class="kw">constructor</span></span>
+<span id="L99">  · <span class="kw">rintro</span> ⟨a, ha⟩</span>
+<span id="L100">    <span class="kw">obtain</span> ⟨s, hs⟩ : (Q.<span class="const token" data-verso-hover="187">filter</span> <span class="kw">fun</span> s =&gt; f s = a).<span class="const token" data-verso-hover="194">Nonempty</span> := <span class="kw">by</span></span>
+<span id="L101">      <span class="kw">rw</span> [← <span class="const token" data-verso-hover="472">Finset.card_pos</span>]; <span class="kw">unfold</span> <span class="const token" data-verso-hover="79">cnt</span> <span class="kw">at</span> ha; <span class="kw">omega</span></span>
+<span id="L102">    <span class="kw">rw</span> [<span class="const token" data-verso-hover="195">Finset.mem_filter</span>] <span class="kw">at</span> hs</span>
+<span id="L103">    <span class="kw">exact</span> ⟨s, hs.<span class="const token" data-verso-hover="166">1</span>, hs.<span class="const token" data-verso-hover="167">2</span> ▸ ha⟩</span>
+<span id="L104">  · <span class="kw">rintro</span> ⟨s, -, hs⟩; <span class="kw">exact</span> ⟨_, hs⟩</span>
+<span id="L105"></span>
+<span id="L106"><span class="kw">lemma</span> <span class="const token" data-verso-hover="154">exists_le_cnt_some_iff</span> {α : <span class="kw">Type</span>} [<span class="const token" data-verso-hover="29">DecidableEq</span> α] (Q : <span class="const token" data-verso-hover="61">Finset</span> (<span class="const token" data-verso-hover="20">Fin</span> n))</span>
+<span id="L107">    (f : <span class="const token" data-verso-hover="20">Fin</span> n → <span class="const token" data-verso-hover="75">Option</span> α) {k : <span class="const token" data-verso-hover="19">ℕ</span>} (hk : <span class="nu">1</span> ≤ k) :</span>
+<span id="L108">    (∃ a, k ≤ <span class="const token" data-verso-hover="79">cnt</span> Q f (<span class="const token" data-verso-hover="78">some</span> a)) ↔ ∃ s ∈ Q, (f s).<span class="const token" data-verso-hover="134">isSome</span> ∧ k ≤ <span class="const token" data-verso-hover="79">cnt</span> Q f (f s) := <span class="kw">by</span></span>
+<span id="L109">  <span class="kw">constructor</span></span>
+<span id="L110">  · <span class="kw">rintro</span> ⟨a, ha⟩</span>
+<span id="L111">    <span class="kw">obtain</span> ⟨s, hs⟩ : (Q.<span class="const token" data-verso-hover="187">filter</span> <span class="kw">fun</span> s =&gt; f s = <span class="const token" data-verso-hover="78">some</span> a).<span class="const token" data-verso-hover="194">Nonempty</span> := <span class="kw">by</span></span>
+<span id="L112">      <span class="kw">rw</span> [← <span class="const token" data-verso-hover="472">Finset.card_pos</span>]; <span class="kw">unfold</span> <span class="const token" data-verso-hover="79">cnt</span> <span class="kw">at</span> ha; <span class="kw">omega</span></span>
+<span id="L113">    <span class="kw">rw</span> [<span class="const token" data-verso-hover="195">Finset.mem_filter</span>] <span class="kw">at</span> hs</span>
+<span id="L114">    <span class="kw">exact</span> ⟨s, hs.<span class="const token" data-verso-hover="166">1</span>, <span class="kw">by</span> <span class="kw">simp</span> [hs.<span class="const token" data-verso-hover="167">2</span>], hs.<span class="const token" data-verso-hover="167">2</span> ▸ ha⟩</span>
+<span id="L115">  · <span class="kw">rintro</span> ⟨s, -, h1, hs⟩</span>
+<span id="L116">    <span class="kw">obtain</span> ⟨a, ha⟩ := <span class="const token" data-verso-hover="533">Option.isSome_iff_exists</span>.<span class="const token" data-verso-hover="173">1</span> h1</span>
+<span id="L117">    <span class="kw">exact</span> ⟨a, ha ▸ hs⟩</span>
+<span id="L118"></span>
+<span id="L119"><span class="kw">end</span> Podc.StabilizingByzStorage</span>
+<span id="L120"></span>
+</code></div>
+        <script>
+          window.versoHoversUrl = "PODC2015/StabilizingByzStorage/-hovers.json";</script>
+        <script src="static/lean/popper.js"></script>
+        <script src="static/lean/tippy.js"></script>
+        <script src="static/lean/marked.js"></script>
+        <script src="static/lean/highlighting.js"></script>
+        <script src="static/lean/lean.js"></script>
+        </article></main><footer class="site-footer"><div class="wrap">
+        Machine-checked formalizations of PODC papers in Lean 4. Generated with <a href="https://github.com/leanprover/verso">Verso</a> from the README files of <a href="https://github.com/vasnesterov/formal_podc">vasnesterov/formal_podc</a>.</div>
+      </footer></body>
+  </html>
+

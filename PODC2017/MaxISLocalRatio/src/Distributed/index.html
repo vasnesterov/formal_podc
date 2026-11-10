@@ -1,0 +1,491 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="light dark">
+    <link rel="icon" href="data:,">
+    <title>MaxISLocalRatio: Distributed.lean · Formal PODC</title><base href="../../../.././"><link rel="stylesheet" href="static/lean/verso-vars.css">
+    <link rel="stylesheet" href="static/lean/highlighting.css">
+    <link rel="stylesheet" href="static/lean/tippy-border.css">
+    <link rel="stylesheet" href="static/style.css">
+    <script defer="defer" src="static/site.js"></script>
+    </head>
+  <body>
+    <header class="site-header">
+      <div class="wrap">
+        <a class="brand" href=".">Formal PODC</a><nav class="top">
+          <a href=".">Search</a><a href="about/">About</a><a href="https://github.com/vasnesterov/formal_podc">GitHub</a></nav>
+        </div>
+      </header>
+    <main class="wrap"><article><nav class="breadcrumbs" aria-label="Breadcrumb">
+          <a href=".">Search</a><span class="sep">›</span><a href="PODC2017/">PODC 2017</a><span class="sep">›</span><a href="PODC2017/MaxISLocalRatio/">MaxISLocalRatio</a><span class="sep">›</span><a href="PODC2017/MaxISLocalRatio/src/">Lean source</a><span class="sep">›</span><span aria-current="page">Distributed</span></nav>
+        <h1>
+          <code>Distributed.lean</code></h1>
+        <div class="paper-links">
+          <p>
+            Source of <a href="PODC2017/MaxISLocalRatio/">Distributed approximation of MaxIS and maximum matching — PODC 2017</a> · <a href="https://github.com/vasnesterov/formal_podc/blob/main/Papers/PODC2017/MaxISLocalRatio/Distributed.lean">GitHub</a> · hover over a name for its type and documentation</p>
+          </div>
+        <div class="lean-code lean-src">
+          <code class="hl lean block" data-lean-context="Distributed"><span id="L1"><span class="kw">import</span> Papers.PODC2017.MaxISLocalRatio.Coloring</span>
+<span id="L2"><span class="kw">import</span> Cslib.Computability.Distributed.Local.Identifiers</span>
+<span id="L3"></span>
+<span id="L4"><span class="dc">/-!</span></span>
+<span id="L5"><span class="dc"># Algorithm 3 as a synchronous distributed algorithm (Section 2.3)</span></span>
+<span id="L6"></span>
+<span id="L7"><span class="dc">We implement Algorithm 3 in CSLib's synchronous locally-iterative model</span></span>
+<span id="L8"><span class="dc">(`Cslib.LocallyIterative.Algorithm`): in every round a node replaces its state by a function of the</span></span>
+<span id="L9"><span class="dc">round number, its own state and the set of its neighbours' states (= the messages it receives).</span></span>
+<span id="L10"><span class="dc">The `(Δ+1)`-colouring of line 1 is a black box: the colour is part of the local input (any proper</span></span>
+<span id="L11"><span class="dc">colouring `c` with `c v &lt; k`).</span></span>
+<span id="L12"></span>
+<span id="L13"><span class="dc">A node state holds the identifier, the colour, a weight, the iteration at which the node became a</span></span>
+<span id="L14"><span class="dc">*candidate* (it was a local colour maximum and sent `reduce(w(v))`), and the candidate's decision.</span></span>
+<span id="L15"><span class="dc">A non-candidate with weight `≤ 0` is *removed* (`NotInIS`).</span></span>
+<span id="L16"></span>
+<span id="L17"><span class="dc">* round `2i` ("select", line 18): a remaining node whose colour exceeds the colours of all its</span></span>
+<span id="L18"><span class="dc">  remaining neighbours becomes a candidate of level `i` and keeps its current weight as the amount</span></span>
+<span id="L19"><span class="dc">  it reduces (lines 19–21);</span></span>
+<span id="L20"><span class="dc">* round `2i+1` ("reduce", lines 4–9): every non-candidate subtracts the amounts of its neighbours</span></span>
+<span id="L21"><span class="dc">  that became candidates of level `i`;</span></span>
+<span id="L22"><span class="dc">* every round ("addition stage", lines 12–17): an undecided candidate of level `j` decides</span></span>
+<span id="L23"><span class="dc">  `NotInIS` if a neighbour that became a candidate later decided `InIS`, and `InIS` if all its</span></span>
+<span id="L24"><span class="dc">  neighbours are removed, earlier candidates, or later candidates that decided `NotInIS`.</span></span>
+<span id="L25"></span>
+<span id="L26"><span class="dc">Main result (`algorithm_3`): after `3k` rounds every node has decided, the nodes that output `InIS`</span></span>
+<span id="L27"><span class="dc">form exactly the set returned by Algorithm 1 with the colouring rule — hence (`colorRule_isApprox`)</span></span>
+<span id="L28"><span class="dc">a `Δ`-approximate maximum-weight independent set — and every output is final and correct when it is</span></span>
+<span id="L29"><span class="dc">first produced. With the black-box `(Δ+1)`-colouring (`k = Δ+1`) this is `3Δ + 3` rounds after the</span></span>
+<span id="L30"><span class="dc">colouring, i.e. `O(Δ + log* n)` rounds with the colouring of [BEK14, Bar15].</span></span>
+<span id="L31"><span class="dc">-/</span></span>
+<span id="L32"></span>
+<span id="L33"><span class="kw">set_option</span> <span class="const token" data-verso-hover="33">linter.unusedSectionVars</span> false</span>
+<span id="L34"></span>
+<span id="L35"><span class="kw">namespace</span> Podc.MaxISLocalRatio</span>
+<span id="L36"></span>
+<span id="L37"><span class="kw">open</span> Finset Cslib.LocallyIterative</span>
+<span id="L38"></span>
+<span id="L39"><span class="dc">/-- Local state of a node in Algorithm 3. -/</span></span>
+<span id="L40"><span class="kw">structure</span> <span class="const token" data-verso-hover="93">NState</span> (V : <span class="kw">Type</span>*) <span class="kw">where</span></span>
+<span id="L41">  <span class="dc">/-- identifier -/</span></span>
+<span id="L42">  <span class="const token" data-verso-hover="94">id</span> : V</span>
+<span id="L43">  <span class="dc">/-- colour (output of the black-box colouring) -/</span></span>
+<span id="L44">  <span class="const token" data-verso-hover="95">col</span> : <span class="const token" data-verso-hover="61">ℕ</span></span>
+<span id="L45">  <span class="dc">/-- current weight; for a candidate, the amount it reduced from its neighbours -/</span></span>
+<span id="L46">  <span class="const token" data-verso-hover="96">w</span> : <span class="const token" data-verso-hover="37">ℝ</span></span>
+<span id="L47">  <span class="dc">/-- `some j` once the node became a candidate at iteration `j` -/</span></span>
+<span id="L48">  <span class="const token" data-verso-hover="97">cand</span> : <span class="const token" data-verso-hover="98">Option</span> <span class="const token" data-verso-hover="61">ℕ</span></span>
+<span id="L49">  <span class="dc">/-- decision of a candidate: `some true` = `InIS`, `some false` = `NotInIS` -/</span></span>
+<span id="L50">  <span class="const token" data-verso-hover="99">dec</span> : <span class="const token" data-verso-hover="98">Option</span> <span class="const token" data-verso-hover="100">Bool</span></span>
+<span id="L51"></span>
+<span id="L52"><span class="kw">variable</span> {V : <span class="kw">Type</span>*}</span>
+<span id="L53"></span>
+<span id="L54"><span class="kw">open</span> <span class="kw">scoped</span> Classical <span class="kw">in</span></span>
+<span id="L55"><span class="dc">/-- One round of Algorithm 3 (see the module docstring). -/</span></span>
+<span id="L56"><span class="kw">noncomputable</span> <span class="kw">def</span> <span class="const token" data-verso-hover="101">alg3Step</span> (t : <span class="const token" data-verso-hover="61">ℕ</span>) (s : <span class="const token" data-verso-hover="93">NState</span> V) (N : <span class="const token" data-verso-hover="36">Set</span> (<span class="const token" data-verso-hover="93">NState</span> V)) : <span class="const token" data-verso-hover="93">NState</span> V :=</span>
+<span id="L57">  <span class="kw">match</span> s.<span class="const token" data-verso-hover="97">cand</span> <span class="kw">with</span></span>
+<span id="L58">  | <span class="const token" data-verso-hover="102">some</span> j =&gt;</span>
+<span id="L59">    <span class="kw">if</span> s.<span class="const token" data-verso-hover="99">dec</span> = <span class="const token" data-verso-hover="103">none</span> <span class="kw">then</span></span>
+<span id="L60">      <span class="kw">if</span> ∃ x ∈ N, (∃ j', x.<span class="const token" data-verso-hover="97">cand</span> = <span class="const token" data-verso-hover="102">some</span> j' ∧ j &lt; j') ∧ x.<span class="const token" data-verso-hover="99">dec</span> = <span class="const token" data-verso-hover="102">some</span> <span class="const token" data-verso-hover="104">true</span> <span class="kw">then</span></span>
+<span id="L61">        { s <span class="kw">with</span> <span class="const token" data-verso-hover="99">dec</span> := <span class="const token" data-verso-hover="102">some</span> <span class="const token" data-verso-hover="105">false</span> }</span>
+<span id="L62">      <span class="kw">else</span> <span class="kw">if</span> ∀ x ∈ N, (x.<span class="const token" data-verso-hover="97">cand</span> = <span class="const token" data-verso-hover="103">none</span> → x.<span class="const token" data-verso-hover="96">w</span> ≤ <span class="nu">0</span>) ∧</span>
+<span id="L63">          (∀ j', x.<span class="const token" data-verso-hover="97">cand</span> = <span class="const token" data-verso-hover="102">some</span> j' → j &lt; j' → x.<span class="const token" data-verso-hover="99">dec</span> = <span class="const token" data-verso-hover="102">some</span> <span class="const token" data-verso-hover="105">false</span>) <span class="kw">then</span></span>
+<span id="L64">        { s <span class="kw">with</span> <span class="const token" data-verso-hover="99">dec</span> := <span class="const token" data-verso-hover="102">some</span> <span class="const token" data-verso-hover="104">true</span> }</span>
+<span id="L65">      <span class="kw">else</span> s</span>
+<span id="L66">    <span class="kw">else</span> s</span>
+<span id="L67">  | <span class="const token" data-verso-hover="103">none</span> =&gt;</span>
+<span id="L68">    <span class="kw">if</span> t % <span class="nu">2</span> = <span class="nu">0</span> <span class="kw">then</span></span>
+<span id="L69">      <span class="kw">if</span> <span class="nu">0</span> &lt; s.<span class="const token" data-verso-hover="96">w</span> ∧ ∀ x ∈ N, x.<span class="const token" data-verso-hover="97">cand</span> = <span class="const token" data-verso-hover="103">none</span> → <span class="nu">0</span> &lt; x.<span class="const token" data-verso-hover="96">w</span> → x.<span class="const token" data-verso-hover="95">col</span> &lt; s.<span class="const token" data-verso-hover="95">col</span> <span class="kw">then</span></span>
+<span id="L70">        { s <span class="kw">with</span> <span class="const token" data-verso-hover="97">cand</span> := <span class="const token" data-verso-hover="102">some</span> (t / <span class="nu">2</span>) }</span>
+<span id="L71">      <span class="kw">else</span> s</span>
+<span id="L72">    <span class="kw">else</span></span>
+<span id="L73">      { s <span class="kw">with</span> <span class="const token" data-verso-hover="96">w</span> := s.<span class="const token" data-verso-hover="96">w</span> - ∑ᶠ x ∈ N, <span class="kw">if</span> x.<span class="const token" data-verso-hover="97">cand</span> = <span class="const token" data-verso-hover="102">some</span> (t / <span class="nu">2</span>) <span class="kw">then</span> x.<span class="const token" data-verso-hover="96">w</span> <span class="kw">else</span> <span class="nu">0</span> }</span>
+<span id="L74"></span>
+<span id="L75"><span class="dc">/-- Algorithm 3 in the locally-iterative model. -/</span></span>
+<span id="L76"><span class="kw">noncomputable</span> <span class="kw">def</span> <span class="const token" data-verso-hover="16">alg3</span> : <span class="const token" data-verso-hover="6">Algorithm</span> (<span class="const token" data-verso-hover="93">NState</span> V) := ⟨<span class="const token" data-verso-hover="101">alg3Step</span>⟩</span>
+<span id="L77"></span>
+<span id="L78"><span class="dc">/-- Initial configuration: identifier, colour (black box) and weight. -/</span></span>
+<span id="L79"><span class="kw">def</span> <span class="const token" data-verso-hover="106">init3</span> (c : V → <span class="const token" data-verso-hover="61">ℕ</span>) (w : V → <span class="const token" data-verso-hover="37">ℝ</span>) (v : V) : <span class="const token" data-verso-hover="93">NState</span> V := ⟨v, c v, w v, <span class="const token" data-verso-hover="103">none</span>, <span class="const token" data-verso-hover="103">none</span>⟩</span>
+<span id="L80"></span>
+<span id="L81"><span class="kw">open</span> <span class="kw">scoped</span> Classical <span class="kw">in</span></span>
+<span id="L82"><span class="dc">/-- The output of a node: a candidate outputs its decision, a removed node `NotInIS`, a remaining</span></span>
+<span id="L83"><span class="dc">node nothing yet. -/</span></span>
+<span id="L84"><span class="kw">noncomputable</span> <span class="kw">def</span> <span class="const token" data-verso-hover="107">output</span> (s : <span class="const token" data-verso-hover="93">NState</span> V) : <span class="const token" data-verso-hover="98">Option</span> <span class="const token" data-verso-hover="100">Bool</span> :=</span>
+<span id="L85">  <span class="kw">match</span> s.<span class="const token" data-verso-hover="97">cand</span> <span class="kw">with</span></span>
+<span id="L86">  | <span class="const token" data-verso-hover="102">some</span> _ =&gt; s.<span class="const token" data-verso-hover="99">dec</span></span>
+<span id="L87">  | <span class="const token" data-verso-hover="103">none</span> =&gt; <span class="kw">if</span> s.<span class="const token" data-verso-hover="96">w</span> ≤ <span class="nu">0</span> <span class="kw">then</span> <span class="const token" data-verso-hover="102">some</span> <span class="const token" data-verso-hover="105">false</span> <span class="kw">else</span> <span class="const token" data-verso-hover="103">none</span></span>
+<span id="L88"></span>
+<span id="L89"><span class="kw">variable</span> [<span class="const token" data-verso-hover="34">Fintype</span> V] [<span class="const token" data-verso-hover="41">DecidableEq</span> V] {G : <span class="const token" data-verso-hover="53">SimpleGraph</span> V} [<span class="const token" data-verso-hover="59">DecidableRel</span> G.<span class="const token" data-verso-hover="60">Adj</span>] {c : V → <span class="const token" data-verso-hover="61">ℕ</span>}</span>
+<span id="L90"></span>
+<span id="L91"><span class="kw">section</span> Invariant</span>
+<span id="L92"></span>
+<span id="L93"><span class="kw">variable</span> (G) (hc : <span class="const token" data-verso-hover="65">IsProper</span> G c) (w : V → <span class="const token" data-verso-hover="37">ℝ</span>)</span>
+<span id="L94"></span>
+<span id="L95"><span class="dc">/-- The invariant of the run at round `t`, relative to the centralized iteration</span></span>
+<span id="L96"><span class="dc">`Wᵢ = (colorRule G c hc).iter w i`, `Uᵢ = (colorRule G c hc).U w i` and the output</span></span>
+<span id="L97"><span class="dc">`S = seqLR (colorRule G c hc) w` of Algorithm 1. -/</span></span>
+<span id="L98"><span class="kw">def</span> <span class="const token" data-verso-hover="108">Inv</span> (t : <span class="const token" data-verso-hover="61">ℕ</span>) (cfg : V → <span class="const token" data-verso-hover="93">NState</span> V) : <span class="kw">Prop</span> :=</span>
+<span id="L99">  ∀ v, (cfg v).<span class="const token" data-verso-hover="94">id</span> = v ∧ (cfg v).<span class="const token" data-verso-hover="95">col</span> = c v ∧</span>
+<span id="L100">    (<span class="kw">match</span> (cfg v).<span class="const token" data-verso-hover="97">cand</span> <span class="kw">with</span></span>
+<span id="L101">      | <span class="const token" data-verso-hover="103">none</span> =&gt; (cfg v).<span class="const token" data-verso-hover="96">w</span> = (<span class="const token" data-verso-hover="14">colorRule</span> G c hc).<span class="const token" data-verso-hover="80">iter</span> w (t / <span class="nu">2</span>) v ∧</span>
+<span id="L102">          ∀ j, v ∈ (<span class="const token" data-verso-hover="14">colorRule</span> G c hc).<span class="const token" data-verso-hover="88">U</span> w j → (t + <span class="nu">1</span>) / <span class="nu">2</span> ≤ j</span>
+<span id="L103">      | <span class="const token" data-verso-hover="102">some</span> j =&gt; v ∈ (<span class="const token" data-verso-hover="14">colorRule</span> G c hc).<span class="const token" data-verso-hover="88">U</span> w j ∧ j &lt; (t + <span class="nu">1</span>) / <span class="nu">2</span> ∧</span>
+<span id="L104">          (cfg v).<span class="const token" data-verso-hover="96">w</span> = (<span class="const token" data-verso-hover="14">colorRule</span> G c hc).<span class="const token" data-verso-hover="80">iter</span> w j v) ∧</span>
+<span id="L105">    (∀ b, (cfg v).<span class="const token" data-verso-hover="99">dec</span> = <span class="const token" data-verso-hover="102">some</span> b → (cfg v).<span class="const token" data-verso-hover="97">cand</span> ≠ <span class="const token" data-verso-hover="103">none</span> ∧ (b = <span class="const token" data-verso-hover="104">true</span> ↔ v ∈ <span class="const token" data-verso-hover="10">seqLR</span> (<span class="const token" data-verso-hover="14">colorRule</span> G c hc) w))</span>
+<span id="L106"></span>
+<span id="L107"><span class="kw">end</span> Invariant</span>
+<span id="L108"></span>
+<span id="L109"><span class="kw">variable</span> {hc : <span class="const token" data-verso-hover="65">IsProper</span> G c} {w : V → <span class="const token" data-verso-hover="37">ℝ</span>}</span>
+<span id="L110"></span>
+<span id="L111"><span class="kw">theorem</span> <span class="const token" data-verso-hover="109">inv_zero</span> : <span class="const token" data-verso-hover="108">Inv</span> G hc w <span class="nu">0</span> (<span class="const token" data-verso-hover="106">init3</span> c w) := <span class="kw">by</span></span>
+<span id="L112">  <span class="kw">intro</span> v</span>
+<span id="L113">  <span class="kw">simp</span> [<span class="const token" data-verso-hover="106">init3</span>]</span>
+<span id="L114"></span>
+<span id="L115"><span class="dc">/-- Neighbours' weights in the run: a candidate of level `j &lt; i` has no weight left in `Wᵢ`. -/</span></span>
+<span id="L116"><span class="kw">theorem</span> <span class="const token" data-verso-hover="110">inv_pos_iff</span> {t : <span class="const token" data-verso-hover="61">ℕ</span>} {cfg : V → <span class="const token" data-verso-hover="93">NState</span> V} (h : <span class="const token" data-verso-hover="108">Inv</span> G hc w t cfg) (i : <span class="const token" data-verso-hover="61">ℕ</span>) (hi : i = t / <span class="nu">2</span>)</span>
+<span id="L117">    (ht : t % <span class="nu">2</span> = <span class="nu">0</span>) (u : V) :</span>
+<span id="L118">    ((cfg u).<span class="const token" data-verso-hover="97">cand</span> = <span class="const token" data-verso-hover="103">none</span> ∧ <span class="nu">0</span> &lt; (cfg u).<span class="const token" data-verso-hover="96">w</span>) ↔ <span class="nu">0</span> &lt; (<span class="const token" data-verso-hover="14">colorRule</span> G c hc).<span class="const token" data-verso-hover="80">iter</span> w i u := <span class="kw">by</span></span>
+<span id="L119">  <span class="kw">obtain</span> ⟨-, -, hm, -⟩ := h u</span>
+<span id="L120">  <span class="kw">subst</span> hi</span>
+<span id="L121">  <span class="kw">cases</span> hcu : (cfg u).<span class="const token" data-verso-hover="97">cand</span> <span class="kw">with</span></span>
+<span id="L122">  | <span class="const token" data-verso-hover="103">none</span> =&gt;</span>
+<span id="L123">    <span class="kw">rw</span> [hcu] <span class="kw">at</span> hm</span>
+<span id="L124">    <span class="kw">simp</span> [hm.<span class="const token" data-verso-hover="38">1</span>]</span>
+<span id="L125">  | <span class="const token" data-verso-hover="102">some</span> j =&gt;</span>
+<span id="L126">    <span class="kw">rw</span> [hcu] <span class="kw">at</span> hm</span>
+<span id="L127">    <span class="kw">simp</span> only [<span class="const token" data-verso-hover="111">reduceCtorEq</span>, <span class="const token" data-verso-hover="112">false_and</span>, <span class="const token" data-verso-hover="113">false_iff</span>, <span class="const token" data-verso-hover="90">not_lt</span>]</span>
+<span id="L128">    <span class="kw">obtain</span> ⟨hU, hj, -⟩ := hm</span>
+<span id="L129">    <span class="kw">have</span> h1 := (<span class="const token" data-verso-hover="14">colorRule</span> G c hc).<span class="const token" data-verso-hover="114">iter_succ_of_mem_U</span> w hU</span>
+<span id="L130">    <span class="kw">have</span> h2 := (<span class="const token" data-verso-hover="14">colorRule</span> G c hc).<span class="const token" data-verso-hover="115">iter_anti</span> w (<span class="kw">show</span> j + <span class="nu">1</span> ≤ t / <span class="nu">2</span> <span class="kw">by</span> <span class="kw">omega</span>) u</span>
+<span id="L131">    <span class="kw">linarith</span></span>
+<span id="L132"></span>
+<span id="L133"><span class="dc">/-- A vertex of `Uⱼ` is a candidate of level `j` from round `2j+1` on. -/</span></span>
+<span id="L134"><span class="kw">theorem</span> <span class="const token" data-verso-hover="116">inv_cand_of_mem_U</span> {t : <span class="const token" data-verso-hover="61">ℕ</span>} {cfg : V → <span class="const token" data-verso-hover="93">NState</span> V} (h : <span class="const token" data-verso-hover="108">Inv</span> G hc w t cfg) {j : <span class="const token" data-verso-hover="61">ℕ</span>} {v : V}</span>
+<span id="L135">    (hv : v ∈ (<span class="const token" data-verso-hover="14">colorRule</span> G c hc).<span class="const token" data-verso-hover="88">U</span> w j) (ht : <span class="nu">2</span> * j + <span class="nu">1</span> ≤ t) : (cfg v).<span class="const token" data-verso-hover="97">cand</span> = <span class="const token" data-verso-hover="102">some</span> j := <span class="kw">by</span></span>
+<span id="L136">  <span class="kw">obtain</span> ⟨-, -, hm, -⟩ := h v</span>
+<span id="L137">  <span class="kw">cases</span> hcv : (cfg v).<span class="const token" data-verso-hover="97">cand</span> <span class="kw">with</span></span>
+<span id="L138">  | <span class="const token" data-verso-hover="103">none</span> =&gt;</span>
+<span id="L139">    <span class="kw">rw</span> [hcv] <span class="kw">at</span> hm</span>
+<span id="L140">    <span class="kw">have</span> := hm.<span class="const token" data-verso-hover="40">2</span> j hv</span>
+<span id="L141">    <span class="kw">omega</span></span>
+<span id="L142">  | <span class="const token" data-verso-hover="102">some</span> j' =&gt;</span>
+<span id="L143">    <span class="kw">rw</span> [hcv] <span class="kw">at</span> hm</span>
+<span id="L144">    <span class="kw">rw</span> [(<span class="const token" data-verso-hover="14">colorRule</span> G c hc).<span class="const token" data-verso-hover="117">U_inj</span> w hm.<span class="const token" data-verso-hover="38">1</span> hv]</span>
+<span id="L145"></span>
+<span id="L146"><span class="dc">/-- Soundness of a `NotInIS` decision (line 15–17): a later candidate neighbour is in the output. -/</span></span>
+<span id="L147"><span class="kw">theorem</span> <span class="const token" data-verso-hover="118">dec_false_sound</span> {t : <span class="const token" data-verso-hover="61">ℕ</span>} {cfg : V → <span class="const token" data-verso-hover="93">NState</span> V} (h : <span class="const token" data-verso-hover="108">Inv</span> G hc w t cfg) {v : V} {j : <span class="const token" data-verso-hover="61">ℕ</span>}</span>
+<span id="L148">    (hv : (cfg v).<span class="const token" data-verso-hover="97">cand</span> = <span class="const token" data-verso-hover="102">some</span> j)</span>
+<span id="L149">    (hex : ∃ x ∈ <span class="const token" data-verso-hover="119">nbrColors</span> G cfg v, (∃ j', x.<span class="const token" data-verso-hover="97">cand</span> = <span class="const token" data-verso-hover="102">some</span> j' ∧ j &lt; j') ∧ x.<span class="const token" data-verso-hover="99">dec</span> = <span class="const token" data-verso-hover="102">some</span> <span class="const token" data-verso-hover="104">true</span>) :</span>
+<span id="L150">    v ∉ <span class="const token" data-verso-hover="10">seqLR</span> (<span class="const token" data-verso-hover="14">colorRule</span> G c hc) w := <span class="kw">by</span></span>
+<span id="L151">  <span class="kw">obtain</span> ⟨u, hadj, ⟨j', hj', hjj'⟩, hdec⟩ := <span class="const token" data-verso-hover="120">exists_mem_nbrColors</span>.<span class="const token" data-verso-hover="74">1</span> hex</span>
+<span id="L152">  <span class="kw">have</span> hvU : v ∈ (<span class="const token" data-verso-hover="14">colorRule</span> G c hc).<span class="const token" data-verso-hover="88">U</span> w j := <span class="kw">by</span></span>
+<span id="L153">    <span class="kw">have</span> := (h v).<span class="const token" data-verso-hover="40">2</span><span class="nu">.</span><span class="const token" data-verso-hover="40">2</span><span class="nu">.</span><span class="const token" data-verso-hover="38">1</span>; <span class="kw">rw</span> [hv] <span class="kw">at</span> this; <span class="kw">exact</span> this.<span class="const token" data-verso-hover="38">1</span></span>
+<span id="L154">  <span class="kw">have</span> huU : u ∈ (<span class="const token" data-verso-hover="14">colorRule</span> G c hc).<span class="const token" data-verso-hover="88">U</span> w j' := <span class="kw">by</span></span>
+<span id="L155">    <span class="kw">have</span> := (h u).<span class="const token" data-verso-hover="40">2</span><span class="nu">.</span><span class="const token" data-verso-hover="40">2</span><span class="nu">.</span><span class="const token" data-verso-hover="38">1</span>; <span class="kw">rw</span> [hj'] <span class="kw">at</span> this; <span class="kw">exact</span> this.<span class="const token" data-verso-hover="38">1</span></span>
+<span id="L156">  <span class="kw">have</span> huS := ((h u).<span class="const token" data-verso-hover="40">2</span><span class="nu">.</span><span class="const token" data-verso-hover="40">2</span><span class="nu">.</span><span class="const token" data-verso-hover="40">2</span> <span class="const token" data-verso-hover="104">true</span> hdec).<span class="const token" data-verso-hover="40">2</span><span class="nu">.</span><span class="const token" data-verso-hover="74">1</span> <span class="const token" data-verso-hover="121">rfl</span></span>
+<span id="L157">  <span class="kw">rw</span> [<span class="const token" data-verso-hover="12">mem_seqLR_iff</span> _ w hvU]</span>
+<span id="L158">  <span class="kw">intro</span> hall</span>
+<span id="L159">  <span class="kw">exact</span> hall u huS ⟨j', hjj', huU⟩ hadj</span>
+<span id="L160"></span>
+<span id="L161"><span class="dc">/-- Soundness of an `InIS` decision (lines 12–14): no later candidate neighbour is in the</span></span>
+<span id="L162"><span class="dc">output. -/</span></span>
+<span id="L163"><span class="kw">theorem</span> <span class="const token" data-verso-hover="122">dec_true_sound</span> {t : <span class="const token" data-verso-hover="61">ℕ</span>} {cfg : V → <span class="const token" data-verso-hover="93">NState</span> V} (h : <span class="const token" data-verso-hover="108">Inv</span> G hc w t cfg) {v : V} {j : <span class="const token" data-verso-hover="61">ℕ</span>}</span>
+<span id="L164">    (hv : (cfg v).<span class="const token" data-verso-hover="97">cand</span> = <span class="const token" data-verso-hover="102">some</span> j)</span>
+<span id="L165">    (hall : ∀ x ∈ <span class="const token" data-verso-hover="119">nbrColors</span> G cfg v, (x.<span class="const token" data-verso-hover="97">cand</span> = <span class="const token" data-verso-hover="103">none</span> → x.<span class="const token" data-verso-hover="96">w</span> ≤ <span class="nu">0</span>) ∧</span>
+<span id="L166">      (∀ j', x.<span class="const token" data-verso-hover="97">cand</span> = <span class="const token" data-verso-hover="102">some</span> j' → j &lt; j' → x.<span class="const token" data-verso-hover="99">dec</span> = <span class="const token" data-verso-hover="102">some</span> <span class="const token" data-verso-hover="105">false</span>)) :</span>
+<span id="L167">    v ∈ <span class="const token" data-verso-hover="10">seqLR</span> (<span class="const token" data-verso-hover="14">colorRule</span> G c hc) w := <span class="kw">by</span></span>
+<span id="L168">  <span class="kw">have</span> hvU : v ∈ (<span class="const token" data-verso-hover="14">colorRule</span> G c hc).<span class="const token" data-verso-hover="88">U</span> w j := <span class="kw">by</span></span>
+<span id="L169">    <span class="kw">have</span> := (h v).<span class="const token" data-verso-hover="40">2</span><span class="nu">.</span><span class="const token" data-verso-hover="40">2</span><span class="nu">.</span><span class="const token" data-verso-hover="38">1</span>; <span class="kw">rw</span> [hv] <span class="kw">at</span> this; <span class="kw">exact</span> this.<span class="const token" data-verso-hover="38">1</span></span>
+<span id="L170">  <span class="kw">rw</span> [<span class="const token" data-verso-hover="12">mem_seqLR_iff</span> _ w hvU]</span>
+<span id="L171">  <span class="kw">rintro</span> u huS ⟨j'', hjj'', huU⟩ hadj</span>
+<span id="L172">  <span class="kw">obtain</span> ⟨h1, h2⟩ := <span class="const token" data-verso-hover="123">forall_mem_nbrColors</span>.<span class="const token" data-verso-hover="74">1</span> hall u hadj</span>
+<span id="L173">  <span class="kw">have</span> hm := (h u).<span class="const token" data-verso-hover="40">2</span><span class="nu">.</span><span class="const token" data-verso-hover="40">2</span><span class="nu">.</span><span class="const token" data-verso-hover="38">1</span></span>
+<span id="L174">  <span class="kw">cases</span> hcu : (cfg u).<span class="const token" data-verso-hover="97">cand</span> <span class="kw">with</span></span>
+<span id="L175">  | <span class="const token" data-verso-hover="103">none</span> =&gt;</span>
+<span id="L176">    <span class="kw">rw</span> [hcu] <span class="kw">at</span> hm</span>
+<span id="L177">    <span class="kw">have</span> hle := h1 hcu</span>
+<span id="L178">    <span class="kw">have</span> hpos := <span class="const token" data-verso-hover="47">mem_pos</span>.<span class="const token" data-verso-hover="74">1</span> ((<span class="const token" data-verso-hover="14">colorRule</span> G c hc).<span class="const token" data-verso-hover="124">U_subset_pos</span> w j'' huU)</span>
+<span id="L179">    <span class="kw">have</span> := (<span class="const token" data-verso-hover="14">colorRule</span> G c hc).<span class="const token" data-verso-hover="115">iter_anti</span> w (<span class="kw">show</span> t / <span class="nu">2</span> ≤ j'' <span class="kw">by</span> <span class="kw">have</span> := hm.<span class="const token" data-verso-hover="40">2</span> j'' huU; <span class="kw">omega</span>) u</span>
+<span id="L180">    <span class="kw">linarith</span> [hm.<span class="const token" data-verso-hover="38">1</span>]</span>
+<span id="L181">  | <span class="const token" data-verso-hover="102">some</span> j' =&gt;</span>
+<span id="L182">    <span class="kw">rw</span> [hcu] <span class="kw">at</span> hm</span>
+<span id="L183">    <span class="kw">have</span> := (<span class="const token" data-verso-hover="14">colorRule</span> G c hc).<span class="const token" data-verso-hover="117">U_inj</span> w hm.<span class="const token" data-verso-hover="38">1</span> huU</span>
+<span id="L184">    <span class="kw">subst</span> this</span>
+<span id="L185">    <span class="kw">have</span> hdec := h2 j' hcu hjj''</span>
+<span id="L186">    <span class="kw">have</span> := ((h u).<span class="const token" data-verso-hover="40">2</span><span class="nu">.</span><span class="const token" data-verso-hover="40">2</span><span class="nu">.</span><span class="const token" data-verso-hover="40">2</span> <span class="const token" data-verso-hover="105">false</span> hdec).<span class="const token" data-verso-hover="40">2</span></span>
+<span id="L187">    <span class="kw">simp</span> only [<span class="const token" data-verso-hover="125">Bool.false_eq_true</span>, <span class="const token" data-verso-hover="113">false_iff</span>] <span class="kw">at</span> this</span>
+<span id="L188">    <span class="kw">exact</span> this huS</span>
+<span id="L189"></span>
+<span id="L190"><span class="dc">/-- The reduction amount received in round `2i+1`: the sum over neighbours picked at level `i`. -/</span></span>
+<span id="L191"><span class="kw">theorem</span> <span class="const token" data-verso-hover="126">finsum_reduce</span> {t : <span class="const token" data-verso-hover="61">ℕ</span>} {cfg : V → <span class="const token" data-verso-hover="93">NState</span> V} (h : <span class="const token" data-verso-hover="108">Inv</span> G hc w t cfg) (ht : t % <span class="nu">2</span> = <span class="nu">1</span>)</span>
+<span id="L192">    {v : V} (hv : (cfg v).<span class="const token" data-verso-hover="97">cand</span> = <span class="const token" data-verso-hover="103">none</span>) :</span>
+<span id="L193">    (∑ᶠ x ∈ <span class="const token" data-verso-hover="119">nbrColors</span> G cfg v, <span class="kw">if</span> x.<span class="const token" data-verso-hover="97">cand</span> = <span class="const token" data-verso-hover="102">some</span> (t / <span class="nu">2</span>) <span class="kw">then</span> x.<span class="const token" data-verso-hover="96">w</span> <span class="kw">else</span> <span class="nu">0</span>) =</span>
+<span id="L194">      <span class="const token" data-verso-hover="127">red</span> G ((<span class="const token" data-verso-hover="14">colorRule</span> G c hc).<span class="const token" data-verso-hover="88">U</span> w (t / <span class="nu">2</span>)) ((<span class="const token" data-verso-hover="14">colorRule</span> G c hc).<span class="const token" data-verso-hover="80">iter</span> w (t / <span class="nu">2</span>)) v := <span class="kw">by</span></span>
+<span id="L195">  <span class="kw">classical</span></span>
+<span id="L196">  <span class="kw">have</span> hid : ∀ u, (cfg u).<span class="const token" data-verso-hover="94">id</span> = u := <span class="kw">fun</span> u =&gt; (h u).<span class="const token" data-verso-hover="38">1</span></span>
+<span id="L197">  <span class="kw">rw</span> [<span class="const token" data-verso-hover="128">finsum_nbrColors</span> (c := cfg) <span class="const token" data-verso-hover="94">NState.id</span> hid]</span>
+<span id="L198">  <span class="kw">have</span> hvU : v ∉ (<span class="const token" data-verso-hover="14">colorRule</span> G c hc).<span class="const token" data-verso-hover="88">U</span> w (t / <span class="nu">2</span>) := <span class="kw">by</span></span>
+<span id="L199">    <span class="kw">intro</span> hU</span>
+<span id="L200">    <span class="kw">have</span> := (h v).<span class="const token" data-verso-hover="40">2</span><span class="nu">.</span><span class="const token" data-verso-hover="40">2</span><span class="nu">.</span><span class="const token" data-verso-hover="38">1</span>; <span class="kw">rw</span> [hv] <span class="kw">at</span> this</span>
+<span id="L201">    <span class="kw">have</span> := this.<span class="const token" data-verso-hover="40">2</span> _ hU; <span class="kw">omega</span></span>
+<span id="L202">  <span class="kw">have</span> hcand : ∀ u, (cfg u).<span class="const token" data-verso-hover="97">cand</span> = <span class="const token" data-verso-hover="102">some</span> (t / <span class="nu">2</span>) ↔ u ∈ (<span class="const token" data-verso-hover="14">colorRule</span> G c hc).<span class="const token" data-verso-hover="88">U</span> w (t / <span class="nu">2</span>) := <span class="kw">by</span></span>
+<span id="L203">    <span class="kw">intro</span> u</span>
+<span id="L204">    <span class="kw">have</span> hm := (h u).<span class="const token" data-verso-hover="40">2</span><span class="nu">.</span><span class="const token" data-verso-hover="40">2</span><span class="nu">.</span><span class="const token" data-verso-hover="38">1</span></span>
+<span id="L205">    <span class="kw">cases</span> hcu : (cfg u).<span class="const token" data-verso-hover="97">cand</span> <span class="kw">with</span></span>
+<span id="L206">    | <span class="const token" data-verso-hover="103">none</span> =&gt;</span>
+<span id="L207">      <span class="kw">rw</span> [hcu] <span class="kw">at</span> hm</span>
+<span id="L208">      <span class="kw">simp</span> only [<span class="const token" data-verso-hover="111">reduceCtorEq</span>, <span class="const token" data-verso-hover="113">false_iff</span>]</span>
+<span id="L209">      <span class="kw">intro</span> hU; <span class="kw">have</span> := hm.<span class="const token" data-verso-hover="40">2</span> _ hU; <span class="kw">omega</span></span>
+<span id="L210">    | <span class="const token" data-verso-hover="102">some</span> j =&gt;</span>
+<span id="L211">      <span class="kw">rw</span> [hcu] <span class="kw">at</span> hm</span>
+<span id="L212">      <span class="kw">simp</span> only [<span class="const token" data-verso-hover="129">Option.some.injEq</span>]</span>
+<span id="L213">      <span class="kw">exact</span> ⟨<span class="kw">fun</span> e =&gt; e ▸ hm.<span class="const token" data-verso-hover="38">1</span>, <span class="kw">fun</span> hU =&gt; (<span class="const token" data-verso-hover="14">colorRule</span> G c hc).<span class="const token" data-verso-hover="117">U_inj</span> w hm.<span class="const token" data-verso-hover="38">1</span> hU⟩</span>
+<span id="L214">  <span class="kw">rw</span> [← <span class="const token" data-verso-hover="130">sum_filter</span>]</span>
+<span id="L215">  <span class="kw">unfold</span> <span class="const token" data-verso-hover="127">red</span></span>
+<span id="L216">  <span class="kw">refine</span> <span class="const token" data-verso-hover="131">sum_congr</span> ?_ <span class="kw">fun</span> u hu =&gt; ?_</span>
+<span id="L217">  · <span class="kw">ext</span> u</span>
+<span id="L218">    <span class="kw">simp</span> only [<span class="const token" data-verso-hover="132">mem_filter</span>, <span class="const token" data-verso-hover="133">SimpleGraph.mem_neighborFinset</span>, <span class="const token" data-verso-hover="134">mem_cl</span>, hcand]</span>
+<span id="L219">    <span class="kw">constructor</span></span>
+<span id="L220">    · <span class="kw">rintro</span> ⟨hadj, hU⟩; <span class="kw">exact</span> ⟨hU, <span class="const token" data-verso-hover="135">Or.inr</span> hadj.<span class="const token" data-verso-hover="68">symm</span>⟩</span>
+<span id="L221">    · <span class="kw">rintro</span> ⟨hU, <span class="kw">rfl</span> | hadj⟩</span>
+<span id="L222">      · <span class="kw">exact</span> <span class="const token" data-verso-hover="136">absurd</span> hU hvU</span>
+<span id="L223">      · <span class="kw">exact</span> ⟨hadj.<span class="const token" data-verso-hover="68">symm</span>, hU⟩</span>
+<span id="L224">  · <span class="kw">have</span> hcu := (hcand u).<span class="const token" data-verso-hover="66">2</span> (<span class="const token" data-verso-hover="132">mem_filter</span>.<span class="const token" data-verso-hover="74">1</span> hu).<span class="const token" data-verso-hover="38">1</span></span>
+<span id="L225">    <span class="kw">have</span> hm := (h u).<span class="const token" data-verso-hover="40">2</span><span class="nu">.</span><span class="const token" data-verso-hover="40">2</span><span class="nu">.</span><span class="const token" data-verso-hover="38">1</span></span>
+<span id="L226">    <span class="kw">rw</span> [hcu] <span class="kw">at</span> hm</span>
+<span id="L227">    <span class="kw">exact</span> hm.<span class="const token" data-verso-hover="40">2</span><span class="nu">.</span><span class="const token" data-verso-hover="40">2</span></span>
+<span id="L228"></span>
+<span id="L229"><span class="dc">/-- The invariant is preserved by every round. -/</span></span>
+<span id="L230"><span class="kw">theorem</span> <span class="const token" data-verso-hover="137">inv_succ</span> {t : <span class="const token" data-verso-hover="61">ℕ</span>} {cfg : V → <span class="const token" data-verso-hover="93">NState</span> V} (h : <span class="const token" data-verso-hover="108">Inv</span> G hc w t cfg) :</span>
+<span id="L231">    <span class="const token" data-verso-hover="108">Inv</span> G hc w (t + <span class="nu">1</span>) (<span class="kw">fun</span> v =&gt; <span class="const token" data-verso-hover="101">alg3Step</span> t (cfg v) (<span class="const token" data-verso-hover="119">nbrColors</span> G cfg v)) := <span class="kw">by</span></span>
+<span id="L232">  <span class="kw">intro</span> v</span>
+<span id="L233">  <span class="kw">obtain</span> ⟨hid, hcol, hm, hdec⟩ := h v</span>
+<span id="L234">  <span class="kw">cases</span> hcv : (cfg v).<span class="const token" data-verso-hover="97">cand</span> <span class="kw">with</span></span>
+<span id="L235">  | <span class="const token" data-verso-hover="102">some</span> j =&gt;</span>
+<span id="L236">    <span class="kw">rw</span> [hcv] <span class="kw">at</span> hm</span>
+<span id="L237">    <span class="kw">obtain</span> ⟨hU, hj, hw⟩ := hm</span>
+<span id="L238">    <span class="kw">simp</span> only [<span class="const token" data-verso-hover="101">alg3Step</span>, hcv]</span>
+<span id="L239">    <span class="kw">split_ifs</span> <span class="kw">with</span> h1 h2 h3</span>
+<span id="L240">    · <span class="kw">refine</span> ⟨hid, hcol, ?_, ?_⟩</span>
+<span id="L241">      · <span class="kw">exact</span> ⟨hU, <span class="kw">by</span> <span class="kw">omega</span>, hw⟩</span>
+<span id="L242">      · <span class="kw">intro</span> b hb</span>
+<span id="L243">        <span class="kw">simp</span> only [<span class="const token" data-verso-hover="129">Option.some.injEq</span>] <span class="kw">at</span> hb</span>
+<span id="L244">        <span class="kw">subst</span> hb</span>
+<span id="L245">        <span class="kw">refine</span> ⟨<span class="kw">by</span> <span class="kw">simp</span>, ?_⟩</span>
+<span id="L246">        <span class="kw">simpa</span> <span class="kw">using</span> <span class="const token" data-verso-hover="118">dec_false_sound</span> h hcv h2</span>
+<span id="L247">    · <span class="kw">refine</span> ⟨hid, hcol, ?_, ?_⟩</span>
+<span id="L248">      · <span class="kw">exact</span> ⟨hU, <span class="kw">by</span> <span class="kw">omega</span>, hw⟩</span>
+<span id="L249">      · <span class="kw">intro</span> b hb</span>
+<span id="L250">        <span class="kw">simp</span> only [<span class="const token" data-verso-hover="129">Option.some.injEq</span>] <span class="kw">at</span> hb</span>
+<span id="L251">        <span class="kw">subst</span> hb</span>
+<span id="L252">        <span class="kw">refine</span> ⟨<span class="kw">by</span> <span class="kw">simp</span>, ?_⟩</span>
+<span id="L253">        <span class="kw">simpa</span> <span class="kw">using</span> <span class="const token" data-verso-hover="122">dec_true_sound</span> h hcv h3</span>
+<span id="L254">    · <span class="kw">refine</span> ⟨hid, hcol, ?_, hdec⟩</span>
+<span id="L255">      <span class="kw">rw</span> [hcv]; <span class="kw">exact</span> ⟨hU, <span class="kw">by</span> <span class="kw">omega</span>, hw⟩</span>
+<span id="L256">    · <span class="kw">refine</span> ⟨hid, hcol, ?_, hdec⟩</span>
+<span id="L257">      <span class="kw">rw</span> [hcv]; <span class="kw">exact</span> ⟨hU, <span class="kw">by</span> <span class="kw">omega</span>, hw⟩</span>
+<span id="L258">  | <span class="const token" data-verso-hover="103">none</span> =&gt;</span>
+<span id="L259">    <span class="kw">rw</span> [hcv] <span class="kw">at</span> hm</span>
+<span id="L260">    <span class="kw">obtain</span> ⟨hw, hlev⟩ := hm</span>
+<span id="L261">    <span class="kw">have</span> hdec' : (cfg v).<span class="const token" data-verso-hover="99">dec</span> = <span class="const token" data-verso-hover="103">none</span> := <span class="kw">by</span></span>
+<span id="L262">      <span class="kw">cases</span> hd : (cfg v).<span class="const token" data-verso-hover="99">dec</span> <span class="kw">with</span></span>
+<span id="L263">      | <span class="const token" data-verso-hover="103">none</span> =&gt; <span class="kw">rfl</span></span>
+<span id="L264">      | <span class="const token" data-verso-hover="102">some</span> b =&gt; <span class="kw">exact</span> <span class="const token" data-verso-hover="136">absurd</span> hcv ((hdec b hd).<span class="const token" data-verso-hover="38">1</span>)</span>
+<span id="L265">    <span class="kw">simp</span> only [<span class="const token" data-verso-hover="101">alg3Step</span>, hcv]</span>
+<span id="L266">    <span class="kw">split_ifs</span> <span class="kw">with</span> h1 h2</span>
+<span id="L267">    · <span class="cm">--</span><span class="cm"> select round, `v` becomes a candidate of level `t / 2`</span></span>
+<span id="L268">      <span class="kw">have</span> hmem : v ∈ (<span class="const token" data-verso-hover="14">colorRule</span> G c hc).<span class="const token" data-verso-hover="88">U</span> w (t / <span class="nu">2</span>) := <span class="kw">by</span></span>
+<span id="L269">        <span class="kw">refine</span> <span class="const token" data-verso-hover="63">mem_localMax</span>.<span class="const token" data-verso-hover="66">2</span> ⟨hw ▸ h2.<span class="const token" data-verso-hover="38">1</span>, <span class="kw">fun</span> u hu hadj =&gt; ?_⟩</span>
+<span id="L270">        <span class="kw">have</span> := <span class="const token" data-verso-hover="123">forall_mem_nbrColors</span>.<span class="const token" data-verso-hover="74">1</span> h2.<span class="const token" data-verso-hover="40">2</span> u hadj</span>
+<span id="L271">        <span class="kw">rw</span> [← (<span class="const token" data-verso-hover="110">inv_pos_iff</span> h (t / <span class="nu">2</span>) <span class="const token" data-verso-hover="121">rfl</span> h1 u)] <span class="kw">at</span> hu</span>
+<span id="L272">        <span class="kw">have</span> := this hu.<span class="const token" data-verso-hover="38">1</span> hu.<span class="const token" data-verso-hover="40">2</span></span>
+<span id="L273">        <span class="kw">rwa</span> [(h u).<span class="const token" data-verso-hover="40">2</span><span class="nu">.</span><span class="const token" data-verso-hover="38">1</span>, hcol] <span class="kw">at</span> this</span>
+<span id="L274">      <span class="kw">refine</span> ⟨hid, hcol, ⟨hmem, <span class="kw">by</span> <span class="kw">omega</span>, hw⟩, ?_⟩</span>
+<span id="L275">      <span class="kw">intro</span> b hb; <span class="kw">simp</span> [hdec'] <span class="kw">at</span> hb</span>
+<span id="L276">    · <span class="cm">--</span><span class="cm"> select round, `v` stays</span></span>
+<span id="L277">      <span class="kw">have</span> hnot : v ∉ (<span class="const token" data-verso-hover="14">colorRule</span> G c hc).<span class="const token" data-verso-hover="88">U</span> w (t / <span class="nu">2</span>) := <span class="kw">by</span></span>
+<span id="L278">        <span class="kw">intro</span> hmem</span>
+<span id="L279">        <span class="kw">obtain</span> ⟨hpos, hmax⟩ := <span class="const token" data-verso-hover="63">mem_localMax</span>.<span class="const token" data-verso-hover="74">1</span> hmem</span>
+<span id="L280">        <span class="kw">refine</span> h2 ⟨hw ▸ hpos, <span class="const token" data-verso-hover="123">forall_mem_nbrColors</span>.<span class="const token" data-verso-hover="66">2</span> <span class="kw">fun</span> u hadj hcu hwu =&gt; ?_⟩</span>
+<span id="L281">        <span class="kw">have</span> hu := (<span class="const token" data-verso-hover="110">inv_pos_iff</span> h (t / <span class="nu">2</span>) <span class="const token" data-verso-hover="121">rfl</span> h1 u).<span class="const token" data-verso-hover="74">1</span> ⟨hcu, hwu⟩</span>
+<span id="L282">        <span class="kw">rw</span> [(h u).<span class="const token" data-verso-hover="40">2</span><span class="nu">.</span><span class="const token" data-verso-hover="38">1</span>, hcol]</span>
+<span id="L283">        <span class="kw">exact</span> hmax u hu hadj</span>
+<span id="L284">      <span class="kw">refine</span> ⟨hid, hcol, ?_, ?_⟩</span>
+<span id="L285">      · <span class="kw">simp</span> only [hcv]</span>
+<span id="L286">        <span class="kw">refine</span> ⟨<span class="kw">by</span> <span class="kw">rw</span> [hw, <span class="kw">show</span> (t + <span class="nu">1</span>) / <span class="nu">2</span> = t / <span class="nu">2</span> <span class="kw">by</span> <span class="kw">omega</span>], <span class="kw">fun</span> j hj =&gt; ?_⟩</span>
+<span id="L287">        <span class="kw">have</span> := hlev j hj</span>
+<span id="L288">        <span class="kw">rcases</span> <span class="const token" data-verso-hover="138">Nat.lt_or_ge</span> (t / <span class="nu">2</span>) j <span class="kw">with</span> hlt | hge</span>
+<span id="L289">        · <span class="kw">omega</span></span>
+<span id="L290">        · <span class="kw">exact</span> <span class="const token" data-verso-hover="136">absurd</span> (<span class="kw">show</span> j = t / <span class="nu">2</span> <span class="kw">by</span> <span class="kw">omega</span> ▸ hj) hnot</span>
+<span id="L291">      · <span class="kw">intro</span> b hb; <span class="kw">simp</span> [hdec'] <span class="kw">at</span> hb</span>
+<span id="L292">    · <span class="cm">--</span><span class="cm"> reduce round</span></span>
+<span id="L293">      <span class="kw">have</span> ht : (t + <span class="nu">1</span>) / <span class="nu">2</span> = t / <span class="nu">2</span> + <span class="nu">1</span> := <span class="kw">by</span> <span class="kw">omega</span></span>
+<span id="L294">      <span class="kw">refine</span> ⟨hid, hcol, ⟨?_, <span class="kw">fun</span> j hj =&gt; ?_⟩, ?_⟩</span>
+<span id="L295">      · <span class="kw">simp</span> only</span>
+<span id="L296">        <span class="kw">rw</span> [<span class="const token" data-verso-hover="126">finsum_reduce</span> h (<span class="kw">by</span> <span class="kw">omega</span>) hcv, hw, ht, <span class="const token" data-verso-hover="84">Rule.iter_succ</span>]</span>
+<span id="L297">        <span class="kw">simp</span> [<span class="const token" data-verso-hover="139">Rule.next</span>, <span class="const token" data-verso-hover="88">Rule.U</span>]</span>
+<span id="L298">      · <span class="kw">have</span> := hlev j hj; <span class="kw">omega</span></span>
+<span id="L299">      · <span class="kw">intro</span> b hb; <span class="kw">simp</span> [hdec'] <span class="kw">at</span> hb</span>
+<span id="L300"></span>
+<span id="L301"><span class="kw">variable</span> (G c w) <span class="kw">in</span></span>
+<span id="L302"><span class="dc">/-- The configuration of Algorithm 3 after `t` rounds. -/</span></span>
+<span id="L303"><span class="kw">noncomputable</span> <span class="kw">def</span> <span class="const token" data-verso-hover="140">cfg3</span> (t : <span class="const token" data-verso-hover="61">ℕ</span>) : V → <span class="const token" data-verso-hover="93">NState</span> V := (<span class="const token" data-verso-hover="16">alg3</span> : <span class="const token" data-verso-hover="6">Algorithm</span> (<span class="const token" data-verso-hover="93">NState</span> V)).<span class="const token" data-verso-hover="141">run</span> G (<span class="const token" data-verso-hover="106">init3</span> c w) t</span>
+<span id="L304"></span>
+<span id="L305"><span class="kw">theorem</span> <span class="const token" data-verso-hover="142">cfg3_succ</span> (t : <span class="const token" data-verso-hover="61">ℕ</span>) (v : V) :</span>
+<span id="L306">    <span class="const token" data-verso-hover="140">cfg3</span> G c w (t + <span class="nu">1</span>) v = <span class="const token" data-verso-hover="101">alg3Step</span> t (<span class="const token" data-verso-hover="140">cfg3</span> G c w t v) (<span class="const token" data-verso-hover="119">nbrColors</span> G (<span class="const token" data-verso-hover="140">cfg3</span> G c w t) v) := <span class="const token" data-verso-hover="121">rfl</span></span>
+<span id="L307"></span>
+<span id="L308"><span class="dc">/-- The invariant holds in every round of the run. -/</span></span>
+<span id="L309"><span class="kw">theorem</span> <span class="const token" data-verso-hover="143">inv_cfg3</span> (t : <span class="const token" data-verso-hover="61">ℕ</span>) : <span class="const token" data-verso-hover="108">Inv</span> G hc w t (<span class="const token" data-verso-hover="140">cfg3</span> G c w t) := <span class="kw">by</span></span>
+<span id="L310">  <span class="kw">induction</span> t <span class="kw">with</span></span>
+<span id="L311">  | <span class="const token" data-verso-hover="81">zero</span> =&gt; <span class="kw">exact</span> <span class="const token" data-verso-hover="109">inv_zero</span></span>
+<span id="L312">  | <span class="const token" data-verso-hover="82">succ</span> t ih =&gt; <span class="kw">exact</span> <span class="const token" data-verso-hover="137">inv_succ</span> ih</span>
+<span id="L313"></span>
+<span id="L314"><span class="kw">theorem</span> <span class="const token" data-verso-hover="144">alg3Step_cand</span> {t : <span class="const token" data-verso-hover="61">ℕ</span>} {s : <span class="const token" data-verso-hover="93">NState</span> V} {N : <span class="const token" data-verso-hover="36">Set</span> (<span class="const token" data-verso-hover="93">NState</span> V)} {j : <span class="const token" data-verso-hover="61">ℕ</span>} (h : s.<span class="const token" data-verso-hover="97">cand</span> = <span class="const token" data-verso-hover="102">some</span> j) :</span>
+<span id="L315">    (<span class="const token" data-verso-hover="101">alg3Step</span> t s N).<span class="const token" data-verso-hover="97">cand</span> = <span class="const token" data-verso-hover="102">some</span> j := <span class="kw">by</span></span>
+<span id="L316">  <span class="kw">simp</span> only [<span class="const token" data-verso-hover="101">alg3Step</span>, h]</span>
+<span id="L317">  <span class="kw">split_ifs</span> &lt;;&gt; <span class="kw">simp</span> [h]</span>
+<span id="L318"></span>
+<span id="L319"><span class="kw">theorem</span> <span class="const token" data-verso-hover="145">alg3Step_dec</span> {t : <span class="const token" data-verso-hover="61">ℕ</span>} {s : <span class="const token" data-verso-hover="93">NState</span> V} {N : <span class="const token" data-verso-hover="36">Set</span> (<span class="const token" data-verso-hover="93">NState</span> V)} {b : <span class="const token" data-verso-hover="100">Bool</span>} (h : s.<span class="const token" data-verso-hover="99">dec</span> = <span class="const token" data-verso-hover="102">some</span> b) :</span>
+<span id="L320">    (<span class="const token" data-verso-hover="101">alg3Step</span> t s N).<span class="const token" data-verso-hover="99">dec</span> = <span class="const token" data-verso-hover="102">some</span> b := <span class="kw">by</span></span>
+<span id="L321">  <span class="kw">unfold</span> <span class="const token" data-verso-hover="101">alg3Step</span></span>
+<span id="L322">  <span class="kw">cases</span> hs : s.<span class="const token" data-verso-hover="97">cand</span> <span class="kw">with</span></span>
+<span id="L323">  | <span class="const token" data-verso-hover="102">some</span> j =&gt; <span class="kw">simp</span> [h]</span>
+<span id="L324">  | <span class="const token" data-verso-hover="103">none</span> =&gt; <span class="kw">simp</span> only; <span class="kw">split_ifs</span> &lt;;&gt; <span class="kw">simp</span> [h]</span>
+<span id="L325"></span>
+<span id="L326"><span class="kw">theorem</span> <span class="const token" data-verso-hover="146">cfg3_cand_mono</span> {t t' : <span class="const token" data-verso-hover="61">ℕ</span>} (htt' : t ≤ t') {v : V} {j : <span class="const token" data-verso-hover="61">ℕ</span>}</span>
+<span id="L327">    (h : (<span class="const token" data-verso-hover="140">cfg3</span> G c w t v).<span class="const token" data-verso-hover="97">cand</span> = <span class="const token" data-verso-hover="102">some</span> j) : (<span class="const token" data-verso-hover="140">cfg3</span> G c w t' v).<span class="const token" data-verso-hover="97">cand</span> = <span class="const token" data-verso-hover="102">some</span> j := <span class="kw">by</span></span>
+<span id="L328">  <span class="kw">induction</span> htt' <span class="kw">with</span></span>
+<span id="L329">  | <span class="const token" data-verso-hover="147">refl</span> =&gt; <span class="kw">exact</span> h</span>
+<span id="L330">  | <span class="const token" data-verso-hover="148">step</span> _ ih =&gt; <span class="kw">rw</span> [<span class="const token" data-verso-hover="142">cfg3_succ</span>]; <span class="kw">exact</span> <span class="const token" data-verso-hover="144">alg3Step_cand</span> ih</span>
+<span id="L331"></span>
+<span id="L332"><span class="kw">theorem</span> <span class="const token" data-verso-hover="149">cfg3_dec_mono</span> {t t' : <span class="const token" data-verso-hover="61">ℕ</span>} (htt' : t ≤ t') {v : V} {b : <span class="const token" data-verso-hover="100">Bool</span>}</span>
+<span id="L333">    (h : (<span class="const token" data-verso-hover="140">cfg3</span> G c w t v).<span class="const token" data-verso-hover="99">dec</span> = <span class="const token" data-verso-hover="102">some</span> b) : (<span class="const token" data-verso-hover="140">cfg3</span> G c w t' v).<span class="const token" data-verso-hover="99">dec</span> = <span class="const token" data-verso-hover="102">some</span> b := <span class="kw">by</span></span>
+<span id="L334">  <span class="kw">induction</span> htt' <span class="kw">with</span></span>
+<span id="L335">  | <span class="const token" data-verso-hover="147">refl</span> =&gt; <span class="kw">exact</span> h</span>
+<span id="L336">  | <span class="const token" data-verso-hover="148">step</span> _ ih =&gt; <span class="kw">rw</span> [<span class="const token" data-verso-hover="142">cfg3_succ</span>]; <span class="kw">exact</span> <span class="const token" data-verso-hover="145">alg3Step_dec</span> ih</span>
+<span id="L337"></span>
+<span id="L338"><span class="dc">/-- After the removal stage (`2k` rounds) every non-candidate is removed. -/</span></span>
+<span id="L339"><span class="kw">theorem</span> <span class="const token" data-verso-hover="150">cfg3_removed</span> (hc : <span class="const token" data-verso-hover="65">IsProper</span> G c) {k : <span class="const token" data-verso-hover="61">ℕ</span>} (hk : ∀ v, c v &lt; k) {t : <span class="const token" data-verso-hover="61">ℕ</span>} (ht : <span class="nu">2</span> * k ≤ t) {v : V}</span>
+<span id="L340">    (hv : (<span class="const token" data-verso-hover="140">cfg3</span> G c w t v).<span class="const token" data-verso-hover="97">cand</span> = <span class="const token" data-verso-hover="103">none</span>) : (<span class="const token" data-verso-hover="140">cfg3</span> G c w t v).<span class="const token" data-verso-hover="96">w</span> ≤ <span class="nu">0</span> := <span class="kw">by</span></span>
+<span id="L341">  <span class="kw">have</span> hm := (<span class="const token" data-verso-hover="143">inv_cfg3</span> (hc := hc) (w := w) t v).<span class="const token" data-verso-hover="40">2</span><span class="nu">.</span><span class="const token" data-verso-hover="40">2</span><span class="nu">.</span><span class="const token" data-verso-hover="38">1</span></span>
+<span id="L342">  <span class="kw">rw</span> [hv] <span class="kw">at</span> hm</span>
+<span id="L343">  <span class="kw">rw</span> [hm.<span class="const token" data-verso-hover="38">1</span>]</span>
+<span id="L344">  <span class="kw">by_contra</span> hpos</span>
+<span id="L345">  <span class="kw">have</span> h0 := <span class="const token" data-verso-hover="15">colorRule_removal</span> hc hk w</span>
+<span id="L346">  <span class="kw">have</span> := (<span class="const token" data-verso-hover="14">colorRule</span> G c hc).<span class="const token" data-verso-hover="115">iter_anti</span> w (<span class="kw">show</span> k ≤ t / <span class="nu">2</span> <span class="kw">by</span> <span class="kw">omega</span>) v</span>
+<span id="L347">  <span class="kw">have</span> hmem : v ∈ <span class="const token" data-verso-hover="44">pos</span> ((<span class="const token" data-verso-hover="14">colorRule</span> G c hc).<span class="const token" data-verso-hover="80">iter</span> w k) := <span class="const token" data-verso-hover="47">mem_pos</span>.<span class="const token" data-verso-hover="66">2</span> (<span class="kw">by</span> <span class="kw">linarith</span>)</span>
+<span id="L348">  <span class="kw">rw</span> [h0] <span class="kw">at</span> hmem</span>
+<span id="L349">  <span class="kw">simp</span> <span class="kw">at</span> hmem</span>
+<span id="L350"></span>
+<span id="L351"><span class="dc">/-- **Addition stage**: a candidate of level `j &lt; k` has decided by round `2k + (k - j)`. -/</span></span>
+<span id="L352"><span class="kw">theorem</span> <span class="const token" data-verso-hover="151">cfg3_decided</span> {k : <span class="const token" data-verso-hover="61">ℕ</span>} (hk : ∀ v, c v &lt; k) (m : <span class="const token" data-verso-hover="61">ℕ</span>) :</span>
+<span id="L353">    ∀ j v, k ≤ j + m → v ∈ (<span class="const token" data-verso-hover="14">colorRule</span> G c hc).<span class="const token" data-verso-hover="88">U</span> w j →</span>
+<span id="L354">      ∃ b, (<span class="const token" data-verso-hover="140">cfg3</span> G c w (<span class="nu">2</span> * k + m) v).<span class="const token" data-verso-hover="99">dec</span> = <span class="const token" data-verso-hover="102">some</span> b := <span class="kw">by</span></span>
+<span id="L355">  <span class="kw">induction</span> m <span class="kw">with</span></span>
+<span id="L356">  | <span class="const token" data-verso-hover="81">zero</span> =&gt;</span>
+<span id="L357">    <span class="kw">intro</span> j v hjm hv</span>
+<span id="L358">    <span class="kw">have</span> := <span class="const token" data-verso-hover="87">colorRule_level_lt</span> hc hk w hv</span>
+<span id="L359">    <span class="kw">omega</span></span>
+<span id="L360">  | <span class="const token" data-verso-hover="82">succ</span> m ih =&gt;</span>
+<span id="L361">    <span class="kw">intro</span> j v hjm hv</span>
+<span id="L362">    <span class="kw">have</span> hjk := <span class="const token" data-verso-hover="87">colorRule_level_lt</span> hc hk w hv</span>
+<span id="L363">    <span class="kw">have</span> h := <span class="const token" data-verso-hover="143">inv_cfg3</span> (hc := hc) (w := w) (<span class="nu">2</span> * k + m)</span>
+<span id="L364">    <span class="kw">have</span> hcv : (<span class="const token" data-verso-hover="140">cfg3</span> G c w (<span class="nu">2</span> * k + m) v).<span class="const token" data-verso-hover="97">cand</span> = <span class="const token" data-verso-hover="102">some</span> j := <span class="const token" data-verso-hover="116">inv_cand_of_mem_U</span> h hv (<span class="kw">by</span> <span class="kw">omega</span>)</span>
+<span id="L365">    <span class="kw">rw</span> [← <span class="const token" data-verso-hover="152">add_assoc</span>, <span class="const token" data-verso-hover="142">cfg3_succ</span>]</span>
+<span id="L366">    <span class="kw">cases</span> hd : (<span class="const token" data-verso-hover="140">cfg3</span> G c w (<span class="nu">2</span> * k + m) v).<span class="const token" data-verso-hover="99">dec</span> <span class="kw">with</span></span>
+<span id="L367">    | <span class="const token" data-verso-hover="102">some</span> b =&gt; <span class="kw">exact</span> ⟨b, <span class="const token" data-verso-hover="145">alg3Step_dec</span> hd⟩</span>
+<span id="L368">    | <span class="const token" data-verso-hover="103">none</span> =&gt;</span>
+<span id="L369">      <span class="kw">simp</span> only [<span class="const token" data-verso-hover="101">alg3Step</span>, hcv, hd, <span class="const token" data-verso-hover="153">ite_true</span>]</span>
+<span id="L370">      <span class="kw">split_ifs</span> <span class="kw">with</span> h1 h2</span>
+<span id="L371">      · <span class="kw">exact</span> ⟨<span class="const token" data-verso-hover="105">false</span>, <span class="const token" data-verso-hover="121">rfl</span>⟩</span>
+<span id="L372">      · <span class="kw">exact</span> ⟨<span class="const token" data-verso-hover="104">true</span>, <span class="const token" data-verso-hover="121">rfl</span>⟩</span>
+<span id="L373">      · <span class="kw">exfalso</span></span>
+<span id="L374">        <span class="kw">refine</span> h2 (<span class="const token" data-verso-hover="123">forall_mem_nbrColors</span>.<span class="const token" data-verso-hover="66">2</span> <span class="kw">fun</span> u hadj =&gt; ⟨<span class="kw">fun</span> hcu =&gt; ?_, <span class="kw">fun</span> j' hcu hjj' =&gt; ?_⟩)</span>
+<span id="L375">        · <span class="kw">exact</span> <span class="const token" data-verso-hover="150">cfg3_removed</span> hc hk (<span class="kw">by</span> <span class="kw">omega</span>) hcu</span>
+<span id="L376">        · <span class="kw">have</span> huU : u ∈ (<span class="const token" data-verso-hover="14">colorRule</span> G c hc).<span class="const token" data-verso-hover="88">U</span> w j' := <span class="kw">by</span></span>
+<span id="L377">            <span class="kw">have</span> := (h u).<span class="const token" data-verso-hover="40">2</span><span class="nu">.</span><span class="const token" data-verso-hover="40">2</span><span class="nu">.</span><span class="const token" data-verso-hover="38">1</span>; <span class="kw">rw</span> [hcu] <span class="kw">at</span> this; <span class="kw">exact</span> this.<span class="const token" data-verso-hover="38">1</span></span>
+<span id="L378">          <span class="kw">obtain</span> ⟨b, hb⟩ := ih j' u (<span class="kw">by</span> <span class="kw">omega</span>) huU</span>
+<span id="L379">          <span class="kw">cases</span> b <span class="kw">with</span></span>
+<span id="L380">          | <span class="const token" data-verso-hover="105">false</span> =&gt; <span class="kw">exact</span> hb</span>
+<span id="L381">          | <span class="const token" data-verso-hover="104">true</span> =&gt;</span>
+<span id="L382">            <span class="kw">exact</span> <span class="const token" data-verso-hover="136">absurd</span> (<span class="const token" data-verso-hover="120">exists_mem_nbrColors</span>.<span class="const token" data-verso-hover="66">2</span> ⟨u, hadj, ⟨j', hcu, hjj'⟩, hb⟩) h1</span>
+<span id="L383"></span>
+<span id="L384"><span class="dc">/-- Outputs are always correct: a node that outputs `InIS`/`NotInIS` in some round is</span></span>
+<span id="L385"><span class="dc">in/not in the output of Algorithm 1 (with the colouring rule). -/</span></span>
+<span id="L386"><span class="kw">theorem</span> <span class="const token" data-verso-hover="18">output_sound</span> (hc : <span class="const token" data-verso-hover="65">IsProper</span> G c) (w : V → <span class="const token" data-verso-hover="37">ℝ</span>) {t : <span class="const token" data-verso-hover="61">ℕ</span>} {v : V} {b : <span class="const token" data-verso-hover="100">Bool</span>}</span>
+<span id="L387">    (h : <span class="const token" data-verso-hover="107">output</span> (<span class="const token" data-verso-hover="140">cfg3</span> G c w t v) = <span class="const token" data-verso-hover="102">some</span> b) :</span>
+<span id="L388">    (b = <span class="const token" data-verso-hover="104">true</span> ↔ v ∈ <span class="const token" data-verso-hover="10">seqLR</span> (<span class="const token" data-verso-hover="14">colorRule</span> G c hc) w) := <span class="kw">by</span></span>
+<span id="L389">  <span class="kw">have</span> hI := <span class="const token" data-verso-hover="143">inv_cfg3</span> (hc := hc) (w := w) t v</span>
+<span id="L390">  <span class="kw">cases</span> hcv : (<span class="const token" data-verso-hover="140">cfg3</span> G c w t v).<span class="const token" data-verso-hover="97">cand</span> <span class="kw">with</span></span>
+<span id="L391">  | <span class="const token" data-verso-hover="102">some</span> j =&gt;</span>
+<span id="L392">    <span class="kw">simp</span> only [<span class="const token" data-verso-hover="107">output</span>, hcv] <span class="kw">at</span> h</span>
+<span id="L393">    <span class="kw">exact</span> (hI.<span class="const token" data-verso-hover="40">2</span><span class="nu">.</span><span class="const token" data-verso-hover="40">2</span><span class="nu">.</span><span class="const token" data-verso-hover="40">2</span> b h).<span class="const token" data-verso-hover="40">2</span></span>
+<span id="L394">  | <span class="const token" data-verso-hover="103">none</span> =&gt;</span>
+<span id="L395">    <span class="kw">simp</span> only [<span class="const token" data-verso-hover="107">output</span>, hcv] <span class="kw">at</span> h</span>
+<span id="L396">    <span class="kw">split_ifs</span> <span class="kw">at</span> h <span class="kw">with</span> hw</span>
+<span id="L397">    <span class="kw">cases</span> h</span>
+<span id="L398">    <span class="kw">simp</span> only [<span class="const token" data-verso-hover="125">Bool.false_eq_true</span>, <span class="const token" data-verso-hover="113">false_iff</span>]</span>
+<span id="L399">    <span class="kw">intro</span> hS</span>
+<span id="L400">    <span class="kw">obtain</span> ⟨j, hj⟩ := <span class="const token" data-verso-hover="154">seqLR_subset_U</span> _ w hS</span>
+<span id="L401">    <span class="kw">have</span> hm := hI.<span class="const token" data-verso-hover="40">2</span><span class="nu">.</span><span class="const token" data-verso-hover="40">2</span><span class="nu">.</span><span class="const token" data-verso-hover="38">1</span></span>
+<span id="L402">    <span class="kw">rw</span> [hcv] <span class="kw">at</span> hm</span>
+<span id="L403">    <span class="kw">have</span> hpos := <span class="const token" data-verso-hover="47">mem_pos</span>.<span class="const token" data-verso-hover="74">1</span> ((<span class="const token" data-verso-hover="14">colorRule</span> G c hc).<span class="const token" data-verso-hover="124">U_subset_pos</span> w j hj)</span>
+<span id="L404">    <span class="kw">have</span> := (<span class="const token" data-verso-hover="14">colorRule</span> G c hc).<span class="const token" data-verso-hover="115">iter_anti</span> w (<span class="kw">show</span> t / <span class="nu">2</span> ≤ j <span class="kw">by</span> <span class="kw">have</span> := hm.<span class="const token" data-verso-hover="40">2</span> j hj; <span class="kw">omega</span>) v</span>
+<span id="L405">    <span class="kw">linarith</span> [hm.<span class="const token" data-verso-hover="38">1</span>]</span>
+<span id="L406"></span>
+<span id="L407"><span class="dc">/-- Termination: from round `3k` on, every node has an output, and it is membership in the output</span></span>
+<span id="L408"><span class="dc">of Algorithm 1 with the colouring rule. -/</span></span>
+<span id="L409"><span class="kw">theorem</span> <span class="const token" data-verso-hover="17">output_eq</span> (hc : <span class="const token" data-verso-hover="65">IsProper</span> G c) {k : <span class="const token" data-verso-hover="61">ℕ</span>} (hk : ∀ v, c v &lt; k) (w : V → <span class="const token" data-verso-hover="37">ℝ</span>) {t : <span class="const token" data-verso-hover="61">ℕ</span>}</span>
+<span id="L410">    (ht : <span class="nu">3</span> * k ≤ t) (v : V) :</span>
+<span id="L411">    <span class="const token" data-verso-hover="107">output</span> (<span class="const token" data-verso-hover="140">cfg3</span> G c w t v) = <span class="const token" data-verso-hover="102">some</span> (<span class="const token" data-verso-hover="155">decide</span> (v ∈ <span class="const token" data-verso-hover="10">seqLR</span> (<span class="const token" data-verso-hover="14">colorRule</span> G c hc) w)) := <span class="kw">by</span></span>
+<span id="L412">  <span class="kw">have</span> hI := <span class="const token" data-verso-hover="143">inv_cfg3</span> (hc := hc) (w := w) t</span>
+<span id="L413">  <span class="kw">suffices</span> hb : ∃ b, <span class="const token" data-verso-hover="107">output</span> (<span class="const token" data-verso-hover="140">cfg3</span> G c w t v) = <span class="const token" data-verso-hover="102">some</span> b <span class="kw">by</span></span>
+<span id="L414">    <span class="kw">obtain</span> ⟨b, hb⟩ := hb</span>
+<span id="L415">    <span class="kw">rw</span> [hb, <span class="const token" data-verso-hover="129">Option.some.injEq</span>]</span>
+<span id="L416">    <span class="kw">have</span> := <span class="const token" data-verso-hover="18">output_sound</span> hc w hb</span>
+<span id="L417">    <span class="kw">cases</span> b &lt;;&gt; <span class="kw">simp_all</span></span>
+<span id="L418">  <span class="kw">by_cases</span> hU : ∃ j, v ∈ (<span class="const token" data-verso-hover="14">colorRule</span> G c hc).<span class="const token" data-verso-hover="88">U</span> w j</span>
+<span id="L419">  · <span class="kw">obtain</span> ⟨j, hj⟩ := hU</span>
+<span id="L420">    <span class="kw">have</span> hjk := <span class="const token" data-verso-hover="87">colorRule_level_lt</span> hc hk w hj</span>
+<span id="L421">    <span class="kw">have</span> hcv := <span class="const token" data-verso-hover="116">inv_cand_of_mem_U</span> hI hj (<span class="kw">by</span> <span class="kw">omega</span>)</span>
+<span id="L422">    <span class="kw">obtain</span> ⟨b, hb⟩ := <span class="const token" data-verso-hover="151">cfg3_decided</span> (hc := hc) (w := w) hk k j v (<span class="kw">by</span> <span class="kw">omega</span>) hj</span>
+<span id="L423">    <span class="kw">refine</span> ⟨b, ?_⟩</span>
+<span id="L424">    <span class="kw">simp</span> only [<span class="const token" data-verso-hover="107">output</span>, hcv]</span>
+<span id="L425">    <span class="kw">exact</span> <span class="const token" data-verso-hover="149">cfg3_dec_mono</span> (<span class="kw">by</span> <span class="kw">omega</span>) hb</span>
+<span id="L426">  · <span class="kw">have</span> hcv : (<span class="const token" data-verso-hover="140">cfg3</span> G c w t v).<span class="const token" data-verso-hover="97">cand</span> = <span class="const token" data-verso-hover="103">none</span> := <span class="kw">by</span></span>
+<span id="L427">      <span class="kw">cases</span> h : (<span class="const token" data-verso-hover="140">cfg3</span> G c w t v).<span class="const token" data-verso-hover="97">cand</span> <span class="kw">with</span></span>
+<span id="L428">      | <span class="const token" data-verso-hover="103">none</span> =&gt; <span class="kw">rfl</span></span>
+<span id="L429">      | <span class="const token" data-verso-hover="102">some</span> j =&gt;</span>
+<span id="L430">        <span class="kw">have</span> := (hI v).<span class="const token" data-verso-hover="40">2</span><span class="nu">.</span><span class="const token" data-verso-hover="40">2</span><span class="nu">.</span><span class="const token" data-verso-hover="38">1</span>; <span class="kw">rw</span> [h] <span class="kw">at</span> this</span>
+<span id="L431">        <span class="kw">exact</span> <span class="const token" data-verso-hover="136">absurd</span> ⟨j, this.<span class="const token" data-verso-hover="38">1</span>⟩ hU</span>
+<span id="L432">    <span class="kw">refine</span> ⟨<span class="const token" data-verso-hover="105">false</span>, ?_⟩</span>
+<span id="L433">    <span class="kw">simp</span> only [<span class="const token" data-verso-hover="107">output</span>, hcv, <span class="const token" data-verso-hover="150">cfg3_removed</span> hc hk (<span class="kw">by</span> <span class="kw">omega</span>) hcv, <span class="const token" data-verso-hover="153">ite_true</span>]</span>
+<span id="L434"></span>
+<span id="L435"><span class="dc">/-- **Algorithm 3 (Section 2.3).** Run on a graph with maximum degree `≤ Δ` (`Δ ≥ 1`), weights</span></span>
+<span id="L436"><span class="dc">`w`, and a black-box proper colouring `c` with `k` colours, the synchronous algorithm `alg3`</span></span>
+<span id="L437"><span class="dc">terminates after `3k` rounds, every output is final and correct when produced, and the set of</span></span>
+<span id="L438"><span class="dc">nodes that output `InIS` is a `Δ`-approximate maximum-weight independent set. With a</span></span>
+<span id="L439"><span class="dc">`(Δ+1)`-colouring this is `3Δ + 3` rounds after the colouring. -/</span></span>
+<span id="L440"><span class="kw">theorem</span> <span class="const token" data-verso-hover="5">algorithm_3</span> (hc : <span class="const token" data-verso-hover="65">IsProper</span> G c) {k : <span class="const token" data-verso-hover="61">ℕ</span>} (hk : ∀ v, c v &lt; k) {Δ : <span class="const token" data-verso-hover="61">ℕ</span>}</span>
+<span id="L441">    (hΔ : ∀ v, G.<span class="const token" data-verso-hover="92">degree</span> v ≤ Δ) (h1 : <span class="nu">1</span> ≤ Δ) (w : V → <span class="const token" data-verso-hover="37">ℝ</span>) :</span>
+<span id="L442">    ∃ S : <span class="const token" data-verso-hover="43">Finset</span> V, <span class="const token" data-verso-hover="52">IsApprox</span> G Δ w S ∧</span>
+<span id="L443">      (∀ t, <span class="nu">3</span> * k ≤ t → ∀ v, <span class="const token" data-verso-hover="107">output</span> (<span class="const token" data-verso-hover="140">cfg3</span> G c w t v) = <span class="const token" data-verso-hover="102">some</span> (<span class="const token" data-verso-hover="155">decide</span> (v ∈ S))) ∧</span>
+<span id="L444">      (∀ t v b, <span class="const token" data-verso-hover="107">output</span> (<span class="const token" data-verso-hover="140">cfg3</span> G c w t v) = <span class="const token" data-verso-hover="102">some</span> b → (b = <span class="const token" data-verso-hover="104">true</span> ↔ v ∈ S)) :=</span>
+<span id="L445">  ⟨<span class="const token" data-verso-hover="10">seqLR</span> (<span class="const token" data-verso-hover="14">colorRule</span> G c hc) w, <span class="const token" data-verso-hover="91">colorRule_isApprox</span> hc hΔ h1 w,</span>
+<span id="L446">    <span class="kw">fun</span> _ ht v =&gt; <span class="const token" data-verso-hover="17">output_eq</span> hc hk w ht v, <span class="kw">fun</span> _ _ _ h =&gt; <span class="const token" data-verso-hover="18">output_sound</span> hc w h⟩</span>
+<span id="L447"></span>
+<span id="L448"><span class="kw">end</span> Podc.MaxISLocalRatio</span>
+<span id="L449"></span>
+</code></div>
+        <script>
+          window.versoHoversUrl = "PODC2017/MaxISLocalRatio/-hovers.json";</script>
+        <script src="static/lean/popper.js"></script>
+        <script src="static/lean/tippy.js"></script>
+        <script src="static/lean/marked.js"></script>
+        <script src="static/lean/highlighting.js"></script>
+        <script src="static/lean/lean.js"></script>
+        </article></main><footer class="site-footer"><div class="wrap">
+        Machine-checked formalizations of PODC papers in Lean 4. Generated with <a href="https://github.com/leanprover/verso">Verso</a> from the README files of <a href="https://github.com/vasnesterov/formal_podc">vasnesterov/formal_podc</a>.</div>
+      </footer></body>
+  </html>
+

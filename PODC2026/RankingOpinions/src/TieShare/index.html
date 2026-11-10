@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="light dark">
+    <link rel="icon" href="data:,">
+    <title>RankingOpinions: TieShare.lean · Formal PODC</title><base href="../../../.././"><link rel="stylesheet" href="static/lean/verso-vars.css">
+    <link rel="stylesheet" href="static/lean/highlighting.css">
+    <link rel="stylesheet" href="static/lean/tippy-border.css">
+    <link rel="stylesheet" href="static/style.css">
+    <script defer="defer" src="static/site.js"></script>
+    </head>
+  <body>
+    <header class="site-header">
+      <div class="wrap">
+        <a class="brand" href=".">Formal PODC</a><nav class="top">
+          <a href=".">Search</a><a href="about/">About</a><a href="https://github.com/vasnesterov/formal_podc">GitHub</a></nav>
+        </div>
+      </header>
+    <main class="wrap"><article><nav class="breadcrumbs" aria-label="Breadcrumb">
+          <a href=".">Search</a><span class="sep">›</span><a href="PODC2026/">PODC 2026</a><span class="sep">›</span><a href="PODC2026/RankingOpinions/">RankingOpinions</a><span class="sep">›</span><a href="PODC2026/RankingOpinions/src/">Lean source</a><span class="sep">›</span><span aria-current="page">TieShare</span></nav>
+        <h1>
+          <code>TieShare.lean</code></h1>
+        <div class="paper-links">
+          <p>
+            Source of <a href="PODC2026/RankingOpinions/">Ranking opinions in population protocols — PODC 2026</a> · <a href="https://github.com/vasnesterov/formal_podc/blob/main/Papers/PODC2026/RankingOpinions/TieShare.lean">GitHub</a> · hover over a name for its type and documentation</p>
+          </div>
+        <div class="lean-code lean-src">
+          <code class="hl lean block" data-lean-context="TieShare"><span id="L1"><span class="kw">import</span> Papers.PODC2026.RankingOpinions.Circles</span>
+<span id="L2"><span class="kw">import</span> Cslib.Computability.Distributed.PopulationProtocols.Schedules</span>
+<span id="L3"><span class="kw">import</span> Cslib.Computability.Distributed.PopulationProtocols.Eventually</span>
+<span id="L4"><span class="kw">import</span> Mathlib.Data.Fin.VecNotation</span>
+<span id="L5"><span class="kw">import</span> Mathlib.Tactic.Ring</span>
+<span id="L6"><span class="kw">import</span> Cslib.Foundations.Data.Fin.Cyclic</span>
+<span id="L7"></span>
+<span id="L8"><span class="dc">/-!</span></span>
+<span id="L9"><span class="dc"># Sharing ties (Section 4.2): `Circles_TieSharing`</span></span>
+<span id="L10"></span>
+<span id="L11"><span class="dc">Breitkopf, Dallot, El-Hayek, Schmid, PODC 2026, Section 4.2 and Appendix 8.4 (Theorem 4.2).</span></span>
+<span id="L12"></span>
+<span id="L13"><span class="dc">On top of the braket part of Circles (rule (1): ket exchange; Circles' own `out` rule (2) is</span></span>
+<span id="L14"><span class="dc">dropped), every agent stores an output color `out` and a `status ∈ {winner_spreader, winner,</span></span>
+<span id="L15"><span class="dc">loser}` (initially `winner`). After the ket exchange, the status rules (1)–(7) and the output</span></span>
+<span id="L16"><span class="dc">rules (i), (ii) of the paper are applied *in this order*, each rule in both orientations</span></span>
+<span id="L17"><span class="dc">`(a, b)` then `(b, a)`; all brakets are the ones after the ket exchange.</span></span>
+<span id="L18"></span>
+<span id="L19"><span class="dc">Interpretation choices (the paper is informal on these points):</span></span>
+<span id="L20"><span class="dc">* modulo range: `[x, y]_k = {x, x+1, …, x + ((y - x) mod k)}` (so `[i, i]_k = {i}`), i.e.</span></span>
+<span id="L21"><span class="dc">  `z ∈ [x, y]_k ↔ (z - x) mod k ≤ (y - x) mod k` (`inRng`);</span></span>
+<span id="L22"><span class="dc">* `[x, y]_k ⊆ [x', y']_k` is set inclusion plus the paper's extra condition `x ≠ y' ∨ y ≠ x'`</span></span>
+<span id="L23"><span class="dc">  (`RSub`); `⊊` is `⊆` together with "the two sets differ" (`RSSub`);</span></span>
+<span id="L24"><span class="dc">* the conditions of the rules read the *current* statuses, already updated by the previous rules</span></span>
+<span id="L25"><span class="dc">  of the same interaction (`pre = false`, the "sequential reading"). With `pre = true` all</span></span>
+<span id="L26"><span class="dc">  conditions of rules (4)–(7) and (ii) read the statuses *before* the interaction; for this reading</span></span>
+<span id="L27"><span class="dc">  Theorem 4.2 is false (`tieShare_pre_counterexample`);</span></span>
+<span id="L28"><span class="dc">* output map: an agent at `winner_spreader`/`winner` outputs its own color (its bra), a `loser`</span></span>
+<span id="L29"><span class="dc">  outputs its `out` variable (`tsOut`).</span></span>
+<span id="L30"></span>
+<span id="L31"><span class="dc">Number of states: `k² · k · 3 = 3k³` (`card_TSState`).</span></span>
+<span id="L32"><span class="dc">-/</span></span>
+<span id="L33"></span>
+<span id="L34"><span class="kw">set_option</span> <span class="const token" data-verso-hover="29">linter.unusedSectionVars</span> false</span>
+<span id="L35"></span>
+<span id="L36"><span class="kw">namespace</span> RankingOpinions</span>
+<span id="L37"></span>
+<span id="L38"><span class="kw">open</span> Finset Cslib.PopulationProtocol Cslib.PopulationProtocol.Protocol</span>
+<span id="L39"></span>
+<span id="L40"><span class="kw">variable</span> {k : <span class="const token" data-verso-hover="30">ℕ</span>}</span>
+<span id="L41"></span>
+<span id="L42"><span class="dc">/-- The status of an agent. -/</span></span>
+<span id="L43"><span class="kw">inductive</span> <span class="const token" data-verso-hover="625">St</span></span>
+<span id="L44">  | <span class="const token" data-verso-hover="626">ws</span>   <span class="cm">--</span><span class="cm"> winner_spreader (holds a token)</span></span>
+<span id="L45">  | <span class="const token" data-verso-hover="627">win</span>  <span class="cm">--</span><span class="cm"> winner</span></span>
+<span id="L46">  | <span class="const token" data-verso-hover="628">los</span>  <span class="cm">--</span><span class="cm"> loser</span></span>
+<span id="L47">  <span class="kw">deriving</span> <span class="const token" data-verso-hover="58">DecidableEq</span>, <span class="const token" data-verso-hover="567">Repr</span></span>
+<span id="L48"></span>
+<span id="L49"><span class="const token" data-verso-hover="629">instance</span> : <span class="const token" data-verso-hover="56">Fintype</span> <span class="const token" data-verso-hover="625">St</span> := ⟨{<span class="const token" data-verso-hover="626">St.ws</span>, <span class="const token" data-verso-hover="627">St.win</span>, <span class="const token" data-verso-hover="628">St.los</span>}, <span class="kw">by</span> <span class="kw">intro</span> x; <span class="kw">cases</span> x &lt;;&gt; <span class="kw">simp</span>⟩</span>
+<span id="L50"></span>
+<span id="L51"><span class="kw">lemma</span> <span class="const token" data-verso-hover="630">card_St</span> : <span class="const token" data-verso-hover="35">Fintype.card</span> <span class="const token" data-verso-hover="625">St</span> = <span class="nu">3</span> := <span class="const token" data-verso-hover="67">rfl</span></span>
+<span id="L52"></span>
+<span id="L53"><span class="dc">/-- `z ∈ [e.1, e.2]_k`. -/</span></span>
+<span id="L54"><span class="kw">def</span> <span class="const token" data-verso-hover="631">inRng</span> (e : <span class="const token" data-verso-hover="32">Braket</span> k) (z : <span class="const token" data-verso-hover="33">Fin</span> k) : <span class="kw">Prop</span> := <span class="const token" data-verso-hover="632">Fin.cdist</span> e.<span class="const token" data-verso-hover="42">1</span> z ≤ <span class="const token" data-verso-hover="632">Fin.cdist</span> e.<span class="const token" data-verso-hover="42">1</span> e.<span class="const token" data-verso-hover="43">2</span></span>
+<span id="L55"></span>
+<span id="L56"><span class="const token" data-verso-hover="633">instance</span> (e : <span class="const token" data-verso-hover="32">Braket</span> k) (z : <span class="const token" data-verso-hover="33">Fin</span> k) : <span class="const token" data-verso-hover="184">Decidable</span> (<span class="const token" data-verso-hover="631">inRng</span> e z) := <span class="kw">by</span> <span class="kw">unfold</span> <span class="const token" data-verso-hover="631">inRng</span>; <span class="kw">infer_instance</span></span>
+<span id="L57"></span>
+<span id="L58"><span class="dc">/-- `[e.1, e.2]_k ⊆ [f.1, f.2]_k` in the sense of the paper (set inclusion and</span></span>
+<span id="L59"><span class="dc">`e.1 ≠ f.2 ∨ e.2 ≠ f.1`). -/</span></span>
+<span id="L60"><span class="kw">def</span> <span class="const token" data-verso-hover="634">RSub</span> (e f : <span class="const token" data-verso-hover="32">Braket</span> k) : <span class="kw">Prop</span> := (∀ z, <span class="const token" data-verso-hover="631">inRng</span> e z → <span class="const token" data-verso-hover="631">inRng</span> f z) ∧ (e.<span class="const token" data-verso-hover="42">1</span> ≠ f.<span class="const token" data-verso-hover="43">2</span> ∨ e.<span class="const token" data-verso-hover="43">2</span> ≠ f.<span class="const token" data-verso-hover="42">1</span>)</span>
+<span id="L61"></span>
+<span id="L62"><span class="dc">/-- `[e.1, e.2]_k ⊊ [f.1, f.2]_k`. -/</span></span>
+<span id="L63"><span class="kw">def</span> <span class="const token" data-verso-hover="635">RSSub</span> (e f : <span class="const token" data-verso-hover="32">Braket</span> k) : <span class="kw">Prop</span> := <span class="const token" data-verso-hover="634">RSub</span> e f ∧ ¬ ∀ z, <span class="const token" data-verso-hover="631">inRng</span> e z ↔ <span class="const token" data-verso-hover="631">inRng</span> f z</span>
+<span id="L64"></span>
+<span id="L65"><span class="const token" data-verso-hover="636">instance</span> (e f : <span class="const token" data-verso-hover="32">Braket</span> k) : <span class="const token" data-verso-hover="184">Decidable</span> (<span class="const token" data-verso-hover="634">RSub</span> e f) := <span class="kw">by</span> <span class="kw">unfold</span> <span class="const token" data-verso-hover="634">RSub</span>; <span class="kw">infer_instance</span></span>
+<span id="L66"><span class="const token" data-verso-hover="637">instance</span> (e f : <span class="const token" data-verso-hover="32">Braket</span> k) : <span class="const token" data-verso-hover="184">Decidable</span> (<span class="const token" data-verso-hover="635">RSSub</span> e f) := <span class="kw">by</span> <span class="kw">unfold</span> <span class="const token" data-verso-hover="635">RSSub</span>; <span class="kw">infer_instance</span></span>
+<span id="L67"></span>
+<span id="L68"><span class="dc">/-- Is a braket diagonal? -/</span></span>
+<span id="L69"><span class="kw">def</span> <span class="const token" data-verso-hover="638">dg</span> (e : <span class="const token" data-verso-hover="32">Braket</span> k) : <span class="const token" data-verso-hover="395">Bool</span> := <span class="const token" data-verso-hover="526">decide</span> (e.<span class="const token" data-verso-hover="42">1</span> = e.<span class="const token" data-verso-hover="43">2</span>)</span>
+<span id="L70"></span>
+<span id="L71"><span class="dc">/-- The facts about two interacting agents `a`, `b` the rules depend on. -/</span></span>
+<span id="L72"><span class="kw">structure</span> <span class="const token" data-verso-hover="639">PR</span> <span class="kw">where</span></span>
+<span id="L73">  <span class="dc">/-- the agents exchanged kets -/</span></span>
+<span id="L74">  <span class="const token" data-verso-hover="640">ex</span> : <span class="const token" data-verso-hover="395">Bool</span></span>
+<span id="L75">  <span class="dc">/-- `a`, `b` diagonal before the exchange -/</span></span>
+<span id="L76">  <span class="const token" data-verso-hover="641">pa</span> : <span class="const token" data-verso-hover="395">Bool</span></span>
+<span id="L77">  <span class="const token" data-verso-hover="642">pb</span> : <span class="const token" data-verso-hover="395">Bool</span></span>
+<span id="L78">  <span class="dc">/-- `a`, `b` diagonal after the exchange -/</span></span>
+<span id="L79">  <span class="const token" data-verso-hover="643">da</span> : <span class="const token" data-verso-hover="395">Bool</span></span>
+<span id="L80">  <span class="const token" data-verso-hover="644">db</span> : <span class="const token" data-verso-hover="395">Bool</span></span>
+<span id="L81">  <span class="dc">/-- same bra -/</span></span>
+<span id="L82">  <span class="const token" data-verso-hover="645">sb</span> : <span class="const token" data-verso-hover="395">Bool</span></span>
+<span id="L83">  <span class="dc">/-- ket of `a` = bra of `b`, and vice versa -/</span></span>
+<span id="L84">  <span class="const token" data-verso-hover="646">kab</span> : <span class="const token" data-verso-hover="395">Bool</span></span>
+<span id="L85">  <span class="const token" data-verso-hover="647">kba</span> : <span class="const token" data-verso-hover="395">Bool</span></span>
+<span id="L86">  <span class="dc">/-- `[a] ⊆ [b]`, `[b] ⊆ [a]` -/</span></span>
+<span id="L87">  <span class="const token" data-verso-hover="648">sab</span> : <span class="const token" data-verso-hover="395">Bool</span></span>
+<span id="L88">  <span class="const token" data-verso-hover="649">sba</span> : <span class="const token" data-verso-hover="395">Bool</span></span>
+<span id="L89">  <span class="dc">/-- `[a] ⊊ [b]`, `[b] ⊊ [a]` -/</span></span>
+<span id="L90">  <span class="const token" data-verso-hover="650">qab</span> : <span class="const token" data-verso-hover="395">Bool</span></span>
+<span id="L91">  <span class="const token" data-verso-hover="651">qba</span> : <span class="const token" data-verso-hover="395">Bool</span></span>
+<span id="L92"></span>
+<span id="L93"><span class="dc">/-- Exchange the roles of the two agents. -/</span></span>
+<span id="L94"><span class="kw">def</span> <span class="const token" data-verso-hover="652">PR.swap</span> (r : <span class="const token" data-verso-hover="639">PR</span>) : <span class="const token" data-verso-hover="639">PR</span> :=</span>
+<span id="L95">  ⟨r.<span class="const token" data-verso-hover="640">ex</span>, r.<span class="const token" data-verso-hover="642">pb</span>, r.<span class="const token" data-verso-hover="641">pa</span>, r.<span class="const token" data-verso-hover="644">db</span>, r.<span class="const token" data-verso-hover="643">da</span>, r.<span class="const token" data-verso-hover="645">sb</span>, r.<span class="const token" data-verso-hover="647">kba</span>, r.<span class="const token" data-verso-hover="646">kab</span>, r.<span class="const token" data-verso-hover="649">sba</span>, r.<span class="const token" data-verso-hover="648">sab</span>, r.<span class="const token" data-verso-hover="651">qba</span>, r.<span class="const token" data-verso-hover="650">qab</span>⟩</span>
+<span id="L96"></span>
+<span id="L97"><span class="dc">/-- The status read by a condition: the current one (`pre = false`) or the one before the</span></span>
+<span id="L98"><span class="dc">interaction (`pre = true`). -/</span></span>
+<span id="L99"><span class="kw">def</span> <span class="const token" data-verso-hover="653">rd</span> (pre : <span class="const token" data-verso-hover="395">Bool</span>) (cur old : <span class="const token" data-verso-hover="625">St</span>) : <span class="const token" data-verso-hover="625">St</span> := <span class="kw">if</span> pre <span class="kw">then</span> old <span class="kw">else</span> cur</span>
+<span id="L100"></span>
+<span id="L101"><span class="dc">/-- Rules (1) token generation, (2) token destructor, (3) token destruction. -/</span></span>
+<span id="L102"><span class="kw">def</span> <span class="const token" data-verso-hover="654">st123</span> (r : <span class="const token" data-verso-hover="639">PR</span>) (sa sb : <span class="const token" data-verso-hover="625">St</span>) : <span class="const token" data-verso-hover="625">St</span> × <span class="const token" data-verso-hover="625">St</span> :=</span>
+<span id="L103">  <span class="kw">let</span> a1 := <span class="kw">if</span> r.<span class="const token" data-verso-hover="640">ex</span> &amp;&amp; !r.<span class="const token" data-verso-hover="643">da</span> <span class="kw">then</span> <span class="const token" data-verso-hover="626">St.ws</span> <span class="kw">else</span> sa</span>
+<span id="L104">  <span class="kw">let</span> b1 := <span class="kw">if</span> r.<span class="const token" data-verso-hover="640">ex</span> &amp;&amp; !r.<span class="const token" data-verso-hover="644">db</span> <span class="kw">then</span> <span class="const token" data-verso-hover="626">St.ws</span> <span class="kw">else</span> sb</span>
+<span id="L105">  <span class="kw">let</span> a2 := <span class="kw">if</span> !r.<span class="const token" data-verso-hover="641">pa</span> &amp;&amp; r.<span class="const token" data-verso-hover="643">da</span> <span class="kw">then</span> <span class="const token" data-verso-hover="627">St.win</span> <span class="kw">else</span> a1</span>
+<span id="L106">  <span class="kw">let</span> b2 := <span class="kw">if</span> !r.<span class="const token" data-verso-hover="642">pb</span> &amp;&amp; r.<span class="const token" data-verso-hover="644">db</span> <span class="kw">then</span> <span class="const token" data-verso-hover="627">St.win</span> <span class="kw">else</span> b1</span>
+<span id="L107">  <span class="kw">let</span> b3 := <span class="kw">if</span> r.<span class="const token" data-verso-hover="643">da</span> <span class="kw">then</span> (<span class="kw">if</span> r.<span class="const token" data-verso-hover="645">sb</span> <span class="kw">then</span> <span class="const token" data-verso-hover="627">St.win</span> <span class="kw">else</span> <span class="kw">if</span> !r.<span class="const token" data-verso-hover="644">db</span> <span class="kw">then</span> <span class="const token" data-verso-hover="628">St.los</span> <span class="kw">else</span> b2) <span class="kw">else</span> b2</span>
+<span id="L108">  <span class="kw">let</span> a3 := <span class="kw">if</span> r.<span class="const token" data-verso-hover="644">db</span> <span class="kw">then</span> (<span class="kw">if</span> r.<span class="const token" data-verso-hover="645">sb</span> <span class="kw">then</span> <span class="const token" data-verso-hover="627">St.win</span> <span class="kw">else</span> <span class="kw">if</span> !r.<span class="const token" data-verso-hover="643">da</span> <span class="kw">then</span> <span class="const token" data-verso-hover="628">St.los</span> <span class="kw">else</span> a2) <span class="kw">else</span> a2</span>
+<span id="L109">  (a3, b3)</span>
+<span id="L110"></span>
+<span id="L111"><span class="dc">/-- Rule (4), token multiplication, `a` acting on `b` (`oa`, `ob`: statuses before the</span></span>
+<span id="L112"><span class="dc">interaction; `a`, `b`: current statuses). -/</span></span>
+<span id="L113"><span class="kw">def</span> <span class="const token" data-verso-hover="655">r4</span> (pre : <span class="const token" data-verso-hover="395">Bool</span>) (r : <span class="const token" data-verso-hover="639">PR</span>) (oa ob a b : <span class="const token" data-verso-hover="625">St</span>) : <span class="const token" data-verso-hover="625">St</span> × <span class="const token" data-verso-hover="625">St</span> :=</span>
+<span id="L114">  <span class="kw">if</span> <span class="const token" data-verso-hover="653">rd</span> pre a oa = <span class="const token" data-verso-hover="626">St.ws</span> ∧ <span class="const token" data-verso-hover="653">rd</span> pre b ob = <span class="const token" data-verso-hover="628">St.los</span> ∧ r.<span class="const token" data-verso-hover="646">kab</span> = <span class="const token" data-verso-hover="285">true</span> <span class="kw">then</span> (a, <span class="const token" data-verso-hover="626">St.ws</span>) <span class="kw">else</span> (a, b)</span>
+<span id="L115"></span>
+<span id="L116"><span class="dc">/-- Rule (5), token ascent. -/</span></span>
+<span id="L117"><span class="kw">def</span> <span class="const token" data-verso-hover="656">r5</span> (pre : <span class="const token" data-verso-hover="395">Bool</span>) (r : <span class="const token" data-verso-hover="639">PR</span>) (oa _ob a b : <span class="const token" data-verso-hover="625">St</span>) : <span class="const token" data-verso-hover="625">St</span> × <span class="const token" data-verso-hover="625">St</span> :=</span>
+<span id="L118">  <span class="kw">if</span> <span class="const token" data-verso-hover="653">rd</span> pre a oa = <span class="const token" data-verso-hover="626">St.ws</span> ∧ r.<span class="const token" data-verso-hover="650">qab</span> = <span class="const token" data-verso-hover="285">true</span> <span class="kw">then</span> (<span class="kw">if</span> r.<span class="const token" data-verso-hover="645">sb</span> <span class="kw">then</span> <span class="const token" data-verso-hover="627">St.win</span> <span class="kw">else</span> <span class="const token" data-verso-hover="628">St.los</span>, <span class="const token" data-verso-hover="626">St.ws</span>) <span class="kw">else</span> (a, b)</span>
+<span id="L119"></span>
+<span id="L120"><span class="dc">/-- Rule (6), token simplification. -/</span></span>
+<span id="L121"><span class="kw">def</span> <span class="const token" data-verso-hover="657">r6</span> (pre : <span class="const token" data-verso-hover="395">Bool</span>) (r : <span class="const token" data-verso-hover="639">PR</span>) (oa ob a b : <span class="const token" data-verso-hover="625">St</span>) : <span class="const token" data-verso-hover="625">St</span> × <span class="const token" data-verso-hover="625">St</span> :=</span>
+<span id="L122">  <span class="kw">if</span> <span class="const token" data-verso-hover="653">rd</span> pre a oa = <span class="const token" data-verso-hover="626">St.ws</span> ∧ <span class="const token" data-verso-hover="653">rd</span> pre b ob = <span class="const token" data-verso-hover="626">St.ws</span> ∧ r.<span class="const token" data-verso-hover="648">sab</span> = <span class="const token" data-verso-hover="285">true</span> <span class="kw">then</span></span>
+<span id="L123">    (<span class="kw">if</span> r.<span class="const token" data-verso-hover="645">sb</span> <span class="kw">then</span> <span class="const token" data-verso-hover="627">St.win</span> <span class="kw">else</span> <span class="const token" data-verso-hover="628">St.los</span>, b) <span class="kw">else</span> (a, b)</span>
+<span id="L124"></span>
+<span id="L125"><span class="dc">/-- Rule (7), information spreading. -/</span></span>
+<span id="L126"><span class="kw">def</span> <span class="const token" data-verso-hover="658">r7</span> (pre : <span class="const token" data-verso-hover="395">Bool</span>) (r : <span class="const token" data-verso-hover="639">PR</span>) (oa _ob a b : <span class="const token" data-verso-hover="625">St</span>) : <span class="const token" data-verso-hover="625">St</span> × <span class="const token" data-verso-hover="625">St</span> :=</span>
+<span id="L127">  <span class="kw">if</span> <span class="const token" data-verso-hover="653">rd</span> pre a oa = <span class="const token" data-verso-hover="626">St.ws</span> <span class="kw">then</span></span>
+<span id="L128">    (<span class="kw">if</span> r.<span class="const token" data-verso-hover="645">sb</span> <span class="kw">then</span> (a, <span class="const token" data-verso-hover="627">St.win</span>) <span class="kw">else</span> <span class="kw">if</span> r.<span class="const token" data-verso-hover="651">qba</span> <span class="kw">then</span> (a, <span class="const token" data-verso-hover="628">St.los</span>) <span class="kw">else</span> (a, b))</span>
+<span id="L129">  <span class="kw">else</span> (a, b)</span>
+<span id="L130"></span>
+<span id="L131"><span class="dc">/-- Apply a rule in the orientation `(a, b)`, then in the orientation `(b, a)`. -/</span></span>
+<span id="L132"><span class="kw">def</span> <span class="const token" data-verso-hover="659">both</span> (f : <span class="const token" data-verso-hover="639">PR</span> → <span class="const token" data-verso-hover="625">St</span> → <span class="const token" data-verso-hover="625">St</span> → <span class="const token" data-verso-hover="625">St</span> → <span class="const token" data-verso-hover="625">St</span> → <span class="const token" data-verso-hover="625">St</span> × <span class="const token" data-verso-hover="625">St</span>) (r : <span class="const token" data-verso-hover="639">PR</span>) (oa ob : <span class="const token" data-verso-hover="625">St</span>) (p : <span class="const token" data-verso-hover="625">St</span> × <span class="const token" data-verso-hover="625">St</span>) :</span>
+<span id="L133">    <span class="const token" data-verso-hover="625">St</span> × <span class="const token" data-verso-hover="625">St</span> :=</span>
+<span id="L134">  <span class="kw">let</span> q := f r oa ob p.<span class="const token" data-verso-hover="42">1</span> p.<span class="const token" data-verso-hover="43">2</span></span>
+<span id="L135">  <span class="kw">let</span> q' := f r.<span class="const token" data-verso-hover="652">swap</span> ob oa q.<span class="const token" data-verso-hover="43">2</span> q.<span class="const token" data-verso-hover="42">1</span></span>
+<span id="L136">  (q'.<span class="const token" data-verso-hover="43">2</span>, q'.<span class="const token" data-verso-hover="42">1</span>)</span>
+<span id="L137"></span>
+<span id="L138"><span class="dc">/-- All status rules, in order. -/</span></span>
+<span id="L139"><span class="kw">def</span> <span class="const token" data-verso-hover="660">stUpd</span> (pre : <span class="const token" data-verso-hover="395">Bool</span>) (r : <span class="const token" data-verso-hover="639">PR</span>) (sa sb : <span class="const token" data-verso-hover="625">St</span>) : <span class="const token" data-verso-hover="625">St</span> × <span class="const token" data-verso-hover="625">St</span> :=</span>
+<span id="L140">  <span class="const token" data-verso-hover="659">both</span> (<span class="const token" data-verso-hover="658">r7</span> pre) r sa sb (<span class="const token" data-verso-hover="659">both</span> (<span class="const token" data-verso-hover="657">r6</span> pre) r sa sb (<span class="const token" data-verso-hover="659">both</span> (<span class="const token" data-verso-hover="656">r5</span> pre) r sa sb</span>
+<span id="L141">    (<span class="const token" data-verso-hover="659">both</span> (<span class="const token" data-verso-hover="655">r4</span> pre) r sa sb (<span class="const token" data-verso-hover="654">st123</span> r sa sb))))</span>
+<span id="L142"></span>
+<span id="L143"><span class="dc">/-- The new `out` of agent `a`, given its partner's new and old status, its partner's bra and its</span></span>
+<span id="L144"><span class="dc">old `out`: rule (i), then rule (ii). -/</span></span>
+<span id="L145"><span class="kw">def</span> <span class="const token" data-verso-hover="661">outUpd</span> (pre : <span class="const token" data-verso-hover="395">Bool</span>) (r : <span class="const token" data-verso-hover="639">PR</span>) (sbNew sbOld : <span class="const token" data-verso-hover="625">St</span>) (braB oa : <span class="const token" data-verso-hover="33">Fin</span> k) : <span class="const token" data-verso-hover="33">Fin</span> k :=</span>
+<span id="L146">  <span class="kw">let</span> o1 := <span class="kw">if</span> r.<span class="const token" data-verso-hover="644">db</span> &amp;&amp; !r.<span class="const token" data-verso-hover="643">da</span> <span class="kw">then</span> braB <span class="kw">else</span> oa</span>
+<span id="L147">  <span class="kw">if</span> <span class="const token" data-verso-hover="653">rd</span> pre sbNew sbOld = <span class="const token" data-verso-hover="626">St.ws</span> ∧ r.<span class="const token" data-verso-hover="648">sab</span> = <span class="const token" data-verso-hover="285">true</span> <span class="kw">then</span> braB <span class="kw">else</span> o1</span>
+<span id="L148"></span>
+<span id="L149"><span class="dc">/-- The facts about two agents with brakets `p`, `q` before and `e`, `f` after the exchange. -/</span></span>
+<span id="L150"><span class="kw">def</span> <span class="const token" data-verso-hover="662">mkPR</span> (p q e f : <span class="const token" data-verso-hover="32">Braket</span> k) : <span class="const token" data-verso-hover="639">PR</span> :=</span>
+<span id="L151">  ⟨<span class="const token" data-verso-hover="526">decide</span> (<span class="const token" data-verso-hover="108">Profitable</span> p q), <span class="const token" data-verso-hover="638">dg</span> p, <span class="const token" data-verso-hover="638">dg</span> q, <span class="const token" data-verso-hover="638">dg</span> e, <span class="const token" data-verso-hover="638">dg</span> f, <span class="const token" data-verso-hover="526">decide</span> (e.<span class="const token" data-verso-hover="42">1</span> = f.<span class="const token" data-verso-hover="42">1</span>), <span class="const token" data-verso-hover="526">decide</span> (e.<span class="const token" data-verso-hover="43">2</span> = f.<span class="const token" data-verso-hover="42">1</span>),</span>
+<span id="L152">    <span class="const token" data-verso-hover="526">decide</span> (f.<span class="const token" data-verso-hover="43">2</span> = e.<span class="const token" data-verso-hover="42">1</span>), <span class="const token" data-verso-hover="526">decide</span> (<span class="const token" data-verso-hover="634">RSub</span> e f), <span class="const token" data-verso-hover="526">decide</span> (<span class="const token" data-verso-hover="634">RSub</span> f e), <span class="const token" data-verso-hover="526">decide</span> (<span class="const token" data-verso-hover="635">RSSub</span> e f),</span>
+<span id="L153">    <span class="const token" data-verso-hover="526">decide</span> (<span class="const token" data-verso-hover="635">RSSub</span> f e)⟩</span>
+<span id="L154"></span>
+<span id="L155"><span class="dc">/-- States of `Circles_TieSharing`: braket, `out`, status. -/</span></span>
+<span id="L156"><span class="kw">abbrev</span> <span class="const token" data-verso-hover="663">TSState</span> (k : <span class="const token" data-verso-hover="30">ℕ</span>) := <span class="const token" data-verso-hover="32">Braket</span> k × <span class="const token" data-verso-hover="33">Fin</span> k × <span class="const token" data-verso-hover="625">St</span></span>
+<span id="L157"></span>
+<span id="L158"><span class="dc">/-- `Circles_TieSharing` has `3k³` states. -/</span></span>
+<span id="L159"><span class="kw">theorem</span> <span class="const token" data-verso-hover="664">card_TSState</span> : <span class="const token" data-verso-hover="35">Fintype.card</span> (<span class="const token" data-verso-hover="663">TSState</span> k) = <span class="nu">3</span> * k ^ <span class="nu">3</span> := <span class="kw">by</span></span>
+<span id="L160">  <span class="kw">simp</span> only [<span class="const token" data-verso-hover="36">Fintype.card_prod</span>, <span class="const token" data-verso-hover="482">Fintype.card_fin</span>, <span class="const token" data-verso-hover="630">card_St</span>]; <span class="kw">ring</span></span>
+<span id="L161"></span>
+<span id="L162"><span class="dc">/-- The transition function. -/</span></span>
+<span id="L163"><span class="kw">def</span> <span class="const token" data-verso-hover="665">tsδ</span> (pre : <span class="const token" data-verso-hover="395">Bool</span>) (p q : <span class="const token" data-verso-hover="663">TSState</span> k) : <span class="const token" data-verso-hover="663">TSState</span> k × <span class="const token" data-verso-hover="663">TSState</span> k :=</span>
+<span id="L164">  <span class="kw">let</span> e := (<span class="const token" data-verso-hover="41">exch</span> p.<span class="const token" data-verso-hover="42">1</span> q.<span class="const token" data-verso-hover="42">1</span>).<span class="const token" data-verso-hover="42">1</span></span>
+<span id="L165">  <span class="kw">let</span> f := (<span class="const token" data-verso-hover="41">exch</span> p.<span class="const token" data-verso-hover="42">1</span> q.<span class="const token" data-verso-hover="42">1</span>).<span class="const token" data-verso-hover="43">2</span></span>
+<span id="L166">  <span class="kw">let</span> r := <span class="const token" data-verso-hover="662">mkPR</span> p.<span class="const token" data-verso-hover="42">1</span> q.<span class="const token" data-verso-hover="42">1</span> e f</span>
+<span id="L167">  <span class="kw">let</span> s := <span class="const token" data-verso-hover="660">stUpd</span> pre r p.<span class="const token" data-verso-hover="43">2</span><span class="nu">.</span><span class="const token" data-verso-hover="43">2</span> q.<span class="const token" data-verso-hover="43">2</span><span class="nu">.</span><span class="const token" data-verso-hover="43">2</span></span>
+<span id="L168">  ((e, <span class="const token" data-verso-hover="661">outUpd</span> pre r s.<span class="const token" data-verso-hover="43">2</span> q.<span class="const token" data-verso-hover="43">2</span><span class="nu">.</span><span class="const token" data-verso-hover="43">2</span> f.<span class="const token" data-verso-hover="42">1</span> p.<span class="const token" data-verso-hover="43">2</span><span class="nu">.</span><span class="const token" data-verso-hover="42">1</span>, s.<span class="const token" data-verso-hover="42">1</span>), (f, <span class="const token" data-verso-hover="661">outUpd</span> pre r.<span class="const token" data-verso-hover="652">swap</span> s.<span class="const token" data-verso-hover="42">1</span> p.<span class="const token" data-verso-hover="43">2</span><span class="nu">.</span><span class="const token" data-verso-hover="43">2</span> e.<span class="const token" data-verso-hover="42">1</span> q.<span class="const token" data-verso-hover="43">2</span><span class="nu">.</span><span class="const token" data-verso-hover="42">1</span>, s.<span class="const token" data-verso-hover="43">2</span>))</span>
+<span id="L169"></span>
+<span id="L170"><span class="dc">/-- The protocol `Circles_TieSharing` (`pre = false`: the sequential reading). -/</span></span>
+<span id="L171"><span class="kw">def</span> <span class="const token" data-verso-hover="666">tieShare</span> (k : <span class="const token" data-verso-hover="30">ℕ</span>) (pre : <span class="const token" data-verso-hover="395">Bool</span>) : <span class="const token" data-verso-hover="45">Protocol</span> (<span class="const token" data-verso-hover="663">TSState</span> k) := ⟨<span class="const token" data-verso-hover="665">tsδ</span> pre⟩</span>
+<span id="L172"></span>
+<span id="L173"><span class="dc">/-- Output: a winner (or winner spreader) outputs its own color, a loser its `out`. -/</span></span>
+<span id="L174"><span class="kw">def</span> <span class="const token" data-verso-hover="667">tsOut</span> (s : <span class="const token" data-verso-hover="663">TSState</span> k) : <span class="const token" data-verso-hover="33">Fin</span> k := <span class="kw">if</span> s.<span class="const token" data-verso-hover="43">2</span><span class="nu">.</span><span class="const token" data-verso-hover="43">2</span> = <span class="const token" data-verso-hover="628">St.los</span> <span class="kw">then</span> s.<span class="const token" data-verso-hover="43">2</span><span class="nu">.</span><span class="const token" data-verso-hover="42">1</span> <span class="kw">else</span> s.<span class="const token" data-verso-hover="42">1</span><span class="nu">.</span><span class="const token" data-verso-hover="42">1</span></span>
+<span id="L175"></span>
+<span id="L176"><span class="dc">/-- Initial configuration: `⟨i|i⟩`, `out = i`, `winner`. -/</span></span>
+<span id="L177"><span class="kw">def</span> <span class="const token" data-verso-hover="668">tsInit</span> {A : <span class="kw">Type</span>*} (input : A → <span class="const token" data-verso-hover="33">Fin</span> k) : <span class="const token" data-verso-hover="54">Config</span> A (<span class="const token" data-verso-hover="663">TSState</span> k) :=</span>
+<span id="L178">  <span class="kw">fun</span> a =&gt; ((input a, input a), input a, <span class="const token" data-verso-hover="627">St.win</span>)</span>
+<span id="L179"></span>
+<span id="L180"><span class="dc">/-- Projection onto the braket part. -/</span></span>
+<span id="L181"><span class="kw">def</span> <span class="const token" data-verso-hover="669">tsToCore</span> (pre : <span class="const token" data-verso-hover="395">Bool</span>) : (<span class="const token" data-verso-hover="666">tieShare</span> k pre).<span class="const token" data-verso-hover="47">Hom</span> (<span class="const token" data-verso-hover="48">circlesCore</span> k) <span class="kw">where</span></span>
+<span id="L182">  <span class="const token" data-verso-hover="49">f</span> s := s.<span class="const token" data-verso-hover="42">1</span></span>
+<span id="L183">  <span class="const token" data-verso-hover="50">map_fst</span> _ _ := <span class="const token" data-verso-hover="67">rfl</span></span>
+<span id="L184">  <span class="const token" data-verso-hover="51">map_snd</span> _ _ := <span class="const token" data-verso-hover="67">rfl</span></span>
+<span id="L185"></span>
+<span id="L186"><span class="dc">/-- The facts used in a configuration whose brakets do not change. -/</span></span>
+<span id="L187"><span class="kw">def</span> <span class="const token" data-verso-hover="670">relOf</span> (e f : <span class="const token" data-verso-hover="32">Braket</span> k) : <span class="const token" data-verso-hover="639">PR</span> := <span class="const token" data-verso-hover="662">mkPR</span> e f e f</span>
+<span id="L188"></span>
+<span id="L189"><span class="kw">variable</span> {A : <span class="kw">Type</span>*} [<span class="const token" data-verso-hover="58">DecidableEq</span> A]</span>
+<span id="L190"></span>
+<span id="L191"><span class="dc">/-- One interaction, in general. -/</span></span>
+<span id="L192"><span class="kw">lemma</span> <span class="const token" data-verso-hover="671">ts_interact</span> (pre : <span class="const token" data-verso-hover="395">Bool</span>) (C : <span class="const token" data-verso-hover="54">Config</span> A (<span class="const token" data-verso-hover="663">TSState</span> k)) {a b : A} (hab : a ≠ b) :</span>
+<span id="L193">    <span class="kw">let</span> r := <span class="const token" data-verso-hover="662">mkPR</span> (C a).<span class="const token" data-verso-hover="42">1</span> (C b).<span class="const token" data-verso-hover="42">1</span> (<span class="const token" data-verso-hover="41">exch</span> (C a).<span class="const token" data-verso-hover="42">1</span> (C b).<span class="const token" data-verso-hover="42">1</span>).<span class="const token" data-verso-hover="42">1</span> (<span class="const token" data-verso-hover="41">exch</span> (C a).<span class="const token" data-verso-hover="42">1</span> (C b).<span class="const token" data-verso-hover="42">1</span>).<span class="const token" data-verso-hover="43">2</span></span>
+<span id="L194">    <span class="kw">let</span> s := <span class="const token" data-verso-hover="660">stUpd</span> pre r (C a).<span class="const token" data-verso-hover="43">2</span><span class="nu">.</span><span class="const token" data-verso-hover="43">2</span> (C b).<span class="const token" data-verso-hover="43">2</span><span class="nu">.</span><span class="const token" data-verso-hover="43">2</span></span>
+<span id="L195">    (<span class="const token" data-verso-hover="666">tieShare</span> k pre).<span class="const token" data-verso-hover="61">interact</span> C a b a =</span>
+<span id="L196">      ((<span class="const token" data-verso-hover="41">exch</span> (C a).<span class="const token" data-verso-hover="42">1</span> (C b).<span class="const token" data-verso-hover="42">1</span>).<span class="const token" data-verso-hover="42">1</span>, <span class="const token" data-verso-hover="661">outUpd</span> pre r s.<span class="const token" data-verso-hover="43">2</span> (C b).<span class="const token" data-verso-hover="43">2</span><span class="nu">.</span><span class="const token" data-verso-hover="43">2</span> (<span class="const token" data-verso-hover="41">exch</span> (C a).<span class="const token" data-verso-hover="42">1</span> (C b).<span class="const token" data-verso-hover="42">1</span>).<span class="const token" data-verso-hover="43">2</span><span class="nu">.</span><span class="const token" data-verso-hover="42">1</span> (C a).<span class="const token" data-verso-hover="43">2</span><span class="nu">.</span><span class="const token" data-verso-hover="42">1</span>,</span>
+<span id="L197">        s.<span class="const token" data-verso-hover="42">1</span>) ∧</span>
+<span id="L198">    (<span class="const token" data-verso-hover="666">tieShare</span> k pre).<span class="const token" data-verso-hover="61">interact</span> C a b b =</span>
+<span id="L199">      ((<span class="const token" data-verso-hover="41">exch</span> (C a).<span class="const token" data-verso-hover="42">1</span> (C b).<span class="const token" data-verso-hover="42">1</span>).<span class="const token" data-verso-hover="43">2</span>, <span class="const token" data-verso-hover="661">outUpd</span> pre r.<span class="const token" data-verso-hover="652">swap</span> s.<span class="const token" data-verso-hover="42">1</span> (C a).<span class="const token" data-verso-hover="43">2</span><span class="nu">.</span><span class="const token" data-verso-hover="43">2</span> (<span class="const token" data-verso-hover="41">exch</span> (C a).<span class="const token" data-verso-hover="42">1</span> (C b).<span class="const token" data-verso-hover="42">1</span>).<span class="const token" data-verso-hover="42">1</span><span class="nu">.</span><span class="const token" data-verso-hover="42">1</span></span>
+<span id="L200">        (C b).<span class="const token" data-verso-hover="43">2</span><span class="nu">.</span><span class="const token" data-verso-hover="42">1</span>, s.<span class="const token" data-verso-hover="43">2</span>) := <span class="kw">by</span></span>
+<span id="L201">  <span class="kw">refine</span> ⟨?_, ?_⟩</span>
+<span id="L202">  · <span class="kw">simp</span> only [<span class="const token" data-verso-hover="63">Protocol.interact_self_left</span>, <span class="const token" data-verso-hover="666">tieShare</span>, <span class="const token" data-verso-hover="665">tsδ</span>]</span>
+<span id="L203">  · <span class="kw">simp</span> only [<span class="const token" data-verso-hover="68">Protocol.interact_self_right</span> _ _ hab, <span class="const token" data-verso-hover="666">tieShare</span>, <span class="const token" data-verso-hover="665">tsδ</span>]</span>
+<span id="L204"></span>
+<span id="L205"><span class="dc">/-- One interaction in a configuration whose brakets `B` are stable: brakets do not change, and</span></span>
+<span id="L206"><span class="dc">statuses and outputs are updated using `relOf (B a) (B b)`. -/</span></span>
+<span id="L207"><span class="kw">lemma</span> <span class="const token" data-verso-hover="672">ts_interact_stable</span> (pre : <span class="const token" data-verso-hover="395">Bool</span>) {B : <span class="const token" data-verso-hover="54">Config</span> A (<span class="const token" data-verso-hover="32">Braket</span> k)} (hB : <span class="const token" data-verso-hover="60">Stable</span> B)</span>
+<span id="L208">    {C : <span class="const token" data-verso-hover="54">Config</span> A (<span class="const token" data-verso-hover="663">TSState</span> k)} (hC : ∀ y, (C y).<span class="const token" data-verso-hover="42">1</span> = B y) {a b : A} (hab : a ≠ b) :</span>
+<span id="L209">    <span class="kw">let</span> r := <span class="const token" data-verso-hover="670">relOf</span> (B a) (B b)</span>
+<span id="L210">    <span class="kw">let</span> s := <span class="const token" data-verso-hover="660">stUpd</span> pre r (C a).<span class="const token" data-verso-hover="43">2</span><span class="nu">.</span><span class="const token" data-verso-hover="43">2</span> (C b).<span class="const token" data-verso-hover="43">2</span><span class="nu">.</span><span class="const token" data-verso-hover="43">2</span></span>
+<span id="L211">    (<span class="const token" data-verso-hover="666">tieShare</span> k pre).<span class="const token" data-verso-hover="61">interact</span> C a b a = (B a, <span class="const token" data-verso-hover="661">outUpd</span> pre r s.<span class="const token" data-verso-hover="43">2</span> (C b).<span class="const token" data-verso-hover="43">2</span><span class="nu">.</span><span class="const token" data-verso-hover="43">2</span> (B b).<span class="const token" data-verso-hover="42">1</span> (C a).<span class="const token" data-verso-hover="43">2</span><span class="nu">.</span><span class="const token" data-verso-hover="42">1</span>, s.<span class="const token" data-verso-hover="42">1</span>) ∧</span>
+<span id="L212">    (<span class="const token" data-verso-hover="666">tieShare</span> k pre).<span class="const token" data-verso-hover="61">interact</span> C a b b =</span>
+<span id="L213">      (B b, <span class="const token" data-verso-hover="661">outUpd</span> pre r.<span class="const token" data-verso-hover="652">swap</span> s.<span class="const token" data-verso-hover="42">1</span> (C a).<span class="const token" data-verso-hover="43">2</span><span class="nu">.</span><span class="const token" data-verso-hover="43">2</span> (B a).<span class="const token" data-verso-hover="42">1</span> (C b).<span class="const token" data-verso-hover="43">2</span><span class="nu">.</span><span class="const token" data-verso-hover="42">1</span>, s.<span class="const token" data-verso-hover="43">2</span>) ∧</span>
+<span id="L214">    ∀ y, y ≠ a → y ≠ b → (<span class="const token" data-verso-hover="666">tieShare</span> k pre).<span class="const token" data-verso-hover="61">interact</span> C a b y = C y := <span class="kw">by</span></span>
+<span id="L215">  <span class="kw">have</span> hex : <span class="const token" data-verso-hover="41">exch</span> (C a).<span class="const token" data-verso-hover="42">1</span> (C b).<span class="const token" data-verso-hover="42">1</span> = (B a, B b) := <span class="kw">by</span></span>
+<span id="L216">    <span class="kw">rw</span> [<span class="const token" data-verso-hover="41">exch</span>, <span class="const token" data-verso-hover="673">ite_eq_right_iff</span>.<span class="const token" data-verso-hover="88">2</span> (<span class="kw">fun</span> h =&gt; <span class="const token" data-verso-hover="84">absurd</span> h (<span class="kw">by</span> <span class="kw">rw</span> [hC, hC]; <span class="kw">exact</span> hB a b hab)), hC, hC]</span>
+<span id="L217">  <span class="kw">obtain</span> ⟨h1, h2⟩ := <span class="const token" data-verso-hover="671">ts_interact</span> pre C hab</span>
+<span id="L218">  <span class="kw">refine</span> ⟨?_, ?_, <span class="kw">fun</span> y hya hyb =&gt; <span class="const token" data-verso-hover="69">Protocol.interact_other</span> _ _ hya hyb⟩</span>
+<span id="L219">  · <span class="kw">rw</span> [h1, hex]; <span class="kw">simp</span> only [hC, <span class="const token" data-verso-hover="670">relOf</span>]</span>
+<span id="L220">  · <span class="kw">rw</span> [h2, hex]; <span class="kw">simp</span> only [hC, <span class="const token" data-verso-hover="670">relOf</span>]</span>
+<span id="L221"></span>
+<span id="L222"><span class="dc">/-! ## The "pre-interaction statuses" reading fails -/</span></span>
+<span id="L223"></span>
+<span id="L224"><span class="kw">section</span> Counterexample</span>
+<span id="L225"></span>
+<span id="L226"><span class="dc">/-- Input: agents `0, 1, 2` with colors `0, 0, 1` (`k = 2`); `0` is the unique majority color. -/</span></span>
+<span id="L227"><span class="kw">def</span> <span class="const token" data-verso-hover="674">tsCexInput</span> : <span class="const token" data-verso-hover="33">Fin</span> <span class="nu">3</span> → <span class="const token" data-verso-hover="33">Fin</span> <span class="nu">2</span> := ![<span class="nu">0</span>, <span class="nu">0</span>, <span class="nu">1</span>]</span>
+<span id="L228"></span>
+<span id="L229"><span class="kw">lemma</span> <span class="const token" data-verso-hover="675">tsCex_majority</span> : <span class="const token" data-verso-hover="55">IsMajority</span> <span class="const token" data-verso-hover="674">tsCexInput</span> <span class="nu">0</span> := <span class="kw">by</span> <span class="kw">unfold</span> <span class="const token" data-verso-hover="55">IsMajority</span> <span class="const token" data-verso-hover="57">inputCount</span>; <span class="kw">decide</span></span>
+<span id="L230"></span>
+<span id="L231"><span class="kw">def</span> <span class="const token" data-verso-hover="676">allPairs3</span> : <span class="const token" data-verso-hover="280">List</span> (<span class="const token" data-verso-hover="33">Fin</span> <span class="nu">3</span> × <span class="const token" data-verso-hover="33">Fin</span> <span class="nu">3</span>) := [(<span class="nu">0</span>, <span class="nu">1</span>), (<span class="nu">0</span>, <span class="nu">2</span>), (<span class="nu">1</span>, <span class="nu">0</span>), (<span class="nu">1</span>, <span class="nu">2</span>), (<span class="nu">2</span>, <span class="nu">0</span>), (<span class="nu">2</span>, <span class="nu">1</span>)]</span>
+<span id="L232"></span>
+<span id="L233"><span class="dc">/-- The schedule `(0,2), (0,1), (1,2)`, then round robin over all ordered pairs. -/</span></span>
+<span id="L234"><span class="kw">def</span> <span class="const token" data-verso-hover="677">tsCexSched</span> (t : <span class="const token" data-verso-hover="30">ℕ</span>) : <span class="const token" data-verso-hover="33">Fin</span> <span class="nu">3</span> × <span class="const token" data-verso-hover="33">Fin</span> <span class="nu">3</span> :=</span>
+<span id="L235">  <span class="kw">if</span> t = <span class="nu">0</span> <span class="kw">then</span> (<span class="nu">0</span>, <span class="nu">2</span>) <span class="kw">else</span> <span class="kw">if</span> t = <span class="nu">1</span> <span class="kw">then</span> (<span class="nu">0</span>, <span class="nu">1</span>) <span class="kw">else</span> <span class="kw">if</span> t = <span class="nu">2</span> <span class="kw">then</span> (<span class="nu">1</span>, <span class="nu">2</span>)</span>
+<span id="L236">  <span class="kw">else</span> <span class="const token" data-verso-hover="676">allPairs3</span>[(t - <span class="nu">3</span>) % <span class="nu">6</span>]'(<span class="const token" data-verso-hover="594">Nat.mod_lt</span> _ (<span class="kw">by</span> <span class="kw">decide</span>))</span>
+<span id="L237"></span>
+<span id="L238"><span class="kw">lemma</span> <span class="const token" data-verso-hover="678">tsCexSched_ne</span> (t : <span class="const token" data-verso-hover="30">ℕ</span>) : (<span class="const token" data-verso-hover="677">tsCexSched</span> t).<span class="const token" data-verso-hover="42">1</span> ≠ (<span class="const token" data-verso-hover="677">tsCexSched</span> t).<span class="const token" data-verso-hover="43">2</span> := <span class="kw">by</span></span>
+<span id="L239">  <span class="kw">unfold</span> <span class="const token" data-verso-hover="677">tsCexSched</span></span>
+<span id="L240">  <span class="kw">split_ifs</span></span>
+<span id="L241">  · <span class="kw">decide</span></span>
+<span id="L242">  · <span class="kw">decide</span></span>
+<span id="L243">  · <span class="kw">decide</span></span>
+<span id="L244">  · <span class="kw">have</span> : ∀ i : <span class="const token" data-verso-hover="33">Fin</span> <span class="nu">6</span>, (<span class="const token" data-verso-hover="676">allPairs3</span>[i.<span class="const token" data-verso-hover="260">val</span>]).<span class="const token" data-verso-hover="42">1</span> ≠ (<span class="const token" data-verso-hover="676">allPairs3</span>[i.<span class="const token" data-verso-hover="260">val</span>]).<span class="const token" data-verso-hover="43">2</span> := <span class="kw">by</span> <span class="kw">decide</span></span>
+<span id="L245">    <span class="kw">exact</span> this ⟨_, <span class="const token" data-verso-hover="594">Nat.mod_lt</span> _ (<span class="kw">by</span> <span class="kw">decide</span>)⟩</span>
+<span id="L246"></span>
+<span id="L247"><span class="dc">/-- The brakets after the prefix: `⟨0|1⟩, ⟨0|0⟩, ⟨1|0⟩` (stable). -/</span></span>
+<span id="L248"><span class="kw">def</span> <span class="const token" data-verso-hover="679">tsCexBrakets</span> : <span class="const token" data-verso-hover="54">Config</span> (<span class="const token" data-verso-hover="33">Fin</span> <span class="nu">3</span>) (<span class="const token" data-verso-hover="32">Braket</span> <span class="nu">2</span>) := ![(<span class="nu">0</span>, <span class="nu">1</span>), (<span class="nu">0</span>, <span class="nu">0</span>), (<span class="nu">1</span>, <span class="nu">0</span>)]</span>
+<span id="L249"></span>
+<span id="L250"><span class="kw">lemma</span> <span class="const token" data-verso-hover="680">tsCex_stable</span> : <span class="const token" data-verso-hover="60">Stable</span> <span class="const token" data-verso-hover="679">tsCexBrakets</span> := <span class="kw">by</span> <span class="kw">unfold</span> <span class="const token" data-verso-hover="60">Stable</span>; <span class="kw">decide</span></span>
+<span id="L251"></span>
+<span id="L252"><span class="kw">lemma</span> <span class="const token" data-verso-hover="681">tsCex_reach</span> :</span>
+<span id="L253">    (∀ y, ((<span class="const token" data-verso-hover="666">tieShare</span> <span class="nu">2</span> <span class="const token" data-verso-hover="285">true</span>).<span class="const token" data-verso-hover="603">runSched</span> (<span class="const token" data-verso-hover="668">tsInit</span> <span class="const token" data-verso-hover="674">tsCexInput</span>) <span class="const token" data-verso-hover="677">tsCexSched</span> <span class="nu">3</span> y).<span class="const token" data-verso-hover="42">1</span> = <span class="const token" data-verso-hover="679">tsCexBrakets</span> y) ∧</span>
+<span id="L254">    (∀ y, ((<span class="const token" data-verso-hover="666">tieShare</span> <span class="nu">2</span> <span class="const token" data-verso-hover="285">true</span>).<span class="const token" data-verso-hover="603">runSched</span> (<span class="const token" data-verso-hover="668">tsInit</span> <span class="const token" data-verso-hover="674">tsCexInput</span>) <span class="const token" data-verso-hover="677">tsCexSched</span> <span class="nu">3</span> y).<span class="const token" data-verso-hover="43">2</span><span class="nu">.</span><span class="const token" data-verso-hover="43">2</span> ≠ <span class="const token" data-verso-hover="626">St.ws</span>) ∧</span>
+<span id="L255">    ((<span class="const token" data-verso-hover="666">tieShare</span> <span class="nu">2</span> <span class="const token" data-verso-hover="285">true</span>).<span class="const token" data-verso-hover="603">runSched</span> (<span class="const token" data-verso-hover="668">tsInit</span> <span class="const token" data-verso-hover="674">tsCexInput</span>) <span class="const token" data-verso-hover="677">tsCexSched</span> <span class="nu">3</span> <span class="nu">1</span>).<span class="const token" data-verso-hover="43">2</span><span class="nu">.</span><span class="const token" data-verso-hover="43">2</span> = <span class="const token" data-verso-hover="628">St.los</span> := <span class="kw">by</span></span>
+<span id="L256">  <span class="kw">decide</span></span>
+<span id="L257"></span>
+<span id="L258"><span class="kw">lemma</span> <span class="const token" data-verso-hover="682">tsCex_upd</span> : ∀ a b : <span class="const token" data-verso-hover="33">Fin</span> <span class="nu">3</span>, a ≠ b → ∀ sa sb : <span class="const token" data-verso-hover="625">St</span>, sa ≠ <span class="const token" data-verso-hover="626">St.ws</span> → sb ≠ <span class="const token" data-verso-hover="626">St.ws</span> →</span>
+<span id="L259">    (<span class="const token" data-verso-hover="660">stUpd</span> <span class="const token" data-verso-hover="285">true</span> (<span class="const token" data-verso-hover="670">relOf</span> (<span class="const token" data-verso-hover="679">tsCexBrakets</span> a) (<span class="const token" data-verso-hover="679">tsCexBrakets</span> b)) sa sb).<span class="const token" data-verso-hover="42">1</span> ≠ <span class="const token" data-verso-hover="626">St.ws</span> ∧</span>
+<span id="L260">    (<span class="const token" data-verso-hover="660">stUpd</span> <span class="const token" data-verso-hover="285">true</span> (<span class="const token" data-verso-hover="670">relOf</span> (<span class="const token" data-verso-hover="679">tsCexBrakets</span> a) (<span class="const token" data-verso-hover="679">tsCexBrakets</span> b)) sa sb).<span class="const token" data-verso-hover="43">2</span> ≠ <span class="const token" data-verso-hover="626">St.ws</span> ∧</span>
+<span id="L261">    (a = <span class="nu">1</span> → sa = <span class="const token" data-verso-hover="628">St.los</span> → (<span class="const token" data-verso-hover="660">stUpd</span> <span class="const token" data-verso-hover="285">true</span> (<span class="const token" data-verso-hover="670">relOf</span> (<span class="const token" data-verso-hover="679">tsCexBrakets</span> a) (<span class="const token" data-verso-hover="679">tsCexBrakets</span> b)) sa sb).<span class="const token" data-verso-hover="42">1</span> = <span class="const token" data-verso-hover="628">St.los</span>) ∧</span>
+<span id="L262">    (b = <span class="nu">1</span> → sb = <span class="const token" data-verso-hover="628">St.los</span> → (<span class="const token" data-verso-hover="660">stUpd</span> <span class="const token" data-verso-hover="285">true</span> (<span class="const token" data-verso-hover="670">relOf</span> (<span class="const token" data-verso-hover="679">tsCexBrakets</span> a) (<span class="const token" data-verso-hover="679">tsCexBrakets</span> b)) sa sb).<span class="const token" data-verso-hover="43">2</span> = <span class="const token" data-verso-hover="628">St.los</span>) := <span class="kw">by</span></span>
+<span id="L263">  <span class="kw">decide</span></span>
+<span id="L264"></span>
+<span id="L265"><span class="dc">/-- With brakets `⟨0|1⟩, ⟨0|0⟩, ⟨1|0⟩`, no winner spreader and agent `1` at `loser`, nothing</span></span>
+<span id="L266"><span class="dc">can change the status of agent `1` in the pre-interaction reading. -/</span></span>
+<span id="L267"><span class="kw">lemma</span> <span class="const token" data-verso-hover="683">tsCex_closed</span> : (<span class="const token" data-verso-hover="666">tieShare</span> <span class="nu">2</span> <span class="const token" data-verso-hover="285">true</span>).<span class="const token" data-verso-hover="92">Closed</span> <span class="kw">fun</span> C : <span class="const token" data-verso-hover="54">Config</span> (<span class="const token" data-verso-hover="33">Fin</span> <span class="nu">3</span>) (<span class="const token" data-verso-hover="663">TSState</span> <span class="nu">2</span>) =&gt;</span>
+<span id="L268">    (∀ y, (C y).<span class="const token" data-verso-hover="42">1</span> = <span class="const token" data-verso-hover="679">tsCexBrakets</span> y) ∧ (∀ y, (C y).<span class="const token" data-verso-hover="43">2</span><span class="nu">.</span><span class="const token" data-verso-hover="43">2</span> ≠ <span class="const token" data-verso-hover="626">St.ws</span>) ∧ (C <span class="nu">1</span>).<span class="const token" data-verso-hover="43">2</span><span class="nu">.</span><span class="const token" data-verso-hover="43">2</span> = <span class="const token" data-verso-hover="628">St.los</span> := <span class="kw">by</span></span>
+<span id="L269">  <span class="kw">rintro</span> C C' ⟨h1, h2, h3⟩ ⟨a, b, hab, <span class="kw">rfl</span>⟩</span>
+<span id="L270">  <span class="kw">obtain</span> ⟨ha, hb, ho⟩ := <span class="const token" data-verso-hover="672">ts_interact_stable</span> <span class="const token" data-verso-hover="285">true</span> <span class="const token" data-verso-hover="680">tsCex_stable</span> h1 hab</span>
+<span id="L271">  <span class="kw">have</span> hu := <span class="const token" data-verso-hover="682">tsCex_upd</span> a b hab _ _ (h2 a) (h2 b)</span>
+<span id="L272">  <span class="kw">refine</span> ⟨<span class="kw">fun</span> y =&gt; ?_, <span class="kw">fun</span> y =&gt; ?_, ?_⟩</span>
+<span id="L273">  · <span class="kw">by_cases</span> hya : y = a</span>
+<span id="L274">    · <span class="kw">subst</span> hya; <span class="kw">rw</span> [ha]</span>
+<span id="L275">    · <span class="kw">by_cases</span> hyb : y = b</span>
+<span id="L276">      · <span class="kw">subst</span> hyb; <span class="kw">rw</span> [hb]</span>
+<span id="L277">      · <span class="kw">rw</span> [ho y hya hyb, h1]</span>
+<span id="L278">  · <span class="kw">by_cases</span> hya : y = a</span>
+<span id="L279">    · <span class="kw">subst</span> hya; <span class="kw">rw</span> [ha]; <span class="kw">exact</span> hu.<span class="const token" data-verso-hover="65">1</span></span>
+<span id="L280">    · <span class="kw">by_cases</span> hyb : y = b</span>
+<span id="L281">      · <span class="kw">subst</span> hyb; <span class="kw">rw</span> [hb]; <span class="kw">exact</span> hu.<span class="const token" data-verso-hover="85">2</span><span class="nu">.</span><span class="const token" data-verso-hover="65">1</span></span>
+<span id="L282">      · <span class="kw">rw</span> [ho y hya hyb]; <span class="kw">exact</span> h2 y</span>
+<span id="L283">  · <span class="kw">obtain</span> <span class="kw">rfl</span> | hya := <span class="const token" data-verso-hover="684">eq_or_ne</span> a <span class="nu">1</span></span>
+<span id="L284">    · <span class="kw">rw</span> [ha]; <span class="kw">exact</span> hu.<span class="const token" data-verso-hover="85">2</span><span class="nu">.</span><span class="const token" data-verso-hover="85">2</span><span class="nu">.</span><span class="const token" data-verso-hover="65">1</span> <span class="const token" data-verso-hover="67">rfl</span> h3</span>
+<span id="L285">    · <span class="kw">obtain</span> <span class="kw">rfl</span> | hyb := <span class="const token" data-verso-hover="684">eq_or_ne</span> b <span class="nu">1</span></span>
+<span id="L286">      · <span class="kw">rw</span> [hb]; <span class="kw">exact</span> hu.<span class="const token" data-verso-hover="85">2</span><span class="nu">.</span><span class="const token" data-verso-hover="85">2</span><span class="nu">.</span><span class="const token" data-verso-hover="85">2</span> <span class="const token" data-verso-hover="67">rfl</span> h3</span>
+<span id="L287">      · <span class="kw">rw</span> [ho <span class="nu">1</span> (<span class="const token" data-verso-hover="86">Ne.symm</span> hya) (<span class="const token" data-verso-hover="86">Ne.symm</span> hyb)]; <span class="kw">exact</span> h3</span>
+<span id="L288"></span>
+<span id="L289"><span class="dc">/-- **Counterexample for the pre-interaction reading of Circles_TieSharing.** If the conditions</span></span>
+<span id="L290"><span class="dc">of rules (4)–(7) and (ii) read the statuses *before* the interaction, Theorem 4.2 fails: with</span></span>
+<span id="L291"><span class="dc">3 agents of colors `0, 0, 1` (`k = 2`, unique majority color `0`) there is a weakly fair</span></span>
+<span id="L292"><span class="dc">execution in which agent `1` (color `0`, braket `⟨0|0⟩`) is a `loser` at every time `t ≥ 3`.</span></span>
+<span id="L293"><span class="dc">(At time 2 the interaction `(1,2)` makes agent `2` a loser by rule (3), but rule (7) still fires</span></span>
+<span id="L294"><span class="dc">with its stale `winner_spreader` status and makes agent `1` a loser; no winner spreader remains.) -/</span></span>
+<span id="L295"><span class="kw">theorem</span> <span class="const token" data-verso-hover="18">tieShare_pre_counterexample</span> :</span>
+<span id="L296">    ∃ E : (<span class="const token" data-verso-hover="666">tieShare</span> <span class="nu">2</span> <span class="const token" data-verso-hover="285">true</span>).<span class="const token" data-verso-hover="70">Execution</span> (<span class="const token" data-verso-hover="33">Fin</span> <span class="nu">3</span>), E.<span class="const token" data-verso-hover="71">config</span> <span class="nu">0</span> = <span class="const token" data-verso-hover="668">tsInit</span> <span class="const token" data-verso-hover="674">tsCexInput</span> ∧ E.<span class="const token" data-verso-hover="72">WeaklyFair</span> ∧</span>
+<span id="L297">      <span class="const token" data-verso-hover="55">IsMajority</span> <span class="const token" data-verso-hover="674">tsCexInput</span> <span class="nu">0</span> ∧ <span class="const token" data-verso-hover="674">tsCexInput</span> <span class="nu">1</span> = <span class="nu">0</span> ∧ ∀ t ≥ <span class="nu">3</span>, (E.<span class="const token" data-verso-hover="71">config</span> t <span class="nu">1</span>).<span class="const token" data-verso-hover="43">2</span><span class="nu">.</span><span class="const token" data-verso-hover="43">2</span> = <span class="const token" data-verso-hover="628">St.los</span> := <span class="kw">by</span></span>
+<span id="L298">  <span class="kw">set</span> E := <span class="const token" data-verso-hover="15">Execution.ofSched</span> (<span class="const token" data-verso-hover="666">tieShare</span> <span class="nu">2</span> <span class="const token" data-verso-hover="285">true</span>) (<span class="const token" data-verso-hover="668">tsInit</span> <span class="const token" data-verso-hover="674">tsCexInput</span>) <span class="const token" data-verso-hover="677">tsCexSched</span> <span class="const token" data-verso-hover="678">tsCexSched_ne</span></span>
+<span id="L299">  <span class="kw">refine</span> ⟨E, <span class="const token" data-verso-hover="67">rfl</span>, ?_, <span class="const token" data-verso-hover="675">tsCex_majority</span>, <span class="const token" data-verso-hover="67">rfl</span>, <span class="kw">fun</span> t ht =&gt; (<span class="const token" data-verso-hover="683">tsCex_closed</span>.<span class="const token" data-verso-hover="95">execution</span> E <span class="const token" data-verso-hover="681">tsCex_reach</span> t ht).<span class="const token" data-verso-hover="85">2</span><span class="nu">.</span><span class="const token" data-verso-hover="85">2</span>⟩</span>
+<span id="L300">  <span class="kw">apply</span> <span class="const token" data-verso-hover="598">Execution.weaklyFair_of_cycle</span> _ <span class="const token" data-verso-hover="676">allPairs3</span> (<span class="kw">by</span> <span class="kw">decide</span>) <span class="nu">3</span></span>
+<span id="L301">  · <span class="kw">intro</span> t</span>
+<span id="L302">    <span class="kw">show</span> <span class="const token" data-verso-hover="677">tsCexSched</span> (<span class="nu">3</span> + t) = _</span>
+<span id="L303">    <span class="kw">simp</span> only [<span class="const token" data-verso-hover="677">tsCexSched</span>]</span>
+<span id="L304">    <span class="kw">split_ifs</span> &lt;;&gt; <span class="kw">first</span> | <span class="kw">omega</span> | (<span class="kw">congr</span> <span class="nu">2</span>; <span class="kw">omega</span>)</span>
+<span id="L305">  · <span class="kw">decide</span></span>
+<span id="L306"></span>
+<span id="L307"><span class="kw">end</span> Counterexample</span>
+<span id="L308"></span>
+<span id="L309"><span class="kw">end</span> RankingOpinions</span>
+<span id="L310"></span>
+</code></div>
+        <script>
+          window.versoHoversUrl = "PODC2026/RankingOpinions/-hovers.json";</script>
+        <script src="static/lean/popper.js"></script>
+        <script src="static/lean/tippy.js"></script>
+        <script src="static/lean/marked.js"></script>
+        <script src="static/lean/highlighting.js"></script>
+        <script src="static/lean/lean.js"></script>
+        </article></main><footer class="site-footer"><div class="wrap">
+        Machine-checked formalizations of PODC papers in Lean 4. Generated with <a href="https://github.com/leanprover/verso">Verso</a> from the README files of <a href="https://github.com/vasnesterov/formal_podc">vasnesterov/formal_podc</a>.</div>
+      </footer></body>
+  </html>
+

@@ -1,0 +1,552 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="light dark">
+    <link rel="icon" href="data:,">
+    <title>SharpThresholdLLL: Parallel.lean · Formal PODC</title><base href="../../../.././"><link rel="stylesheet" href="static/lean/verso-vars.css">
+    <link rel="stylesheet" href="static/lean/highlighting.css">
+    <link rel="stylesheet" href="static/lean/tippy-border.css">
+    <link rel="stylesheet" href="static/style.css">
+    <script defer="defer" src="static/site.js"></script>
+    </head>
+  <body>
+    <header class="site-header">
+      <div class="wrap">
+        <a class="brand" href=".">Formal PODC</a><nav class="top">
+          <a href=".">Search</a><a href="about/">About</a><a href="https://github.com/vasnesterov/formal_podc">GitHub</a></nav>
+        </div>
+      </header>
+    <main class="wrap"><article><nav class="breadcrumbs" aria-label="Breadcrumb">
+          <a href=".">Search</a><span class="sep">›</span><a href="PODC2019/">PODC 2019</a><span class="sep">›</span><a href="PODC2019/SharpThresholdLLL/">SharpThresholdLLL</a><span class="sep">›</span><a href="PODC2019/SharpThresholdLLL/src/">Lean source</a><span class="sep">›</span><span aria-current="page">Parallel</span></nav>
+        <h1>
+          <code>Parallel.lean</code></h1>
+        <div class="paper-links">
+          <p>
+            Source of <a href="PODC2019/SharpThresholdLLL/">Sharp threshold for the distributed Lovász Local Lemma — PODC 2019</a> · <a href="https://github.com/vasnesterov/formal_podc/blob/main/Papers/PODC2019/SharpThresholdLLL/Parallel.lean">GitHub</a> · hover over a name for its type and documentation</p>
+          </div>
+        <div class="lean-code lean-src">
+          <code class="hl lean block" data-lean-context="Parallel"><span id="L1"><span class="kw">import</span> Papers.PODC2019.SharpThresholdLLL.Process</span>
+<span id="L2"></span>
+<span id="L3"><span class="dc">/-!</span></span>
+<span id="L4"><span class="dc"># Parallel execution of the process (the combinatorial core of Corollaries 1.2 and 1.4)</span></span>
+<span id="L5"></span>
+<span id="L6"><span class="dc">The distributed algorithms of Corollaries 1.2 and 1.4 run the sequential process in parallel.</span></span>
+<span id="L7"><span class="dc">In each phase, several *groups* act at the same time. Each group fixes its own variables one</span></span>
+<span id="L8"><span class="dc">after another (a sequential run from the common state at the start of the phase). The groups'</span></span>
+<span id="L9"><span class="dc">*regions* (sets of events) are pairwise disjoint, and every variable of a group affects only</span></span>
+<span id="L10"><span class="dc">events in the group's region. For Corollary 1.2, a group is a single variable (edge) of the</span></span>
+<span id="L11"><span class="dc">current edge-colour class. For Corollary 1.4, a group is a node `v` of the current colour of a</span></span>
+<span id="L12"><span class="dc">2-hop colouring, with region `N[v]`.</span></span>
+<span id="L13"></span>
+<span id="L14"><span class="dc">The paper's argument is: "Since Theorem 1.3 works for any order and due to the local nature of</span></span>
+<span id="L15"><span class="dc">the fixing and bookkeeping ...". We make it precise.</span></span>
+<span id="L16"></span>
+<span id="L17"><span class="dc">* `condProb_congr`: `Pr[E_t | ·]` depends only on the variables of `E_t`.</span></span>
+<span id="L18"><span class="dc">* `Run.transport`: a run can be replayed from any state that agrees with its start state on</span></span>
+<span id="L19"><span class="dc">  what the run reads.</span></span>
+<span id="L20"><span class="dc">* `phase_run`: the merged result of a parallel phase is reached by a sequential run, the</span></span>
+<span id="L21"><span class="dc">  concatenation of the groups' runs. Hence every execution of a valid schedule is an execution</span></span>
+<span id="L22"><span class="dc">  of the sequential process, and Theorem 1.3 applies (`schedule_correct`).</span></span>
+<span id="L23"><span class="dc">* `corollary_1_2_core` and `corollary_1_4_core`: the phase schedules built from a conflict-free</span></span>
+<span id="L24"><span class="dc">  colouring of the variables (Corollary 1.2) or from a 2-hop colouring of the dependency graph</span></span>
+<span id="L25"><span class="dc">  (Corollary 1.4) can always be executed. Every execution fixes all variables and avoids all bad</span></span>
+<span id="L26"><span class="dc">  events, and the number of phases is the number of colours.</span></span>
+<span id="L27"></span>
+<span id="L28"><span class="dc">The round complexity bounds (`O(d + log* n)` and `O(d² + log* n)`) also need the cited</span></span>
+<span id="L29"><span class="dc">colouring algorithms ([PR01], [FHK16]) and a LOCAL implementation of each phase. These are not</span></span>
+<span id="L30"><span class="dc">formalized.</span></span>
+<span id="L31"><span class="dc">-/</span></span>
+<span id="L32"></span>
+<span id="L33"><span class="kw">open</span> Finset</span>
+<span id="L34"></span>
+<span id="L35"><span class="kw">set_option</span> <span class="const token" data-verso-hover="36">linter.unusedSectionVars</span> false</span>
+<span id="L36"></span>
+<span id="L37"><span class="kw">namespace</span> SharpThresholdLLL</span>
+<span id="L38"></span>
+<span id="L39"><span class="kw">variable</span> {ι : <span class="kw">Type</span>} [<span class="const token" data-verso-hover="38">Fintype</span> ι] [<span class="const token" data-verso-hover="47">DecidableEq</span> ι] {α : ι → <span class="kw">Type</span>} [∀ i, <span class="const token" data-verso-hover="38">Fintype</span> (α i)]</span>
+<span id="L40">  [∀ i, <span class="const token" data-verso-hover="47">DecidableEq</span> (α i)] {V : <span class="kw">Type</span>} [<span class="const token" data-verso-hover="38">Fintype</span> V] [<span class="const token" data-verso-hover="47">DecidableEq</span> V]</span>
+<span id="L41"></span>
+<span id="L42">@[<span class="kw">ext</span>] <span class="kw">lemma</span> <span class="const token" data-verso-hover="159">State.ext'</span> {s s' : <span class="const token" data-verso-hover="160">State</span> ι α V} (h1 : s.<span class="const token" data-verso-hover="126">σ</span> = s'.<span class="const token" data-verso-hover="126">σ</span>) (h2 : s.<span class="const token" data-verso-hover="161">φ</span> = s'.<span class="const token" data-verso-hover="161">φ</span>) : s = s' := <span class="kw">by</span></span>
+<span id="L43">  <span class="kw">cases</span> s; <span class="kw">cases</span> s'; <span class="kw">simp_all</span></span>
+<span id="L44"></span>
+<span id="L45"><span class="kw">namespace</span> Instance</span>
+<span id="L46"></span>
+<span id="L47"><span class="kw">variable</span> (I : <span class="const token" data-verso-hover="37">Instance</span> ι α V)</span>
+<span id="L48"></span>
+<span id="L49"><span class="dc">/-! ## Locality of conditional probabilities -/</span></span>
+<span id="L50"></span>
+<span id="L51"><span class="kw">lemma</span> <span class="const token" data-verso-hover="162">condProb_update_of_not_mem</span> (σ : ∀ i, <span class="const token" data-verso-hover="70">Option</span> (α i)) {t : V} {i : ι} (hi : i ∉ I.<span class="const token" data-verso-hover="43">vbl</span> t)</span>
+<span id="L52">    (o : <span class="const token" data-verso-hover="70">Option</span> (α i)) :</span>
+<span id="L53">    I.<span class="const token" data-verso-hover="73">condProb</span> (<span class="const token" data-verso-hover="86">Function.update</span> σ i o) t = I.<span class="const token" data-verso-hover="73">condProb</span> (<span class="const token" data-verso-hover="86">Function.update</span> σ i <span class="const token" data-verso-hover="71">none</span>) t := <span class="kw">by</span></span>
+<span id="L54">  <span class="kw">cases</span> o <span class="kw">with</span></span>
+<span id="L55">  | <span class="const token" data-verso-hover="71">none</span> =&gt; <span class="kw">rfl</span></span>
+<span id="L56">  | <span class="const token" data-verso-hover="72">some</span> a =&gt;</span>
+<span id="L57">    <span class="kw">have</span> : <span class="const token" data-verso-hover="86">Function.update</span> σ i (<span class="const token" data-verso-hover="72">some</span> a) =</span>
+<span id="L58">        <span class="const token" data-verso-hover="86">Function.update</span> (<span class="const token" data-verso-hover="86">Function.update</span> σ i <span class="const token" data-verso-hover="71">none</span>) i (<span class="const token" data-verso-hover="72">some</span> a) := <span class="kw">by</span> <span class="kw">simp</span></span>
+<span id="L59">    <span class="kw">rw</span> [this, I.<span class="const token" data-verso-hover="89">condProb_fix_of_not_mem</span> _ (<span class="kw">by</span> <span class="kw">simp</span>) hi]</span>
+<span id="L60"></span>
+<span id="L61"><span class="dc">/-- `Pr[E_t | ·]` depends only on the values of the variables of `E_t`. -/</span></span>
+<span id="L62"><span class="kw">theorem</span> <span class="const token" data-verso-hover="163">condProb_congr</span> {σ σ' : ∀ i, <span class="const token" data-verso-hover="70">Option</span> (α i)} {t : V} (h : ∀ i ∈ I.<span class="const token" data-verso-hover="43">vbl</span> t, σ i = σ' i) :</span>
+<span id="L63">    I.<span class="const token" data-verso-hover="73">condProb</span> σ t = I.<span class="const token" data-verso-hover="73">condProb</span> σ' t := <span class="kw">by</span></span>
+<span id="L64">  <span class="kw">classical</span></span>
+<span id="L65">  <span class="kw">suffices</span> key : ∀ S : <span class="const token" data-verso-hover="44">Finset</span> ι, ∀ σ : ∀ i, <span class="const token" data-verso-hover="70">Option</span> (α i), (∀ i ∉ S, σ i = σ' i) →</span>
+<span id="L66">      (∀ i ∈ S, i ∉ I.<span class="const token" data-verso-hover="43">vbl</span> t) → I.<span class="const token" data-verso-hover="73">condProb</span> σ t = I.<span class="const token" data-verso-hover="73">condProb</span> σ' t <span class="kw">by</span></span>
+<span id="L67">    <span class="kw">apply</span> key (<span class="const token" data-verso-hover="49">univ</span>.<span class="const token" data-verso-hover="50">filter</span> <span class="kw">fun</span> i =&gt; i ∉ I.<span class="const token" data-verso-hover="43">vbl</span> t) σ</span>
+<span id="L68">    · <span class="kw">intro</span> i hi; <span class="kw">simp</span> only [<span class="const token" data-verso-hover="63">mem_filter</span>, <span class="const token" data-verso-hover="64">mem_univ</span>, <span class="const token" data-verso-hover="65">true_and</span>, <span class="const token" data-verso-hover="164">not_not</span>] <span class="kw">at</span> hi; <span class="kw">exact</span> h i hi</span>
+<span id="L69">    · <span class="kw">intro</span> i hi; <span class="kw">exact</span> (<span class="const token" data-verso-hover="63">mem_filter</span>.<span class="const token" data-verso-hover="107">1</span> hi).<span class="const token" data-verso-hover="165">2</span></span>
+<span id="L70">  <span class="kw">intro</span> S</span>
+<span id="L71">  <span class="kw">induction</span> S <span class="kw">using</span> <span class="const token" data-verso-hover="166">Finset.induction_on</span> <span class="kw">with</span></span>
+<span id="L72">  | <span class="const token" data-verso-hover="167">empty</span> =&gt; <span class="kw">intro</span> σ hσ _; <span class="kw">congr</span> <span class="nu">1</span>; <span class="kw">funext</span> i; <span class="kw">exact</span> hσ i (<span class="kw">by</span> <span class="kw">simp</span>)</span>
+<span id="L73">  | insert i S hiS ih =&gt;</span>
+<span id="L74">    <span class="kw">intro</span> σ hσ hS</span>
+<span id="L75">    <span class="kw">have</span> hi : i ∉ I.<span class="const token" data-verso-hover="43">vbl</span> t := hS i (<span class="const token" data-verso-hover="168">mem_insert_self</span> i S)</span>
+<span id="L76">    <span class="kw">have</span> e : I.<span class="const token" data-verso-hover="73">condProb</span> σ t = I.<span class="const token" data-verso-hover="73">condProb</span> (<span class="const token" data-verso-hover="86">Function.update</span> σ i (σ' i)) t := <span class="kw">by</span></span>
+<span id="L77">      <span class="kw">rw</span> [I.<span class="const token" data-verso-hover="162">condProb_update_of_not_mem</span> σ hi, ← I.<span class="const token" data-verso-hover="162">condProb_update_of_not_mem</span> σ hi (σ i),</span>
+<span id="L78">        <span class="const token" data-verso-hover="169">Function.update_eq_self</span>]</span>
+<span id="L79">    <span class="kw">rw</span> [e]</span>
+<span id="L80">    <span class="kw">apply</span> ih</span>
+<span id="L81">    · <span class="kw">intro</span> k hk</span>
+<span id="L82">      <span class="kw">by_cases</span> hki : k = i</span>
+<span id="L83">      · <span class="kw">subst</span> hki; <span class="kw">simp</span></span>
+<span id="L84">      · <span class="kw">rw</span> [<span class="const token" data-verso-hover="87">Function.update_of_ne</span> hki]; <span class="kw">exact</span> hσ k (<span class="kw">by</span> <span class="kw">simp</span> [hki, hk])</span>
+<span id="L85">    · <span class="kw">intro</span> k hk; <span class="kw">exact</span> hS k (<span class="const token" data-verso-hover="132">mem_insert_of_mem</span> hk)</span>
+<span id="L86"></span>
+<span id="L87"><span class="dc">/-! ## Runs -/</span></span>
+<span id="L88"></span>
+<span id="L89"><span class="dc">/-- A sequential run of the process fixing the variables of `l` in this order. -/</span></span>
+<span id="L90"><span class="kw">inductive</span> <span class="const token" data-verso-hover="170">Run</span> (p : <span class="const token" data-verso-hover="40">ℝ</span>) : <span class="const token" data-verso-hover="160">State</span> ι α V → <span class="const token" data-verso-hover="171">List</span> ι → <span class="const token" data-verso-hover="160">State</span> ι α V → <span class="kw">Prop</span></span>
+<span id="L91">  | <span class="const token" data-verso-hover="172">nil</span> (s : <span class="const token" data-verso-hover="160">State</span> ι α V) : <span class="const token" data-verso-hover="170">Run</span> p s [] s</span>
+<span id="L92">  | <span class="const token" data-verso-hover="173">cons</span> {s s₁ s₂ : <span class="const token" data-verso-hover="160">State</span> ι α V} {j : ι} {l : <span class="const token" data-verso-hover="171">List</span> ι} :</span>
+<span id="L93">      I.<span class="const token" data-verso-hover="152">Step</span> p j s s₁ → <span class="const token" data-verso-hover="170">Run</span> p s₁ l s₂ → <span class="const token" data-verso-hover="170">Run</span> p s (j :: l) s₂</span>
+<span id="L94"></span>
+<span id="L95"><span class="kw">variable</span> {I}</span>
+<span id="L96"></span>
+<span id="L97"><span class="kw">lemma</span> <span class="const token" data-verso-hover="174">Run.append</span> {p : <span class="const token" data-verso-hover="40">ℝ</span>} {s s₁ s₂ : <span class="const token" data-verso-hover="160">State</span> ι α V} {l₁ l₂ : <span class="const token" data-verso-hover="171">List</span> ι} (h₁ : I.<span class="const token" data-verso-hover="170">Run</span> p s l₁ s₁)</span>
+<span id="L98">    (h₂ : I.<span class="const token" data-verso-hover="170">Run</span> p s₁ l₂ s₂) : I.<span class="const token" data-verso-hover="170">Run</span> p s (l₁ ++ l₂) s₂ := <span class="kw">by</span></span>
+<span id="L99">  <span class="kw">induction</span> h₁ <span class="kw">with</span></span>
+<span id="L100">  | <span class="const token" data-verso-hover="172">nil</span> =&gt; <span class="kw">exact</span> h₂</span>
+<span id="L101">  | <span class="const token" data-verso-hover="173">cons</span> hs _ ih =&gt; <span class="kw">exact</span> <span class="const token" data-verso-hover="173">Run.cons</span> hs (ih h₂)</span>
+<span id="L102"></span>
+<span id="L103"><span class="kw">lemma</span> <span class="const token" data-verso-hover="175">Run.reflTransGen</span> {p : <span class="const token" data-verso-hover="40">ℝ</span>} {s s' : <span class="const token" data-verso-hover="160">State</span> ι α V} {l : <span class="const token" data-verso-hover="171">List</span> ι} (h : I.<span class="const token" data-verso-hover="170">Run</span> p s l s') :</span>
+<span id="L104">    <span class="const token" data-verso-hover="176">Relation.ReflTransGen</span> (<span class="kw">fun</span> a b =&gt; ∃ j, I.<span class="const token" data-verso-hover="152">Step</span> p j a b) s s' := <span class="kw">by</span></span>
+<span id="L105">  <span class="kw">induction</span> h <span class="kw">with</span></span>
+<span id="L106">  | <span class="const token" data-verso-hover="172">nil</span> =&gt; <span class="kw">exact</span> <span class="const token" data-verso-hover="177">Relation.ReflTransGen.refl</span></span>
+<span id="L107">  | <span class="const token" data-verso-hover="173">cons</span> hs _ ih =&gt; <span class="kw">exact</span> <span class="const token" data-verso-hover="178">Relation.ReflTransGen.head</span> ⟨_, hs⟩ ih</span>
+<span id="L108"></span>
+<span id="L109"><span class="kw">lemma</span> <span class="const token" data-verso-hover="179">Run.sigma_frame</span> {p : <span class="const token" data-verso-hover="40">ℝ</span>} {s s' : <span class="const token" data-verso-hover="160">State</span> ι α V} {l : <span class="const token" data-verso-hover="171">List</span> ι} (h : I.<span class="const token" data-verso-hover="170">Run</span> p s l s') :</span>
+<span id="L110">    ∀ i ∉ l, s'.<span class="const token" data-verso-hover="126">σ</span> i = s.<span class="const token" data-verso-hover="126">σ</span> i := <span class="kw">by</span></span>
+<span id="L111">  <span class="kw">induction</span> h <span class="kw">with</span></span>
+<span id="L112">  | <span class="const token" data-verso-hover="172">nil</span> =&gt; <span class="kw">intro</span> i _; <span class="kw">rfl</span></span>
+<span id="L113">  | <span class="const token" data-verso-hover="173">cons</span> hs _ ih =&gt;</span>
+<span id="L114">    <span class="kw">intro</span> i hi</span>
+<span id="L115">    <span class="kw">obtain</span> ⟨-, ⟨a, -, hσ⟩, -⟩ := hs</span>
+<span id="L116">    <span class="kw">have</span> hij : i ≠ _ := <span class="kw">fun</span> e =&gt; hi (<span class="kw">by</span> <span class="kw">rw</span> [e]; <span class="kw">exact</span> <span class="const token" data-verso-hover="180">List.mem_cons_self</span>)</span>
+<span id="L117">    <span class="kw">rw</span> [ih i (<span class="kw">fun</span> h =&gt; hi (<span class="const token" data-verso-hover="181">List.mem_cons_of_mem</span> _ h)), hσ, <span class="const token" data-verso-hover="87">Function.update_of_ne</span> hij]</span>
+<span id="L118"></span>
+<span id="L119"><span class="kw">lemma</span> <span class="const token" data-verso-hover="182">Run.phi_frame</span> {p : <span class="const token" data-verso-hover="40">ℝ</span>} {s s' : <span class="const token" data-verso-hover="160">State</span> ι α V} {l : <span class="const token" data-verso-hover="171">List</span> ι} (h : I.<span class="const token" data-verso-hover="170">Run</span> p s l s')</span>
+<span id="L120">    {R : <span class="const token" data-verso-hover="95">Set</span> V} (hR : ∀ j ∈ l, ∀ t ∈ I.<span class="const token" data-verso-hover="48">evs</span> j, t ∈ R) : ∀ u ∉ R, ∀ v, s'.<span class="const token" data-verso-hover="161">φ</span> u v = s.<span class="const token" data-verso-hover="161">φ</span> u v := <span class="kw">by</span></span>
+<span id="L121">  <span class="kw">induction</span> h <span class="kw">with</span></span>
+<span id="L122">  | <span class="const token" data-verso-hover="172">nil</span> =&gt; <span class="kw">intro</span> u _ v; <span class="kw">rfl</span></span>
+<span id="L123">  | <span class="const token" data-verso-hover="173">cons</span> hs _ ih =&gt;</span>
+<span id="L124">    <span class="kw">intro</span> u hu v</span>
+<span id="L125">    <span class="kw">obtain</span> ⟨-, -, hframe, -⟩ := hs</span>
+<span id="L126">    <span class="kw">rw</span> [ih (<span class="kw">fun</span> j hj =&gt; hR j (<span class="const token" data-verso-hover="181">List.mem_cons_of_mem</span> _ hj)) u hu v]</span>
+<span id="L127">    <span class="kw">exact</span> hframe u v <span class="kw">fun</span> h' =&gt; hu (hR _ <span class="const token" data-verso-hover="180">List.mem_cons_self</span> u h'.<span class="const token" data-verso-hover="58">1</span>)</span>
+<span id="L128"></span>
+<span id="L129"><span class="dc">/-- Fixed variables stay fixed, and the variables of a run are fixed at its end. -/</span></span>
+<span id="L130"><span class="kw">lemma</span> <span class="const token" data-verso-hover="183">Run.fixed</span> {p : <span class="const token" data-verso-hover="40">ℝ</span>} {s s' : <span class="const token" data-verso-hover="160">State</span> ι α V} {l : <span class="const token" data-verso-hover="171">List</span> ι} (h : I.<span class="const token" data-verso-hover="170">Run</span> p s l s') :</span>
+<span id="L131">    ∀ i, (i ∈ l ∨ s.<span class="const token" data-verso-hover="126">σ</span> i ≠ <span class="const token" data-verso-hover="71">none</span>) → s'.<span class="const token" data-verso-hover="126">σ</span> i ≠ <span class="const token" data-verso-hover="71">none</span> := <span class="kw">by</span></span>
+<span id="L132">  <span class="kw">induction</span> h <span class="kw">with</span></span>
+<span id="L133">  | <span class="const token" data-verso-hover="172">nil</span> =&gt; <span class="kw">intro</span> i hi; <span class="kw">exact</span> hi.<span class="const token" data-verso-hover="184">resolve_left</span> (<span class="kw">by</span> <span class="kw">simp</span>)</span>
+<span id="L134">  | @<span class="const token" data-verso-hover="173">cons</span> s s₁ s₂ j l hs _ ih =&gt;</span>
+<span id="L135">    <span class="kw">intro</span> i hi</span>
+<span id="L136">    <span class="kw">obtain</span> ⟨hj, ⟨a, -, hσ⟩, -⟩ := hs</span>
+<span id="L137">    <span class="kw">apply</span> ih</span>
+<span id="L138">    <span class="kw">by_cases</span> hij : i = j</span>
+<span id="L139">    · <span class="kw">subst</span> hij; <span class="kw">right</span>; <span class="kw">rw</span> [hσ]; <span class="kw">simp</span></span>
+<span id="L140">    · <span class="kw">rcases</span> hi <span class="kw">with</span> hi | hi</span>
+<span id="L141">      · <span class="kw">left</span>; <span class="kw">simpa</span> [hij] <span class="kw">using</span> hi</span>
+<span id="L142">      · <span class="kw">right</span>; <span class="kw">rw</span> [hσ, <span class="const token" data-verso-hover="87">Function.update_of_ne</span> hij]; <span class="kw">exact</span> hi</span>
+<span id="L143"></span>
+<span id="L144"><span class="dc">/-! ## Transport of runs -/</span></span>
+<span id="L145"></span>
+<span id="L146"><span class="dc">/-- `s` and `z` agree on the variables `W` and on the bookkeeping rows of the events `R`. -/</span></span>
+<span id="L147"><span class="kw">def</span> <span class="const token" data-verso-hover="185">Agree</span> (W : <span class="const token" data-verso-hover="95">Set</span> ι) (R : <span class="const token" data-verso-hover="95">Set</span> V) (s z : <span class="const token" data-verso-hover="160">State</span> ι α V) : <span class="kw">Prop</span> :=</span>
+<span id="L148">  (∀ i ∈ W, s.<span class="const token" data-verso-hover="126">σ</span> i = z.<span class="const token" data-verso-hover="126">σ</span> i) ∧ ∀ t ∈ R, ∀ u, s.<span class="const token" data-verso-hover="161">φ</span> t u = z.<span class="const token" data-verso-hover="161">φ</span> t u</span>
+<span id="L149"></span>
+<span id="L150"><span class="dc">/-- What a run on the variables `l` inside the region `R` reads: the variables of `l` and of the</span></span>
+<span id="L151"><span class="dc">events in `R`. -/</span></span>
+<span id="L152"><span class="kw">def</span> <span class="const token" data-verso-hover="186">readVars</span> (I : <span class="const token" data-verso-hover="37">Instance</span> ι α V) (l : <span class="const token" data-verso-hover="171">List</span> ι) (R : <span class="const token" data-verso-hover="95">Set</span> V) : <span class="const token" data-verso-hover="95">Set</span> ι :=</span>
+<span id="L153">  {i | i ∈ l ∨ ∃ t ∈ R, i ∈ I.<span class="const token" data-verso-hover="43">vbl</span> t}</span>
+<span id="L154"></span>
+<span id="L155"><span class="kw">open</span> <span class="kw">scoped</span> Classical <span class="kw">in</span></span>
+<span id="L156"><span class="dc">/-- Replay the effect of a step `s → s'` on variable `j` on another state `z`. -/</span></span>
+<span id="L157"><span class="kw">noncomputable</span> <span class="kw">def</span> <span class="const token" data-verso-hover="187">applyStep</span> (I : <span class="const token" data-verso-hover="37">Instance</span> ι α V) (j : ι) (s' z : <span class="const token" data-verso-hover="160">State</span> ι α V) : <span class="const token" data-verso-hover="160">State</span> ι α V :=</span>
+<span id="L158">  ⟨<span class="const token" data-verso-hover="86">Function.update</span> z.<span class="const token" data-verso-hover="126">σ</span> j (s'.<span class="const token" data-verso-hover="126">σ</span> j),</span>
+<span id="L159">    <span class="kw">fun</span> u v =&gt; <span class="kw">if</span> u ∈ I.<span class="const token" data-verso-hover="48">evs</span> j ∧ v ∈ I.<span class="const token" data-verso-hover="48">evs</span> j <span class="kw">then</span> s'.<span class="const token" data-verso-hover="161">φ</span> u v <span class="kw">else</span> z.<span class="const token" data-verso-hover="161">φ</span> u v⟩</span>
+<span id="L160"></span>
+<span id="L161"><span class="dc">/-- **Locality of a step.** A step `s → s'` on `X_j` stays valid from any state `z` that agrees</span></span>
+<span id="L162"><span class="dc">with `s` on the variables of the events of `X_j` and on their bookkeeping rows. -/</span></span>
+<span id="L163"><span class="kw">theorem</span> <span class="const token" data-verso-hover="12">Step.transport</span> {p : <span class="const token" data-verso-hover="40">ℝ</span>} {j : ι} {s s' z : <span class="const token" data-verso-hover="160">State</span> ι α V} (hstep : I.<span class="const token" data-verso-hover="152">Step</span> p j s s')</span>
+<span id="L164">    (hσ : ∀ t ∈ I.<span class="const token" data-verso-hover="48">evs</span> j, ∀ i ∈ I.<span class="const token" data-verso-hover="43">vbl</span> t, s.<span class="const token" data-verso-hover="126">σ</span> i = z.<span class="const token" data-verso-hover="126">σ</span> i)</span>
+<span id="L165">    (hφ : ∀ t ∈ I.<span class="const token" data-verso-hover="48">evs</span> j, ∀ u, s.<span class="const token" data-verso-hover="161">φ</span> t u = z.<span class="const token" data-verso-hover="161">φ</span> t u) (hj : z.<span class="const token" data-verso-hover="126">σ</span> j = <span class="const token" data-verso-hover="71">none</span>) :</span>
+<span id="L166">    I.<span class="const token" data-verso-hover="152">Step</span> p j z (I.<span class="const token" data-verso-hover="187">applyStep</span> j s' z) := <span class="kw">by</span></span>
+<span id="L167">  <span class="kw">classical</span></span>
+<span id="L168">  <span class="kw">obtain</span> ⟨-, ⟨a, ha, hσ'⟩, hframe, hpair, hloc⟩ := hstep</span>
+<span id="L169">  <span class="kw">have</span> hs'j : s'.<span class="const token" data-verso-hover="126">σ</span> j = <span class="const token" data-verso-hover="72">some</span> a := <span class="kw">by</span> <span class="kw">rw</span> [hσ']; <span class="kw">simp</span></span>
+<span id="L170">  <span class="kw">refine</span> ⟨hj, ⟨a, ha, <span class="kw">by</span> <span class="kw">simp</span> [<span class="const token" data-verso-hover="187">applyStep</span>, hs'j]⟩, ?_, ?_, ?_⟩</span>
+<span id="L171">  · <span class="kw">intro</span> u v huv; <span class="kw">simp</span> [<span class="const token" data-verso-hover="187">applyStep</span>, huv]</span>
+<span id="L172">  · <span class="kw">intro</span> u hu v hv huv</span>
+<span id="L173">    <span class="kw">simp</span> only [<span class="const token" data-verso-hover="187">applyStep</span>, hu, hv, <span class="const token" data-verso-hover="188">and_self</span>, ↓<span class="const token" data-verso-hover="189">reduceIte</span>]</span>
+<span id="L174">    <span class="kw">exact</span> hpair u hu v hv huv</span>
+<span id="L175">  · <span class="kw">intro</span> t ht</span>
+<span id="L176">    <span class="kw">have</span> hc : I.<span class="const token" data-verso-hover="73">condProb</span> (I.<span class="const token" data-verso-hover="187">applyStep</span> j s' z).<span class="const token" data-verso-hover="126">σ</span> t = I.<span class="const token" data-verso-hover="73">condProb</span> s'.<span class="const token" data-verso-hover="126">σ</span> t := <span class="kw">by</span></span>
+<span id="L177">      <span class="kw">apply</span> I.<span class="const token" data-verso-hover="163">condProb_congr</span></span>
+<span id="L178">      <span class="kw">intro</span> i hi</span>
+<span id="L179">      <span class="kw">simp</span> only [<span class="const token" data-verso-hover="187">applyStep</span>]</span>
+<span id="L180">      <span class="kw">by_cases</span> hij : i = j</span>
+<span id="L181">      · <span class="kw">subst</span> hij; <span class="kw">simp</span> [hs'j]</span>
+<span id="L182">      · <span class="kw">rw</span> [<span class="const token" data-verso-hover="87">Function.update_of_ne</span> hij, hσ', <span class="const token" data-verso-hover="87">Function.update_of_ne</span> hij]</span>
+<span id="L183">        <span class="kw">exact</span> (hσ t ht i hi).<span class="const token" data-verso-hover="113">symm</span></span>
+<span id="L184">    <span class="kw">have</span> hp : ∏ u ∈ I.<span class="const token" data-verso-hover="51">dep</span> t, (I.<span class="const token" data-verso-hover="187">applyStep</span> j s' z).<span class="const token" data-verso-hover="161">φ</span> t u = ∏ u ∈ I.<span class="const token" data-verso-hover="51">dep</span> t, s'.<span class="const token" data-verso-hover="161">φ</span> t u := <span class="kw">by</span></span>
+<span id="L185">      <span class="kw">apply</span> <span class="const token" data-verso-hover="190">prod_congr</span> <span class="const token" data-verso-hover="59">rfl</span></span>
+<span id="L186">      <span class="kw">intro</span> u _</span>
+<span id="L187">      <span class="kw">simp</span> only [<span class="const token" data-verso-hover="187">applyStep</span>]</span>
+<span id="L188">      <span class="kw">by_cases</span> hu : u ∈ I.<span class="const token" data-verso-hover="48">evs</span> j</span>
+<span id="L189">      · <span class="kw">simp</span> [ht, hu]</span>
+<span id="L190">      · <span class="kw">simp</span> only [ht, hu, <span class="const token" data-verso-hover="191">and_false</span>, ↓<span class="const token" data-verso-hover="189">reduceIte</span>]</span>
+<span id="L191">        <span class="kw">rw</span> [← hφ t ht u]</span>
+<span id="L192">        <span class="kw">exact</span> (hframe t u <span class="kw">fun</span> h =&gt; hu h.<span class="const token" data-verso-hover="165">2</span>).<span class="const token" data-verso-hover="113">symm</span></span>
+<span id="L193">    <span class="kw">rw</span> [hc, hp]; <span class="kw">exact</span> hloc t ht</span>
+<span id="L194"></span>
+<span id="L195"><span class="kw">lemma</span> <span class="const token" data-verso-hover="192">Agree.mono</span> {W W' : <span class="const token" data-verso-hover="95">Set</span> ι} {R : <span class="const token" data-verso-hover="95">Set</span> V} {s z : <span class="const token" data-verso-hover="160">State</span> ι α V} (h : <span class="const token" data-verso-hover="185">Agree</span> W R s z)</span>
+<span id="L196">    (hW : W' ⊆ W) : <span class="const token" data-verso-hover="185">Agree</span> W' R s z := ⟨<span class="kw">fun</span> i hi =&gt; h.<span class="const token" data-verso-hover="58">1</span> i (hW hi), h.<span class="const token" data-verso-hover="165">2</span>⟩</span>
+<span id="L197"></span>
+<span id="L198"><span class="dc">/-- **Transport of runs.** A run from `s` inside region `R` can be replayed from any `z`</span></span>
+<span id="L199"><span class="dc">agreeing with `s` on what the run reads. The replayed run ends in a state that agrees with the</span></span>
+<span id="L200"><span class="dc">original end state on what the run reads, and that coincides with `z` elsewhere. -/</span></span>
+<span id="L201"><span class="kw">theorem</span> <span class="const token" data-verso-hover="193">Run.transport</span> {p : <span class="const token" data-verso-hover="40">ℝ</span>} {s s' : <span class="const token" data-verso-hover="160">State</span> ι α V} {l : <span class="const token" data-verso-hover="171">List</span> ι} (hrun : I.<span class="const token" data-verso-hover="170">Run</span> p s l s')</span>
+<span id="L202">    {R : <span class="const token" data-verso-hover="95">Set</span> V} (hR : ∀ j ∈ l, ∀ t ∈ I.<span class="const token" data-verso-hover="48">evs</span> j, t ∈ R) {z : <span class="const token" data-verso-hover="160">State</span> ι α V}</span>
+<span id="L203">    (hag : <span class="const token" data-verso-hover="185">Agree</span> (I.<span class="const token" data-verso-hover="186">readVars</span> l R) R s z) :</span>
+<span id="L204">    ∃ z', I.<span class="const token" data-verso-hover="170">Run</span> p z l z' ∧ <span class="const token" data-verso-hover="185">Agree</span> (I.<span class="const token" data-verso-hover="186">readVars</span> l R) R s' z' ∧ (∀ i ∉ l, z'.<span class="const token" data-verso-hover="126">σ</span> i = z.<span class="const token" data-verso-hover="126">σ</span> i) ∧</span>
+<span id="L205">      (∀ u ∉ R, ∀ v, z'.<span class="const token" data-verso-hover="161">φ</span> u v = z.<span class="const token" data-verso-hover="161">φ</span> u v) := <span class="kw">by</span></span>
+<span id="L206">  <span class="kw">classical</span></span>
+<span id="L207">  <span class="kw">induction</span> hrun generalizing z <span class="kw">with</span></span>
+<span id="L208">  | <span class="const token" data-verso-hover="172">nil</span> s =&gt; <span class="kw">exact</span> ⟨z, <span class="const token" data-verso-hover="172">Run.nil</span> z, hag, <span class="kw">fun</span> _ _ =&gt; <span class="const token" data-verso-hover="59">rfl</span>, <span class="kw">fun</span> _ _ _ =&gt; <span class="const token" data-verso-hover="59">rfl</span>⟩</span>
+<span id="L209">  | @<span class="const token" data-verso-hover="173">cons</span> s s₁ s₂ j l hs hrest ih =&gt;</span>
+<span id="L210">    <span class="kw">have</span> hRj : ∀ t ∈ I.<span class="const token" data-verso-hover="48">evs</span> j, t ∈ R := hR j <span class="const token" data-verso-hover="180">List.mem_cons_self</span></span>
+<span id="L211">    <span class="kw">have</span> hRl : ∀ k ∈ l, ∀ t ∈ I.<span class="const token" data-verso-hover="48">evs</span> k, t ∈ R := <span class="kw">fun</span> k hk =&gt; hR k (<span class="const token" data-verso-hover="181">List.mem_cons_of_mem</span> _ hk)</span>
+<span id="L212">    <span class="kw">obtain</span> ⟨hj, ⟨a, -, hσ⟩, hframe, -, -⟩ := <span class="const token" data-verso-hover="122">id</span> hs</span>
+<span id="L213">    <span class="kw">have</span> hjW : j ∈ I.<span class="const token" data-verso-hover="186">readVars</span> (j :: l) R := <span class="const token" data-verso-hover="194">Or.inl</span> <span class="const token" data-verso-hover="180">List.mem_cons_self</span></span>
+<span id="L214">    <span class="kw">have</span> hzj : z.<span class="const token" data-verso-hover="126">σ</span> j = <span class="const token" data-verso-hover="71">none</span> := (hag.<span class="const token" data-verso-hover="58">1</span> j hjW).<span class="const token" data-verso-hover="113">symm</span>.<span class="const token" data-verso-hover="112">trans</span> hj</span>
+<span id="L215">    <span class="kw">have</span> hstep' := <span class="const token" data-verso-hover="12">Step.transport</span> hs</span>
+<span id="L216">      (<span class="kw">fun</span> t ht i hi =&gt; hag.<span class="const token" data-verso-hover="58">1</span> i (<span class="const token" data-verso-hover="195">Or.inr</span> ⟨t, hRj t ht, hi⟩)) (<span class="kw">fun</span> t ht =&gt; hag.<span class="const token" data-verso-hover="165">2</span> t (hRj t ht)) hzj</span>
+<span id="L217">    <span class="kw">set</span> z₁ := I.<span class="const token" data-verso-hover="187">applyStep</span> j s₁ z</span>
+<span id="L218">    <span class="kw">have</span> hs₁j : s₁.<span class="const token" data-verso-hover="126">σ</span> j = <span class="const token" data-verso-hover="72">some</span> a := <span class="kw">by</span> <span class="kw">rw</span> [hσ]; <span class="kw">simp</span></span>
+<span id="L219">    <span class="cm">--</span><span class="cm"> agreement after one step</span></span>
+<span id="L220">    <span class="kw">have</span> hag₁ : <span class="const token" data-verso-hover="185">Agree</span> (I.<span class="const token" data-verso-hover="186">readVars</span> (j :: l) R) R s₁ z₁ := <span class="kw">by</span></span>
+<span id="L221">      <span class="kw">refine</span> ⟨<span class="kw">fun</span> i hi =&gt; ?_, <span class="kw">fun</span> t ht u =&gt; ?_⟩</span>
+<span id="L222">      · <span class="kw">simp</span> only [z₁, <span class="const token" data-verso-hover="187">applyStep</span>]</span>
+<span id="L223">        <span class="kw">by_cases</span> hij : i = j</span>
+<span id="L224">        · <span class="kw">subst</span> hij; <span class="kw">simp</span></span>
+<span id="L225">        · <span class="kw">rw</span> [<span class="const token" data-verso-hover="87">Function.update_of_ne</span> hij, hσ, <span class="const token" data-verso-hover="87">Function.update_of_ne</span> hij]; <span class="kw">exact</span> hag.<span class="const token" data-verso-hover="58">1</span> i hi</span>
+<span id="L226">      · <span class="kw">simp</span> only [z₁, <span class="const token" data-verso-hover="187">applyStep</span>]</span>
+<span id="L227">        <span class="kw">by_cases</span> h : t ∈ I.<span class="const token" data-verso-hover="48">evs</span> j ∧ u ∈ I.<span class="const token" data-verso-hover="48">evs</span> j</span>
+<span id="L228">        · <span class="kw">simp</span> [h]</span>
+<span id="L229">        · <span class="kw">simp</span> only [h, ↓<span class="const token" data-verso-hover="189">reduceIte</span>]; <span class="kw">rw</span> [hframe t u h]; <span class="kw">exact</span> hag.<span class="const token" data-verso-hover="165">2</span> t ht u</span>
+<span id="L230">    <span class="kw">have</span> hsub : I.<span class="const token" data-verso-hover="186">readVars</span> l R ⊆ I.<span class="const token" data-verso-hover="186">readVars</span> (j :: l) R := <span class="kw">by</span></span>
+<span id="L231">      <span class="kw">intro</span> i hi; <span class="kw">rcases</span> hi <span class="kw">with</span> hi | hi</span>
+<span id="L232">      · <span class="kw">exact</span> <span class="const token" data-verso-hover="194">Or.inl</span> (<span class="const token" data-verso-hover="181">List.mem_cons_of_mem</span> _ hi)</span>
+<span id="L233">      · <span class="kw">exact</span> <span class="const token" data-verso-hover="195">Or.inr</span> hi</span>
+<span id="L234">    <span class="kw">obtain</span> ⟨z', hrun', hag', hσfr, hφfr⟩ := ih hRl (hag₁.<span class="const token" data-verso-hover="192">mono</span> hsub)</span>
+<span id="L235">    <span class="kw">refine</span> ⟨z', <span class="const token" data-verso-hover="173">Run.cons</span> hstep' hrun', ⟨<span class="kw">fun</span> i hi =&gt; ?_, hag'.<span class="const token" data-verso-hover="165">2</span>⟩, <span class="kw">fun</span> i hi =&gt; ?_, <span class="kw">fun</span> u hu v =&gt; ?_⟩</span>
+<span id="L236">    · <span class="kw">by_cases</span> hil : i ∈ l</span>
+<span id="L237">      · <span class="kw">exact</span> hag'.<span class="const token" data-verso-hover="58">1</span> i (<span class="const token" data-verso-hover="194">Or.inl</span> hil)</span>
+<span id="L238">      · <span class="kw">rcases</span> hi <span class="kw">with</span> hi | hi</span>
+<span id="L239">        · <span class="kw">rw</span> [hrest.<span class="const token" data-verso-hover="179">sigma_frame</span> i hil, hσfr i hil]; <span class="kw">exact</span> hag₁.<span class="const token" data-verso-hover="58">1</span> i (<span class="const token" data-verso-hover="194">Or.inl</span> hi)</span>
+<span id="L240">        · <span class="kw">exact</span> hag'.<span class="const token" data-verso-hover="58">1</span> i (<span class="const token" data-verso-hover="195">Or.inr</span> hi)</span>
+<span id="L241">    · <span class="kw">have</span> hij : i ≠ j := <span class="kw">fun</span> e =&gt; hi (e ▸ <span class="const token" data-verso-hover="180">List.mem_cons_self</span>)</span>
+<span id="L242">      <span class="kw">rw</span> [hσfr i (<span class="kw">fun</span> h =&gt; hi (<span class="const token" data-verso-hover="181">List.mem_cons_of_mem</span> _ h))]</span>
+<span id="L243">      <span class="kw">simp</span> [z₁, <span class="const token" data-verso-hover="187">applyStep</span>, <span class="const token" data-verso-hover="87">Function.update_of_ne</span> hij]</span>
+<span id="L244">    · <span class="kw">rw</span> [hφfr u hu v]</span>
+<span id="L245">      <span class="kw">have</span> : ¬ (u ∈ I.<span class="const token" data-verso-hover="48">evs</span> j ∧ v ∈ I.<span class="const token" data-verso-hover="48">evs</span> j) := <span class="kw">fun</span> h =&gt; hu (hRj u h.<span class="const token" data-verso-hover="58">1</span>)</span>
+<span id="L246">      <span class="kw">simp</span> [z₁, <span class="const token" data-verso-hover="187">applyStep</span>, this]</span>
+<span id="L247"></span>
+<span id="L248"><span class="dc">/-! ## Parallel phases -/</span></span>
+<span id="L249"></span>
+<span id="L250"><span class="dc">/-- A group of a parallel phase: its variables (fixed in this order), its region, and the state</span></span>
+<span id="L251"><span class="dc">its run reaches from the common start state. -/</span></span>
+<span id="L252"><span class="kw">structure</span> <span class="const token" data-verso-hover="196">Group</span> (ι : <span class="kw">Type</span>) (α : ι → <span class="kw">Type</span>) (V : <span class="kw">Type</span>) <span class="kw">where</span></span>
+<span id="L253">  <span class="const token" data-verso-hover="197">vars</span> : <span class="const token" data-verso-hover="171">List</span> ι</span>
+<span id="L254">  <span class="const token" data-verso-hover="198">region</span> : <span class="const token" data-verso-hover="95">Set</span> V</span>
+<span id="L255">  <span class="const token" data-verso-hover="199">out</span> : <span class="const token" data-verso-hover="160">State</span> ι α V</span>
+<span id="L256"></span>
+<span id="L257"><span class="kw">open</span> <span class="kw">scoped</span> Classical <span class="kw">in</span></span>
+<span id="L258"><span class="dc">/-- Overlay the changes of group `g` on `base`. -/</span></span>
+<span id="L259"><span class="kw">noncomputable</span> <span class="kw">def</span> <span class="const token" data-verso-hover="200">overlay</span> (base : <span class="const token" data-verso-hover="160">State</span> ι α V) (g : <span class="const token" data-verso-hover="196">Group</span> ι α V) : <span class="const token" data-verso-hover="160">State</span> ι α V :=</span>
+<span id="L260">  ⟨<span class="kw">fun</span> i =&gt; <span class="kw">if</span> i ∈ g.<span class="const token" data-verso-hover="197">vars</span> <span class="kw">then</span> g.<span class="const token" data-verso-hover="199">out</span>.<span class="const token" data-verso-hover="126">σ</span> i <span class="kw">else</span> base.<span class="const token" data-verso-hover="126">σ</span> i,</span>
+<span id="L261">    <span class="kw">fun</span> u v =&gt; <span class="kw">if</span> u ∈ g.<span class="const token" data-verso-hover="198">region</span> <span class="kw">then</span> g.<span class="const token" data-verso-hover="199">out</span>.<span class="const token" data-verso-hover="161">φ</span> u v <span class="kw">else</span> base.<span class="const token" data-verso-hover="161">φ</span> u v⟩</span>
+<span id="L262"></span>
+<span id="L263"><span class="dc">/-- The result of a parallel phase: all groups' changes merged into the start state. -/</span></span>
+<span id="L264"><span class="kw">noncomputable</span> <span class="kw">def</span> <span class="const token" data-verso-hover="201">merge</span> (s : <span class="const token" data-verso-hover="160">State</span> ι α V) : <span class="const token" data-verso-hover="171">List</span> (<span class="const token" data-verso-hover="196">Group</span> ι α V) → <span class="const token" data-verso-hover="160">State</span> ι α V</span>
+<span id="L265">  | [] =&gt; s</span>
+<span id="L266">  | g :: gs =&gt; <span class="const token" data-verso-hover="200">overlay</span> (<span class="const token" data-verso-hover="201">merge</span> s gs) g</span>
+<span id="L267"></span>
+<span id="L268"><span class="dc">/-- The variables of a phase, in a sequential order realising it. -/</span></span>
+<span id="L269"><span class="kw">def</span> <span class="const token" data-verso-hover="202">phaseVars</span> : <span class="const token" data-verso-hover="171">List</span> (<span class="const token" data-verso-hover="196">Group</span> ι α V) → <span class="const token" data-verso-hover="171">List</span> ι</span>
+<span id="L270">  | [] =&gt; []</span>
+<span id="L271">  | g :: gs =&gt; <span class="const token" data-verso-hover="202">phaseVars</span> gs ++ g.<span class="const token" data-verso-hover="197">vars</span></span>
+<span id="L272"></span>
+<span id="L273"><span class="dc">/-- A valid parallel phase from state `s`. Each group's run starts at `s` and stays inside its</span></span>
+<span id="L274"><span class="dc">region, the regions are pairwise disjoint, and no variable belongs to two groups. -/</span></span>
+<span id="L275"><span class="kw">structure</span> <span class="const token" data-verso-hover="203">ValidPhase</span> (I : <span class="const token" data-verso-hover="37">Instance</span> ι α V) (p : <span class="const token" data-verso-hover="40">ℝ</span>) (s : <span class="const token" data-verso-hover="160">State</span> ι α V) (G : <span class="const token" data-verso-hover="171">List</span> (<span class="const token" data-verso-hover="196">Group</span> ι α V)) :</span>
+<span id="L276">    <span class="kw">Prop</span> <span class="kw">where</span></span>
+<span id="L277">  <span class="const token" data-verso-hover="204">run</span> : ∀ g ∈ G, I.<span class="const token" data-verso-hover="170">Run</span> p s g.<span class="const token" data-verso-hover="197">vars</span> g.<span class="const token" data-verso-hover="199">out</span></span>
+<span id="L278">  <span class="const token" data-verso-hover="205">region</span> : ∀ g ∈ G, ∀ j ∈ g.<span class="const token" data-verso-hover="197">vars</span>, ∀ t ∈ I.<span class="const token" data-verso-hover="48">evs</span> j, t ∈ g.<span class="const token" data-verso-hover="198">region</span></span>
+<span id="L279">  <span class="const token" data-verso-hover="206">disj</span> : G.<span class="const token" data-verso-hover="207">Pairwise</span> <span class="kw">fun</span> g g' =&gt; <span class="const token" data-verso-hover="104">Disjoint</span> g.<span class="const token" data-verso-hover="198">region</span> g'.<span class="const token" data-verso-hover="198">region</span> ∧ ∀ j ∈ g.<span class="const token" data-verso-hover="197">vars</span>, j ∉ g'.<span class="const token" data-verso-hover="197">vars</span></span>
+<span id="L280"></span>
+<span id="L281"><span class="kw">lemma</span> <span class="const token" data-verso-hover="208">merge_sigma</span> (s : <span class="const token" data-verso-hover="160">State</span> ι α V) (G : <span class="const token" data-verso-hover="171">List</span> (<span class="const token" data-verso-hover="196">Group</span> ι α V)) (i : ι)</span>
+<span id="L282">    (hi : ∀ g ∈ G, i ∉ g.<span class="const token" data-verso-hover="197">vars</span>) : (<span class="const token" data-verso-hover="201">merge</span> s G).<span class="const token" data-verso-hover="126">σ</span> i = s.<span class="const token" data-verso-hover="126">σ</span> i := <span class="kw">by</span></span>
+<span id="L283">  <span class="kw">classical</span></span>
+<span id="L284">  <span class="kw">induction</span> G <span class="kw">with</span></span>
+<span id="L285">  | <span class="const token" data-verso-hover="209">nil</span> =&gt; <span class="kw">rfl</span></span>
+<span id="L286">  | <span class="const token" data-verso-hover="210">cons</span> g gs ih =&gt;</span>
+<span id="L287">    <span class="kw">simp</span> only [<span class="const token" data-verso-hover="201">merge</span>, <span class="const token" data-verso-hover="200">overlay</span>, hi g <span class="const token" data-verso-hover="180">List.mem_cons_self</span>, ↓<span class="const token" data-verso-hover="189">reduceIte</span>]</span>
+<span id="L288">    <span class="kw">exact</span> ih <span class="kw">fun</span> g' hg' =&gt; hi g' (<span class="const token" data-verso-hover="181">List.mem_cons_of_mem</span> _ hg')</span>
+<span id="L289"></span>
+<span id="L290"><span class="kw">lemma</span> <span class="const token" data-verso-hover="211">merge_phi</span> (s : <span class="const token" data-verso-hover="160">State</span> ι α V) (G : <span class="const token" data-verso-hover="171">List</span> (<span class="const token" data-verso-hover="196">Group</span> ι α V)) (u : V)</span>
+<span id="L291">    (hu : ∀ g ∈ G, u ∉ g.<span class="const token" data-verso-hover="198">region</span>) (v : V) : (<span class="const token" data-verso-hover="201">merge</span> s G).<span class="const token" data-verso-hover="161">φ</span> u v = s.<span class="const token" data-verso-hover="161">φ</span> u v := <span class="kw">by</span></span>
+<span id="L292">  <span class="kw">classical</span></span>
+<span id="L293">  <span class="kw">induction</span> G <span class="kw">with</span></span>
+<span id="L294">  | <span class="const token" data-verso-hover="209">nil</span> =&gt; <span class="kw">rfl</span></span>
+<span id="L295">  | <span class="const token" data-verso-hover="210">cons</span> g gs ih =&gt;</span>
+<span id="L296">    <span class="kw">simp</span> only [<span class="const token" data-verso-hover="201">merge</span>, <span class="const token" data-verso-hover="200">overlay</span>, hu g <span class="const token" data-verso-hover="180">List.mem_cons_self</span>, ↓<span class="const token" data-verso-hover="189">reduceIte</span>]</span>
+<span id="L297">    <span class="kw">exact</span> ih <span class="kw">fun</span> g' hg' =&gt; hu g' (<span class="const token" data-verso-hover="181">List.mem_cons_of_mem</span> _ hg')</span>
+<span id="L298"></span>
+<span id="L299"><span class="dc">/-- **A parallel phase is a sequential run.** The merged result of a valid phase is reached</span></span>
+<span id="L300"><span class="dc">from the start state by the concatenation of the groups' runs. -/</span></span>
+<span id="L301"><span class="kw">theorem</span> <span class="const token" data-verso-hover="29">phase_run</span> {p : <span class="const token" data-verso-hover="40">ℝ</span>} {s : <span class="const token" data-verso-hover="160">State</span> ι α V} {G : <span class="const token" data-verso-hover="171">List</span> (<span class="const token" data-verso-hover="196">Group</span> ι α V)} (h : I.<span class="const token" data-verso-hover="203">ValidPhase</span> p s G) :</span>
+<span id="L302">    I.<span class="const token" data-verso-hover="170">Run</span> p s (<span class="const token" data-verso-hover="202">phaseVars</span> G) (<span class="const token" data-verso-hover="201">merge</span> s G) := <span class="kw">by</span></span>
+<span id="L303">  <span class="kw">classical</span></span>
+<span id="L304">  <span class="kw">induction</span> G <span class="kw">with</span></span>
+<span id="L305">  | <span class="const token" data-verso-hover="209">nil</span> =&gt; <span class="kw">exact</span> <span class="const token" data-verso-hover="172">Run.nil</span> s</span>
+<span id="L306">  | <span class="const token" data-verso-hover="210">cons</span> g gs ih =&gt;</span>
+<span id="L307">    <span class="kw">have</span> hgs : I.<span class="const token" data-verso-hover="203">ValidPhase</span> p s gs := ⟨<span class="kw">fun</span> g' hg' =&gt; h.<span class="const token" data-verso-hover="204">run</span> g' (<span class="const token" data-verso-hover="181">List.mem_cons_of_mem</span> _ hg'),</span>
+<span id="L308">      <span class="kw">fun</span> g' hg' =&gt; h.<span class="const token" data-verso-hover="205">region</span> g' (<span class="const token" data-verso-hover="181">List.mem_cons_of_mem</span> _ hg'), (<span class="const token" data-verso-hover="212">List.pairwise_cons</span>.<span class="const token" data-verso-hover="107">1</span> h.<span class="const token" data-verso-hover="206">disj</span>).<span class="const token" data-verso-hover="165">2</span>⟩</span>
+<span id="L309">    <span class="kw">have</span> hdisj := (<span class="const token" data-verso-hover="212">List.pairwise_cons</span>.<span class="const token" data-verso-hover="107">1</span> h.<span class="const token" data-verso-hover="206">disj</span>).<span class="const token" data-verso-hover="58">1</span></span>
+<span id="L310">    <span class="kw">have</span> hrun := h.<span class="const token" data-verso-hover="204">run</span> g <span class="const token" data-verso-hover="180">List.mem_cons_self</span></span>
+<span id="L311">    <span class="kw">have</span> hR := h.<span class="const token" data-verso-hover="205">region</span> g <span class="const token" data-verso-hover="180">List.mem_cons_self</span></span>
+<span id="L312">    <span class="cm">--</span><span class="cm"> the merged state of the other groups agrees with `s` on what `g` reads</span></span>
+<span id="L313">    <span class="kw">have</span> hag : <span class="const token" data-verso-hover="185">Agree</span> (I.<span class="const token" data-verso-hover="186">readVars</span> g.<span class="const token" data-verso-hover="197">vars</span> g.<span class="const token" data-verso-hover="198">region</span>) g.<span class="const token" data-verso-hover="198">region</span> s (<span class="const token" data-verso-hover="201">merge</span> s gs) := <span class="kw">by</span></span>
+<span id="L314">      <span class="kw">refine</span> ⟨<span class="kw">fun</span> i hi =&gt; (<span class="const token" data-verso-hover="208">merge_sigma</span> s gs i <span class="kw">fun</span> g' hg' hig' =&gt; ?_).<span class="const token" data-verso-hover="113">symm</span>,</span>
+<span id="L315">        <span class="kw">fun</span> t ht u =&gt; (<span class="const token" data-verso-hover="211">merge_phi</span> s gs t (<span class="kw">fun</span> g' hg' htg' =&gt; ?_) u).<span class="const token" data-verso-hover="113">symm</span>⟩</span>
+<span id="L316">      · <span class="kw">rcases</span> hi <span class="kw">with</span> hi | ⟨t, ht, hit⟩</span>
+<span id="L317">        · <span class="kw">exact</span> (hdisj g' hg').<span class="const token" data-verso-hover="165">2</span> i hi hig'</span>
+<span id="L318">        · <span class="kw">have</span> := h.<span class="const token" data-verso-hover="205">region</span> g' (<span class="const token" data-verso-hover="181">List.mem_cons_of_mem</span> _ hg') i hig' t (I.<span class="const token" data-verso-hover="61">mem_evs</span>.<span class="const token" data-verso-hover="119">2</span> hit)</span>
+<span id="L319">          <span class="kw">exact</span> <span class="const token" data-verso-hover="213">Set.disjoint_left</span>.<span class="const token" data-verso-hover="107">1</span> (hdisj g' hg').<span class="const token" data-verso-hover="58">1</span> ht this</span>
+<span id="L320">      · <span class="kw">exact</span> <span class="const token" data-verso-hover="213">Set.disjoint_left</span>.<span class="const token" data-verso-hover="107">1</span> (hdisj g' hg').<span class="const token" data-verso-hover="58">1</span> ht htg'</span>
+<span id="L321">    <span class="kw">obtain</span> ⟨z', hrun', hag', hσfr, hφfr⟩ := hrun.<span class="const token" data-verso-hover="193">transport</span> hR hag</span>
+<span id="L322">    <span class="kw">have</span> heq : z' = <span class="const token" data-verso-hover="200">overlay</span> (<span class="const token" data-verso-hover="201">merge</span> s gs) g := <span class="kw">by</span></span>
+<span id="L323">      <span class="kw">apply</span> <span class="const token" data-verso-hover="159">State.ext'</span></span>
+<span id="L324">      · <span class="kw">funext</span> i</span>
+<span id="L325">        <span class="kw">simp</span> only [<span class="const token" data-verso-hover="200">overlay</span>]</span>
+<span id="L326">        <span class="kw">by_cases</span> hi : i ∈ g.<span class="const token" data-verso-hover="197">vars</span></span>
+<span id="L327">        · <span class="kw">simp</span> only [hi, ↓<span class="const token" data-verso-hover="189">reduceIte</span>]; <span class="kw">exact</span> (hag'.<span class="const token" data-verso-hover="58">1</span> i (<span class="const token" data-verso-hover="194">Or.inl</span> hi)).<span class="const token" data-verso-hover="113">symm</span></span>
+<span id="L328">        · <span class="kw">simp</span> only [hi, ↓<span class="const token" data-verso-hover="189">reduceIte</span>]; <span class="kw">exact</span> hσfr i hi</span>
+<span id="L329">      · <span class="kw">funext</span> u v</span>
+<span id="L330">        <span class="kw">simp</span> only [<span class="const token" data-verso-hover="200">overlay</span>]</span>
+<span id="L331">        <span class="kw">by_cases</span> hu : u ∈ g.<span class="const token" data-verso-hover="198">region</span></span>
+<span id="L332">        · <span class="kw">simp</span> only [hu, ↓<span class="const token" data-verso-hover="189">reduceIte</span>]; <span class="kw">exact</span> (hag'.<span class="const token" data-verso-hover="165">2</span> u hu v).<span class="const token" data-verso-hover="113">symm</span></span>
+<span id="L333">        · <span class="kw">simp</span> only [hu, ↓<span class="const token" data-verso-hover="189">reduceIte</span>]; <span class="kw">exact</span> hφfr u hu v</span>
+<span id="L334">    <span class="kw">rw</span> [<span class="const token" data-verso-hover="201">merge</span>, <span class="const token" data-verso-hover="202">phaseVars</span>, ← heq]</span>
+<span id="L335">    <span class="kw">exact</span> (ih hgs).<span class="const token" data-verso-hover="174">append</span> hrun'</span>
+<span id="L336"></span>
+<span id="L337"><span class="dc">/-! ## Schedules -/</span></span>
+<span id="L338"></span>
+<span id="L339"><span class="dc">/-- An execution of a sequence of valid parallel phases. -/</span></span>
+<span id="L340"><span class="kw">inductive</span> <span class="const token" data-verso-hover="124">RunPhases</span> (I : <span class="const token" data-verso-hover="37">Instance</span> ι α V) (p : <span class="const token" data-verso-hover="40">ℝ</span>) :</span>
+<span id="L341">    <span class="const token" data-verso-hover="160">State</span> ι α V → <span class="const token" data-verso-hover="171">List</span> (<span class="const token" data-verso-hover="171">List</span> (<span class="const token" data-verso-hover="196">Group</span> ι α V)) → <span class="const token" data-verso-hover="160">State</span> ι α V → <span class="kw">Prop</span></span>
+<span id="L342">  | <span class="const token" data-verso-hover="214">nil</span> (s : <span class="const token" data-verso-hover="160">State</span> ι α V) : <span class="const token" data-verso-hover="124">RunPhases</span> I p s [] s</span>
+<span id="L343">  | <span class="const token" data-verso-hover="215">cons</span> {s s' : <span class="const token" data-verso-hover="160">State</span> ι α V} {G : <span class="const token" data-verso-hover="171">List</span> (<span class="const token" data-verso-hover="196">Group</span> ι α V)} {Gs : <span class="const token" data-verso-hover="171">List</span> (<span class="const token" data-verso-hover="171">List</span> (<span class="const token" data-verso-hover="196">Group</span> ι α V))} :</span>
+<span id="L344">      I.<span class="const token" data-verso-hover="203">ValidPhase</span> p s G → <span class="const token" data-verso-hover="124">RunPhases</span> I p (<span class="const token" data-verso-hover="201">merge</span> s G) Gs s' → <span class="const token" data-verso-hover="124">RunPhases</span> I p s (G :: Gs) s'</span>
+<span id="L345"></span>
+<span id="L346"><span class="kw">lemma</span> <span class="const token" data-verso-hover="216">mem_phaseVars</span> {G : <span class="const token" data-verso-hover="171">List</span> (<span class="const token" data-verso-hover="196">Group</span> ι α V)} {g : <span class="const token" data-verso-hover="196">Group</span> ι α V} (hg : g ∈ G) {j : ι}</span>
+<span id="L347">    (hj : j ∈ g.<span class="const token" data-verso-hover="197">vars</span>) : j ∈ <span class="const token" data-verso-hover="202">phaseVars</span> G := <span class="kw">by</span></span>
+<span id="L348">  <span class="kw">induction</span> G <span class="kw">with</span></span>
+<span id="L349">  | <span class="const token" data-verso-hover="209">nil</span> =&gt; <span class="kw">simp</span> <span class="kw">at</span> hg</span>
+<span id="L350">  | <span class="const token" data-verso-hover="210">cons</span> g' gs ih =&gt;</span>
+<span id="L351">    <span class="kw">rcases</span> <span class="const token" data-verso-hover="217">List.mem_cons</span>.<span class="const token" data-verso-hover="107">1</span> hg <span class="kw">with</span> <span class="kw">rfl</span> | hg</span>
+<span id="L352">    · <span class="kw">simp</span> [<span class="const token" data-verso-hover="202">phaseVars</span>, hj]</span>
+<span id="L353">    · <span class="kw">simp</span> [<span class="const token" data-verso-hover="202">phaseVars</span>, ih hg]</span>
+<span id="L354"></span>
+<span id="L355"><span class="kw">lemma</span> <span class="const token" data-verso-hover="218">RunPhases.run</span> {p : <span class="const token" data-verso-hover="40">ℝ</span>} {s s' : <span class="const token" data-verso-hover="160">State</span> ι α V} {Gs : <span class="const token" data-verso-hover="171">List</span> (<span class="const token" data-verso-hover="171">List</span> (<span class="const token" data-verso-hover="196">Group</span> ι α V))}</span>
+<span id="L356">    (h : I.<span class="const token" data-verso-hover="124">RunPhases</span> p s Gs s') : ∃ l, I.<span class="const token" data-verso-hover="170">Run</span> p s l s' ∧ ∀ G ∈ Gs, ∀ g ∈ G, ∀ j ∈ g.<span class="const token" data-verso-hover="197">vars</span>, j ∈ l := <span class="kw">by</span></span>
+<span id="L357">  <span class="kw">induction</span> h <span class="kw">with</span></span>
+<span id="L358">  | <span class="const token" data-verso-hover="214">nil</span> s =&gt; <span class="kw">exact</span> ⟨[], <span class="const token" data-verso-hover="172">Run.nil</span> s, <span class="kw">by</span> <span class="kw">simp</span>⟩</span>
+<span id="L359">  | @<span class="const token" data-verso-hover="215">cons</span> s s' G Gs hG _ ih =&gt;</span>
+<span id="L360">    <span class="kw">obtain</span> ⟨l, hl, hmem⟩ := ih</span>
+<span id="L361">    <span class="kw">refine</span> ⟨<span class="const token" data-verso-hover="202">phaseVars</span> G ++ l, (I.<span class="const token" data-verso-hover="29">phase_run</span> hG).<span class="const token" data-verso-hover="174">append</span> hl, ?_⟩</span>
+<span id="L362">    <span class="kw">intro</span> G' hG' g hg j hj</span>
+<span id="L363">    <span class="kw">rcases</span> <span class="const token" data-verso-hover="217">List.mem_cons</span>.<span class="const token" data-verso-hover="107">1</span> hG' <span class="kw">with</span> <span class="kw">rfl</span> | hG'</span>
+<span id="L364">    · <span class="kw">apply</span> <span class="const token" data-verso-hover="219">List.mem_append_left</span></span>
+<span id="L365">      <span class="kw">clear</span> hl hmem hG</span>
+<span id="L366">      <span class="kw">exact</span> <span class="const token" data-verso-hover="216">mem_phaseVars</span> hg hj</span>
+<span id="L367">    · <span class="kw">exact</span> <span class="const token" data-verso-hover="220">List.mem_append_right</span> _ (hmem G' hG' g hg j hj)</span>
+<span id="L368"></span>
+<span id="L369"><span class="dc">/-- **Correctness of every parallel schedule** (rank `≤ 3`, `p · 2^d &lt; 1`). Every execution of</span></span>
+<span id="L370"><span class="dc">valid parallel phases from the initial state reaches a state reachable by the sequential</span></span>
+<span id="L371"><span class="dc">process. Its variables (those of all groups) are fixed, and if this covers all variables, no</span></span>
+<span id="L372"><span class="dc">bad event occurs. -/</span></span>
+<span id="L373"><span class="kw">theorem</span> <span class="const token" data-verso-hover="221">schedule_correct</span> {p : <span class="const token" data-verso-hover="40">ℝ</span>} {d : <span class="const token" data-verso-hover="94">ℕ</span>} (hrank : ∀ j, (I.<span class="const token" data-verso-hover="48">evs</span> j).<span class="const token" data-verso-hover="121">card</span> ≤ <span class="nu">3</span>)</span>
+<span id="L374">    (hp : ∀ v, I.<span class="const token" data-verso-hover="75">pr</span> v ≤ p) (hd : ∀ v, (I.<span class="const token" data-verso-hover="51">dep</span> v).<span class="const token" data-verso-hover="121">card</span> ≤ d) (hpd : p * <span class="nu">2</span> ^ d &lt; <span class="nu">1</span>)</span>
+<span id="L375">    {s' : <span class="const token" data-verso-hover="160">State</span> ι α V} {Gs : <span class="const token" data-verso-hover="171">List</span> (<span class="const token" data-verso-hover="171">List</span> (<span class="const token" data-verso-hover="196">Group</span> ι α V))} (h : I.<span class="const token" data-verso-hover="124">RunPhases</span> p <span class="const token" data-verso-hover="125">init</span> Gs s') :</span>
+<span id="L376">    I.<span class="const token" data-verso-hover="151">Reachable</span> p s' ∧ (∀ G ∈ Gs, ∀ g ∈ G, ∀ j ∈ g.<span class="const token" data-verso-hover="197">vars</span>, s'.<span class="const token" data-verso-hover="126">σ</span> j ≠ <span class="const token" data-verso-hover="71">none</span>) ∧</span>
+<span id="L377">      ∀ x : ∀ i, α i, (∀ i, s'.<span class="const token" data-verso-hover="126">σ</span> i = <span class="const token" data-verso-hover="72">some</span> (x i)) → ∀ v, ¬ I.<span class="const token" data-verso-hover="45">bad</span> v x := <span class="kw">by</span></span>
+<span id="L378">  <span class="kw">obtain</span> ⟨l, hl, hmem⟩ := h.<span class="const token" data-verso-hover="218">run</span></span>
+<span id="L379">  <span class="kw">have</span> hreach : I.<span class="const token" data-verso-hover="151">Reachable</span> p s' := hl.<span class="const token" data-verso-hover="175">reflTransGen</span></span>
+<span id="L380">  <span class="kw">refine</span> ⟨hreach, <span class="kw">fun</span> G hG g hg j hj =&gt; hl.<span class="const token" data-verso-hover="183">fixed</span> j (<span class="const token" data-verso-hover="194">Or.inl</span> (hmem G hG g hg j hj)), ?_⟩</span>
+<span id="L381">  <span class="kw">exact</span> (I.<span class="const token" data-verso-hover="14">theorem_1_3</span> hrank hp hd hpd).<span class="const token" data-verso-hover="165">2</span><span class="nu">.</span><span class="const token" data-verso-hover="58">1</span> s' hreach</span>
+<span id="L382"></span>
+<span id="L383"><span class="dc">/-! ## Existence of executions -/</span></span>
+<span id="L384"></span>
+<span id="L385"><span class="kw">lemma</span> <span class="const token" data-verso-hover="222">exists_run</span> {p : <span class="const token" data-verso-hover="40">ℝ</span>} (hstep : ∀ s, I.<span class="const token" data-verso-hover="151">Reachable</span> p s → ∀ j, s.<span class="const token" data-verso-hover="126">σ</span> j = <span class="const token" data-verso-hover="71">none</span> →</span>
+<span id="L386">    ∃ s', I.<span class="const token" data-verso-hover="152">Step</span> p j s s') :</span>
+<span id="L387">    ∀ (l : <span class="const token" data-verso-hover="171">List</span> ι) (s : <span class="const token" data-verso-hover="160">State</span> ι α V), I.<span class="const token" data-verso-hover="151">Reachable</span> p s → l.<span class="const token" data-verso-hover="223">Nodup</span> → (∀ j ∈ l, s.<span class="const token" data-verso-hover="126">σ</span> j = <span class="const token" data-verso-hover="71">none</span>) →</span>
+<span id="L388">      ∃ s', I.<span class="const token" data-verso-hover="170">Run</span> p s l s' := <span class="kw">by</span></span>
+<span id="L389">  <span class="kw">intro</span> l</span>
+<span id="L390">  <span class="kw">induction</span> l <span class="kw">with</span></span>
+<span id="L391">  | <span class="const token" data-verso-hover="209">nil</span> =&gt; <span class="kw">intro</span> s _ _ _; <span class="kw">exact</span> ⟨s, <span class="const token" data-verso-hover="172">Run.nil</span> s⟩</span>
+<span id="L392">  | <span class="const token" data-verso-hover="210">cons</span> j l ih =&gt;</span>
+<span id="L393">    <span class="kw">intro</span> s hs hnd hnone</span>
+<span id="L394">    <span class="kw">obtain</span> ⟨s₁, hs₁⟩ := hstep s hs j (hnone j <span class="const token" data-verso-hover="180">List.mem_cons_self</span>)</span>
+<span id="L395">    <span class="kw">have</span> hreach₁ : I.<span class="const token" data-verso-hover="151">Reachable</span> p s₁ := <span class="const token" data-verso-hover="224">Relation.ReflTransGen.tail</span> hs ⟨j, hs₁⟩</span>
+<span id="L396">    <span class="kw">obtain</span> ⟨hj, ⟨a, -, hσ⟩, -⟩ := <span class="const token" data-verso-hover="122">id</span> hs₁</span>
+<span id="L397">    <span class="kw">obtain</span> ⟨s₂, h₂⟩ := ih s₁ hreach₁ (<span class="const token" data-verso-hover="225">List.nodup_cons</span>.<span class="const token" data-verso-hover="107">1</span> hnd).<span class="const token" data-verso-hover="165">2</span> (<span class="kw">fun</span> k hk =&gt; <span class="kw">by</span></span>
+<span id="L398">      <span class="kw">have</span> hkj : k ≠ j := <span class="kw">fun</span> e =&gt; (<span class="const token" data-verso-hover="225">List.nodup_cons</span>.<span class="const token" data-verso-hover="107">1</span> hnd).<span class="const token" data-verso-hover="58">1</span> (<span class="kw">by</span> <span class="kw">rw</span> [← e]; <span class="kw">exact</span> hk)</span>
+<span id="L399">      <span class="kw">rw</span> [hσ, <span class="const token" data-verso-hover="87">Function.update_of_ne</span> hkj]; <span class="kw">exact</span> hnone k (<span class="const token" data-verso-hover="181">List.mem_cons_of_mem</span> _ hk))</span>
+<span id="L400">    <span class="kw">exact</span> ⟨s₂, <span class="const token" data-verso-hover="173">Run.cons</span> hs₁ h₂⟩</span>
+<span id="L401"></span>
+<span id="L402"><span class="dc">/-- A *schedule*: a list of phases, each a list of groups `(variables, region)`. -/</span></span>
+<span id="L403"><span class="kw">abbrev</span> <span class="const token" data-verso-hover="97">Schedule</span> (ι : <span class="kw">Type</span>) (V : <span class="kw">Type</span>) := <span class="const token" data-verso-hover="171">List</span> (<span class="const token" data-verso-hover="171">List</span> (<span class="const token" data-verso-hover="171">List</span> ι × <span class="const token" data-verso-hover="95">Set</span> V))</span>
+<span id="L404"></span>
+<span id="L405"><span class="dc">/-- A schedule is *valid* if within each phase the regions are pairwise disjoint, each group's</span></span>
+<span id="L406"><span class="dc">variables affect only events of its region, and over the whole schedule every variable appears</span></span>
+<span id="L407"><span class="dc">exactly once. -/</span></span>
+<span id="L408"><span class="kw">structure</span> <span class="const token" data-verso-hover="105">ValidSchedule</span> (I : <span class="const token" data-verso-hover="37">Instance</span> ι α V) (S : <span class="const token" data-verso-hover="97">Schedule</span> ι V) : <span class="kw">Prop</span> <span class="kw">where</span></span>
+<span id="L409">  <span class="const token" data-verso-hover="226">region</span> : ∀ P ∈ S, ∀ g ∈ P, ∀ j ∈ g.<span class="const token" data-verso-hover="227">1</span>, ∀ t ∈ I.<span class="const token" data-verso-hover="48">evs</span> j, t ∈ g.<span class="const token" data-verso-hover="228">2</span></span>
+<span id="L410">  <span class="const token" data-verso-hover="229">disj</span> : ∀ P ∈ S, P.<span class="const token" data-verso-hover="207">Pairwise</span> <span class="kw">fun</span> g g' =&gt; <span class="const token" data-verso-hover="104">Disjoint</span> g.<span class="const token" data-verso-hover="228">2</span> g'.<span class="const token" data-verso-hover="228">2</span></span>
+<span id="L411">  <span class="const token" data-verso-hover="230">nodup</span> : (S.<span class="const token" data-verso-hover="231">flatMap</span> <span class="kw">fun</span> P =&gt; P.<span class="const token" data-verso-hover="231">flatMap</span> <span class="const token" data-verso-hover="227">Prod.fst</span>).<span class="const token" data-verso-hover="223">Nodup</span></span>
+<span id="L412">  <span class="const token" data-verso-hover="232">cover</span> : ∀ j, ∃ P ∈ S, ∃ g ∈ P, j ∈ g.<span class="const token" data-verso-hover="227">1</span></span>
+<span id="L413"></span>
+<span id="L414"><span class="dc">/-- The skeleton (variables and regions) of an execution. -/</span></span>
+<span id="L415"><span class="kw">def</span> <span class="const token" data-verso-hover="123">skeleton</span> (Gs : <span class="const token" data-verso-hover="171">List</span> (<span class="const token" data-verso-hover="171">List</span> (<span class="const token" data-verso-hover="196">Group</span> ι α V))) : <span class="const token" data-verso-hover="97">Schedule</span> ι V :=</span>
+<span id="L416">  Gs.<span class="const token" data-verso-hover="99">map</span> <span class="kw">fun</span> G =&gt; G.<span class="const token" data-verso-hover="99">map</span> <span class="kw">fun</span> g =&gt; (g.<span class="const token" data-verso-hover="197">vars</span>, g.<span class="const token" data-verso-hover="198">region</span>)</span>
+<span id="L417"></span>
+<span id="L418"><span class="dc">/-- **Every valid schedule can be executed, and every execution succeeds** (rank `≤ 3`,</span></span>
+<span id="L419"><span class="dc">`p · 2^d &lt; 1`). There is an execution following the schedule. Every execution following the</span></span>
+<span id="L420"><span class="dc">schedule ends with all variables fixed to an assignment avoiding all bad events. -/</span></span>
+<span id="L421"><span class="kw">theorem</span> <span class="const token" data-verso-hover="30">valid_schedule_correct</span> {p : <span class="const token" data-verso-hover="40">ℝ</span>} {d : <span class="const token" data-verso-hover="94">ℕ</span>} (hrank : ∀ j, (I.<span class="const token" data-verso-hover="48">evs</span> j).<span class="const token" data-verso-hover="121">card</span> ≤ <span class="nu">3</span>)</span>
+<span id="L422">    (hp : ∀ v, I.<span class="const token" data-verso-hover="75">pr</span> v ≤ p) (hd : ∀ v, (I.<span class="const token" data-verso-hover="51">dep</span> v).<span class="const token" data-verso-hover="121">card</span> ≤ d) (hpd : p * <span class="nu">2</span> ^ d &lt; <span class="nu">1</span>)</span>
+<span id="L423">    {S : <span class="const token" data-verso-hover="97">Schedule</span> ι V} (hS : I.<span class="const token" data-verso-hover="105">ValidSchedule</span> S) :</span>
+<span id="L424">    (∃ Gs s', <span class="const token" data-verso-hover="123">skeleton</span> Gs = S ∧ I.<span class="const token" data-verso-hover="124">RunPhases</span> p <span class="const token" data-verso-hover="125">init</span> Gs s') ∧</span>
+<span id="L425">      ∀ Gs s', <span class="const token" data-verso-hover="123">skeleton</span> Gs = S → I.<span class="const token" data-verso-hover="124">RunPhases</span> p <span class="const token" data-verso-hover="125">init</span> Gs s' →</span>
+<span id="L426">        ∃ x : ∀ i, α i, (∀ i, s'.<span class="const token" data-verso-hover="126">σ</span> i = <span class="const token" data-verso-hover="72">some</span> (x i)) ∧ ∀ v, ¬ I.<span class="const token" data-verso-hover="45">bad</span> v x := <span class="kw">by</span></span>
+<span id="L427">  <span class="kw">classical</span></span>
+<span id="L428">  <span class="kw">have</span> hstep := (I.<span class="const token" data-verso-hover="14">theorem_1_3</span> hrank hp hd hpd).<span class="const token" data-verso-hover="58">1</span></span>
+<span id="L429">  <span class="kw">constructor</span></span>
+<span id="L430">  · <span class="cm">--</span><span class="cm"> build the execution phase by phase</span></span>
+<span id="L431">    <span class="kw">suffices</span> key : ∀ (S' : <span class="const token" data-verso-hover="97">Schedule</span> ι V) (s : <span class="const token" data-verso-hover="160">State</span> ι α V), I.<span class="const token" data-verso-hover="151">Reachable</span> p s →</span>
+<span id="L432">        (∀ P ∈ S', ∀ g ∈ P, ∀ j ∈ g.<span class="const token" data-verso-hover="227">1</span>, ∀ t ∈ I.<span class="const token" data-verso-hover="48">evs</span> j, t ∈ g.<span class="const token" data-verso-hover="228">2</span>) →</span>
+<span id="L433">        (∀ P ∈ S', P.<span class="const token" data-verso-hover="207">Pairwise</span> <span class="kw">fun</span> g g' =&gt; <span class="const token" data-verso-hover="104">Disjoint</span> g.<span class="const token" data-verso-hover="228">2</span> g'.<span class="const token" data-verso-hover="228">2</span>) →</span>
+<span id="L434">        (S'.<span class="const token" data-verso-hover="231">flatMap</span> <span class="kw">fun</span> P =&gt; P.<span class="const token" data-verso-hover="231">flatMap</span> <span class="const token" data-verso-hover="227">Prod.fst</span>).<span class="const token" data-verso-hover="223">Nodup</span> →</span>
+<span id="L435">        (∀ P ∈ S', ∀ g ∈ P, ∀ j ∈ g.<span class="const token" data-verso-hover="227">1</span>, s.<span class="const token" data-verso-hover="126">σ</span> j = <span class="const token" data-verso-hover="71">none</span>) →</span>
+<span id="L436">        ∃ Gs s', <span class="const token" data-verso-hover="123">skeleton</span> Gs = S' ∧ I.<span class="const token" data-verso-hover="124">RunPhases</span> p s Gs s' <span class="kw">by</span></span>
+<span id="L437">      <span class="kw">exact</span> key S <span class="const token" data-verso-hover="125">init</span> <span class="const token" data-verso-hover="177">Relation.ReflTransGen.refl</span> hS.<span class="const token" data-verso-hover="226">region</span> hS.<span class="const token" data-verso-hover="229">disj</span> hS.<span class="const token" data-verso-hover="230">nodup</span></span>
+<span id="L438">        (<span class="kw">fun</span> _ _ _ _ _ _ =&gt; <span class="const token" data-verso-hover="59">rfl</span>)</span>
+<span id="L439">    <span class="kw">intro</span> S'</span>
+<span id="L440">    <span class="kw">induction</span> S' <span class="kw">with</span></span>
+<span id="L441">    | <span class="const token" data-verso-hover="209">nil</span> =&gt; <span class="kw">intro</span> s _ _ _ _ _; <span class="kw">exact</span> ⟨[], s, <span class="const token" data-verso-hover="59">rfl</span>, <span class="const token" data-verso-hover="214">RunPhases.nil</span> s⟩</span>
+<span id="L442">    | <span class="const token" data-verso-hover="210">cons</span> P S' ih =&gt;</span>
+<span id="L443">      <span class="kw">intro</span> s hs hreg hdisj hnd hnone</span>
+<span id="L444">      <span class="cm">--</span><span class="cm"> every group of `P` runs from `s`</span></span>
+<span id="L445">      <span class="kw">have</span> hndP : (P.<span class="const token" data-verso-hover="231">flatMap</span> <span class="const token" data-verso-hover="227">Prod.fst</span>).<span class="const token" data-verso-hover="223">Nodup</span> := (<span class="const token" data-verso-hover="233">List.nodup_append</span>.<span class="const token" data-verso-hover="107">1</span></span>
+<span id="L446">        (<span class="kw">by</span> <span class="kw">simpa</span> [<span class="const token" data-verso-hover="234">List.flatMap_cons</span>] <span class="kw">using</span> hnd)).<span class="const token" data-verso-hover="58">1</span></span>
+<span id="L447">      <span class="kw">have</span> hndP' := <span class="const token" data-verso-hover="114">List.nodup_flatMap</span>.<span class="const token" data-verso-hover="107">1</span> hndP</span>
+<span id="L448">      <span class="kw">have</span> hgroup : ∀ g ∈ P, ∃ o, I.<span class="const token" data-verso-hover="170">Run</span> p s g.<span class="const token" data-verso-hover="227">1</span> o := <span class="kw">by</span></span>
+<span id="L449">        <span class="kw">intro</span> g hg</span>
+<span id="L450">        <span class="kw">exact</span> <span class="const token" data-verso-hover="222">exists_run</span> hstep g.<span class="const token" data-verso-hover="227">1</span> s hs (hndP'.<span class="const token" data-verso-hover="58">1</span> g hg) (hnone P <span class="const token" data-verso-hover="180">List.mem_cons_self</span> g hg)</span>
+<span id="L451">      <span class="kw">have</span> : <span class="const token" data-verso-hover="235">Nonempty</span> (<span class="const token" data-verso-hover="160">State</span> ι α V) := ⟨⟨<span class="kw">fun</span> _ =&gt; <span class="const token" data-verso-hover="71">none</span>, <span class="kw">fun</span> _ _ =&gt; <span class="nu">0</span>⟩⟩</span>
+<span id="L452">      choose! out hout <span class="kw">using</span> hgroup</span>
+<span id="L453">      <span class="kw">let</span> G : <span class="const token" data-verso-hover="171">List</span> (<span class="const token" data-verso-hover="196">Group</span> ι α V) := P.<span class="const token" data-verso-hover="99">map</span> <span class="kw">fun</span> g =&gt; ⟨g.<span class="const token" data-verso-hover="227">1</span>, g.<span class="const token" data-verso-hover="228">2</span>, out g⟩</span>
+<span id="L454">      <span class="kw">have</span> hvalid : I.<span class="const token" data-verso-hover="203">ValidPhase</span> p s G := <span class="kw">by</span></span>
+<span id="L455">        <span class="kw">refine</span> ⟨?_, ?_, ?_⟩</span>
+<span id="L456">        · <span class="kw">intro</span> g' hg'</span>
+<span id="L457">          <span class="kw">obtain</span> ⟨g, hg, <span class="kw">rfl</span>⟩ := <span class="const token" data-verso-hover="106">List.mem_map</span>.<span class="const token" data-verso-hover="107">1</span> hg'</span>
+<span id="L458">          <span class="kw">exact</span> hout g hg</span>
+<span id="L459">        · <span class="kw">intro</span> g' hg'</span>
+<span id="L460">          <span class="kw">obtain</span> ⟨g, hg, <span class="kw">rfl</span>⟩ := <span class="const token" data-verso-hover="106">List.mem_map</span>.<span class="const token" data-verso-hover="107">1</span> hg'</span>
+<span id="L461">          <span class="kw">exact</span> hreg P <span class="const token" data-verso-hover="180">List.mem_cons_self</span> g hg</span>
+<span id="L462">        · <span class="kw">rw</span> [<span class="const token" data-verso-hover="109">List.pairwise_map</span>]</span>
+<span id="L463">          <span class="kw">have</span> hpw := hdisj P <span class="const token" data-verso-hover="180">List.mem_cons_self</span></span>
+<span id="L464">          <span class="kw">have</span> hpw2 := hndP'.<span class="const token" data-verso-hover="165">2</span></span>
+<span id="L465">          <span class="kw">refine</span> <span class="const token" data-verso-hover="236">List.Pairwise.and</span> hpw ?_</span>
+<span id="L466">          <span class="kw">refine</span> hpw2.<span class="const token" data-verso-hover="237">imp</span> ?_</span>
+<span id="L467">          <span class="kw">intro</span> g g' h j hj hj'</span>
+<span id="L468">          <span class="kw">exact</span> <span class="const token" data-verso-hover="116">List.disjoint_left</span>.<span class="const token" data-verso-hover="107">1</span> h hj hj'</span>
+<span id="L469">      <span class="kw">have</span> hrun := I.<span class="const token" data-verso-hover="29">phase_run</span> hvalid</span>
+<span id="L470">      <span class="kw">have</span> hreach' : I.<span class="const token" data-verso-hover="151">Reachable</span> p (<span class="const token" data-verso-hover="201">merge</span> s G) :=</span>
+<span id="L471">        <span class="const token" data-verso-hover="238">Relation.ReflTransGen.trans</span> hs hrun.<span class="const token" data-verso-hover="175">reflTransGen</span></span>
+<span id="L472">      <span class="kw">have</span> hndrest : (S'.<span class="const token" data-verso-hover="231">flatMap</span> <span class="kw">fun</span> P =&gt; P.<span class="const token" data-verso-hover="231">flatMap</span> <span class="const token" data-verso-hover="227">Prod.fst</span>).<span class="const token" data-verso-hover="223">Nodup</span> :=</span>
+<span id="L473">        (<span class="const token" data-verso-hover="233">List.nodup_append</span>.<span class="const token" data-verso-hover="107">1</span> (<span class="kw">by</span> <span class="kw">simpa</span> [<span class="const token" data-verso-hover="234">List.flatMap_cons</span>] <span class="kw">using</span> hnd)).<span class="const token" data-verso-hover="165">2</span><span class="nu">.</span><span class="const token" data-verso-hover="58">1</span></span>
+<span id="L474">      <span class="kw">have</span> hdisjrest := (<span class="const token" data-verso-hover="233">List.nodup_append</span>.<span class="const token" data-verso-hover="107">1</span> (<span class="kw">by</span> <span class="kw">simpa</span> [<span class="const token" data-verso-hover="234">List.flatMap_cons</span>] <span class="kw">using</span> hnd)).<span class="const token" data-verso-hover="165">2</span><span class="nu">.</span><span class="const token" data-verso-hover="165">2</span></span>
+<span id="L475">      <span class="kw">obtain</span> ⟨Gs, s', hsk, hrp⟩ := ih (<span class="const token" data-verso-hover="201">merge</span> s G) hreach'</span>
+<span id="L476">        (<span class="kw">fun</span> P' hP' =&gt; hreg P' (<span class="const token" data-verso-hover="181">List.mem_cons_of_mem</span> _ hP'))</span>
+<span id="L477">        (<span class="kw">fun</span> P' hP' =&gt; hdisj P' (<span class="const token" data-verso-hover="181">List.mem_cons_of_mem</span> _ hP')) hndrest</span>
+<span id="L478">        (<span class="kw">by</span></span>
+<span id="L479">          <span class="kw">intro</span> P' hP' g hg j hj</span>
+<span id="L480">          <span class="kw">rw</span> [<span class="const token" data-verso-hover="208">merge_sigma</span>]</span>
+<span id="L481">          · <span class="kw">exact</span> hnone P' (<span class="const token" data-verso-hover="181">List.mem_cons_of_mem</span> _ hP') g hg j hj</span>
+<span id="L482">          · <span class="kw">intro</span> g' hg' hjg'</span>
+<span id="L483">            <span class="kw">obtain</span> ⟨g'', hg'', <span class="kw">rfl</span>⟩ := <span class="const token" data-verso-hover="106">List.mem_map</span>.<span class="const token" data-verso-hover="107">1</span> hg'</span>
+<span id="L484">            <span class="kw">have</span> h1 : j ∈ P.<span class="const token" data-verso-hover="231">flatMap</span> <span class="const token" data-verso-hover="227">Prod.fst</span> := <span class="const token" data-verso-hover="118">List.mem_flatMap</span>.<span class="const token" data-verso-hover="119">2</span> ⟨g'', hg'', hjg'⟩</span>
+<span id="L485">            <span class="kw">have</span> h2 : j ∈ S'.<span class="const token" data-verso-hover="231">flatMap</span> <span class="kw">fun</span> P =&gt; P.<span class="const token" data-verso-hover="231">flatMap</span> <span class="const token" data-verso-hover="227">Prod.fst</span> :=</span>
+<span id="L486">              <span class="const token" data-verso-hover="118">List.mem_flatMap</span>.<span class="const token" data-verso-hover="119">2</span> ⟨P', hP', <span class="const token" data-verso-hover="118">List.mem_flatMap</span>.<span class="const token" data-verso-hover="119">2</span> ⟨g, hg, hj⟩⟩</span>
+<span id="L487">            <span class="kw">exact</span> hdisjrest j h1 j h2 <span class="const token" data-verso-hover="59">rfl</span>)</span>
+<span id="L488">      <span class="kw">refine</span> ⟨G :: Gs, s', ?_, <span class="const token" data-verso-hover="215">RunPhases.cons</span> hvalid hrp⟩</span>
+<span id="L489">      <span class="kw">simp</span> only [<span class="const token" data-verso-hover="123">skeleton</span>, <span class="const token" data-verso-hover="239">List.map_cons</span>] <span class="kw">at</span> hsk ⊢</span>
+<span id="L490">      <span class="kw">rw</span> [hsk]</span>
+<span id="L491">      <span class="kw">simp</span> only [G, <span class="const token" data-verso-hover="240">List.map_map</span>, <span class="const token" data-verso-hover="241">List.cons.injEq</span>, <span class="const token" data-verso-hover="242">and_true</span>]</span>
+<span id="L492">      conv_rhs =&gt; <span class="kw">rw</span> [← <span class="const token" data-verso-hover="243">List.map_id</span> P]</span>
+<span id="L493">      <span class="kw">rfl</span></span>
+<span id="L494">  · <span class="kw">intro</span> Gs s' hsk hrp</span>
+<span id="L495">    <span class="kw">obtain</span> ⟨hreach, hfixed, hgood⟩ := I.<span class="const token" data-verso-hover="221">schedule_correct</span> hrank hp hd hpd hrp</span>
+<span id="L496">    <span class="kw">have</span> hall : ∀ i, s'.<span class="const token" data-verso-hover="126">σ</span> i ≠ <span class="const token" data-verso-hover="71">none</span> := <span class="kw">by</span></span>
+<span id="L497">      <span class="kw">intro</span> i</span>
+<span id="L498">      <span class="kw">obtain</span> ⟨P, hP, g, hg, hi⟩ := hS.<span class="const token" data-verso-hover="232">cover</span> i</span>
+<span id="L499">      <span class="kw">rw</span> [← hsk] <span class="kw">at</span> hP</span>
+<span id="L500">      <span class="kw">obtain</span> ⟨G, hG, <span class="kw">rfl</span>⟩ := <span class="const token" data-verso-hover="106">List.mem_map</span>.<span class="const token" data-verso-hover="107">1</span> hP</span>
+<span id="L501">      <span class="kw">obtain</span> ⟨g', hg', <span class="kw">rfl</span>⟩ := <span class="const token" data-verso-hover="106">List.mem_map</span>.<span class="const token" data-verso-hover="107">1</span> hg</span>
+<span id="L502">      <span class="kw">exact</span> hfixed G hG g' hg' i hi</span>
+<span id="L503">    <span class="kw">let</span> x : ∀ i, α i := <span class="kw">fun</span> i =&gt; (s'.<span class="const token" data-verso-hover="126">σ</span> i).<span class="const token" data-verso-hover="244">get</span> (<span class="const token" data-verso-hover="245">Option.ne_none_iff_isSome</span>.<span class="const token" data-verso-hover="107">1</span> (hall i))</span>
+<span id="L504">    <span class="kw">have</span> hx : ∀ i, s'.<span class="const token" data-verso-hover="126">σ</span> i = <span class="const token" data-verso-hover="72">some</span> (x i) := <span class="kw">fun</span> i =&gt; <span class="kw">by</span> <span class="kw">simp</span> [x]</span>
+<span id="L505">    <span class="kw">exact</span> ⟨x, hx, hgood x hx⟩</span>
+<span id="L506"></span>
+<span id="L507"><span class="kw">end</span> Instance</span>
+<span id="L508"></span>
+<span id="L509"><span class="kw">end</span> SharpThresholdLLL</span>
+<span id="L510"></span>
+</code></div>
+        <script>
+          window.versoHoversUrl = "PODC2019/SharpThresholdLLL/-hovers.json";</script>
+        <script src="static/lean/popper.js"></script>
+        <script src="static/lean/tippy.js"></script>
+        <script src="static/lean/marked.js"></script>
+        <script src="static/lean/highlighting.js"></script>
+        <script src="static/lean/lean.js"></script>
+        </article></main><footer class="site-footer"><div class="wrap">
+        Machine-checked formalizations of PODC papers in Lean 4. Generated with <a href="https://github.com/leanprover/verso">Verso</a> from the README files of <a href="https://github.com/vasnesterov/formal_podc">vasnesterov/formal_podc</a>.</div>
+      </footer></body>
+  </html>
+

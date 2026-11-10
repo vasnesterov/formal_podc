@@ -1,0 +1,492 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="light dark">
+    <link rel="icon" href="data:,">
+    <title>AsymmetricDAGConsensus: Gather3.lean · Formal PODC</title><base href="../../../.././"><link rel="stylesheet" href="static/lean/verso-vars.css">
+    <link rel="stylesheet" href="static/lean/highlighting.css">
+    <link rel="stylesheet" href="static/lean/tippy-border.css">
+    <link rel="stylesheet" href="static/style.css">
+    <script defer="defer" src="static/site.js"></script>
+    </head>
+  <body>
+    <header class="site-header">
+      <div class="wrap">
+        <a class="brand" href=".">Formal PODC</a><nav class="top">
+          <a href=".">Search</a><a href="about/">About</a><a href="https://github.com/vasnesterov/formal_podc">GitHub</a></nav>
+        </div>
+      </header>
+    <main class="wrap"><article><nav class="breadcrumbs" aria-label="Breadcrumb">
+          <a href=".">Search</a><span class="sep">›</span><a href="PODC2025/">PODC 2025</a><span class="sep">›</span><a href="PODC2025/AsymmetricDAGConsensus/">AsymmetricDAGConsensus</a><span class="sep">›</span><a href="PODC2025/AsymmetricDAGConsensus/src/">Lean source</a><span class="sep">›</span><span aria-current="page">Gather3</span></nav>
+        <h1>
+          <code>Gather3.lean</code></h1>
+        <div class="paper-links">
+          <p>
+            Source of <a href="PODC2025/AsymmetricDAGConsensus/">DAG-based Consensus with Asymmetric Trust — PODC 2025</a> · <a href="https://github.com/vasnesterov/formal_podc/blob/main/Papers/PODC2025/AsymmetricDAGConsensus/Gather3.lean">GitHub</a> · hover over a name for its type and documentation</p>
+          </div>
+        <div class="lean-code lean-src">
+          <code class="hl lean block" data-lean-context="Gather3"><span id="L1"><span class="kw">import</span> Papers.PODC2025.AsymmetricDAGConsensus.RoundGather</span>
+<span id="L2"></span>
+<span id="L3"><span class="dc">/-!</span></span>
+<span id="L4"><span class="dc"># Algorithm 3: constant-round asymmetric gather — model and safety</span></span>
+<span id="L5"></span>
+<span id="L6"><span class="dc">Amores-Sesar, Cachin, Villacis, Zanolini, *DAG-based Consensus with Asymmetric Trust*, PODC 2025.</span></span>
+<span id="L7"></span>
+<span id="L8"><span class="dc">Algorithm 3 in the asynchronous interleaving model `Cslib.Byzantine.AsyncBroadcast` (Byzantine</span></span>
+<span id="L9"><span class="dc">faults, adaptive corruption, authenticated channels). Each handler of the pseudocode is a</span></span>
+<span id="L10"><span class="dc">disjunct of the send guard:</span></span>
+<span id="L11"></span>
+<span id="L12"><span class="dc">* line 43: arb-broadcast the input (`GMsg.val`);</span></span>
+<span id="L13"><span class="dc">* line 46: once the arb-delivered pairs `S` cover a quorum, send `DISTRIBUTES S` (once);</span></span>
+<span id="L14"><span class="dc">* line 48: on `DISTRIBUTES S` from `j` with `S ⊆ Sᵢ` and before sending `DISTRIBUTET`,</span></span>
+<span id="L15"><span class="dc">  acknowledge (`GMsg.ack j S`, addressed to `j`; `Tᵢ` is the union of the acknowledged sets);</span></span>
+<span id="L16"><span class="dc">* line 51: `READY` after acknowledgements of the own `DISTRIBUTES` from a quorum;</span></span>
+<span id="L17"><span class="dc">* lines 53/55: `CONFIRM` after `READY` from a quorum or `CONFIRM` from a kernel;</span></span>
+<span id="L18"><span class="dc">* line 57: `DISTRIBUTET Tᵢ` (once) after `CONFIRM` from a quorum, `Tᵢ` = union of the</span></span>
+<span id="L19"><span class="dc">  acknowledged sets; afterwards no more acknowledgements (`sentT`);</span></span>
+<span id="L20"><span class="dc">* lines 60/62: ag-deliver `U` once `DISTRIBUTET` messages `T_q` with `T_q ⊆ Sᵢ` were received</span></span>
+<span id="L21"><span class="dc">  from all `q` of a quorum; `U` contains these `T_q` and only received `DISTRIBUTET` sets</span></span>
+<span id="L22"><span class="dc">  with `T ⊆ Sᵢ`.</span></span>
+<span id="L23"></span>
+<span id="L24"><span class="dc">The asymmetric reliable broadcast of the inputs is the `val` message; its guarantees for the</span></span>
+<span id="L25"><span class="dc">guild that are not automatic in the model (consistency and totality for Byzantine senders) are</span></span>
+<span id="L26"><span class="dc">hypotheses on the execution (`RBC`), exactly the properties of the primitive of Alpos et al.</span></span>
+<span id="L27"></span>
+<span id="L28"><span class="dc">This file: the protocol, invariants of reachable states, and the safety lemmas</span></span>
+<span id="L29"><span class="dc">(Lemma 3.4, Lemma 3.5, Lemma 3.7 = common core, Lemma 3.8 validity and agreement) for any</span></span>
+<span id="L30"><span class="dc">guild `G` of the execution. Liveness (Lemmas 3.3, 3.6, termination) is in `Gather3Liveness`.</span></span>
+<span id="L31"><span class="dc">-/</span></span>
+<span id="L32"></span>
+<span id="L33"><span class="kw">namespace</span> Podc.AsymmetricDAGConsensus</span>
+<span id="L34"></span>
+<span id="L35"><span class="kw">open</span> Cslib.Byzantine.AsyncBroadcast Cslib.AsymmetricQuorum</span>
+<span id="L36"></span>
+<span id="L37"><span class="kw">variable</span> {P V : <span class="kw">Type</span>*}</span>
+<span id="L38"></span>
+<span id="L39"><span class="dc">/-! ### Generic step lemma -/</span></span>
+<span id="L40"></span>
+<span id="L41"><span class="kw">section</span> Generic</span>
+<span id="L42"></span>
+<span id="L43"><span class="kw">variable</span> {M I O : <span class="kw">Type</span>*} [<span class="const token" data-verso-hover="63">DecidableEq</span> P] {A : <span class="const token" data-verso-hover="64">Protocol</span> P M I O} {x : P → I} {k : <span class="const token" data-verso-hover="65">FaultKind</span>}</span>
+<span id="L44">  {t : <span class="const token" data-verso-hover="61">ℕ</span>}</span>
+<span id="L45"></span>
+<span id="L46"><span class="cm">--</span><span class="cm"> CSLib candidate (AsyncBroadcast).</span></span>
+<span id="L47"><span class="dc">/-- A message that is broadcast after a step was broadcast before, or the step was its</span></span>
+<span id="L48"><span class="dc">broadcast (by an uncorrupted party whose guard held). -/</span></span>
+<span id="L49"><span class="kw">theorem</span> <span class="const token" data-verso-hover="20">step_sent_new</span> {σ σ' : <span class="const token" data-verso-hover="66">State</span> P M O} (h : <span class="const token" data-verso-hover="67">Step</span> A x k t σ σ') {p : P} {m : M}</span>
+<span id="L50">    (hm : (p, m) ∈ σ'.<span class="const token" data-verso-hover="68">sent</span>) :</span>
+<span id="L51">    (p, m) ∈ σ.<span class="const token" data-verso-hover="68">sent</span> ∨ (p ∉ σ.<span class="const token" data-verso-hover="40">bad</span> ∧ A.<span class="const token" data-verso-hover="69">send</span> p (x p) (σ.<span class="const token" data-verso-hover="70">inbox</span> p) (σ.<span class="const token" data-verso-hover="71">out</span> p) m) := <span class="kw">by</span></span>
+<span id="L52">  <span class="kw">cases</span> h <span class="kw">with</span></span>
+<span id="L53">  | <span class="const token" data-verso-hover="72">send</span> p' m' hb hg =&gt;</span>
+<span id="L54">    <span class="kw">rcases</span> <span class="const token" data-verso-hover="73">Set.mem_insert_iff</span>.<span class="const token" data-verso-hover="74">1</span> hm <span class="kw">with</span> he | hm</span>
+<span id="L55">    · <span class="kw">simp</span> only [<span class="const token" data-verso-hover="75">Prod.mk.injEq</span>] <span class="kw">at</span> he</span>
+<span id="L56">      <span class="kw">obtain</span> ⟨<span class="kw">rfl</span>, <span class="kw">rfl</span>⟩ := he</span>
+<span id="L57">      <span class="kw">exact</span> <span class="const token" data-verso-hover="76">Or.inr</span> ⟨hb, hg⟩</span>
+<span id="L58">    · <span class="kw">exact</span> <span class="const token" data-verso-hover="77">Or.inl</span> hm</span>
+<span id="L59">  | <span class="const token" data-verso-hover="78">_</span> =&gt; <span class="kw">exact</span> <span class="const token" data-verso-hover="77">Or.inl</span> hm</span>
+<span id="L60"></span>
+<span id="L61"><span class="cm">--</span><span class="cm"> CSLib candidate (AsyncBroadcast).</span></span>
+<span id="L62"><span class="dc">/-- In an execution, a broadcast present at time `i + 1` was present at time `i` or was made by</span></span>
+<span id="L63"><span class="dc">the step `i → i + 1` (with the guard holding at time `i`). -/</span></span>
+<span id="L64"><span class="kw">theorem</span> <span class="const token" data-verso-hover="21">exec_sent_succ</span> (E : <span class="const token" data-verso-hover="79">Exec</span> A x k t) (i : <span class="const token" data-verso-hover="61">ℕ</span>) {p : P} {m : M}</span>
+<span id="L65">    (hm : (p, m) ∈ (E.<span class="const token" data-verso-hover="80">σ</span> (i + <span class="nu">1</span>)).<span class="const token" data-verso-hover="68">sent</span>) :</span>
+<span id="L66">    (p, m) ∈ (E.<span class="const token" data-verso-hover="80">σ</span> i).<span class="const token" data-verso-hover="68">sent</span> ∨</span>
+<span id="L67">      (p ∉ (E.<span class="const token" data-verso-hover="80">σ</span> i).<span class="const token" data-verso-hover="40">bad</span> ∧ A.<span class="const token" data-verso-hover="69">send</span> p (x p) ((E.<span class="const token" data-verso-hover="80">σ</span> i).<span class="const token" data-verso-hover="70">inbox</span> p) ((E.<span class="const token" data-verso-hover="80">σ</span> i).<span class="const token" data-verso-hover="71">out</span> p) m) := <span class="kw">by</span></span>
+<span id="L68">  <span class="kw">rcases</span> E.<span class="const token" data-verso-hover="81">step</span> i <span class="kw">with</span> h | h</span>
+<span id="L69">  · <span class="kw">exact</span> <span class="const token" data-verso-hover="20">step_sent_new</span> h hm</span>
+<span id="L70">  · <span class="kw">rw</span> [h] <span class="kw">at</span> hm; <span class="kw">exact</span> <span class="const token" data-verso-hover="77">Or.inl</span> hm</span>
+<span id="L71"></span>
+<span id="L72"><span class="kw">end</span> Generic</span>
+<span id="L73"></span>
+<span id="L74"><span class="dc">/-! ### The protocol -/</span></span>
+<span id="L75"></span>
+<span id="L76"><span class="dc">/-- Messages of Algorithm 3. `ack j S` is the acknowledgement addressed to `j` for its</span></span>
+<span id="L77"><span class="dc">`DISTRIBUTES S` (point-to-point messages are modelled as broadcasts carrying the addressee). -/</span></span>
+<span id="L78"><span class="kw">inductive</span> <span class="const token" data-verso-hover="82">GMsg</span> (P V : <span class="kw">Type</span>*)</span>
+<span id="L79">  | <span class="const token" data-verso-hover="83">val</span> (v : V)</span>
+<span id="L80">  | <span class="const token" data-verso-hover="84">distS</span> (S : <span class="const token" data-verso-hover="85">Set</span> (P × V))</span>
+<span id="L81">  | <span class="const token" data-verso-hover="86">ack</span> (j : P) (S : <span class="const token" data-verso-hover="85">Set</span> (P × V))</span>
+<span id="L82">  | <span class="const token" data-verso-hover="87">ready</span></span>
+<span id="L83">  | <span class="const token" data-verso-hover="88">confirm</span></span>
+<span id="L84">  | <span class="const token" data-verso-hover="89">distT</span> (T : <span class="const token" data-verso-hover="85">Set</span> (P × V))</span>
+<span id="L85"></span>
+<span id="L86"><span class="kw">namespace</span> Gather3</span>
+<span id="L87"></span>
+<span id="L88"><span class="dc">/-- `Sᵢ`: the arb-delivered pairs. -/</span></span>
+<span id="L89"><span class="kw">def</span> <span class="const token" data-verso-hover="90">delivered</span> (ib : P → <span class="const token" data-verso-hover="85">Set</span> (<span class="const token" data-verso-hover="82">GMsg</span> P V)) : <span class="const token" data-verso-hover="85">Set</span> (P × V) := {sv | <span class="const token" data-verso-hover="83">GMsg.val</span> sv.<span class="const token" data-verso-hover="91">2</span> ∈ ib sv.<span class="const token" data-verso-hover="92">1</span>}</span>
+<span id="L90"></span>
+<span id="L91"><span class="dc">/-- `Tᵢ`: the union of the acknowledged `DISTRIBUTES` sets. -/</span></span>
+<span id="L92"><span class="kw">def</span> <span class="const token" data-verso-hover="93">acked</span> (out : <span class="const token" data-verso-hover="85">Set</span> (<span class="const token" data-verso-hover="82">GMsg</span> P V)) : <span class="const token" data-verso-hover="85">Set</span> (P × V) := {sv | ∃ j S, <span class="const token" data-verso-hover="86">GMsg.ack</span> j S ∈ out ∧ sv ∈ S}</span>
+<span id="L93"></span>
+<span id="L94"><span class="dc">/-- `φ` holds for all members of some quorum of `p`. -/</span></span>
+<span id="L95"><span class="kw">def</span> <span class="const token" data-verso-hover="94">QSays</span> (Qs : P → <span class="const token" data-verso-hover="85">Set</span> (<span class="const token" data-verso-hover="25">Finset</span> P)) (p : P) (φ : P → <span class="kw">Prop</span>) : <span class="kw">Prop</span> := ∃ Q ∈ Qs p, ∀ q ∈ Q, φ q</span>
+<span id="L96"></span>
+<span id="L97"><span class="dc">/-- `φ` holds for all members of some kernel of `p`. -/</span></span>
+<span id="L98"><span class="kw">def</span> <span class="const token" data-verso-hover="95">KSays</span> (Qs : P → <span class="const token" data-verso-hover="85">Set</span> (<span class="const token" data-verso-hover="25">Finset</span> P)) (p : P) (φ : P → <span class="kw">Prop</span>) : <span class="kw">Prop</span> :=</span>
+<span id="L99">  ∃ K : <span class="const token" data-verso-hover="85">Set</span> P, <span class="const token" data-verso-hover="96">IsKernel</span> Qs p K ∧ ∀ q ∈ K, φ q</span>
+<span id="L100"></span>
+<span id="L101"><span class="dc">/-- A received `DISTRIBUTET T` from `q` whose pairs are all arb-delivered (line 60). -/</span></span>
+<span id="L102"><span class="kw">def</span> <span class="const token" data-verso-hover="4">QualT</span> (ib : P → <span class="const token" data-verso-hover="85">Set</span> (<span class="const token" data-verso-hover="82">GMsg</span> P V)) (q : P) (T : <span class="const token" data-verso-hover="85">Set</span> (P × V)) : <span class="kw">Prop</span> :=</span>
+<span id="L103">  <span class="const token" data-verso-hover="89">GMsg.distT</span> T ∈ ib q ∧ T ⊆ <span class="const token" data-verso-hover="90">delivered</span> ib</span>
+<span id="L104"></span>
+<span id="L105"><span class="dc">/-- Algorithm 3 for the asymmetric quorum system `Qs`. -/</span></span>
+<span id="L106"><span class="kw">def</span> <span class="const token" data-verso-hover="97">protocol</span> (Qs : P → <span class="const token" data-verso-hover="85">Set</span> (<span class="const token" data-verso-hover="25">Finset</span> P)) : <span class="const token" data-verso-hover="64">Protocol</span> P (<span class="const token" data-verso-hover="82">GMsg</span> P V) V (<span class="const token" data-verso-hover="85">Set</span> (P × V)) <span class="kw">where</span></span>
+<span id="L107">  <span class="const token" data-verso-hover="69">send</span> p x ib out m :=</span>
+<span id="L108">    m = <span class="const token" data-verso-hover="83">.</span>val x ∨</span>
+<span id="L109">    (m = <span class="const token" data-verso-hover="84">.</span>distS (<span class="const token" data-verso-hover="90">delivered</span> ib) ∧ <span class="const token" data-verso-hover="94">QSays</span> Qs p (<span class="kw">fun</span> q =&gt; ∃ v, (q, v) ∈ <span class="const token" data-verso-hover="90">delivered</span> ib) ∧</span>
+<span id="L110">      ∀ S, <span class="const token" data-verso-hover="84">GMsg.distS</span> S ∉ out) ∨</span>
+<span id="L111">    (∃ j S, m = <span class="const token" data-verso-hover="86">.</span>ack j S ∧ <span class="const token" data-verso-hover="84">GMsg.distS</span> S ∈ ib j ∧ S ⊆ <span class="const token" data-verso-hover="90">delivered</span> ib ∧ ∀ T, <span class="const token" data-verso-hover="89">GMsg.distT</span> T ∉ out) ∨</span>
+<span id="L112">    (m = <span class="const token" data-verso-hover="87">.</span>ready ∧ <span class="const token" data-verso-hover="94">QSays</span> Qs p (<span class="kw">fun</span> q =&gt; ∃ S, <span class="const token" data-verso-hover="86">GMsg.ack</span> p S ∈ ib q)) ∨</span>
+<span id="L113">    (m = <span class="const token" data-verso-hover="88">.</span>confirm ∧ (<span class="const token" data-verso-hover="94">QSays</span> Qs p (<span class="kw">fun</span> q =&gt; <span class="const token" data-verso-hover="87">GMsg.ready</span> ∈ ib q) ∨</span>
+<span id="L114">      <span class="const token" data-verso-hover="95">KSays</span> Qs p (<span class="kw">fun</span> q =&gt; <span class="const token" data-verso-hover="88">GMsg.confirm</span> ∈ ib q))) ∨</span>
+<span id="L115">    (m = <span class="const token" data-verso-hover="89">.</span>distT (<span class="const token" data-verso-hover="93">acked</span> out) ∧ <span class="const token" data-verso-hover="94">QSays</span> Qs p (<span class="kw">fun</span> q =&gt; <span class="const token" data-verso-hover="88">GMsg.confirm</span> ∈ ib q) ∧</span>
+<span id="L116">      ∀ T, <span class="const token" data-verso-hover="89">GMsg.distT</span> T ∉ out)</span>
+<span id="L117">  <span class="const token" data-verso-hover="98">decide</span> p _ ib _ U := ∃ Q ∈ Qs p, ∃ Tq : P → <span class="const token" data-verso-hover="85">Set</span> (P × V),</span>
+<span id="L118">    (∀ q ∈ Q, <span class="const token" data-verso-hover="4">QualT</span> ib q (Tq q) ∧ Tq q ⊆ U) ∧ U ⊆ {sv | ∃ q T, <span class="const token" data-verso-hover="4">QualT</span> ib q T ∧ sv ∈ T}</span>
+<span id="L119"></span>
+<span id="L120"><span class="kw">theorem</span> <span class="const token" data-verso-hover="99">delivered_mono</span> {ib ib' : P → <span class="const token" data-verso-hover="85">Set</span> (<span class="const token" data-verso-hover="82">GMsg</span> P V)} (h : ∀ s, ib s ⊆ ib' s) :</span>
+<span id="L121">    <span class="const token" data-verso-hover="90">delivered</span> ib ⊆ <span class="const token" data-verso-hover="90">delivered</span> ib' := <span class="kw">fun</span> _ hm =&gt; h _ hm</span>
+<span id="L122"></span>
+<span id="L123"><span class="kw">theorem</span> <span class="const token" data-verso-hover="100">acked_mono</span> {out out' : <span class="const token" data-verso-hover="85">Set</span> (<span class="const token" data-verso-hover="82">GMsg</span> P V)} (h : out ⊆ out') : <span class="const token" data-verso-hover="93">acked</span> out ⊆ <span class="const token" data-verso-hover="93">acked</span> out' := <span class="kw">by</span></span>
+<span id="L124">  <span class="kw">rintro</span> sv ⟨j, S, hm, hs⟩; <span class="kw">exact</span> ⟨j, S, h hm, hs⟩</span>
+<span id="L125"></span>
+<span id="L126"><span class="kw">theorem</span> <span class="const token" data-verso-hover="101">QSays.mono</span> {Qs : P → <span class="const token" data-verso-hover="85">Set</span> (<span class="const token" data-verso-hover="25">Finset</span> P)} {p : P} {φ ψ : P → <span class="kw">Prop</span>} (h : ∀ q, φ q → ψ q) :</span>
+<span id="L127">    <span class="const token" data-verso-hover="94">QSays</span> Qs p φ → <span class="const token" data-verso-hover="94">QSays</span> Qs p ψ := <span class="kw">by</span></span>
+<span id="L128">  <span class="kw">rintro</span> ⟨Q, hQ, hφ⟩; <span class="kw">exact</span> ⟨Q, hQ, <span class="kw">fun</span> q hq =&gt; h q (hφ q hq)⟩</span>
+<span id="L129"></span>
+<span id="L130"><span class="kw">theorem</span> <span class="const token" data-verso-hover="102">KSays.mono</span> {Qs : P → <span class="const token" data-verso-hover="85">Set</span> (<span class="const token" data-verso-hover="25">Finset</span> P)} {p : P} {φ ψ : P → <span class="kw">Prop</span>} (h : ∀ q, φ q → ψ q) :</span>
+<span id="L131">    <span class="const token" data-verso-hover="95">KSays</span> Qs p φ → <span class="const token" data-verso-hover="95">KSays</span> Qs p ψ := <span class="kw">by</span></span>
+<span id="L132">  <span class="kw">rintro</span> ⟨K, hK, hφ⟩; <span class="kw">exact</span> ⟨K, hK, <span class="kw">fun</span> q hq =&gt; h q (hφ q hq)⟩</span>
+<span id="L133"></span>
+<span id="L134"><span class="kw">theorem</span> <span class="const token" data-verso-hover="103">QualT.mono</span> {ib ib' : P → <span class="const token" data-verso-hover="85">Set</span> (<span class="const token" data-verso-hover="82">GMsg</span> P V)} (h : ∀ s, ib s ⊆ ib' s) {q : P}</span>
+<span id="L135">    {T : <span class="const token" data-verso-hover="85">Set</span> (P × V)} (hT : <span class="const token" data-verso-hover="4">QualT</span> ib q T) : <span class="const token" data-verso-hover="4">QualT</span> ib' q T :=</span>
+<span id="L136">  ⟨h q hT.<span class="const token" data-verso-hover="104">1</span>, hT.<span class="const token" data-verso-hover="105">2</span>.<span class="const token" data-verso-hover="106">trans</span> (<span class="const token" data-verso-hover="99">delivered_mono</span> h)⟩</span>
+<span id="L137"></span>
+<span id="L138"><span class="dc">/-- The common-core property of Definition 3.1 for executions: one set `S`, covering a quorum</span></span>
+<span id="L139"><span class="dc">of a guild member, is contained in every set ag-delivered (at any time) by a guild member. -/</span></span>
+<span id="L140"><span class="kw">def</span> <span class="const token" data-verso-hover="107">ExecCommonCore</span> [<span class="const token" data-verso-hover="63">DecidableEq</span> P] {x : P → V} {Qs : P → <span class="const token" data-verso-hover="85">Set</span> (<span class="const token" data-verso-hover="25">Finset</span> P)} {fk : <span class="const token" data-verso-hover="65">FaultKind</span>}</span>
+<span id="L141">    {t : <span class="const token" data-verso-hover="61">ℕ</span>} (G : <span class="const token" data-verso-hover="85">Set</span> P) (E : <span class="const token" data-verso-hover="79">Exec</span> (<span class="const token" data-verso-hover="97">protocol</span> Qs) x fk t) : <span class="kw">Prop</span> :=</span>
+<span id="L142">  ∃ i ∈ G, ∃ Q ∈ Qs i, ∃ S : <span class="const token" data-verso-hover="85">Set</span> (P × V), (∀ s ∈ Q, ∃ v, (s, v) ∈ S) ∧</span>
+<span id="L143">    ∀ k ∈ G, ∀ n U, (E.<span class="const token" data-verso-hover="80">σ</span> n).<span class="const token" data-verso-hover="41">dec</span> k = <span class="const token" data-verso-hover="108">some</span> U → S ⊆ U</span>
+<span id="L144"></span>
+<span id="L145"><span class="dc">/-! ### Invariants of reachable states -/</span></span>
+<span id="L146"></span>
+<span id="L147"><span class="kw">section</span> Invariants</span>
+<span id="L148"></span>
+<span id="L149"><span class="kw">variable</span> [<span class="const token" data-verso-hover="63">DecidableEq</span> P] {Qs : P → <span class="const token" data-verso-hover="85">Set</span> (<span class="const token" data-verso-hover="25">Finset</span> P)} {x : P → V} {fk : <span class="const token" data-verso-hover="65">FaultKind</span>} {t : <span class="const token" data-verso-hover="61">ℕ</span>}</span>
+<span id="L150">  {σ : <span class="const token" data-verso-hover="66">State</span> P (<span class="const token" data-verso-hover="82">GMsg</span> P V) (<span class="const token" data-verso-hover="85">Set</span> (P × V))} (hσ : <span class="const token" data-verso-hover="37">Reachable</span> (<span class="const token" data-verso-hover="97">protocol</span> Qs) x fk t σ)</span>
+<span id="L151"><span class="kw">include</span> hσ</span>
+<span id="L152"></span>
+<span id="L153"><span class="kw">theorem</span> <span class="const token" data-verso-hover="109">sent_val</span> {p : P} {v : V} (h : (p, <span class="const token" data-verso-hover="83">GMsg.val</span> v) ∈ σ.<span class="const token" data-verso-hover="68">sent</span>) : v = x p := <span class="kw">by</span></span>
+<span id="L154">  <span class="kw">have</span> := hσ.<span class="const token" data-verso-hover="110">sent_just</span> (<span class="kw">fun</span> p m _ _ =&gt; ∀ v, m = <span class="const token" data-verso-hover="83">GMsg.val</span> v → v = x p)</span>
+<span id="L155">    (<span class="kw">fun</span> _ _ _ _ _ _ _ _ h =&gt; h) ?_ h v <span class="const token" data-verso-hover="49">rfl</span></span>
+<span id="L156">  · <span class="kw">exact</span> this</span>
+<span id="L157">  · <span class="kw">intro</span> p ib out m hg v hv</span>
+<span id="L158">    <span class="kw">subst</span> hv</span>
+<span id="L159">    <span class="kw">rcases</span> hg <span class="kw">with</span> h | ⟨h, -⟩ | ⟨j, S, h, -⟩ | ⟨h, -⟩ | ⟨h, -⟩ | ⟨h, -⟩</span>
+<span id="L160">    · <span class="kw">exact</span> (<span class="const token" data-verso-hover="111">GMsg.val.inj</span> h)</span>
+<span id="L161">    <span class="kw">all_goals</span> <span class="kw">cases</span> h</span>
+<span id="L162"></span>
+<span id="L163"><span class="kw">theorem</span> <span class="const token" data-verso-hover="112">sent_distS</span> {p : P} {S : <span class="const token" data-verso-hover="85">Set</span> (P × V)} (h : (p, <span class="const token" data-verso-hover="84">GMsg.distS</span> S) ∈ σ.<span class="const token" data-verso-hover="68">sent</span>) :</span>
+<span id="L164">    S ⊆ <span class="const token" data-verso-hover="90">delivered</span> (σ.<span class="const token" data-verso-hover="70">inbox</span> p) ∧ <span class="const token" data-verso-hover="94">QSays</span> Qs p (<span class="kw">fun</span> q =&gt; ∃ v, (q, v) ∈ S) := <span class="kw">by</span></span>
+<span id="L165">  <span class="kw">refine</span> hσ.<span class="const token" data-verso-hover="110">sent_just</span> (<span class="kw">fun</span> p m ib _ =&gt; ∀ S, m = <span class="const token" data-verso-hover="84">GMsg.distS</span> S →</span>
+<span id="L166">      S ⊆ <span class="const token" data-verso-hover="90">delivered</span> ib ∧ <span class="const token" data-verso-hover="94">QSays</span> Qs p (<span class="kw">fun</span> q =&gt; ∃ v, (q, v) ∈ S))</span>
+<span id="L167">    (<span class="kw">fun</span> _ _ _ _ _ _ hib _ h S hS =&gt; ⟨(h S hS).<span class="const token" data-verso-hover="104">1</span>.<span class="const token" data-verso-hover="106">trans</span> (<span class="const token" data-verso-hover="99">delivered_mono</span> hib), (h S hS).<span class="const token" data-verso-hover="105">2</span>⟩)</span>
+<span id="L168">    ?_ h S <span class="const token" data-verso-hover="49">rfl</span></span>
+<span id="L169">  <span class="kw">intro</span> p ib out m hg S hS</span>
+<span id="L170">  <span class="kw">subst</span> hS</span>
+<span id="L171">  <span class="kw">rcases</span> hg <span class="kw">with</span> h | ⟨h, hq, -⟩ | ⟨j, S', h, -⟩ | ⟨h, -⟩ | ⟨h, -⟩ | ⟨h, -⟩</span>
+<span id="L172">  · <span class="kw">cases</span> h</span>
+<span id="L173">  · <span class="kw">cases</span> h; <span class="kw">exact</span> ⟨<span class="const token" data-verso-hover="113">subset_rfl</span>, hq⟩</span>
+<span id="L174">  <span class="kw">all_goals</span> <span class="kw">cases</span> h</span>
+<span id="L175"></span>
+<span id="L176"><span class="kw">theorem</span> <span class="const token" data-verso-hover="114">sent_ack</span> {q j : P} {S : <span class="const token" data-verso-hover="85">Set</span> (P × V)} (h : (q, <span class="const token" data-verso-hover="86">GMsg.ack</span> j S) ∈ σ.<span class="const token" data-verso-hover="68">sent</span>) :</span>
+<span id="L177">    <span class="const token" data-verso-hover="84">GMsg.distS</span> S ∈ σ.<span class="const token" data-verso-hover="70">inbox</span> q j ∧ S ⊆ <span class="const token" data-verso-hover="90">delivered</span> (σ.<span class="const token" data-verso-hover="70">inbox</span> q) := <span class="kw">by</span></span>
+<span id="L178">  <span class="kw">refine</span> hσ.<span class="const token" data-verso-hover="110">sent_just</span> (<span class="kw">fun</span> _ m ib _ =&gt; ∀ j S, m = <span class="const token" data-verso-hover="86">GMsg.ack</span> j S →</span>
+<span id="L179">      <span class="const token" data-verso-hover="84">GMsg.distS</span> S ∈ ib j ∧ S ⊆ <span class="const token" data-verso-hover="90">delivered</span> ib)</span>
+<span id="L180">    (<span class="kw">fun</span> _ _ _ _ _ _ hib _ h j S hS =&gt;</span>
+<span id="L181">      ⟨hib _ (h j S hS).<span class="const token" data-verso-hover="104">1</span>, (h j S hS).<span class="const token" data-verso-hover="105">2</span>.<span class="const token" data-verso-hover="106">trans</span> (<span class="const token" data-verso-hover="99">delivered_mono</span> hib)⟩) ?_ h j S <span class="const token" data-verso-hover="49">rfl</span></span>
+<span id="L182">  <span class="kw">intro</span> p ib out m hg j S hS</span>
+<span id="L183">  <span class="kw">subst</span> hS</span>
+<span id="L184">  <span class="kw">rcases</span> hg <span class="kw">with</span> h | ⟨h, -⟩ | ⟨j', S', h, h1, h2, -⟩ | ⟨h, -⟩ | ⟨h, -⟩ | ⟨h, -⟩</span>
+<span id="L185">  · <span class="kw">cases</span> h</span>
+<span id="L186">  · <span class="kw">cases</span> h</span>
+<span id="L187">  · <span class="kw">cases</span> h; <span class="kw">exact</span> ⟨h1, h2⟩</span>
+<span id="L188">  <span class="kw">all_goals</span> <span class="kw">cases</span> h</span>
+<span id="L189"></span>
+<span id="L190"><span class="kw">theorem</span> <span class="const token" data-verso-hover="115">sent_ready</span> {p : P} (h : (p, <span class="const token" data-verso-hover="87">GMsg.ready</span>) ∈ σ.<span class="const token" data-verso-hover="68">sent</span>) :</span>
+<span id="L191">    <span class="const token" data-verso-hover="94">QSays</span> Qs p (<span class="kw">fun</span> q =&gt; ∃ S, <span class="const token" data-verso-hover="86">GMsg.ack</span> p S ∈ σ.<span class="const token" data-verso-hover="70">inbox</span> p q) := <span class="kw">by</span></span>
+<span id="L192">  <span class="kw">refine</span> hσ.<span class="const token" data-verso-hover="110">sent_just</span> (<span class="kw">fun</span> p m ib _ =&gt; m = <span class="const token" data-verso-hover="87">GMsg.ready</span> →</span>
+<span id="L193">      <span class="const token" data-verso-hover="94">QSays</span> Qs p (<span class="kw">fun</span> q =&gt; ∃ S, <span class="const token" data-verso-hover="86">GMsg.ack</span> p S ∈ ib q))</span>
+<span id="L194">    (<span class="kw">fun</span> _ _ _ _ _ _ hib _ h hm =&gt; (h hm).<span class="const token" data-verso-hover="101">mono</span> <span class="kw">fun</span> q ⟨S, hS⟩ =&gt; ⟨S, hib q hS⟩) ?_ h <span class="const token" data-verso-hover="49">rfl</span></span>
+<span id="L195">  <span class="kw">intro</span> p ib out m hg hm</span>
+<span id="L196">  <span class="kw">subst</span> hm</span>
+<span id="L197">  <span class="kw">rcases</span> hg <span class="kw">with</span> h | ⟨h, -⟩ | ⟨j', S', h, -⟩ | ⟨-, hq⟩ | ⟨h, -⟩ | ⟨h, -⟩</span>
+<span id="L198">  · <span class="kw">cases</span> h</span>
+<span id="L199">  · <span class="kw">cases</span> h</span>
+<span id="L200">  · <span class="kw">cases</span> h</span>
+<span id="L201">  · <span class="kw">exact</span> hq</span>
+<span id="L202">  <span class="kw">all_goals</span> <span class="kw">cases</span> h</span>
+<span id="L203"></span>
+<span id="L204"><span class="kw">theorem</span> <span class="const token" data-verso-hover="116">sent_distT</span> {p : P} {T : <span class="const token" data-verso-hover="85">Set</span> (P × V)} (h : (p, <span class="const token" data-verso-hover="89">GMsg.distT</span> T) ∈ σ.<span class="const token" data-verso-hover="68">sent</span>) :</span>
+<span id="L205">    <span class="const token" data-verso-hover="94">QSays</span> Qs p (<span class="kw">fun</span> q =&gt; <span class="const token" data-verso-hover="88">GMsg.confirm</span> ∈ σ.<span class="const token" data-verso-hover="70">inbox</span> p q) ∧ T ⊆ <span class="const token" data-verso-hover="93">acked</span> (σ.<span class="const token" data-verso-hover="71">out</span> p) := <span class="kw">by</span></span>
+<span id="L206">  <span class="kw">refine</span> hσ.<span class="const token" data-verso-hover="110">sent_just</span> (<span class="kw">fun</span> p m ib out =&gt; ∀ T, m = <span class="const token" data-verso-hover="89">GMsg.distT</span> T →</span>
+<span id="L207">      <span class="const token" data-verso-hover="94">QSays</span> Qs p (<span class="kw">fun</span> q =&gt; <span class="const token" data-verso-hover="88">GMsg.confirm</span> ∈ ib q) ∧ T ⊆ <span class="const token" data-verso-hover="93">acked</span> out)</span>
+<span id="L208">    (<span class="kw">fun</span> _ _ _ _ _ _ hib hout h T hT =&gt;</span>
+<span id="L209">      ⟨(h T hT).<span class="const token" data-verso-hover="104">1</span>.<span class="const token" data-verso-hover="101">mono</span> <span class="kw">fun</span> q hq =&gt; hib q hq, (h T hT).<span class="const token" data-verso-hover="105">2</span>.<span class="const token" data-verso-hover="106">trans</span> (<span class="const token" data-verso-hover="100">acked_mono</span> hout)⟩) ?_ h T <span class="const token" data-verso-hover="49">rfl</span></span>
+<span id="L210">  <span class="kw">intro</span> p ib out m hg T hT</span>
+<span id="L211">  <span class="kw">subst</span> hT</span>
+<span id="L212">  <span class="kw">rcases</span> hg <span class="kw">with</span> h | ⟨h, -⟩ | ⟨j', S', h, -⟩ | ⟨h, -⟩ | ⟨h, -⟩ | ⟨h, hq, -⟩</span>
+<span id="L213">  · <span class="kw">cases</span> h</span>
+<span id="L214">  · <span class="kw">cases</span> h</span>
+<span id="L215">  · <span class="kw">cases</span> h</span>
+<span id="L216">  · <span class="kw">cases</span> h</span>
+<span id="L217">  · <span class="kw">cases</span> h</span>
+<span id="L218">  · <span class="kw">cases</span> h; <span class="kw">exact</span> ⟨hq, <span class="const token" data-verso-hover="113">subset_rfl</span>⟩</span>
+<span id="L219"></span>
+<span id="L220"><span class="kw">theorem</span> <span class="const token" data-verso-hover="117">acked_sub_delivered</span> (p : P) : <span class="const token" data-verso-hover="93">acked</span> (σ.<span class="const token" data-verso-hover="71">out</span> p) ⊆ <span class="const token" data-verso-hover="90">delivered</span> (σ.<span class="const token" data-verso-hover="70">inbox</span> p) := <span class="kw">by</span></span>
+<span id="L221">  <span class="kw">rintro</span> sv ⟨j, S, hm, hs⟩</span>
+<span id="L222">  <span class="kw">exact</span> (<span class="const token" data-verso-hover="114">sent_ack</span> hσ hm).<span class="const token" data-verso-hover="105">2</span> hs</span>
+<span id="L223"></span>
+<span id="L224"><span class="kw">theorem</span> <span class="const token" data-verso-hover="118">distT_sub_delivered</span> {p : P} {T : <span class="const token" data-verso-hover="85">Set</span> (P × V)} (h : (p, <span class="const token" data-verso-hover="89">GMsg.distT</span> T) ∈ σ.<span class="const token" data-verso-hover="68">sent</span>) :</span>
+<span id="L225">    T ⊆ <span class="const token" data-verso-hover="90">delivered</span> (σ.<span class="const token" data-verso-hover="70">inbox</span> p) :=</span>
+<span id="L226">  (<span class="const token" data-verso-hover="116">sent_distT</span> hσ h).<span class="const token" data-verso-hover="105">2</span>.<span class="const token" data-verso-hover="106">trans</span> (<span class="const token" data-verso-hover="117">acked_sub_delivered</span> hσ p)</span>
+<span id="L227"></span>
+<span id="L228"><span class="kw">omit</span> hσ <span class="kw">in</span></span>
+<span id="L229"><span class="dc">/-- The `DISTRIBUTET` set of a process contains every set it acknowledged. -/</span></span>
+<span id="L230"><span class="kw">theorem</span> <span class="const token" data-verso-hover="119">ack_sub_distT</span> (hσ : <span class="const token" data-verso-hover="37">Reachable</span> (<span class="const token" data-verso-hover="97">protocol</span> Qs) x fk t σ) {p j : P} {S T : <span class="const token" data-verso-hover="85">Set</span> (P × V)}</span>
+<span id="L231">    (hT : (p, <span class="const token" data-verso-hover="89">GMsg.distT</span> T) ∈ σ.<span class="const token" data-verso-hover="68">sent</span>) (hS : (p, <span class="const token" data-verso-hover="86">GMsg.ack</span> j S) ∈ σ.<span class="const token" data-verso-hover="68">sent</span>) : S ⊆ T := <span class="kw">by</span></span>
+<span id="L232">  <span class="kw">revert</span> p j S T</span>
+<span id="L233">  <span class="kw">refine</span> <span class="const token" data-verso-hover="120">Reachable.induction</span> (Inv := <span class="kw">fun</span> σ =&gt; ∀ {p j : P} {S T : <span class="const token" data-verso-hover="85">Set</span> (P × V)},</span>
+<span id="L234">    (p, <span class="const token" data-verso-hover="89">GMsg.distT</span> T) ∈ σ.<span class="const token" data-verso-hover="68">sent</span> → (p, <span class="const token" data-verso-hover="86">GMsg.ack</span> j S) ∈ σ.<span class="const token" data-verso-hover="68">sent</span> → S ⊆ T)</span>
+<span id="L235">    (<span class="kw">by</span> <span class="kw">simp</span> [<span class="const token" data-verso-hover="121">State.init</span>]) ?_ hσ</span>
+<span id="L236">  <span class="kw">intro</span> σ σ' _ ih hst p j S T hT hS</span>
+<span id="L237">  <span class="kw">cases</span> hst <span class="kw">with</span></span>
+<span id="L238">  | <span class="const token" data-verso-hover="72">send</span> p' m' _ hg =&gt;</span>
+<span id="L239">    <span class="kw">rcases</span> <span class="const token" data-verso-hover="73">Set.mem_insert_iff</span>.<span class="const token" data-verso-hover="74">1</span> hT <span class="kw">with</span> he | hT' &lt;;&gt; <span class="kw">rcases</span> <span class="const token" data-verso-hover="73">Set.mem_insert_iff</span>.<span class="const token" data-verso-hover="74">1</span> hS <span class="kw">with</span> he' | hS'</span>
+<span id="L240">    · <span class="kw">simp</span> only [<span class="const token" data-verso-hover="75">Prod.mk.injEq</span>] <span class="kw">at</span> he he'</span>
+<span id="L241">      <span class="kw">obtain</span> ⟨<span class="kw">rfl</span>, <span class="kw">rfl</span>⟩ := he</span>
+<span id="L242">      <span class="kw">cases</span> he'.<span class="const token" data-verso-hover="105">2</span></span>
+<span id="L243">    · <span class="kw">simp</span> only [<span class="const token" data-verso-hover="75">Prod.mk.injEq</span>] <span class="kw">at</span> he</span>
+<span id="L244">      <span class="kw">obtain</span> ⟨<span class="kw">rfl</span>, <span class="kw">rfl</span>⟩ := he</span>
+<span id="L245">      <span class="kw">rcases</span> hg <span class="kw">with</span> h | ⟨h, -⟩ | ⟨j', S', h, -⟩ | ⟨h, -⟩ | ⟨h, -⟩ | ⟨h, -, -⟩</span>
+<span id="L246">      · <span class="kw">cases</span> h</span>
+<span id="L247">      · <span class="kw">cases</span> h</span>
+<span id="L248">      · <span class="kw">cases</span> h</span>
+<span id="L249">      · <span class="kw">cases</span> h</span>
+<span id="L250">      · <span class="kw">cases</span> h</span>
+<span id="L251">      · <span class="kw">cases</span> h; <span class="kw">exact</span> <span class="kw">fun</span> sv hsv =&gt; ⟨j, S, hS', hsv⟩</span>
+<span id="L252">    · <span class="kw">simp</span> only [<span class="const token" data-verso-hover="75">Prod.mk.injEq</span>] <span class="kw">at</span> he'</span>
+<span id="L253">      <span class="kw">obtain</span> ⟨<span class="kw">rfl</span>, <span class="kw">rfl</span>⟩ := he'</span>
+<span id="L254">      <span class="kw">rcases</span> hg <span class="kw">with</span> h | ⟨h, -⟩ | ⟨j', S', h, -, -, hno⟩ | ⟨h, -⟩ | ⟨h, -⟩ | ⟨h, -⟩</span>
+<span id="L255">      · <span class="kw">cases</span> h</span>
+<span id="L256">      · <span class="kw">cases</span> h</span>
+<span id="L257">      · <span class="kw">exact</span> <span class="const token" data-verso-hover="122">absurd</span> hT' (hno T)</span>
+<span id="L258">      · <span class="kw">cases</span> h</span>
+<span id="L259">      · <span class="kw">cases</span> h</span>
+<span id="L260">      · <span class="kw">cases</span> h</span>
+<span id="L261">    · <span class="kw">exact</span> ih hT' hS'</span>
+<span id="L262">  | <span class="const token" data-verso-hover="123">_</span> =&gt; <span class="kw">exact</span> ih hT hS</span>
+<span id="L263"></span>
+<span id="L264"><span class="kw">theorem</span> <span class="const token" data-verso-hover="124">distS_unique</span> {p : P} {S S' : <span class="const token" data-verso-hover="85">Set</span> (P × V)} (h : (p, <span class="const token" data-verso-hover="84">GMsg.distS</span> S) ∈ σ.<span class="const token" data-verso-hover="68">sent</span>)</span>
+<span id="L265">    (h' : (p, <span class="const token" data-verso-hover="84">GMsg.distS</span> S') ∈ σ.<span class="const token" data-verso-hover="68">sent</span>) : S = S' := <span class="kw">by</span></span>
+<span id="L266">  <span class="kw">have</span> := hσ.<span class="const token" data-verso-hover="125">sent_excl</span> (<span class="kw">fun</span> m =&gt; ∃ S, m = <span class="const token" data-verso-hover="84">GMsg.distS</span> S) ?_ h h' ⟨S, <span class="const token" data-verso-hover="49">rfl</span>⟩ ⟨S', <span class="const token" data-verso-hover="49">rfl</span>⟩</span>
+<span id="L267">  · <span class="kw">cases</span> this; <span class="kw">rfl</span></span>
+<span id="L268">  · <span class="kw">rintro</span> p ib out m hg ⟨S, <span class="kw">rfl</span>⟩ m' hm' ⟨S', <span class="kw">rfl</span>⟩</span>
+<span id="L269">    <span class="kw">rcases</span> hg <span class="kw">with</span> h | ⟨-, -, hno⟩ | ⟨j', S'', h, -⟩ | ⟨h, -⟩ | ⟨h, -⟩ | ⟨h, -⟩</span>
+<span id="L270">    · <span class="kw">cases</span> h</span>
+<span id="L271">    · <span class="kw">exact</span> hno S' hm'</span>
+<span id="L272">    <span class="kw">all_goals</span> <span class="kw">cases</span> h</span>
+<span id="L273"></span>
+<span id="L274"><span class="kw">theorem</span> <span class="const token" data-verso-hover="126">dec_guard</span> {p : P} {U : <span class="const token" data-verso-hover="85">Set</span> (P × V)} (h : σ.<span class="const token" data-verso-hover="41">dec</span> p = <span class="const token" data-verso-hover="108">some</span> U) :</span>
+<span id="L275">    (<span class="const token" data-verso-hover="97">protocol</span> Qs).<span class="const token" data-verso-hover="98">decide</span> p (x p) (σ.<span class="const token" data-verso-hover="70">inbox</span> p) (σ.<span class="const token" data-verso-hover="71">out</span> p) U := <span class="kw">by</span></span>
+<span id="L276">  <span class="kw">refine</span> hσ.<span class="const token" data-verso-hover="127">dec_just</span> (<span class="kw">fun</span> p U ib out =&gt; (<span class="const token" data-verso-hover="97">protocol</span> Qs).<span class="const token" data-verso-hover="98">decide</span> p (x p) ib out U) ?_</span>
+<span id="L277">    (<span class="kw">fun</span> _ _ _ _ h =&gt; h) h</span>
+<span id="L278">  <span class="kw">rintro</span> p U ib ib' out out' hib - ⟨Q, hQ, Tq, hT, hU⟩</span>
+<span id="L279">  <span class="kw">refine</span> ⟨Q, hQ, Tq, <span class="kw">fun</span> q hq =&gt; ⟨(hT q hq).<span class="const token" data-verso-hover="104">1</span>.<span class="const token" data-verso-hover="103">mono</span> hib, (hT q hq).<span class="const token" data-verso-hover="105">2</span>⟩, ?_⟩</span>
+<span id="L280">  <span class="kw">rintro</span> sv hsv</span>
+<span id="L281">  <span class="kw">obtain</span> ⟨q, T, hqT, hsvT⟩ := hU hsv</span>
+<span id="L282">  <span class="kw">exact</span> ⟨q, T, hqT.<span class="const token" data-verso-hover="103">mono</span> hib, hsvT⟩</span>
+<span id="L283"></span>
+<span id="L284"><span class="kw">theorem</span> <span class="const token" data-verso-hover="128">dec_sub_delivered</span> {p : P} {U : <span class="const token" data-verso-hover="85">Set</span> (P × V)} (h : σ.<span class="const token" data-verso-hover="41">dec</span> p = <span class="const token" data-verso-hover="108">some</span> U) :</span>
+<span id="L285">    U ⊆ <span class="const token" data-verso-hover="90">delivered</span> (σ.<span class="const token" data-verso-hover="70">inbox</span> p) := <span class="kw">by</span></span>
+<span id="L286">  <span class="kw">obtain</span> ⟨-, -, -, -, hU⟩ := <span class="const token" data-verso-hover="126">dec_guard</span> hσ h</span>
+<span id="L287">  <span class="kw">intro</span> sv hsv</span>
+<span id="L288">  <span class="kw">obtain</span> ⟨q, T, hqT, hsvT⟩ := hU hsv</span>
+<span id="L289">  <span class="kw">exact</span> hqT.<span class="const token" data-verso-hover="105">2</span> hsvT</span>
+<span id="L290"></span>
+<span id="L291"><span class="kw">end</span> Invariants</span>
+<span id="L292"></span>
+<span id="L293"><span class="dc">/-! ### Safety in executions with a guild -/</span></span>
+<span id="L294"></span>
+<span id="L295"><span class="dc">/-- The guarantees of the asymmetric reliable broadcast of the inputs for the guild `G` that</span></span>
+<span id="L296"><span class="dc">the model does not give for free (Alpos et al., asymmetric reliable broadcast): *consistency*</span></span>
+<span id="L297"><span class="dc">(guild members deliver the same value from a sender, and at most one) and *totality* (a value</span></span>
+<span id="L298"><span class="dc">delivered by one guild member is delivered by all). Validity and integrity for correct senders</span></span>
+<span id="L299"><span class="dc">follow from the model and fairness. -/</span></span>
+<span id="L300"><span class="kw">structure</span> <span class="const token" data-verso-hover="129">RBC</span> [<span class="const token" data-verso-hover="63">DecidableEq</span> P] {Qs : P → <span class="const token" data-verso-hover="85">Set</span> (<span class="const token" data-verso-hover="25">Finset</span> P)} {x : P → V} {fk : <span class="const token" data-verso-hover="65">FaultKind</span>} {t : <span class="const token" data-verso-hover="61">ℕ</span>}</span>
+<span id="L301">    (E : <span class="const token" data-verso-hover="79">Exec</span> (<span class="const token" data-verso-hover="97">protocol</span> Qs) x fk t) (G : <span class="const token" data-verso-hover="85">Set</span> P) : <span class="kw">Prop</span> <span class="kw">where</span></span>
+<span id="L302">  <span class="const token" data-verso-hover="130">agree</span> : ∀ q ∈ G, ∀ q' ∈ G, ∀ s v v' i j, <span class="const token" data-verso-hover="83">GMsg.val</span> v ∈ (E.<span class="const token" data-verso-hover="80">σ</span> i).<span class="const token" data-verso-hover="70">inbox</span> q s →</span>
+<span id="L303">    <span class="const token" data-verso-hover="83">GMsg.val</span> v' ∈ (E.<span class="const token" data-verso-hover="80">σ</span> j).<span class="const token" data-verso-hover="70">inbox</span> q' s → v = v'</span>
+<span id="L304">  <span class="const token" data-verso-hover="131">total</span> : ∀ q ∈ G, ∀ q' ∈ G, ∀ s v i, <span class="const token" data-verso-hover="83">GMsg.val</span> v ∈ (E.<span class="const token" data-verso-hover="80">σ</span> i).<span class="const token" data-verso-hover="70">inbox</span> q s →</span>
+<span id="L305">    ∃ j, <span class="const token" data-verso-hover="83">GMsg.val</span> v ∈ (E.<span class="const token" data-verso-hover="80">σ</span> j).<span class="const token" data-verso-hover="70">inbox</span> q' s</span>
+<span id="L306"></span>
+<span id="L307"><span class="kw">variable</span> [<span class="const token" data-verso-hover="63">DecidableEq</span> P] {Fs Qs : P → <span class="const token" data-verso-hover="85">Set</span> (<span class="const token" data-verso-hover="25">Finset</span> P)} {x : P → V} {fk : <span class="const token" data-verso-hover="65">FaultKind</span>} {t : <span class="const token" data-verso-hover="61">ℕ</span>}</span>
+<span id="L308">  (E : <span class="const token" data-verso-hover="79">Exec</span> (<span class="const token" data-verso-hover="97">protocol</span> Qs) x fk t) {G : <span class="const token" data-verso-hover="85">Set</span> P}</span>
+<span id="L309"></span>
+<span id="L310"><span class="dc">/-- The faulty processes of an execution: those corrupted at some time. -/</span></span>
+<span id="L311"><span class="kw">def</span> <span class="const token" data-verso-hover="132">Faulty</span> : <span class="const token" data-verso-hover="85">Set</span> P := {p | ¬ E.<span class="const token" data-verso-hover="133">Correct</span> p}</span>
+<span id="L312"></span>
+<span id="L313"><span class="kw">theorem</span> <span class="const token" data-verso-hover="134">correct_of_guild</span> (hG : <span class="const token" data-verso-hover="135">IsGuild</span> Fs Qs (<span class="const token" data-verso-hover="132">Faulty</span> E) G) {g : P} (hg : g ∈ G) :</span>
+<span id="L314">    E.<span class="const token" data-verso-hover="133">Correct</span> g := <span class="kw">by</span></span>
+<span id="L315">  <span class="kw">have</span> := hG.<span class="const token" data-verso-hover="136">notMem_fault</span> hg</span>
+<span id="L316">  <span class="kw">simpa</span> [<span class="const token" data-verso-hover="132">Faulty</span>] <span class="kw">using</span> this</span>
+<span id="L317"></span>
+<span id="L318"><span class="kw">theorem</span> <span class="const token" data-verso-hover="137">genuine_of_correct</span> {g q : P} (hg : E.<span class="const token" data-verso-hover="133">Correct</span> g) {i : <span class="const token" data-verso-hover="61">ℕ</span>} {m : <span class="const token" data-verso-hover="82">GMsg</span> P V}</span>
+<span id="L319">    (hm : m ∈ (E.<span class="const token" data-verso-hover="80">σ</span> i).<span class="const token" data-verso-hover="70">inbox</span> q g) : (g, m) ∈ (E.<span class="const token" data-verso-hover="80">σ</span> i).<span class="const token" data-verso-hover="68">sent</span> :=</span>
+<span id="L320">  (E.<span class="const token" data-verso-hover="138">reachable</span> i).<span class="const token" data-verso-hover="139">genuine</span> hm (hg i)</span>
+<span id="L321"></span>
+<span id="L322"><span class="dc">/-- **Lemma 3.4.** If a guild member has sent `CONFIRM` by time `i`, then some guild member has</span></span>
+<span id="L323"><span class="dc">received `READY` from all members of one of its quorums by time `i`. -/</span></span>
+<span id="L324"><span class="kw">theorem</span> <span class="const token" data-verso-hover="11">lemma_3_4</span> (hG : <span class="const token" data-verso-hover="135">IsGuild</span> Fs Qs (<span class="const token" data-verso-hover="132">Faulty</span> E) G) :</span>
+<span id="L325">    ∀ i, ∀ g ∈ G, (g, <span class="const token" data-verso-hover="88">GMsg.confirm</span>) ∈ (E.<span class="const token" data-verso-hover="80">σ</span> i).<span class="const token" data-verso-hover="68">sent</span> →</span>
+<span id="L326">      ∃ m ∈ G, <span class="const token" data-verso-hover="94">QSays</span> Qs m (<span class="kw">fun</span> q =&gt; <span class="const token" data-verso-hover="87">GMsg.ready</span> ∈ (E.<span class="const token" data-verso-hover="80">σ</span> i).<span class="const token" data-verso-hover="70">inbox</span> m q) := <span class="kw">by</span></span>
+<span id="L327">  <span class="kw">intro</span> i</span>
+<span id="L328">  <span class="kw">induction</span> i <span class="kw">with</span></span>
+<span id="L329">  | <span class="const token" data-verso-hover="140">zero</span> =&gt; <span class="kw">intro</span> g _ h; <span class="kw">rw</span> [E.<span class="const token" data-verso-hover="141">zero</span>] <span class="kw">at</span> h; <span class="kw">exact</span> <span class="const token" data-verso-hover="122">absurd</span> h (<span class="kw">by</span> <span class="kw">simp</span> [<span class="const token" data-verso-hover="121">State.init</span>])</span>
+<span id="L330">  | <span class="const token" data-verso-hover="142">succ</span> i ih =&gt;</span>
+<span id="L331">    <span class="kw">intro</span> g hg h</span>
+<span id="L332">    <span class="kw">have</span> mono : ∀ m, <span class="const token" data-verso-hover="94">QSays</span> Qs m (<span class="kw">fun</span> q =&gt; <span class="const token" data-verso-hover="87">GMsg.ready</span> ∈ (E.<span class="const token" data-verso-hover="80">σ</span> i).<span class="const token" data-verso-hover="70">inbox</span> m q) →</span>
+<span id="L333">        <span class="const token" data-verso-hover="94">QSays</span> Qs m (<span class="kw">fun</span> q =&gt; <span class="const token" data-verso-hover="87">GMsg.ready</span> ∈ (E.<span class="const token" data-verso-hover="80">σ</span> (i + <span class="nu">1</span>)).<span class="const token" data-verso-hover="70">inbox</span> m q) :=</span>
+<span id="L334">      <span class="kw">fun</span> m =&gt; <span class="const token" data-verso-hover="101">QSays.mono</span> <span class="kw">fun</span> q hq =&gt; E.<span class="const token" data-verso-hover="143">inbox_mono</span> (<span class="const token" data-verso-hover="144">Nat.le_succ</span> i) m q hq</span>
+<span id="L335">    <span class="kw">rcases</span> <span class="const token" data-verso-hover="21">exec_sent_succ</span> E i h <span class="kw">with</span> h | ⟨-, hgd⟩</span>
+<span id="L336">    · <span class="kw">obtain</span> ⟨m, hm, hq⟩ := ih g hg h</span>
+<span id="L337">      <span class="kw">exact</span> ⟨m, hm, mono m hq⟩</span>
+<span id="L338">    · <span class="kw">rcases</span> hgd <span class="kw">with</span> h | ⟨h, -⟩ | ⟨j', S', h, -⟩ | ⟨h, -⟩ | ⟨-, hc | hc⟩ | ⟨h, -⟩</span>
+<span id="L339">      · <span class="kw">cases</span> h</span>
+<span id="L340">      · <span class="kw">cases</span> h</span>
+<span id="L341">      · <span class="kw">cases</span> h</span>
+<span id="L342">      · <span class="kw">cases</span> h</span>
+<span id="L343">      · <span class="kw">exact</span> ⟨g, hg, mono g hc⟩</span>
+<span id="L344">      · <span class="cm">--</span><span class="cm"> a kernel of `g` sent `CONFIRM`; it contains a guild member</span></span>
+<span id="L345">        <span class="kw">obtain</span> ⟨K, hK, hKc⟩ := hc</span>
+<span id="L346">        <span class="kw">obtain</span> ⟨Qg, hQg, hQgG⟩ := hG.<span class="const token" data-verso-hover="105">2</span> g hg</span>
+<span id="L347">        <span class="kw">obtain</span> ⟨y, hyQ, hyK⟩ := hK Qg hQg</span>
+<span id="L348">        <span class="kw">have</span> hyG : y ∈ G := hQgG hyQ</span>
+<span id="L349">        <span class="kw">have</span> := <span class="const token" data-verso-hover="137">genuine_of_correct</span> E (<span class="const token" data-verso-hover="134">correct_of_guild</span> E hG hyG) (hKc y hyK)</span>
+<span id="L350">        <span class="kw">obtain</span> ⟨m, hm, hq⟩ := ih y hyG this</span>
+<span id="L351">        <span class="kw">exact</span> ⟨m, hm, mono m hq⟩</span>
+<span id="L352">      · <span class="kw">cases</span> h</span>
+<span id="L353"></span>
+<span id="L354"><span class="dc">/-- The common-core candidate: a guild member `pᵢ` with its `DISTRIBUTES` set `S`, which covers</span></span>
+<span id="L355"><span class="dc">a quorum of `pᵢ`, and a quorum `Q` of `pᵢ` whose correct members all acknowledged `S` by time</span></span>
+<span id="L356"><span class="dc">`i₀`. This is what the proof of Lemma 3.5 constructs. -/</span></span>
+<span id="L357"><span class="kw">structure</span> <span class="const token" data-verso-hover="145">Candidate</span> (G : <span class="const token" data-verso-hover="85">Set</span> P) (i₀ : <span class="const token" data-verso-hover="61">ℕ</span>) (pi : P) (S : <span class="const token" data-verso-hover="85">Set</span> (P × V)) (Q : <span class="const token" data-verso-hover="25">Finset</span> P) : <span class="kw">Prop</span> <span class="kw">where</span></span>
+<span id="L358">  <span class="const token" data-verso-hover="146">mem</span> : pi ∈ G</span>
+<span id="L359">  <span class="const token" data-verso-hover="147">distS</span> : (pi, <span class="const token" data-verso-hover="84">GMsg.distS</span> S) ∈ (E.<span class="const token" data-verso-hover="80">σ</span> i₀).<span class="const token" data-verso-hover="68">sent</span></span>
+<span id="L360">  <span class="const token" data-verso-hover="148">cover</span> : <span class="const token" data-verso-hover="94">QSays</span> Qs pi (<span class="kw">fun</span> q =&gt; ∃ v, (q, v) ∈ S)</span>
+<span id="L361">  <span class="const token" data-verso-hover="149">quorum</span> : Q ∈ Qs pi</span>
+<span id="L362">  <span class="const token" data-verso-hover="150">acks</span> : ∀ q ∈ Q, E.<span class="const token" data-verso-hover="133">Correct</span> q → (q, <span class="const token" data-verso-hover="86">GMsg.ack</span> pi S) ∈ (E.<span class="const token" data-verso-hover="80">σ</span> i₀).<span class="const token" data-verso-hover="68">sent</span></span>
+<span id="L363"></span>
+<span id="L364"><span class="dc">/-- If some guild member has sent `DISTRIBUTET`, a common-core candidate exists. -/</span></span>
+<span id="L365"><span class="kw">theorem</span> <span class="const token" data-verso-hover="6">exists_candidate</span> (hG : <span class="const token" data-verso-hover="135">IsGuild</span> Fs Qs (<span class="const token" data-verso-hover="132">Faulty</span> E) G) (hQ : <span class="const token" data-verso-hover="33">IsQuorumSystem</span> Fs Qs)</span>
+<span id="L366">    {g₀ : P} (hg₀ : g₀ ∈ G) {i₀ : <span class="const token" data-verso-hover="61">ℕ</span>} {T₀ : <span class="const token" data-verso-hover="85">Set</span> (P × V)}</span>
+<span id="L367">    (hT₀ : (g₀, <span class="const token" data-verso-hover="89">GMsg.distT</span> T₀) ∈ (E.<span class="const token" data-verso-hover="80">σ</span> i₀).<span class="const token" data-verso-hover="68">sent</span>) : ∃ pi S Q, <span class="const token" data-verso-hover="145">Candidate</span> E G i₀ pi S Q := <span class="kw">by</span></span>
+<span id="L368">  <span class="kw">have</span> hr := E.<span class="const token" data-verso-hover="138">reachable</span> i₀</span>
+<span id="L369">  <span class="cm">--</span><span class="cm"> a guild member of the CONFIRM quorum of `g₀` sent CONFIRM</span></span>
+<span id="L370">  <span class="kw">obtain</span> ⟨Q₀, hQ₀, hc⟩ := (<span class="const token" data-verso-hover="116">sent_distT</span> hr hT₀).<span class="const token" data-verso-hover="104">1</span></span>
+<span id="L371">  <span class="kw">obtain</span> ⟨y, hyQ, hyG⟩ := hG.<span class="const token" data-verso-hover="151">exists_mem_guild_of_quorum</span> hQ hg₀ hQ₀</span>
+<span id="L372">  <span class="kw">have</span> hyc : (y, <span class="const token" data-verso-hover="88">GMsg.confirm</span>) ∈ (E.<span class="const token" data-verso-hover="80">σ</span> i₀).<span class="const token" data-verso-hover="68">sent</span> :=</span>
+<span id="L373">    <span class="const token" data-verso-hover="137">genuine_of_correct</span> E (<span class="const token" data-verso-hover="134">correct_of_guild</span> E hG hyG) (hc y hyQ)</span>
+<span id="L374">  <span class="cm">--</span><span class="cm"> Lemma 3.4: a guild member received READY from a quorum</span></span>
+<span id="L375">  <span class="kw">obtain</span> ⟨m, hmG, Qm, hQm, hr'⟩ := <span class="const token" data-verso-hover="11">lemma_3_4</span> E hG i₀ y hyG hyc</span>
+<span id="L376">  <span class="kw">obtain</span> ⟨pi, hpiQ, hpiG⟩ := hG.<span class="const token" data-verso-hover="151">exists_mem_guild_of_quorum</span> hQ hmG hQm</span>
+<span id="L377">  <span class="kw">have</span> hpic := <span class="const token" data-verso-hover="134">correct_of_guild</span> E hG hpiG</span>
+<span id="L378">  <span class="kw">have</span> hready : (pi, <span class="const token" data-verso-hover="87">GMsg.ready</span>) ∈ (E.<span class="const token" data-verso-hover="80">σ</span> i₀).<span class="const token" data-verso-hover="68">sent</span> := <span class="const token" data-verso-hover="137">genuine_of_correct</span> E hpic (hr' pi hpiQ)</span>
+<span id="L379">  <span class="cm">--</span><span class="cm"> `pi` received acknowledgements from a quorum `Q`</span></span>
+<span id="L380">  <span class="kw">obtain</span> ⟨Q, hQQ, hacks⟩ := <span class="const token" data-verso-hover="115">sent_ready</span> hr hready</span>
+<span id="L381">  <span class="cm">--</span><span class="cm"> a correct member of `Q` acknowledged the (unique) DISTRIBUTES set of `pi`</span></span>
+<span id="L382">  <span class="kw">have</span> hw := hG.<span class="const token" data-verso-hover="104">1</span> pi hpiG</span>
+<span id="L383">  <span class="kw">obtain</span> ⟨z, hzQ, -, hzF⟩ := hQ.<span class="const token" data-verso-hover="152">exists_mem_inter_notMem</span> hw hw hQQ hQQ</span>
+<span id="L384">  <span class="kw">have</span> hzc : E.<span class="const token" data-verso-hover="133">Correct</span> z := <span class="kw">by</span> <span class="kw">simpa</span> [<span class="const token" data-verso-hover="132">Faulty</span>] <span class="kw">using</span> hzF</span>
+<span id="L385">  <span class="kw">obtain</span> ⟨S, hS⟩ := hacks z hzQ</span>
+<span id="L386">  <span class="kw">have</span> hzack := <span class="const token" data-verso-hover="137">genuine_of_correct</span> E hzc hS</span>
+<span id="L387">  <span class="kw">have</span> hdS := <span class="const token" data-verso-hover="137">genuine_of_correct</span> E hpic (<span class="const token" data-verso-hover="114">sent_ack</span> hr hzack).<span class="const token" data-verso-hover="104">1</span></span>
+<span id="L388">  <span class="kw">refine</span> ⟨pi, S, Q, hpiG, hdS, (<span class="const token" data-verso-hover="112">sent_distS</span> hr hdS).<span class="const token" data-verso-hover="105">2</span>, hQQ, <span class="kw">fun</span> q hq hqc =&gt; ?_⟩</span>
+<span id="L389">  <span class="kw">obtain</span> ⟨S', hS'⟩ := hacks q hq</span>
+<span id="L390">  <span class="kw">have</span> hqack := <span class="const token" data-verso-hover="137">genuine_of_correct</span> E hqc hS'</span>
+<span id="L391">  <span class="kw">have</span> hdS' := <span class="const token" data-verso-hover="137">genuine_of_correct</span> E hpic (<span class="const token" data-verso-hover="114">sent_ack</span> hr hqack).<span class="const token" data-verso-hover="104">1</span></span>
+<span id="L392">  <span class="kw">rwa</span> [← <span class="const token" data-verso-hover="124">distS_unique</span> hr hdS hdS'] <span class="kw">at</span> hqack</span>
+<span id="L393"></span>
+<span id="L394"><span class="dc">/-- **Lemma 3.5.** If some guild member sends `DISTRIBUTET`, then there are a guild member `pᵢ`,</span></span>
+<span id="L395"><span class="dc">its `DISTRIBUTES` set `S` (covering a quorum of `pᵢ`) and a quorum `Q` of `pᵢ` such that every</span></span>
+<span id="L396"><span class="dc">correct member of `Q` received `DISTRIBUTES S` from `pᵢ` and acknowledged it, and every</span></span>
+<span id="L397"><span class="dc">`DISTRIBUTET` set it ever sends contains `S`. -/</span></span>
+<span id="L398"><span class="kw">theorem</span> <span class="const token" data-verso-hover="5">lemma_3_5</span> (hG : <span class="const token" data-verso-hover="135">IsGuild</span> Fs Qs (<span class="const token" data-verso-hover="132">Faulty</span> E) G) (hQ : <span class="const token" data-verso-hover="33">IsQuorumSystem</span> Fs Qs)</span>
+<span id="L399">    (h : ∃ g ∈ G, ∃ i T, (g, <span class="const token" data-verso-hover="89">GMsg.distT</span> T) ∈ (E.<span class="const token" data-verso-hover="80">σ</span> i).<span class="const token" data-verso-hover="68">sent</span>) :</span>
+<span id="L400">    ∃ pi ∈ G, ∃ S, (∃ i, (pi, <span class="const token" data-verso-hover="84">GMsg.distS</span> S) ∈ (E.<span class="const token" data-verso-hover="80">σ</span> i).<span class="const token" data-verso-hover="68">sent</span>) ∧</span>
+<span id="L401">      <span class="const token" data-verso-hover="94">QSays</span> Qs pi (<span class="kw">fun</span> q =&gt; ∃ v, (q, v) ∈ S) ∧</span>
+<span id="L402">      ∃ Q ∈ Qs pi, ∀ q ∈ Q, E.<span class="const token" data-verso-hover="133">Correct</span> q →</span>
+<span id="L403">        (∃ i, <span class="const token" data-verso-hover="84">GMsg.distS</span> S ∈ (E.<span class="const token" data-verso-hover="80">σ</span> i).<span class="const token" data-verso-hover="70">inbox</span> q pi ∧ (q, <span class="const token" data-verso-hover="86">GMsg.ack</span> pi S) ∈ (E.<span class="const token" data-verso-hover="80">σ</span> i).<span class="const token" data-verso-hover="68">sent</span>) ∧</span>
+<span id="L404">        ∀ i T, (q, <span class="const token" data-verso-hover="89">GMsg.distT</span> T) ∈ (E.<span class="const token" data-verso-hover="80">σ</span> i).<span class="const token" data-verso-hover="68">sent</span> → S ⊆ T := <span class="kw">by</span></span>
+<span id="L405">  <span class="kw">obtain</span> ⟨g₀, hg₀, i₀, T₀, hT₀⟩ := h</span>
+<span id="L406">  <span class="kw">obtain</span> ⟨pi, S, Q, hc⟩ := <span class="const token" data-verso-hover="6">exists_candidate</span> E hG hQ hg₀ hT₀</span>
+<span id="L407">  <span class="kw">refine</span> ⟨pi, hc.<span class="const token" data-verso-hover="146">mem</span>, S, ⟨i₀, hc.<span class="const token" data-verso-hover="147">distS</span>⟩, hc.<span class="const token" data-verso-hover="148">cover</span>, Q, hc.<span class="const token" data-verso-hover="149">quorum</span>, <span class="kw">fun</span> q hq hqc =&gt; ⟨⟨i₀,</span>
+<span id="L408">    (<span class="const token" data-verso-hover="114">sent_ack</span> (E.<span class="const token" data-verso-hover="138">reachable</span> i₀) (hc.<span class="const token" data-verso-hover="150">acks</span> q hq hqc)).<span class="const token" data-verso-hover="104">1</span>, hc.<span class="const token" data-verso-hover="150">acks</span> q hq hqc⟩, <span class="kw">fun</span> i T hT =&gt; ?_⟩⟩</span>
+<span id="L409">  <span class="kw">exact</span> <span class="const token" data-verso-hover="119">ack_sub_distT</span> (E.<span class="const token" data-verso-hover="138">reachable</span> (<span class="const token" data-verso-hover="153">max</span> i i₀)) (E.<span class="const token" data-verso-hover="154">sent_mono</span> (<span class="const token" data-verso-hover="155">le_max_left</span> _ _) hT)</span>
+<span id="L410">    (E.<span class="const token" data-verso-hover="154">sent_mono</span> (<span class="const token" data-verso-hover="156">le_max_right</span> _ _) (hc.<span class="const token" data-verso-hover="150">acks</span> q hq hqc))</span>
+<span id="L411"></span>
+<span id="L412"><span class="dc">/-- **Lemma 3.7 (common core), safety part.** If some guild member sends `DISTRIBUTET`, the</span></span>
+<span id="L413"><span class="dc">`DISTRIBUTES` set of a guild member, which covers one of its quorums, is contained in every set</span></span>
+<span id="L414"><span class="dc">ag-delivered by a guild member. -/</span></span>
+<span id="L415"><span class="kw">theorem</span> <span class="const token" data-verso-hover="7">lemma_3_7</span> (hG : <span class="const token" data-verso-hover="135">IsGuild</span> Fs Qs (<span class="const token" data-verso-hover="132">Faulty</span> E) G) (hQ : <span class="const token" data-verso-hover="33">IsQuorumSystem</span> Fs Qs)</span>
+<span id="L416">    (h : ∃ g ∈ G, ∃ i T, (g, <span class="const token" data-verso-hover="89">GMsg.distT</span> T) ∈ (E.<span class="const token" data-verso-hover="80">σ</span> i).<span class="const token" data-verso-hover="68">sent</span>) : <span class="const token" data-verso-hover="107">ExecCommonCore</span> G E := <span class="kw">by</span></span>
+<span id="L417">  <span class="kw">obtain</span> ⟨g₀, hg₀, i₀, T₀, hT₀⟩ := h</span>
+<span id="L418">  <span class="kw">obtain</span> ⟨pi, S, Q, hc⟩ := <span class="const token" data-verso-hover="6">exists_candidate</span> E hG hQ hg₀ hT₀</span>
+<span id="L419">  <span class="kw">obtain</span> ⟨QS, hQS, hcov⟩ := hc.<span class="const token" data-verso-hover="148">cover</span></span>
+<span id="L420">  <span class="kw">refine</span> ⟨pi, hc.<span class="const token" data-verso-hover="146">mem</span>, QS, hQS, S, hcov, <span class="kw">fun</span> k hk n U hU =&gt; ?_⟩</span>
+<span id="L421">  <span class="kw">obtain</span> ⟨Qk, hQk, Tq, hT, -⟩ := <span class="const token" data-verso-hover="126">dec_guard</span> (E.<span class="const token" data-verso-hover="138">reachable</span> n) hU</span>
+<span id="L422">  <span class="kw">obtain</span> ⟨q, hqQ, hqQk, hqF⟩ :=</span>
+<span id="L423">    hQ.<span class="const token" data-verso-hover="152">exists_mem_inter_notMem</span> (hG.<span class="const token" data-verso-hover="104">1</span> pi hc.<span class="const token" data-verso-hover="146">mem</span>) (hG.<span class="const token" data-verso-hover="104">1</span> k hk) hc.<span class="const token" data-verso-hover="149">quorum</span> hQk</span>
+<span id="L424">  <span class="kw">have</span> hqc : E.<span class="const token" data-verso-hover="133">Correct</span> q := <span class="kw">by</span> <span class="kw">simpa</span> [<span class="const token" data-verso-hover="132">Faulty</span>] <span class="kw">using</span> hqF</span>
+<span id="L425">  <span class="kw">have</span> hdT := <span class="const token" data-verso-hover="137">genuine_of_correct</span> E hqc (hT q hqQk).<span class="const token" data-verso-hover="104">1</span><span class="nu">.</span><span class="const token" data-verso-hover="104">1</span></span>
+<span id="L426">  <span class="kw">have</span> := <span class="const token" data-verso-hover="119">ack_sub_distT</span> (E.<span class="const token" data-verso-hover="138">reachable</span> (<span class="const token" data-verso-hover="153">max</span> n i₀)) (E.<span class="const token" data-verso-hover="154">sent_mono</span> (<span class="const token" data-verso-hover="155">le_max_left</span> _ _) hdT)</span>
+<span id="L427">    (E.<span class="const token" data-verso-hover="154">sent_mono</span> (<span class="const token" data-verso-hover="156">le_max_right</span> _ _) (hc.<span class="const token" data-verso-hover="150">acks</span> q hqQ hqc))</span>
+<span id="L428">  <span class="kw">exact</span> this.<span class="const token" data-verso-hover="106">trans</span> (hT q hqQk).<span class="const token" data-verso-hover="105">2</span></span>
+<span id="L429"></span>
+<span id="L430"><span class="dc">/-- **Lemma 3.8, validity.** If a guild member ag-delivers a set containing `(s, v)` and `s` is</span></span>
+<span id="L431"><span class="dc">wise, then `v` is the input of `s`. -/</span></span>
+<span id="L432"><span class="kw">theorem</span> <span class="const token" data-verso-hover="157">validity</span> {k s : P} (hs : <span class="const token" data-verso-hover="158">Wise</span> Fs (<span class="const token" data-verso-hover="132">Faulty</span> E) s) {n : <span class="const token" data-verso-hover="61">ℕ</span>} {U : <span class="const token" data-verso-hover="85">Set</span> (P × V)}</span>
+<span id="L433">    (hU : (E.<span class="const token" data-verso-hover="80">σ</span> n).<span class="const token" data-verso-hover="41">dec</span> k = <span class="const token" data-verso-hover="108">some</span> U) {v : V} (hv : (s, v) ∈ U) : v = x s := <span class="kw">by</span></span>
+<span id="L434">  <span class="kw">have</span> hr := E.<span class="const token" data-verso-hover="138">reachable</span> n</span>
+<span id="L435">  <span class="kw">have</span> h1 := <span class="const token" data-verso-hover="128">dec_sub_delivered</span> hr hU hv</span>
+<span id="L436">  <span class="kw">have</span> hsc : E.<span class="const token" data-verso-hover="133">Correct</span> s := <span class="kw">by</span> <span class="kw">simpa</span> [<span class="const token" data-verso-hover="132">Faulty</span>] <span class="kw">using</span> hs.<span class="const token" data-verso-hover="104">1</span></span>
+<span id="L437">  <span class="kw">exact</span> <span class="const token" data-verso-hover="109">sent_val</span> hr (<span class="const token" data-verso-hover="137">genuine_of_correct</span> E hsc h1)</span>
+<span id="L438"></span>
+<span id="L439"><span class="dc">/-- **Lemma 3.8, agreement.** Two guild members never ag-deliver different values of the same</span></span>
+<span id="L440"><span class="dc">sender. -/</span></span>
+<span id="L441"><span class="kw">theorem</span> <span class="const token" data-verso-hover="159">agreement</span> (hrbc : <span class="const token" data-verso-hover="129">RBC</span> E G) {k k' s : P} (hk : k ∈ G) (hk' : k' ∈ G) {n n' : <span class="const token" data-verso-hover="61">ℕ</span>}</span>
+<span id="L442">    {U U' : <span class="const token" data-verso-hover="85">Set</span> (P × V)} (hU : (E.<span class="const token" data-verso-hover="80">σ</span> n).<span class="const token" data-verso-hover="41">dec</span> k = <span class="const token" data-verso-hover="108">some</span> U) (hU' : (E.<span class="const token" data-verso-hover="80">σ</span> n').<span class="const token" data-verso-hover="41">dec</span> k' = <span class="const token" data-verso-hover="108">some</span> U')</span>
+<span id="L443">    {v v' : V} (hv : (s, v) ∈ U) (hv' : (s, v') ∈ U') : v = v' :=</span>
+<span id="L444">  hrbc.<span class="const token" data-verso-hover="130">agree</span> k hk k' hk' s v v' n n' (<span class="const token" data-verso-hover="128">dec_sub_delivered</span> (E.<span class="const token" data-verso-hover="138">reachable</span> n) hU hv)</span>
+<span id="L445">    (<span class="const token" data-verso-hover="128">dec_sub_delivered</span> (E.<span class="const token" data-verso-hover="138">reachable</span> n') hU' hv')</span>
+<span id="L446"></span>
+<span id="L447"><span class="kw">end</span> Gather3</span>
+<span id="L448"></span>
+<span id="L449"><span class="kw">end</span> Podc.AsymmetricDAGConsensus</span>
+<span id="L450"></span>
+</code></div>
+        <script>
+          window.versoHoversUrl = "PODC2025/AsymmetricDAGConsensus/-hovers.json";</script>
+        <script src="static/lean/popper.js"></script>
+        <script src="static/lean/tippy.js"></script>
+        <script src="static/lean/marked.js"></script>
+        <script src="static/lean/highlighting.js"></script>
+        <script src="static/lean/lean.js"></script>
+        </article></main><footer class="site-footer"><div class="wrap">
+        Machine-checked formalizations of PODC papers in Lean 4. Generated with <a href="https://github.com/leanprover/verso">Verso</a> from the README files of <a href="https://github.com/vasnesterov/formal_podc">vasnesterov/formal_podc</a>.</div>
+      </footer></body>
+  </html>
+

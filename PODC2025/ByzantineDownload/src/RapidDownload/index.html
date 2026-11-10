@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="light dark">
+    <link rel="icon" href="data:,">
+    <title>ByzantineDownload: RapidDownload.lean · Formal PODC</title><base href="../../../.././"><link rel="stylesheet" href="static/lean/verso-vars.css">
+    <link rel="stylesheet" href="static/lean/highlighting.css">
+    <link rel="stylesheet" href="static/lean/tippy-border.css">
+    <link rel="stylesheet" href="static/style.css">
+    <script defer="defer" src="static/site.js"></script>
+    </head>
+  <body>
+    <header class="site-header">
+      <div class="wrap">
+        <a class="brand" href=".">Formal PODC</a><nav class="top">
+          <a href=".">Search</a><a href="about/">About</a><a href="https://github.com/vasnesterov/formal_podc">GitHub</a></nav>
+        </div>
+      </header>
+    <main class="wrap"><article><nav class="breadcrumbs" aria-label="Breadcrumb">
+          <a href=".">Search</a><span class="sep">›</span><a href="PODC2025/">PODC 2025</a><span class="sep">›</span><a href="PODC2025/ByzantineDownload/">ByzantineDownload</a><span class="sep">›</span><a href="PODC2025/ByzantineDownload/src/">Lean source</a><span class="sep">›</span><span aria-current="page">RapidDownload</span></nav>
+        <h1>
+          <code>RapidDownload.lean</code></h1>
+        <div class="paper-links">
+          <p>
+            Source of <a href="PODC2025/ByzantineDownload/">Distributed Download from an External Data Source — PODC 2025</a> · <a href="https://github.com/vasnesterov/formal_podc/blob/main/Papers/PODC2025/ByzantineDownload/RapidDownload.lean">GitHub</a> · hover over a name for its type and documentation</p>
+          </div>
+        <div class="lean-code lean-src">
+          <code class="hl lean block" data-lean-context="RapidDownload"><span id="L1"><span class="kw">import</span> Papers.PODC2025.ByzantineDownload.Model</span>
+<span id="L2"></span>
+<span id="L3"><span class="dc">/-!</span></span>
+<span id="L4"><span class="dc"># Algorithm 7 (Rapid Download) and a counterexample to Lemmas 5.13, 5.15 and Theorem 5.16</span></span>
+<span id="L5"></span>
+<span id="L6"><span class="dc">We encode Algorithm 7 of the paper as a `Protocol` of the synchronous DR crash model and exhibit</span></span>
+<span id="L7"><span class="dc">an execution with `k = 4` peers, `n = 4` bits and `f = 2` crashes (`β = 1/2`) in which a nonfaulty</span></span>
+<span id="L8"><span class="dc">peer finishes (its index passes `n`) without ever learning bit 2 (1-based; bit `1 : Fin 4` here).</span></span>
+<span id="L9"></span>
+<span id="L10"><span class="dc">## Timing (the only interpretation choices)</span></span>
+<span id="L11"></span>
+<span id="L12"><span class="dc">The pseudocode is event driven; we fix the synchronous timing of the paper's own Remarks in §5.2:</span></span>
+<span id="L13"><span class="dc">a message sent in round `r` is received at the end of round `r`.</span></span>
+<span id="L14"></span>
+<span id="L15"><span class="dc">* A peer that invokes `view change` at the end of round `r` sends its `⟨view change v', I⟩` message</span></span>
+<span id="L16"><span class="dc">  in round `r + 1` and is *idle* at the end of round `r + 1` (it does not expect a view message in</span></span>
+<span id="L17"><span class="dc">  that round); from the end of round `r + 2` on it suspects `lead(view)` at the end of every round in</span></span>
+<span id="L18"><span class="dc">  which it receives nothing from it (line 26).</span></span>
+<span id="L19"><span class="dc">* A peer that receives `view change v` messages for the first time at the end of round `r` (line 7)</span></span>
+<span id="L20"><span class="dc">  takes the highest index among the ones received *in that round* (line 8), queries in round `r + 1`</span></span>
+<span id="L21"><span class="dc">  if needed, and sends its view message in rounds `r + 1` and `r + 2` (to every peer, itself</span></span>
+<span id="L22"><span class="dc">  included).</span></span>
+<span id="L23"><span class="dc">* View messages are processed as in lines 16–24: `res[i] ← b` only if `v ≥ view(M)`, and the second</span></span>
+<span id="L24"><span class="dc">  view-`v` message increments `I(M)` whatever its index was.</span></span>
+<span id="L25"><span class="dc">* Initialisation (not specified in the paper): `lead(1)` starts view 1 at time 0 with index 1, i.e.</span></span>
+<span id="L26"><span class="dc">  sends `⟨view 1, 1, b₁⟩` in rounds 1 and 2; nobody is idle initially.</span></span>
+<span id="L27"><span class="dc">* A peer whose index exceeds `n` has finished (it no longer suspects or changes views, and ignores</span></span>
+<span id="L28"><span class="dc">  leadership requests); this only matters after the failure has happened.</span></span>
+<span id="L29"></span>
+<span id="L30"><span class="dc">Indices are 0-based in Lean (`I = 0` is the paper's `I = 1`); views and `lead(v) = v mod k` are as in</span></span>
+<span id="L31"><span class="dc">the paper.</span></span>
+<span id="L32"><span class="dc">-/</span></span>
+<span id="L33"></span>
+<span id="L34"><span class="kw">namespace</span> Podc.ByzantineDownload.Rapid</span>
+<span id="L35"></span>
+<span id="L36"><span class="dc">/-- The messages of Algorithm 7: an optional view message `⟨view v, i, b⟩` and an optional</span></span>
+<span id="L37"><span class="dc">`⟨view change v, i⟩` message (a peer may send both in the same round to the same peer). -/</span></span>
+<span id="L38"><span class="kw">structure</span> <span class="const token" data-verso-hover="232">Msg</span> <span class="kw">where</span></span>
+<span id="L39">  <span class="dc">/-- `⟨view v, i, b⟩`. -/</span></span>
+<span id="L40">  <span class="const token" data-verso-hover="233">view</span> : <span class="const token" data-verso-hover="107">Option</span> (<span class="const token" data-verso-hover="20">ℕ</span> × <span class="const token" data-verso-hover="20">ℕ</span> × <span class="const token" data-verso-hover="108">Bool</span>)</span>
+<span id="L41">  <span class="dc">/-- `⟨view change v, i⟩`. -/</span></span>
+<span id="L42">  <span class="const token" data-verso-hover="234">vc</span> : <span class="const token" data-verso-hover="107">Option</span> (<span class="const token" data-verso-hover="20">ℕ</span> × <span class="const token" data-verso-hover="20">ℕ</span>)</span>
+<span id="L43">  <span class="kw">deriving</span> <span class="const token" data-verso-hover="235">DecidableEq</span>, <span class="const token" data-verso-hover="236">Repr</span></span>
+<span id="L44"></span>
+<span id="L45"><span class="dc">/-- Local state of a peer in Algorithm 7. -/</span></span>
+<span id="L46"><span class="kw">structure</span> <span class="const token" data-verso-hover="237">St</span> (k n : <span class="const token" data-verso-hover="20">ℕ</span>) <span class="kw">where</span></span>
+<span id="L47">  <span class="dc">/-- `view(M)`. -/</span></span>
+<span id="L48">  <span class="const token" data-verso-hover="238">view</span> : <span class="const token" data-verso-hover="20">ℕ</span></span>
+<span id="L49">  <span class="dc">/-- `I(M)` (0-based). -/</span></span>
+<span id="L50">  <span class="const token" data-verso-hover="239">I</span> : <span class="const token" data-verso-hover="20">ℕ</span></span>
+<span id="L51">  <span class="dc">/-- `F`: the peers `M` believes crashed. -/</span></span>
+<span id="L52">  <span class="const token" data-verso-hover="240">F</span> : <span class="const token" data-verso-hover="40">Finset</span> (<span class="const token" data-verso-hover="28">Fin</span> k)</span>
+<span id="L53">  <span class="dc">/-- `res`. -/</span></span>
+<span id="L54">  <span class="const token" data-verso-hover="241">res</span> : <span class="const token" data-verso-hover="28">Fin</span> n → <span class="const token" data-verso-hover="107">Option</span> <span class="const token" data-verso-hover="108">Bool</span></span>
+<span id="L55">  <span class="dc">/-- Idle at the end of the current round (line 33). -/</span></span>
+<span id="L56">  <span class="const token" data-verso-hover="242">idle</span> : <span class="const token" data-verso-hover="108">Bool</span></span>
+<span id="L57">  <span class="dc">/-- The view entered at the end of the idle round (line 34). -/</span></span>
+<span id="L58">  <span class="const token" data-verso-hover="243">target</span> : <span class="const token" data-verso-hover="20">ℕ</span></span>
+<span id="L59">  <span class="dc">/-- The `view change` message to send in the current round. -/</span></span>
+<span id="L60">  <span class="const token" data-verso-hover="244">vcOut</span> : <span class="const token" data-verso-hover="107">Option</span> (<span class="const token" data-verso-hover="20">ℕ</span> × <span class="const token" data-verso-hover="20">ℕ</span>)</span>
+<span id="L61">  <span class="dc">/-- Views of the view messages received so far (with multiplicity). -/</span></span>
+<span id="L62">  <span class="const token" data-verso-hover="245">got</span> : <span class="const token" data-verso-hover="246">List</span> <span class="const token" data-verso-hover="20">ℕ</span></span>
+<span id="L63">  <span class="dc">/-- Views this peer has started leading (line 7: "for the first time"). -/</span></span>
+<span id="L64">  <span class="const token" data-verso-hover="247">led</span> : <span class="const token" data-verso-hover="246">List</span> <span class="const token" data-verso-hover="20">ℕ</span></span>
+<span id="L65">  <span class="dc">/-- Leader duty: view, index, number of view messages still to send. -/</span></span>
+<span id="L66">  <span class="const token" data-verso-hover="248">duty</span> : <span class="const token" data-verso-hover="107">Option</span> (<span class="const token" data-verso-hover="20">ℕ</span> × <span class="const token" data-verso-hover="20">ℕ</span> × <span class="const token" data-verso-hover="20">ℕ</span>)</span>
+<span id="L67">  <span class="kw">deriving</span> <span class="const token" data-verso-hover="235">DecidableEq</span></span>
+<span id="L68"></span>
+<span id="L69"><span class="kw">variable</span> {k n : <span class="const token" data-verso-hover="20">ℕ</span>} [<span class="const token" data-verso-hover="21">NeZero</span> k]</span>
+<span id="L70"></span>
+<span id="L71"><span class="dc">/-- Procedure `view change` (lines 30–34), invoked at the end of a round. -/</span></span>
+<span id="L72"><span class="kw">def</span> <span class="const token" data-verso-hover="249">invokeVC</span> (s : <span class="const token" data-verso-hover="237">St</span> k n) : <span class="const token" data-verso-hover="237">St</span> k n :=</span>
+<span id="L73">  <span class="kw">let</span> v' := <span class="const token" data-verso-hover="41">nextView</span> s.<span class="const token" data-verso-hover="240">F</span> s.<span class="const token" data-verso-hover="238">view</span></span>
+<span id="L74">  { s <span class="kw">with</span> <span class="const token" data-verso-hover="244">vcOut</span> := <span class="const token" data-verso-hover="111">some</span> (v', s.<span class="const token" data-verso-hover="239">I</span>), <span class="const token" data-verso-hover="242">idle</span> := <span class="const token" data-verso-hover="212">true</span>, <span class="const token" data-verso-hover="243">target</span> := v' }</span>
+<span id="L75"></span>
+<span id="L76"><span class="dc">/-- The bit carried by the leader's view message (after its query, if any). -/</span></span>
+<span id="L77"><span class="kw">def</span> <span class="const token" data-verso-hover="250">dutyBit</span> (s : <span class="const token" data-verso-hover="237">St</span> k n) (a : <span class="const token" data-verso-hover="28">Fin</span> n → <span class="const token" data-verso-hover="107">Option</span> <span class="const token" data-verso-hover="108">Bool</span>) : <span class="const token" data-verso-hover="107">Option</span> (<span class="const token" data-verso-hover="20">ℕ</span> × <span class="const token" data-verso-hover="20">ℕ</span> × <span class="const token" data-verso-hover="108">Bool</span>) :=</span>
+<span id="L78">  <span class="kw">match</span> s.<span class="const token" data-verso-hover="248">duty</span> <span class="kw">with</span></span>
+<span id="L79">  | <span class="const token" data-verso-hover="111">some</span> (v, i, r) =&gt;</span>
+<span id="L80">    <span class="kw">if</span> <span class="nu">0</span> &lt; r <span class="kw">then</span></span>
+<span id="L81">      <span class="kw">match</span> <span class="const token" data-verso-hover="230">get</span> s.<span class="const token" data-verso-hover="241">res</span> i &lt;|&gt; <span class="const token" data-verso-hover="230">get</span> a i <span class="kw">with</span></span>
+<span id="L82">      | <span class="const token" data-verso-hover="111">some</span> b =&gt; <span class="const token" data-verso-hover="111">some</span> (v, i, b)</span>
+<span id="L83">      | <span class="const token" data-verso-hover="112">none</span> =&gt; <span class="const token" data-verso-hover="112">none</span></span>
+<span id="L84">    <span class="kw">else</span> <span class="const token" data-verso-hover="112">none</span></span>
+<span id="L85">  | <span class="const token" data-verso-hover="112">none</span> =&gt; <span class="const token" data-verso-hover="112">none</span></span>
+<span id="L86"></span>
+<span id="L87"><span class="dc">/-- Lines 7–14 for one view `v` with `view change` messages of indices `idx` in this round. -/</span></span>
+<span id="L88"><span class="kw">def</span> <span class="const token" data-verso-hover="251">startLead</span> (s : <span class="const token" data-verso-hover="237">St</span> k n) (v : <span class="const token" data-verso-hover="20">ℕ</span>) (idx : <span class="const token" data-verso-hover="246">List</span> <span class="const token" data-verso-hover="20">ℕ</span>) : <span class="const token" data-verso-hover="237">St</span> k n :=</span>
+<span id="L89">  <span class="kw">if</span> v ∈ s.<span class="const token" data-verso-hover="247">led</span> <span class="kw">then</span> s <span class="kw">else</span></span>
+<span id="L90">  <span class="kw">let</span> I' := <span class="const token" data-verso-hover="252">max</span> s.<span class="const token" data-verso-hover="239">I</span> (idx.<span class="const token" data-verso-hover="253">foldl</span> <span class="const token" data-verso-hover="252">max</span> <span class="nu">0</span>)</span>
+<span id="L91">  <span class="kw">let</span> s := { s <span class="kw">with</span> <span class="const token" data-verso-hover="247">led</span> := v :: s.<span class="const token" data-verso-hover="247">led</span>, <span class="const token" data-verso-hover="239">I</span> := I' }</span>
+<span id="L92">  <span class="kw">if</span> I' &lt; n <span class="kw">then</span> { s <span class="kw">with</span> <span class="const token" data-verso-hover="248">duty</span> := <span class="const token" data-verso-hover="111">some</span> (v, I', <span class="nu">2</span>) } <span class="kw">else</span> s</span>
+<span id="L93"></span>
+<span id="L94"><span class="dc">/-- Lines 16–24 for one received view message. Returns the new state and whether `view change`</span></span>
+<span id="L95"><span class="dc">was invoked. -/</span></span>
+<span id="L96"><span class="kw">def</span> <span class="const token" data-verso-hover="254">onView</span> (s : <span class="const token" data-verso-hover="237">St</span> k n) (m : <span class="const token" data-verso-hover="20">ℕ</span> × <span class="const token" data-verso-hover="20">ℕ</span> × <span class="const token" data-verso-hover="108">Bool</span>) : <span class="const token" data-verso-hover="237">St</span> k n × <span class="const token" data-verso-hover="108">Bool</span> :=</span>
+<span id="L97">  <span class="kw">let</span> (v, i, b) := m</span>
+<span id="L98">  <span class="kw">let</span> s := <span class="kw">if</span> s.<span class="const token" data-verso-hover="238">view</span> ≤ v <span class="kw">then</span></span>
+<span id="L99">      { s <span class="kw">with</span> <span class="const token" data-verso-hover="238">view</span> := v, <span class="const token" data-verso-hover="239">I</span> := <span class="kw">if</span> s.<span class="const token" data-verso-hover="239">I</span> ≤ i <span class="kw">then</span> i <span class="kw">else</span> s.<span class="const token" data-verso-hover="239">I</span>, <span class="const token" data-verso-hover="241">res</span> := <span class="const token" data-verso-hover="231">set</span> s.<span class="const token" data-verso-hover="241">res</span> i b }</span>
+<span id="L100">    <span class="kw">else</span> s</span>
+<span id="L101">  <span class="kw">let</span> s := { s <span class="kw">with</span> <span class="const token" data-verso-hover="242">idle</span> := <span class="const token" data-verso-hover="190">false</span>, <span class="const token" data-verso-hover="245">got</span> := v :: s.<span class="const token" data-verso-hover="245">got</span> }</span>
+<span id="L102">  <span class="kw">if</span> s.<span class="const token" data-verso-hover="245">got</span>.<span class="const token" data-verso-hover="255">count</span> v = <span class="nu">2</span> <span class="kw">then</span></span>
+<span id="L103">    <span class="kw">let</span> s := { s <span class="kw">with</span> <span class="const token" data-verso-hover="239">I</span> := s.<span class="const token" data-verso-hover="239">I</span> + <span class="nu">1</span> }</span>
+<span id="L104">    <span class="kw">if</span> s.<span class="const token" data-verso-hover="239">I</span> &lt; n <span class="kw">then</span> (<span class="const token" data-verso-hover="249">invokeVC</span> s, <span class="const token" data-verso-hover="212">true</span>) <span class="kw">else</span> (s, <span class="const token" data-verso-hover="190">false</span>)</span>
+<span id="L105">  <span class="kw">else</span> (s, <span class="const token" data-verso-hover="190">false</span>)</span>
+<span id="L106"></span>
+<span id="L107"><span class="dc">/-- Algorithm 7 as a protocol of the DR model. -/</span></span>
+<span id="L108"><span class="kw">def</span> <span class="const token" data-verso-hover="17">alg</span> (k n : <span class="const token" data-verso-hover="20">ℕ</span>) [<span class="const token" data-verso-hover="21">NeZero</span> k] : <span class="const token" data-verso-hover="201">Protocol</span> k n (<span class="const token" data-verso-hover="237">St</span> k n) <span class="const token" data-verso-hover="232">Msg</span> <span class="kw">where</span></span>
+<span id="L109">  <span class="const token" data-verso-hover="202">init</span> p :=</span>
+<span id="L110">    { <span class="const token" data-verso-hover="238">view</span> := <span class="nu">1</span>, <span class="const token" data-verso-hover="239">I</span> := <span class="nu">0</span>, <span class="const token" data-verso-hover="240">F</span> := ∅, <span class="const token" data-verso-hover="241">res</span> := <span class="kw">fun</span> _ =&gt; <span class="const token" data-verso-hover="112">none</span>, <span class="const token" data-verso-hover="242">idle</span> := <span class="const token" data-verso-hover="190">false</span>, <span class="const token" data-verso-hover="243">target</span> := <span class="nu">1</span>, <span class="const token" data-verso-hover="244">vcOut</span> := <span class="const token" data-verso-hover="112">none</span>,</span>
+<span id="L111">      <span class="const token" data-verso-hover="245">got</span> := [], <span class="const token" data-verso-hover="247">led</span> := <span class="kw">if</span> p = <span class="const token" data-verso-hover="23">lead</span> <span class="nu">1</span> <span class="kw">then</span> [<span class="nu">1</span>] <span class="kw">else</span> [],</span>
+<span id="L112">      <span class="const token" data-verso-hover="248">duty</span> := <span class="kw">if</span> p = <span class="const token" data-verso-hover="23">lead</span> <span class="nu">1</span> ∧ <span class="nu">0</span> &lt; n <span class="kw">then</span> <span class="const token" data-verso-hover="111">some</span> (<span class="nu">1</span>, <span class="nu">0</span>, <span class="nu">2</span>) <span class="kw">else</span> <span class="const token" data-verso-hover="112">none</span> }</span>
+<span id="L113">  <span class="const token" data-verso-hover="203">query</span> _ s :=</span>
+<span id="L114">    <span class="kw">match</span> s.<span class="const token" data-verso-hover="248">duty</span> <span class="kw">with</span></span>
+<span id="L115">    | <span class="const token" data-verso-hover="111">some</span> (_, i, <span class="nu">2</span>) =&gt; <span class="kw">if</span> h : i &lt; n <span class="kw">then</span> (<span class="kw">if</span> s.<span class="const token" data-verso-hover="241">res</span> ⟨i, h⟩ = <span class="const token" data-verso-hover="112">none</span> <span class="kw">then</span> {⟨i, h⟩} <span class="kw">else</span> ∅) <span class="kw">else</span> ∅</span>
+<span id="L116">    | _ =&gt; ∅</span>
+<span id="L117">  <span class="const token" data-verso-hover="204">send</span> _ s a q :=</span>
+<span id="L118">    <span class="kw">let</span> vw := <span class="const token" data-verso-hover="250">dutyBit</span> s a</span>
+<span id="L119">    <span class="kw">let</span> vc := <span class="kw">match</span> s.<span class="const token" data-verso-hover="244">vcOut</span> <span class="kw">with</span></span>
+<span id="L120">      | <span class="const token" data-verso-hover="111">some</span> (v', i) =&gt; <span class="kw">if</span> <span class="const token" data-verso-hover="23">lead</span> v' = q <span class="kw">then</span> <span class="const token" data-verso-hover="111">some</span> (v', i) <span class="kw">else</span> <span class="const token" data-verso-hover="112">none</span></span>
+<span id="L121">      | <span class="const token" data-verso-hover="112">none</span> =&gt; <span class="const token" data-verso-hover="112">none</span></span>
+<span id="L122">    <span class="kw">if</span> vw.<span class="const token" data-verso-hover="216">isSome</span> || vc.<span class="const token" data-verso-hover="216">isSome</span> <span class="kw">then</span> <span class="const token" data-verso-hover="111">some</span> ⟨vw, vc⟩ <span class="kw">else</span> <span class="const token" data-verso-hover="112">none</span></span>
+<span id="L123">  <span class="const token" data-verso-hover="205">step</span> _ s a inbox :=</span>
+<span id="L124">    <span class="cm">--</span><span class="cm"> the leader's query answer and the bookkeeping of its sends</span></span>
+<span id="L125">    <span class="kw">let</span> s0 : <span class="const token" data-verso-hover="237">St</span> k n :=</span>
+<span id="L126">      { s <span class="kw">with</span></span>
+<span id="L127">        <span class="const token" data-verso-hover="241">res</span> := (<span class="kw">match</span> s.<span class="const token" data-verso-hover="248">duty</span> <span class="kw">with</span></span>
+<span id="L128">          | <span class="const token" data-verso-hover="111">some</span> (_, i, _) =&gt; <span class="kw">match</span> <span class="const token" data-verso-hover="230">get</span> a i <span class="kw">with</span></span>
+<span id="L129">            | <span class="const token" data-verso-hover="111">some</span> b =&gt; <span class="const token" data-verso-hover="231">set</span> s.<span class="const token" data-verso-hover="241">res</span> i b</span>
+<span id="L130">            | <span class="const token" data-verso-hover="112">none</span> =&gt; s.<span class="const token" data-verso-hover="241">res</span></span>
+<span id="L131">          | <span class="const token" data-verso-hover="112">none</span> =&gt; s.<span class="const token" data-verso-hover="241">res</span>),</span>
+<span id="L132">        <span class="const token" data-verso-hover="248">duty</span> := (<span class="kw">match</span> s.<span class="const token" data-verso-hover="248">duty</span> <span class="kw">with</span></span>
+<span id="L133">          | <span class="const token" data-verso-hover="111">some</span> (v, i, r) =&gt; <span class="kw">if</span> <span class="nu">1</span> &lt; r <span class="kw">then</span> <span class="const token" data-verso-hover="111">some</span> (v, i, r - <span class="nu">1</span>) <span class="kw">else</span> <span class="const token" data-verso-hover="112">none</span></span>
+<span id="L134">          | <span class="const token" data-verso-hover="112">none</span> =&gt; <span class="const token" data-verso-hover="112">none</span>),</span>
+<span id="L135">        <span class="const token" data-verso-hover="244">vcOut</span> := <span class="const token" data-verso-hover="112">none</span> }</span>
+<span id="L136">    <span class="kw">let</span> senders := <span class="const token" data-verso-hover="256">List.finRange</span> k</span>
+<span id="L137">    <span class="cm">--</span><span class="cm"> lines 7–14: view change messages</span></span>
+<span id="L138">    <span class="kw">let</span> vcs : <span class="const token" data-verso-hover="246">List</span> (<span class="const token" data-verso-hover="20">ℕ</span> × <span class="const token" data-verso-hover="20">ℕ</span>) := senders.<span class="const token" data-verso-hover="257">filterMap</span> (<span class="kw">fun</span> p =&gt; (inbox p).<span class="const token" data-verso-hover="258">bind</span> <span class="const token" data-verso-hover="234">Msg.vc</span>)</span>
+<span id="L139">    <span class="kw">let</span> views := (vcs.<span class="const token" data-verso-hover="259">map</span> <span class="const token" data-verso-hover="260">Prod.fst</span>).<span class="const token" data-verso-hover="261">dedup</span>.<span class="const token" data-verso-hover="262">mergeSort</span> (· ≤ ·)</span>
+<span id="L140">    <span class="kw">let</span> s1 := views.<span class="const token" data-verso-hover="253">foldl</span> (<span class="kw">fun</span> s v =&gt;</span>
+<span id="L141">      <span class="const token" data-verso-hover="251">startLead</span> s v ((vcs.<span class="const token" data-verso-hover="263">filter</span> (<span class="kw">fun</span> x =&gt; x.<span class="const token" data-verso-hover="260">1</span> = v)).<span class="const token" data-verso-hover="259">map</span> <span class="const token" data-verso-hover="264">Prod.snd</span>)) s0</span>
+<span id="L142">    <span class="cm">--</span><span class="cm"> lines 16–24: view messages, in the order of the senders</span></span>
+<span id="L143">    <span class="kw">let</span> oldView := s.<span class="const token" data-verso-hover="238">view</span></span>
+<span id="L144">    <span class="kw">let</span> heard := senders.<span class="const token" data-verso-hover="265">any</span> (<span class="kw">fun</span> p =&gt; (inbox p).<span class="const token" data-verso-hover="216">isSome</span> &amp;&amp; p == <span class="const token" data-verso-hover="23">lead</span> oldView) ||</span>
+<span id="L145">      senders.<span class="const token" data-verso-hover="265">any</span> (<span class="kw">fun</span> p =&gt; <span class="kw">match</span> (inbox p).<span class="const token" data-verso-hover="258">bind</span> <span class="const token" data-verso-hover="233">Msg.view</span> <span class="kw">with</span></span>
+<span id="L146">        | <span class="const token" data-verso-hover="111">some</span> (v, _, _) =&gt; <span class="const token" data-verso-hover="229">decide</span> (oldView ≤ v)</span>
+<span id="L147">        | <span class="const token" data-verso-hover="112">none</span> =&gt; <span class="const token" data-verso-hover="190">false</span>)</span>
+<span id="L148">    <span class="kw">let</span> (s2, inv) := senders.<span class="const token" data-verso-hover="253">foldl</span> (<span class="kw">fun</span> (acc : <span class="const token" data-verso-hover="237">St</span> k n × <span class="const token" data-verso-hover="108">Bool</span>) p =&gt;</span>
+<span id="L149">      <span class="kw">match</span> (inbox p).<span class="const token" data-verso-hover="258">bind</span> <span class="const token" data-verso-hover="233">Msg.view</span> <span class="kw">with</span></span>
+<span id="L150">      | <span class="const token" data-verso-hover="111">some</span> m =&gt; <span class="kw">let</span> r := <span class="const token" data-verso-hover="254">onView</span> acc.<span class="const token" data-verso-hover="260">1</span> m; (r.<span class="const token" data-verso-hover="260">1</span>, acc.<span class="const token" data-verso-hover="264">2</span> || r.<span class="const token" data-verso-hover="264">2</span>)</span>
+<span id="L151">      | <span class="const token" data-verso-hover="112">none</span> =&gt; acc) (s1, <span class="const token" data-verso-hover="190">false</span>)</span>
+<span id="L152">    <span class="cm">--</span><span class="cm"> lines 26–28 and the end of the idle round (line 34)</span></span>
+<span id="L153">    <span class="kw">if</span> inv <span class="kw">then</span> s2</span>
+<span id="L154">    <span class="kw">else</span> <span class="kw">if</span> s2.<span class="const token" data-verso-hover="242">idle</span> <span class="kw">then</span></span>
+<span id="L155">      { s2 <span class="kw">with</span> <span class="const token" data-verso-hover="242">idle</span> := <span class="const token" data-verso-hover="190">false</span>, <span class="const token" data-verso-hover="238">view</span> := <span class="kw">if</span> s2.<span class="const token" data-verso-hover="238">view</span> ≤ s2.<span class="const token" data-verso-hover="243">target</span> <span class="kw">then</span> s2.<span class="const token" data-verso-hover="243">target</span> <span class="kw">else</span> s2.<span class="const token" data-verso-hover="238">view</span> }</span>
+<span id="L156">    <span class="kw">else</span> <span class="kw">if</span> !heard &amp;&amp; <span class="const token" data-verso-hover="229">decide</span> (s2.<span class="const token" data-verso-hover="239">I</span> &lt; n) <span class="kw">then</span></span>
+<span id="L157">      <span class="const token" data-verso-hover="249">invokeVC</span> { s2 <span class="kw">with</span> <span class="const token" data-verso-hover="240">F</span> := <span class="const token" data-verso-hover="144">insert</span> (<span class="const token" data-verso-hover="23">lead</span> s2.<span class="const token" data-verso-hover="238">view</span>) s2.<span class="const token" data-verso-hover="240">F</span> }</span>
+<span id="L158">    <span class="kw">else</span> s2</span>
+<span id="L159">  <span class="const token" data-verso-hover="206">res</span> s := s.<span class="const token" data-verso-hover="241">res</span></span>
+<span id="L160"></span>
+<span id="L161"><span class="dc">/-! ### A memoized simulator (used to evaluate executions in the kernel) -/</span></span>
+<span id="L162"></span>
+<span id="L163"><span class="dc">/-- The configurations of `A`, tabulated as lists (`tab A X π t = [cfg t 0, …, cfg t (k-1)]`). -/</span></span>
+<span id="L164"><span class="kw">def</span> <span class="const token" data-verso-hover="266">tab</span> {S M : <span class="kw">Type</span>} {n k : <span class="const token" data-verso-hover="20">ℕ</span>} (A : <span class="const token" data-verso-hover="201">Protocol</span> k n S M) (X : <span class="const token" data-verso-hover="28">Fin</span> n → <span class="const token" data-verso-hover="108">Bool</span>) (π : <span class="const token" data-verso-hover="208">Pattern</span> k) (d : S) :</span>
+<span id="L165">    <span class="const token" data-verso-hover="20">ℕ</span> → <span class="const token" data-verso-hover="246">List</span> S</span>
+<span id="L166">  | <span class="nu">0</span> =&gt; <span class="const token" data-verso-hover="267">List.ofFn</span> A.<span class="const token" data-verso-hover="202">init</span></span>
+<span id="L167">  | t + <span class="nu">1</span> =&gt; <span class="kw">let</span> l := <span class="const token" data-verso-hover="266">tab</span> A X π d t</span>
+<span id="L168">    <span class="const token" data-verso-hover="267">List.ofFn</span> (A.<span class="const token" data-verso-hover="220">round</span> X π (t + <span class="nu">1</span>) (<span class="kw">fun</span> p =&gt; l.<span class="const token" data-verso-hover="268">getD</span> p.<span class="const token" data-verso-hover="24">val</span> d))</span>
+<span id="L169"></span>
+<span id="L170"><span class="kw">omit</span> [<span class="const token" data-verso-hover="21">NeZero</span> k] <span class="kw">in</span></span>
+<span id="L171"><span class="kw">lemma</span> <span class="const token" data-verso-hover="18">cfg_eq_tab</span> {S M : <span class="kw">Type</span>} (A : <span class="const token" data-verso-hover="201">Protocol</span> k n S M) (X : <span class="const token" data-verso-hover="28">Fin</span> n → <span class="const token" data-verso-hover="108">Bool</span>) (π : <span class="const token" data-verso-hover="208">Pattern</span> k) (d : S)</span>
+<span id="L172">    (t : <span class="const token" data-verso-hover="20">ℕ</span>) (p : <span class="const token" data-verso-hover="28">Fin</span> k) : A.<span class="const token" data-verso-hover="221">cfg</span> X π t p = (<span class="const token" data-verso-hover="266">tab</span> A X π d t).<span class="const token" data-verso-hover="268">getD</span> p.<span class="const token" data-verso-hover="24">val</span> d := <span class="kw">by</span></span>
+<span id="L173">  <span class="kw">induction</span> t generalizing p <span class="kw">with</span></span>
+<span id="L174">  | <span class="const token" data-verso-hover="69">zero</span> =&gt; <span class="kw">simp</span> [<span class="const token" data-verso-hover="266">tab</span>, <span class="const token" data-verso-hover="221">Protocol.cfg</span>, <span class="const token" data-verso-hover="269">List.getD_eq_getElem?_getD</span>]</span>
+<span id="L175">  | <span class="const token" data-verso-hover="70">succ</span> t ih =&gt;</span>
+<span id="L176">    <span class="kw">have</span> : A.<span class="const token" data-verso-hover="221">cfg</span> X π t = <span class="kw">fun</span> p =&gt; (<span class="const token" data-verso-hover="266">tab</span> A X π d t).<span class="const token" data-verso-hover="268">getD</span> p.<span class="const token" data-verso-hover="24">val</span> d := <span class="const token" data-verso-hover="270">funext</span> ih</span>
+<span id="L177">    <span class="kw">simp</span> [<span class="const token" data-verso-hover="266">tab</span>, <span class="const token" data-verso-hover="221">Protocol.cfg</span>, this, <span class="const token" data-verso-hover="269">List.getD_eq_getElem?_getD</span>]</span>
+<span id="L178"></span>
+<span id="L179"><span class="dc">/-! ### The counterexample -/</span></span>
+<span id="L180"></span>
+<span id="L181"><span class="dc">/-- The counterexample's crash pattern (`k = 4`, `f = 2`): peer 1 (= `lead(1)`) crashes in round 2,</span></span>
+<span id="L182"><span class="dc">its second view-1 message reaching only peer 2; peer 2 (= `lead(2)`) crashes in round 4, its first</span></span>
+<span id="L183"><span class="dc">view-2 message reaching only peers 0 and 1. Peers 0 and 3 are nonfaulty. -/</span></span>
+<span id="L184"><span class="kw">def</span> <span class="const token" data-verso-hover="271">badPattern</span> : <span class="const token" data-verso-hover="208">Pattern</span> <span class="nu">4</span> <span class="kw">where</span></span>
+<span id="L185">  <span class="const token" data-verso-hover="209">crash</span> p := <span class="kw">if</span> p = <span class="nu">1</span> <span class="kw">then</span> <span class="const token" data-verso-hover="111">some</span> <span class="nu">2</span> <span class="kw">else</span> <span class="kw">if</span> p = <span class="nu">2</span> <span class="kw">then</span> <span class="const token" data-verso-hover="111">some</span> <span class="nu">4</span> <span class="kw">else</span> <span class="const token" data-verso-hover="112">none</span></span>
+<span id="L186">  <span class="const token" data-verso-hover="210">reach</span> p q := (p = <span class="nu">1</span> ∧ q = <span class="nu">2</span>) || (p = <span class="nu">2</span> ∧ (q = <span class="nu">0</span> ∨ q = <span class="nu">1</span>))</span>
+<span id="L187"></span>
+<span id="L188"><span class="kw">lemma</span> <span class="const token" data-verso-hover="272">badPattern_admissible</span> : <span class="const token" data-verso-hover="271">badPattern</span>.<span class="const token" data-verso-hover="217">Admissible</span> <span class="nu">2</span> := <span class="kw">by</span></span>
+<span id="L189">  <span class="kw">unfold</span> <span class="const token" data-verso-hover="217">Pattern.Admissible</span> <span class="const token" data-verso-hover="215">Pattern.faulty</span>; <span class="kw">decide</span></span>
+<span id="L190"></span>
+<span id="L191"><span class="kw">lemma</span> <span class="const token" data-verso-hover="273">badPattern_nonfaulty_0</span> : <span class="const token" data-verso-hover="271">badPattern</span>.<span class="const token" data-verso-hover="214">Nonfaulty</span> <span class="nu">0</span> := <span class="const token" data-verso-hover="25">rfl</span></span>
+<span id="L192"><span class="kw">lemma</span> <span class="const token" data-verso-hover="274">badPattern_nonfaulty_3</span> : <span class="const token" data-verso-hover="271">badPattern</span>.<span class="const token" data-verso-hover="214">Nonfaulty</span> <span class="nu">3</span> := <span class="const token" data-verso-hover="25">rfl</span></span>
+<span id="L193"></span>
+<span id="L194"><span class="dc">/-- The input of the counterexample (any input works: only whether a bit is known matters). -/</span></span>
+<span id="L195"><span class="kw">def</span> <span class="const token" data-verso-hover="275">X₀</span> : <span class="const token" data-verso-hover="28">Fin</span> <span class="nu">4</span> → <span class="const token" data-verso-hover="108">Bool</span> := <span class="kw">fun</span> _ =&gt; <span class="const token" data-verso-hover="212">true</span></span>
+<span id="L196"></span>
+<span id="L197"><span class="dc">/-- The configuration of the counterexample at time `t`. -/</span></span>
+<span id="L198"><span class="kw">def</span> <span class="const token" data-verso-hover="276">badCfg</span> (t : <span class="const token" data-verso-hover="20">ℕ</span>) : <span class="const token" data-verso-hover="28">Fin</span> <span class="nu">4</span> → <span class="const token" data-verso-hover="237">St</span> <span class="nu">4</span> <span class="nu">4</span> := (<span class="const token" data-verso-hover="17">alg</span> <span class="nu">4</span> <span class="nu">4</span>).<span class="const token" data-verso-hover="221">cfg</span> <span class="const token" data-verso-hover="275">X₀</span> <span class="const token" data-verso-hover="271">badPattern</span> t</span>
+<span id="L199"></span>
+<span id="L200"><span class="kw">lemma</span> <span class="const token" data-verso-hover="277">badCfg_eq</span> (t : <span class="const token" data-verso-hover="20">ℕ</span>) (p : <span class="const token" data-verso-hover="28">Fin</span> <span class="nu">4</span>) :</span>
+<span id="L201">    <span class="const token" data-verso-hover="276">badCfg</span> t p = (<span class="const token" data-verso-hover="266">tab</span> (<span class="const token" data-verso-hover="17">alg</span> <span class="nu">4</span> <span class="nu">4</span>) <span class="const token" data-verso-hover="275">X₀</span> <span class="const token" data-verso-hover="271">badPattern</span> ((<span class="const token" data-verso-hover="17">alg</span> <span class="nu">4</span> <span class="nu">4</span>).<span class="const token" data-verso-hover="202">init</span> <span class="nu">0</span>) t).<span class="const token" data-verso-hover="268">getD</span> p.<span class="const token" data-verso-hover="24">val</span> ((<span class="const token" data-verso-hover="17">alg</span> <span class="nu">4</span> <span class="nu">4</span>).<span class="const token" data-verso-hover="202">init</span> <span class="nu">0</span>) :=</span>
+<span id="L202">  <span class="const token" data-verso-hover="18">cfg_eq_tab</span> _ _ _ _ _ _</span>
+<span id="L203"></span>
+<span id="L204"><span class="dc">/-- The tabulated configuration at time `t`. -/</span></span>
+<span id="L205"><span class="kw">abbrev</span> <span class="const token" data-verso-hover="278">badTab</span> (t : <span class="const token" data-verso-hover="20">ℕ</span>) : <span class="const token" data-verso-hover="28">Fin</span> <span class="nu">4</span> → <span class="const token" data-verso-hover="237">St</span> <span class="nu">4</span> <span class="nu">4</span> :=</span>
+<span id="L206">  <span class="kw">fun</span> p =&gt; (<span class="const token" data-verso-hover="266">tab</span> (<span class="const token" data-verso-hover="17">alg</span> <span class="nu">4</span> <span class="nu">4</span>) <span class="const token" data-verso-hover="275">X₀</span> <span class="const token" data-verso-hover="271">badPattern</span> ((<span class="const token" data-verso-hover="17">alg</span> <span class="nu">4</span> <span class="nu">4</span>).<span class="const token" data-verso-hover="202">init</span> <span class="nu">0</span>) t).<span class="const token" data-verso-hover="268">getD</span> p.<span class="const token" data-verso-hover="24">val</span> ((<span class="const token" data-verso-hover="17">alg</span> <span class="nu">4</span> <span class="nu">4</span>).<span class="const token" data-verso-hover="202">init</span> <span class="nu">0</span>)</span>
+<span id="L207"></span>
+<span id="L208"><span class="kw">lemma</span> <span class="const token" data-verso-hover="279">badCfg_eq_tab</span> (t : <span class="const token" data-verso-hover="20">ℕ</span>) : <span class="const token" data-verso-hover="276">badCfg</span> t = <span class="const token" data-verso-hover="278">badTab</span> t := <span class="const token" data-verso-hover="270">funext</span> (<span class="const token" data-verso-hover="277">badCfg_eq</span> t)</span>
+<span id="L209"></span>
+<span id="L210"><span class="kw">lemma</span> <span class="const token" data-verso-hover="280">badPattern_alive</span> (p : <span class="const token" data-verso-hover="28">Fin</span> <span class="nu">4</span>) {r : <span class="const token" data-verso-hover="20">ℕ</span>} (hr : <span class="nu">4</span> ≤ r) :</span>
+<span id="L211">    <span class="const token" data-verso-hover="271">badPattern</span>.<span class="const token" data-verso-hover="211">alive</span> p r = <span class="const token" data-verso-hover="271">badPattern</span>.<span class="const token" data-verso-hover="211">alive</span> p <span class="nu">4</span> := <span class="kw">by</span></span>
+<span id="L212">  <span class="kw">fin_cases</span> p &lt;;&gt; <span class="kw">simp</span> [<span class="const token" data-verso-hover="211">Pattern.alive</span>, <span class="const token" data-verso-hover="271">badPattern</span>] &lt;;&gt; <span class="kw">omega</span></span>
+<span id="L213"></span>
+<span id="L214"><span class="kw">lemma</span> <span class="const token" data-verso-hover="281">badPattern_delivers</span> (p q : <span class="const token" data-verso-hover="28">Fin</span> <span class="nu">4</span>) {r : <span class="const token" data-verso-hover="20">ℕ</span>} (hr : <span class="nu">5</span> ≤ r) :</span>
+<span id="L215">    <span class="const token" data-verso-hover="271">badPattern</span>.<span class="const token" data-verso-hover="213">delivers</span> p q r = <span class="const token" data-verso-hover="271">badPattern</span>.<span class="const token" data-verso-hover="213">delivers</span> p q <span class="nu">5</span> := <span class="kw">by</span></span>
+<span id="L216">  <span class="kw">fin_cases</span> p &lt;;&gt; <span class="kw">simp</span> [<span class="const token" data-verso-hover="213">Pattern.delivers</span>, <span class="const token" data-verso-hover="271">badPattern</span>] &lt;;&gt; <span class="kw">omega</span></span>
+<span id="L217"></span>
+<span id="L218"><span class="kw">lemma</span> <span class="const token" data-verso-hover="282">round_eq_five</span> {r : <span class="const token" data-verso-hover="20">ℕ</span>} (hr : <span class="nu">5</span> ≤ r) (c : <span class="const token" data-verso-hover="28">Fin</span> <span class="nu">4</span> → <span class="const token" data-verso-hover="237">St</span> <span class="nu">4</span> <span class="nu">4</span>) :</span>
+<span id="L219">    (<span class="const token" data-verso-hover="17">alg</span> <span class="nu">4</span> <span class="nu">4</span>).<span class="const token" data-verso-hover="220">round</span> <span class="const token" data-verso-hover="275">X₀</span> <span class="const token" data-verso-hover="271">badPattern</span> r c = (<span class="const token" data-verso-hover="17">alg</span> <span class="nu">4</span> <span class="nu">4</span>).<span class="const token" data-verso-hover="220">round</span> <span class="const token" data-verso-hover="275">X₀</span> <span class="const token" data-verso-hover="271">badPattern</span> <span class="nu">5</span> c := <span class="kw">by</span></span>
+<span id="L220">  <span class="kw">funext</span> q</span>
+<span id="L221">  <span class="kw">have</span> hi : (<span class="const token" data-verso-hover="17">alg</span> <span class="nu">4</span> <span class="nu">4</span>).<span class="const token" data-verso-hover="219">inbox</span> <span class="const token" data-verso-hover="275">X₀</span> <span class="const token" data-verso-hover="271">badPattern</span> r c q = (<span class="const token" data-verso-hover="17">alg</span> <span class="nu">4</span> <span class="nu">4</span>).<span class="const token" data-verso-hover="219">inbox</span> <span class="const token" data-verso-hover="275">X₀</span> <span class="const token" data-verso-hover="271">badPattern</span> <span class="nu">5</span> c q := <span class="kw">by</span></span>
+<span id="L222">    <span class="kw">funext</span> p; <span class="kw">simp</span> only [<span class="const token" data-verso-hover="219">Protocol.inbox</span>, <span class="const token" data-verso-hover="281">badPattern_delivers</span> p q hr]</span>
+<span id="L223">  <span class="kw">simp</span> only [<span class="const token" data-verso-hover="220">Protocol.round</span>, hi, <span class="const token" data-verso-hover="280">badPattern_alive</span> q (<span class="kw">by</span> <span class="kw">omega</span> : <span class="nu">4</span> ≤ r),</span>
+<span id="L224">    <span class="const token" data-verso-hover="280">badPattern_alive</span> q (<span class="kw">by</span> <span class="kw">omega</span> : <span class="nu">4</span> ≤ <span class="nu">5</span>)]</span>
+<span id="L225"></span>
+<span id="L226"><span class="kw">set_option</span> <span class="const token" data-verso-hover="283">maxRecDepth</span> <span class="nu">100000</span> <span class="kw">in</span></span>
+<span id="L227"><span class="dc">/-- The configuration at time 13 is a fixed point of all later rounds. -/</span></span>
+<span id="L228"><span class="kw">lemma</span> <span class="const token" data-verso-hover="284">round_badTab_13</span> : (<span class="const token" data-verso-hover="17">alg</span> <span class="nu">4</span> <span class="nu">4</span>).<span class="const token" data-verso-hover="220">round</span> <span class="const token" data-verso-hover="275">X₀</span> <span class="const token" data-verso-hover="271">badPattern</span> <span class="nu">5</span> (<span class="const token" data-verso-hover="278">badTab</span> <span class="nu">13</span>) = <span class="const token" data-verso-hover="278">badTab</span> <span class="nu">13</span> := <span class="kw">by</span></span>
+<span id="L229">  <span class="kw">funext</span> p</span>
+<span id="L230">  <span class="kw">revert</span> p</span>
+<span id="L231">  <span class="kw">decide</span> +<span class="const token" data-verso-hover="285">kernel</span></span>
+<span id="L232"></span>
+<span id="L233"><span class="dc">/-- From time 13 on, nothing changes. -/</span></span>
+<span id="L234"><span class="kw">lemma</span> <span class="const token" data-verso-hover="286">badCfg_stable</span> (t : <span class="const token" data-verso-hover="20">ℕ</span>) (ht : <span class="nu">13</span> ≤ t) : <span class="const token" data-verso-hover="276">badCfg</span> t = <span class="const token" data-verso-hover="276">badCfg</span> <span class="nu">13</span> := <span class="kw">by</span></span>
+<span id="L235">  <span class="kw">induction</span> t, ht <span class="kw">using</span> <span class="const token" data-verso-hover="76">Nat.le_induction</span> <span class="kw">with</span></span>
+<span id="L236">  | base =&gt; <span class="kw">rfl</span></span>
+<span id="L237">  | <span class="const token" data-verso-hover="70">succ</span> t ht ih =&gt;</span>
+<span id="L238">    <span class="kw">change</span> (<span class="const token" data-verso-hover="17">alg</span> <span class="nu">4</span> <span class="nu">4</span>).<span class="const token" data-verso-hover="220">round</span> <span class="const token" data-verso-hover="275">X₀</span> <span class="const token" data-verso-hover="271">badPattern</span> (t + <span class="nu">1</span>) (<span class="const token" data-verso-hover="276">badCfg</span> t) = <span class="const token" data-verso-hover="276">badCfg</span> <span class="nu">13</span></span>
+<span id="L239">    <span class="kw">rw</span> [ih, <span class="const token" data-verso-hover="282">round_eq_five</span> (<span class="kw">by</span> <span class="kw">omega</span>), <span class="const token" data-verso-hover="279">badCfg_eq_tab</span>, <span class="const token" data-verso-hover="284">round_badTab_13</span>]</span>
+<span id="L240"></span>
+<span id="L241"><span class="kw">set_option</span> <span class="const token" data-verso-hover="283">maxRecDepth</span> <span class="nu">100000</span> <span class="kw">in</span></span>
+<span id="L242"><span class="kw">lemma</span> <span class="const token" data-verso-hover="287">badCfg_7</span> : (<span class="const token" data-verso-hover="276">badCfg</span> <span class="nu">7</span> <span class="nu">0</span>).<span class="const token" data-verso-hover="239">I</span> = <span class="nu">2</span> ∧ (<span class="const token" data-verso-hover="276">badCfg</span> <span class="nu">7</span> <span class="nu">3</span>).<span class="const token" data-verso-hover="241">res</span> <span class="nu">1</span> = <span class="const token" data-verso-hover="112">none</span> := <span class="kw">by</span></span>
+<span id="L243">  <span class="kw">rw</span> [<span class="const token" data-verso-hover="279">badCfg_eq_tab</span>]; <span class="kw">decide</span> +<span class="const token" data-verso-hover="285">kernel</span></span>
+<span id="L244"></span>
+<span id="L245"><span class="kw">set_option</span> <span class="const token" data-verso-hover="283">maxRecDepth</span> <span class="nu">100000</span> <span class="kw">in</span></span>
+<span id="L246"><span class="kw">lemma</span> <span class="const token" data-verso-hover="288">badCfg_13</span> : (<span class="const token" data-verso-hover="276">badCfg</span> <span class="nu">13</span> <span class="nu">3</span>).<span class="const token" data-verso-hover="239">I</span> = <span class="nu">4</span> ∧ (<span class="const token" data-verso-hover="276">badCfg</span> <span class="nu">13</span> <span class="nu">3</span>).<span class="const token" data-verso-hover="241">res</span> <span class="nu">1</span> = <span class="const token" data-verso-hover="112">none</span> ∧ (<span class="const token" data-verso-hover="276">badCfg</span> <span class="nu">13</span> <span class="nu">3</span>).<span class="const token" data-verso-hover="240">F</span> = {<span class="nu">1</span>, <span class="nu">2</span>} := <span class="kw">by</span></span>
+<span id="L247">  <span class="kw">rw</span> [<span class="const token" data-verso-hover="279">badCfg_eq_tab</span>]; <span class="kw">decide</span> +<span class="const token" data-verso-hover="285">kernel</span></span>
+<span id="L248"></span>
+<span id="L249"><span class="dc">/-- **Lemma 5.13 is false.** "For every two nonfaulty peers `M, M'` and index `i`, if `i &lt; I(M)` then</span></span>
+<span id="L250"><span class="dc">`res_{M'}[i] = b_i`": at time 7 of the counterexample, the nonfaulty peer 0 has `I = 2` (0-based;</span></span>
+<span id="L251"><span class="dc">the paper's `I = 3`), but the nonfaulty peer 3 has `res[1] = ⊥` (the paper's bit 2). -/</span></span>
+<span id="L252"><span class="kw">theorem</span> <span class="const token" data-verso-hover="0">lemma_5_13_false</span> :</span>
+<span id="L253">    ∃ (X : <span class="const token" data-verso-hover="28">Fin</span> <span class="nu">4</span> → <span class="const token" data-verso-hover="108">Bool</span>) (π : <span class="const token" data-verso-hover="208">Pattern</span> <span class="nu">4</span>), π.<span class="const token" data-verso-hover="217">Admissible</span> <span class="nu">2</span> ∧ ∃ (t : <span class="const token" data-verso-hover="20">ℕ</span>) (M M' : <span class="const token" data-verso-hover="28">Fin</span> <span class="nu">4</span>) (i : <span class="const token" data-verso-hover="28">Fin</span> <span class="nu">4</span>),</span>
+<span id="L254">      π.<span class="const token" data-verso-hover="214">Nonfaulty</span> M ∧ π.<span class="const token" data-verso-hover="214">Nonfaulty</span> M' ∧ i.<span class="const token" data-verso-hover="24">val</span> &lt; ((<span class="const token" data-verso-hover="17">alg</span> <span class="nu">4</span> <span class="nu">4</span>).<span class="const token" data-verso-hover="221">cfg</span> X π t M).<span class="const token" data-verso-hover="239">I</span> ∧</span>
+<span id="L255">      ((<span class="const token" data-verso-hover="17">alg</span> <span class="nu">4</span> <span class="nu">4</span>).<span class="const token" data-verso-hover="221">cfg</span> X π t M').<span class="const token" data-verso-hover="241">res</span> i ≠ <span class="const token" data-verso-hover="111">some</span> (X i) := <span class="kw">by</span></span>
+<span id="L256">  <span class="kw">refine</span> ⟨<span class="const token" data-verso-hover="275">X₀</span>, <span class="const token" data-verso-hover="271">badPattern</span>, <span class="const token" data-verso-hover="272">badPattern_admissible</span>, <span class="nu">7</span>, <span class="nu">0</span>, <span class="nu">3</span>, <span class="nu">1</span>, <span class="const token" data-verso-hover="273">badPattern_nonfaulty_0</span>,</span>
+<span id="L257">    <span class="const token" data-verso-hover="274">badPattern_nonfaulty_3</span>, ?_, ?_⟩</span>
+<span id="L258">  · <span class="kw">change</span> <span class="nu">1</span> &lt; (<span class="const token" data-verso-hover="276">badCfg</span> <span class="nu">7</span> <span class="nu">0</span>).<span class="const token" data-verso-hover="239">I</span></span>
+<span id="L259">    <span class="kw">rw</span> [<span class="const token" data-verso-hover="287">badCfg_7</span>.<span class="const token" data-verso-hover="85">1</span>]; <span class="kw">decide</span></span>
+<span id="L260">  · <span class="kw">change</span> (<span class="const token" data-verso-hover="276">badCfg</span> <span class="nu">7</span> <span class="nu">3</span>).<span class="const token" data-verso-hover="241">res</span> <span class="nu">1</span> ≠ _</span>
+<span id="L261">    <span class="kw">rw</span> [<span class="const token" data-verso-hover="287">badCfg_7</span>.<span class="const token" data-verso-hover="83">2</span>]; <span class="kw">simp</span></span>
+<span id="L262"></span>
+<span id="L263"><span class="dc">/-- **Lemma 5.15 is false.** In the counterexample (`k = n = 4`, `f = 2`), the nonfaulty peer 3</span></span>
+<span id="L264"><span class="dc">has finished (`I(3) &gt; n` in the paper's 1-based indexing, `= 4` here) and never changes state</span></span>
+<span id="L265"><span class="dc">again from time 13 on, but never learns bit 1 (the paper's bit 2): no number of views suffices. -/</span></span>
+<span id="L266"><span class="kw">theorem</span> <span class="const token" data-verso-hover="1">lemma_5_15_false</span> :</span>
+<span id="L267">    ∃ (X : <span class="const token" data-verso-hover="28">Fin</span> <span class="nu">4</span> → <span class="const token" data-verso-hover="108">Bool</span>) (π : <span class="const token" data-verso-hover="208">Pattern</span> <span class="nu">4</span>), π.<span class="const token" data-verso-hover="217">Admissible</span> <span class="nu">2</span> ∧ ∃ M : <span class="const token" data-verso-hover="28">Fin</span> <span class="nu">4</span>, π.<span class="const token" data-verso-hover="214">Nonfaulty</span> M ∧</span>
+<span id="L268">      ∀ t ≥ <span class="nu">13</span>, <span class="nu">4</span> ≤ ((<span class="const token" data-verso-hover="17">alg</span> <span class="nu">4</span> <span class="nu">4</span>).<span class="const token" data-verso-hover="221">cfg</span> X π t M).<span class="const token" data-verso-hover="239">I</span> ∧ ((<span class="const token" data-verso-hover="17">alg</span> <span class="nu">4</span> <span class="nu">4</span>).<span class="const token" data-verso-hover="221">cfg</span> X π t M).<span class="const token" data-verso-hover="241">res</span> <span class="nu">1</span> = <span class="const token" data-verso-hover="112">none</span> := <span class="kw">by</span></span>
+<span id="L269">  <span class="kw">refine</span> ⟨<span class="const token" data-verso-hover="275">X₀</span>, <span class="const token" data-verso-hover="271">badPattern</span>, <span class="const token" data-verso-hover="272">badPattern_admissible</span>, <span class="nu">3</span>, <span class="const token" data-verso-hover="274">badPattern_nonfaulty_3</span>, <span class="kw">fun</span> t ht =&gt; ?_⟩</span>
+<span id="L270">  <span class="kw">change</span> <span class="nu">4</span> ≤ (<span class="const token" data-verso-hover="276">badCfg</span> t <span class="nu">3</span>).<span class="const token" data-verso-hover="239">I</span> ∧ (<span class="const token" data-verso-hover="276">badCfg</span> t <span class="nu">3</span>).<span class="const token" data-verso-hover="241">res</span> <span class="nu">1</span> = <span class="const token" data-verso-hover="112">none</span></span>
+<span id="L271">  <span class="kw">rw</span> [<span class="const token" data-verso-hover="286">badCfg_stable</span> t ht]</span>
+<span id="L272">  <span class="kw">exact</span> ⟨<span class="const token" data-verso-hover="288">badCfg_13</span>.<span class="const token" data-verso-hover="85">1</span>.<span class="const token" data-verso-hover="289">ge</span>, <span class="const token" data-verso-hover="288">badCfg_13</span>.<span class="const token" data-verso-hover="83">2</span><span class="nu">.</span><span class="const token" data-verso-hover="85">1</span>⟩</span>
+<span id="L273"></span>
+<span id="L274"><span class="dc">/-- **Algorithm 7 does not solve Download** with `k = 4` peers, `n = 4` bits and `f = 2` crash</span></span>
+<span id="L275"><span class="dc">faults (`f ≤ βk` with `β = 1/2 &lt; 1`), contrary to the proof of Theorem 5.16, at any time bound. -/</span></span>
+<span id="L276"><span class="kw">theorem</span> <span class="const token" data-verso-hover="2">rapid_not_solves</span> (T : <span class="const token" data-verso-hover="20">ℕ</span>) : ¬ (<span class="const token" data-verso-hover="17">alg</span> <span class="nu">4</span> <span class="nu">4</span>).<span class="const token" data-verso-hover="224">SolvesWithin</span> <span class="nu">2</span> T := <span class="kw">by</span></span>
+<span id="L277">  <span class="kw">intro</span> h</span>
+<span id="L278">  <span class="kw">obtain</span> ⟨X, π, hπ, M, hM, hfin⟩ := <span class="const token" data-verso-hover="1">lemma_5_15_false</span></span>
+<span id="L279">  <span class="kw">have</span> := <span class="const token" data-verso-hover="290">congrFun</span> (h X π hπ M hM (<span class="const token" data-verso-hover="252">max</span> T <span class="nu">13</span>) (<span class="const token" data-verso-hover="291">le_max_left</span> _ _)) <span class="nu">1</span></span>
+<span id="L280">  <span class="kw">have</span> h2 := (hfin (<span class="const token" data-verso-hover="252">max</span> T <span class="nu">13</span>) (<span class="const token" data-verso-hover="292">le_max_right</span> _ _)).<span class="const token" data-verso-hover="83">2</span></span>
+<span id="L281">  <span class="kw">change</span> ((<span class="const token" data-verso-hover="17">alg</span> <span class="nu">4</span> <span class="nu">4</span>).<span class="const token" data-verso-hover="221">cfg</span> X π (<span class="const token" data-verso-hover="252">max</span> T <span class="nu">13</span>) M).<span class="const token" data-verso-hover="241">res</span> <span class="nu">1</span> = <span class="const token" data-verso-hover="111">some</span> (X <span class="nu">1</span>) <span class="kw">at</span> this</span>
+<span id="L282">  <span class="kw">rw</span> [h2] <span class="kw">at</span> this</span>
+<span id="L283">  <span class="kw">exact</span> <span class="const token" data-verso-hover="91">absurd</span> this (<span class="kw">by</span> <span class="kw">simp</span>)</span>
+<span id="L284"></span>
+<span id="L285"><span class="dc">/-- Sanity check of the encoding: without crashes, Algorithm 7 downloads all 4 bits with 4 peers</span></span>
+<span id="L286"><span class="dc">within 12 rounds (3 rounds per view), each peer querying one bit. -/</span></span>
+<span id="L287"><span class="kw">def</span> <span class="const token" data-verso-hover="293">noCrash</span> : <span class="const token" data-verso-hover="208">Pattern</span> <span class="nu">4</span> := ⟨<span class="kw">fun</span> _ =&gt; <span class="const token" data-verso-hover="112">none</span>, <span class="kw">fun</span> _ _ =&gt; <span class="const token" data-verso-hover="190">false</span>⟩</span>
+<span id="L288"></span>
+<span id="L289"><span class="kw">set_option</span> <span class="const token" data-verso-hover="283">maxRecDepth</span> <span class="nu">100000</span> <span class="kw">in</span></span>
+<span id="L290"><span class="kw">theorem</span> <span class="const token" data-verso-hover="19">rapid_crashFree</span> :</span>
+<span id="L291">    (∀ p, (<span class="const token" data-verso-hover="17">alg</span> <span class="nu">4</span> <span class="nu">4</span>).<span class="const token" data-verso-hover="206">res</span> ((<span class="const token" data-verso-hover="17">alg</span> <span class="nu">4</span> <span class="nu">4</span>).<span class="const token" data-verso-hover="221">cfg</span> <span class="const token" data-verso-hover="275">X₀</span> <span class="const token" data-verso-hover="293">noCrash</span> <span class="nu">12</span> p) = <span class="kw">fun</span> i =&gt; <span class="const token" data-verso-hover="111">some</span> (<span class="const token" data-verso-hover="275">X₀</span> i)) ∧</span>
+<span id="L292">    ∀ p, (<span class="const token" data-verso-hover="17">alg</span> <span class="nu">4</span> <span class="nu">4</span>).<span class="const token" data-verso-hover="222">queries</span> <span class="const token" data-verso-hover="275">X₀</span> <span class="const token" data-verso-hover="293">noCrash</span> p <span class="nu">12</span> = <span class="nu">1</span> := <span class="kw">by</span></span>
+<span id="L293">  <span class="kw">simp</span> only [<span class="const token" data-verso-hover="222">Protocol.queries</span>, <span class="const token" data-verso-hover="18">cfg_eq_tab</span> _ _ _ ((<span class="const token" data-verso-hover="17">alg</span> <span class="nu">4</span> <span class="nu">4</span>).<span class="const token" data-verso-hover="202">init</span> <span class="nu">0</span>)]</span>
+<span id="L294">  <span class="kw">constructor</span></span>
+<span id="L295">  · <span class="kw">intro</span> p; <span class="kw">funext</span> i; <span class="kw">revert</span> p i; <span class="kw">decide</span> +<span class="const token" data-verso-hover="285">kernel</span></span>
+<span id="L296">  · <span class="kw">decide</span> +<span class="const token" data-verso-hover="285">kernel</span></span>
+<span id="L297"></span>
+<span id="L298"><span class="kw">end</span> Podc.ByzantineDownload.Rapid</span>
+<span id="L299"></span>
+</code></div>
+        <script>
+          window.versoHoversUrl = "PODC2025/ByzantineDownload/-hovers.json";</script>
+        <script src="static/lean/popper.js"></script>
+        <script src="static/lean/tippy.js"></script>
+        <script src="static/lean/marked.js"></script>
+        <script src="static/lean/highlighting.js"></script>
+        <script src="static/lean/lean.js"></script>
+        </article></main><footer class="site-footer"><div class="wrap">
+        Machine-checked formalizations of PODC papers in Lean 4. Generated with <a href="https://github.com/leanprover/verso">Verso</a> from the README files of <a href="https://github.com/vasnesterov/formal_podc">vasnesterov/formal_podc</a>.</div>
+      </footer></body>
+  </html>
+

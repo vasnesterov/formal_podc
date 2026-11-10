@@ -1,0 +1,459 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="light dark">
+    <link rel="icon" href="data:,">
+    <title>RWLockRMRTradeoff: Model.lean · Formal PODC</title><base href="../../../.././"><link rel="stylesheet" href="static/lean/verso-vars.css">
+    <link rel="stylesheet" href="static/lean/highlighting.css">
+    <link rel="stylesheet" href="static/lean/tippy-border.css">
+    <link rel="stylesheet" href="static/style.css">
+    <script defer="defer" src="static/site.js"></script>
+    </head>
+  <body>
+    <header class="site-header">
+      <div class="wrap">
+        <a class="brand" href=".">Formal PODC</a><nav class="top">
+          <a href=".">Search</a><a href="about/">About</a><a href="https://github.com/vasnesterov/formal_podc">GitHub</a></nav>
+        </div>
+      </header>
+    <main class="wrap"><article><nav class="breadcrumbs" aria-label="Breadcrumb">
+          <a href=".">Search</a><span class="sep">›</span><a href="PODC2016/">PODC 2016</a><span class="sep">›</span><a href="PODC2016/RWLockRMRTradeoff/">RWLockRMRTradeoff</a><span class="sep">›</span><a href="PODC2016/RWLockRMRTradeoff/src/">Lean source</a><span class="sep">›</span><span aria-current="page">Model</span></nav>
+        <h1>
+          <code>Model.lean</code></h1>
+        <div class="paper-links">
+          <p>
+            Source of <a href="PODC2016/RWLockRMRTradeoff/">On the Complexity of Reader-Writer Locks — PODC 2016</a> · <a href="https://github.com/vasnesterov/formal_podc/blob/main/Papers/PODC2016/RWLockRMRTradeoff/Model.lean">GitHub</a> · hover over a name for its type and documentation</p>
+          </div>
+        <div class="lean-code lean-src">
+          <code class="hl lean block" data-lean-context="Model"><span id="L1"><span class="kw">import</span> Cslib.Computability.Distributed.SharedMemory.Mutex</span>
+<span id="L2"><span class="kw">import</span> Mathlib.Data.Fintype.Sum</span>
+<span id="L3"><span class="kw">import</span> Mathlib.Data.Finset.Lattice.Fold</span>
+<span id="L4"></span>
+<span id="L5"><span class="dc">/-!</span></span>
+<span id="L6"><span class="dc"># The model of Hendler, *On the Complexity of Reader-Writer Locks* (PODC 2016)</span></span>
+<span id="L7"></span>
+<span id="L8"><span class="dc">* **Shared memory.** Asynchronous shared memory; processes are deterministic and communicate</span></span>
+<span id="L9"><span class="dc">  through registers supporting `read`, `write` and `CAS` (`rwcas`): `CAS(v, a, b)` sets `v` to</span></span>
+<span id="L10"><span class="dc">  `b` iff its value is `a`, and (as in the paper) returns the value of `v` before the step.</span></span>
+<span id="L11"><span class="dc">  Reader-writer lock algorithms are CSLib implementations (`Impl`) of the lock object</span></span>
+<span id="L12"><span class="dc">  `mutexObj` (operations `lock` / `unlock`) from such registers. Region bookkeeping (remainder,</span></span>
+<span id="L13"><span class="dc">  entry = `trying`, critical section, exit = `exiting`) is CSLib's `regionOf`.</span></span>
+<span id="L14"><span class="dc">* **Processes.** `Proc n m = Fin n ⊕ Fin m`: readers `Sum.inl i`, writers `Sum.inr j`.</span></span>
+<span id="L15"><span class="dc">* **Knowledge** (`Know`, `kstep`): the awareness sets `AW(p, C ↪ E)` and familiarity sets</span></span>
+<span id="L16"><span class="dc">  `F(v, C ↪ E)` of Definitions 1–2 of the paper, computed forward along an execution fragment</span></span>
+<span id="L17"><span class="dc">  (a *trivial* step, i.e. one that does not change the value of its register, never changes a</span></span>
+<span id="L18"><span class="dc">  familiarity set).</span></span>
+<span id="L19"><span class="dc">* **Cache-coherent RMRs** (`CacheModel`): an abstract CC cache with three axioms; the write-back</span></span>
+<span id="L20"><span class="dc">  (`writeBack`) and write-through (`writeThrough`) protocols quoted in the paper are instances.</span></span>
+<span id="L21"><span class="dc">* **Augmented runs** (`Ext`, `xrun`): configuration, knowledge and cache state together; `xcount`</span></span>
+<span id="L22"><span class="dc">  counts labels with a given property along a run.</span></span>
+<span id="L23"><span class="dc">-/</span></span>
+<span id="L24"></span>
+<span id="L25"><span class="kw">namespace</span> Podc.RWLockRMRTradeoff</span>
+<span id="L26"></span>
+<span id="L27"><span class="kw">open</span> Cslib.SharedMemory</span>
+<span id="L28"></span>
+<span id="L29"><span class="dc">/-! ### Registers -/</span></span>
+<span id="L30"></span>
+<span id="L31"><span class="dc">/-- A read/write/CAS register with values in `V`. `read` and `CAS` return the value before the</span></span>
+<span id="L32"><span class="dc">step; `write` returns an acknowledgement (`none`). -/</span></span>
+<span id="L33"><span class="kw">abbrev</span> <span class="const token" data-verso-hover="337">rwcas</span> (V : <span class="kw">Type</span>) [<span class="const token" data-verso-hover="132">DecidableEq</span> V] (v₀ : V) : <span class="const token" data-verso-hover="332">ObjSpec</span> <span class="kw">where</span></span>
+<span id="L34">  <span class="const token" data-verso-hover="586">State</span> := V</span>
+<span id="L35">  <span class="const token" data-verso-hover="516">Op</span> := <span class="const token" data-verso-hover="343">CASOp</span> V</span>
+<span id="L36">  <span class="const token" data-verso-hover="338">Resp</span> := <span class="const token" data-verso-hover="45">Option</span> V</span>
+<span id="L37">  <span class="const token" data-verso-hover="587">init</span> := v₀</span>
+<span id="L38">  <span class="const token" data-verso-hover="522">δ</span> q</span>
+<span id="L39">    | <span class="const token" data-verso-hover="342">.</span>read =&gt; (q, <span class="const token" data-verso-hover="48">some</span> q)</span>
+<span id="L40">    | <span class="const token" data-verso-hover="348">.</span>write v =&gt; (v, <span class="const token" data-verso-hover="55">none</span>)</span>
+<span id="L41">    | <span class="const token" data-verso-hover="351">.</span>cas a b =&gt; (<span class="kw">if</span> q = a <span class="kw">then</span> b <span class="kw">else</span> q, <span class="const token" data-verso-hover="48">some</span> q)</span>
+<span id="L42"></span>
+<span id="L43"><span class="dc">/-- The shared variables: registers indexed by `ι`. -/</span></span>
+<span id="L44"><span class="kw">abbrev</span> <span class="const token" data-verso-hover="333">Regs</span> (ι V : <span class="kw">Type</span>) [<span class="const token" data-verso-hover="132">DecidableEq</span> V] (v₀ : V) : ι → <span class="const token" data-verso-hover="332">ObjSpec</span> := <span class="kw">fun</span> _ =&gt; <span class="const token" data-verso-hover="337">rwcas</span> V v₀</span>
+<span id="L45"></span>
+<span id="L46"><span class="dc">/-- The processes: `n` readers `Sum.inl i` and `m` writers `Sum.inr j`. -/</span></span>
+<span id="L47"><span class="kw">abbrev</span> <span class="const token" data-verso-hover="415">Proc</span> (n m : <span class="const token" data-verso-hover="42">ℕ</span>) := <span class="const token" data-verso-hover="69">Fin</span> n ⊕ <span class="const token" data-verso-hover="69">Fin</span> m</span>
+<span id="L48"></span>
+<span id="L49"><span class="dc">/-- A reader-writer lock algorithm for `n` readers and `m` writers from read/write/CAS registers:</span></span>
+<span id="L50"><span class="dc">an implementation of `lock`/`unlock` (entry and exit section) with local states `L`. -/</span></span>
+<span id="L51"><span class="kw">abbrev</span> <span class="const token" data-verso-hover="414">RWAlg</span> (n m : <span class="const token" data-verso-hover="42">ℕ</span>) (ι V : <span class="kw">Type</span>) [<span class="const token" data-verso-hover="132">DecidableEq</span> V] (v₀ : V) (L : <span class="kw">Type</span>) :=</span>
+<span id="L52">  <span class="const token" data-verso-hover="15">Impl</span> <span class="const token" data-verso-hover="405">mutexObj</span> (<span class="const token" data-verso-hover="333">Regs</span> ι V v₀) (<span class="const token" data-verso-hover="415">Proc</span> n m) L</span>
+<span id="L53"></span>
+<span id="L54"><span class="dc">/-! ### Knowledge: awareness and familiarity sets (Definitions 1 and 2) -/</span></span>
+<span id="L55"></span>
+<span id="L56"><span class="dc">/-- Awareness sets of processes and familiarity sets of variables. -/</span></span>
+<span id="L57"><span class="kw">structure</span> <span class="const token" data-verso-hover="336">Know</span> (P ι : <span class="kw">Type</span>) <span class="kw">where</span></span>
+<span id="L58">  <span class="dc">/-- `AW(p, ·)`. -/</span></span>
+<span id="L59">  <span class="const token" data-verso-hover="345">aw</span> : P → <span class="const token" data-verso-hover="204">Finset</span> P</span>
+<span id="L60">  <span class="dc">/-- `F(v, ·)`. -/</span></span>
+<span id="L61">  <span class="const token" data-verso-hover="346">fam</span> : ι → <span class="const token" data-verso-hover="204">Finset</span> P</span>
+<span id="L62"></span>
+<span id="L63"><span class="dc">/-- Knowledge at the beginning of an execution fragment: `AW(p, C ↪ ⊥) = {p}`,</span></span>
+<span id="L64"><span class="dc">`F(v, C ↪ ⊥) = ∅`. -/</span></span>
+<span id="L65"><span class="kw">def</span> <span class="const token" data-verso-hover="364">Know.init</span> {P ι : <span class="kw">Type</span>} : <span class="const token" data-verso-hover="336">Know</span> P ι := ⟨<span class="kw">fun</span> p =&gt; {p}, <span class="kw">fun</span> _ =&gt; ∅⟩</span>
+<span id="L66"></span>
+<span id="L67"><span class="kw">section</span> Steps</span>
+<span id="L68"></span>
+<span id="L69"><span class="kw">variable</span> {A : <span class="const token" data-verso-hover="332">ObjSpec</span>} {ι V P L : <span class="kw">Type</span>} [<span class="const token" data-verso-hover="132">DecidableEq</span> ι] [<span class="const token" data-verso-hover="132">DecidableEq</span> V] [<span class="const token" data-verso-hover="132">DecidableEq</span> P] {v₀ : V}</span>
+<span id="L70"><span class="kw">variable</span> (I : <span class="const token" data-verso-hover="15">Impl</span> A (<span class="const token" data-verso-hover="333">Regs</span> ι V v₀) P L)</span>
+<span id="L71"></span>
+<span id="L72"><span class="dc">/-- The effect of a label on the knowledge (Definitions 1 and 2, read forward): a reading step</span></span>
+<span id="L73"><span class="dc">(read or CAS) of `p` on `v` adds `F(v)` to `AW(p)`; a non-trivial write sets `F(v) := AW(p)`; a</span></span>
+<span id="L74"><span class="dc">non-trivial CAS sets `F(v) := AW(p) ∪ F(v)` (which is the new `AW(p)`). Trivial steps (writes of</span></span>
+<span id="L75"><span class="dc">the current value, failed CAS, CAS with `new = expected`) leave `F(v)` unchanged. -/</span></span>
+<span id="L76"><span class="kw">def</span> <span class="const token" data-verso-hover="23">kstep</span> (C : <span class="const token" data-verso-hover="335">Config</span> A (<span class="const token" data-verso-hover="333">Regs</span> ι V v₀) P L) (K : <span class="const token" data-verso-hover="336">Know</span> P ι) : <span class="const token" data-verso-hover="353">Label</span> P A → <span class="const token" data-verso-hover="336">Know</span> P ι</span>
+<span id="L77">  | <span class="const token" data-verso-hover="344">.</span>tau p =&gt;</span>
+<span id="L78">    <span class="kw">match</span> I.<span class="const token" data-verso-hover="339">act</span> p (C.<span class="const token" data-verso-hover="340">loc</span> p) <span class="kw">with</span></span>
+<span id="L79">    | <span class="const token" data-verso-hover="341">.</span>access i o _ =&gt;</span>
+<span id="L80">      <span class="kw">match</span> (o : <span class="const token" data-verso-hover="343">CASOp</span> V) <span class="kw">with</span></span>
+<span id="L81">      | <span class="const token" data-verso-hover="342">.</span>read =&gt; { K <span class="kw">with</span> <span class="const token" data-verso-hover="345">aw</span> := <span class="const token" data-verso-hover="175">Function.update</span> K.<span class="const token" data-verso-hover="345">aw</span> p (K.<span class="const token" data-verso-hover="345">aw</span> p ∪ K.<span class="const token" data-verso-hover="346">fam</span> i) }</span>
+<span id="L82">      | <span class="const token" data-verso-hover="348">.</span>write v =&gt; <span class="kw">if</span> C.<span class="const token" data-verso-hover="349">mem</span> i = v <span class="kw">then</span> K <span class="kw">else</span> { K <span class="kw">with</span> <span class="const token" data-verso-hover="346">fam</span> := <span class="const token" data-verso-hover="175">Function.update</span> K.<span class="const token" data-verso-hover="346">fam</span> i (K.<span class="const token" data-verso-hover="345">aw</span> p) }</span>
+<span id="L83">      | <span class="const token" data-verso-hover="351">.</span>cas a b =&gt;</span>
+<span id="L84">        { <span class="const token" data-verso-hover="345">aw</span> := <span class="const token" data-verso-hover="175">Function.update</span> K.<span class="const token" data-verso-hover="345">aw</span> p (K.<span class="const token" data-verso-hover="345">aw</span> p ∪ K.<span class="const token" data-verso-hover="346">fam</span> i)</span>
+<span id="L85">          <span class="const token" data-verso-hover="346">fam</span> := <span class="kw">if</span> C.<span class="const token" data-verso-hover="349">mem</span> i = a ∧ b ≠ a <span class="kw">then</span> <span class="const token" data-verso-hover="175">Function.update</span> K.<span class="const token" data-verso-hover="346">fam</span> i (K.<span class="const token" data-verso-hover="345">aw</span> p ∪ K.<span class="const token" data-verso-hover="346">fam</span> i)</span>
+<span id="L86">            <span class="kw">else</span> K.<span class="const token" data-verso-hover="346">fam</span> }</span>
+<span id="L87">    | <span class="const token" data-verso-hover="356">.</span>ret _ _ =&gt; K</span>
+<span id="L88">  | _ =&gt; K</span>
+<span id="L89"></span>
+<span id="L90"><span class="kw">end</span> Steps</span>
+<span id="L91"></span>
+<span id="L92"><span class="dc">/-! ### Cache-coherent RMR model -/</span></span>
+<span id="L93"></span>
+<span id="L94"><span class="dc">/-- A memory access as seen by the cache: a read, a write (and whether it changes the value), a</span></span>
+<span id="L95"><span class="dc">CAS (whether it succeeds, and whether it changes the value). -/</span></span>
+<span id="L96"><span class="kw">inductive</span> <span class="const token" data-verso-hover="588">Access</span></span>
+<span id="L97">  | <span class="const token" data-verso-hover="589">read</span></span>
+<span id="L98">  | <span class="const token" data-verso-hover="590">write</span> (changes : <span class="const token" data-verso-hover="161">Bool</span>)</span>
+<span id="L99">  | <span class="const token" data-verso-hover="591">cas</span> (success changes : <span class="const token" data-verso-hover="161">Bool</span>)</span>
+<span id="L100"></span>
+<span id="L101"><span class="dc">/-- Whether an access changes the value of its variable. -/</span></span>
+<span id="L102"><span class="kw">def</span> <span class="const token" data-verso-hover="541">Access.changes</span> : <span class="const token" data-verso-hover="588">Access</span> → <span class="const token" data-verso-hover="161">Bool</span></span>
+<span id="L103">  | <span class="const token" data-verso-hover="589">.</span>read =&gt; <span class="const token" data-verso-hover="164">false</span></span>
+<span id="L104">  | <span class="const token" data-verso-hover="590">.</span>write c =&gt; c</span>
+<span id="L105">  | <span class="const token" data-verso-hover="591">.</span>cas _ c =&gt; c</span>
+<span id="L106"></span>
+<span id="L107"><span class="cm">--</span><span class="cm"> CSLib candidate: Cslib/Computability/Distributed/SharedMemory/CacheCoherent.lean</span></span>
+<span id="L108"><span class="dc">/-- An abstract cache-coherent (CC) memory: per-process caches, a predicate `rmr` telling whether</span></span>
+<span id="L109"><span class="dc">an access is a remote memory reference, and a predicate `valid s p v` (process `p` holds a valid</span></span>
+<span id="L110"><span class="dc">cached copy of `v`). Axioms:</span></span>
+<span id="L111"><span class="dc">* an access to a variable without a valid cached copy is an RMR;</span></span>
+<span id="L112"><span class="dc">* a step only creates valid copies for the stepping process and the accessed variable;</span></span>
+<span id="L113"><span class="dc">* a step that changes the value of `v` invalidates the copies of `v` held by other processes. -/</span></span>
+<span id="L114"><span class="kw">structure</span> <span class="const token" data-verso-hover="18">CacheModel</span> (P ι : <span class="kw">Type</span>) <span class="kw">where</span></span>
+<span id="L115">  <span class="dc">/-- Cache states. -/</span></span>
+<span id="L116">  <span class="const token" data-verso-hover="592">σ</span> : <span class="kw">Type</span></span>
+<span id="L117">  <span class="dc">/-- Initial cache state. -/</span></span>
+<span id="L118">  <span class="const token" data-verso-hover="593">init</span> : <span class="const token" data-verso-hover="592">σ</span></span>
+<span id="L119">  <span class="dc">/-- Effect of an access by `p` to `v`. -/</span></span>
+<span id="L120">  <span class="const token" data-verso-hover="552">step</span> : <span class="const token" data-verso-hover="592">σ</span> → P → ι → <span class="const token" data-verso-hover="588">Access</span> → <span class="const token" data-verso-hover="592">σ</span></span>
+<span id="L121">  <span class="dc">/-- The access is a remote memory reference. -/</span></span>
+<span id="L122">  <span class="const token" data-verso-hover="553">rmr</span> : <span class="const token" data-verso-hover="592">σ</span> → P → ι → <span class="const token" data-verso-hover="588">Access</span> → <span class="kw">Prop</span></span>
+<span id="L123">  <span class="dc">/-- `p` holds a valid copy of `v`. -/</span></span>
+<span id="L124">  <span class="const token" data-verso-hover="545">valid</span> : <span class="const token" data-verso-hover="592">σ</span> → P → ι → <span class="kw">Prop</span></span>
+<span id="L125">  <span class="const token" data-verso-hover="559">rmr_of_not_valid</span> : ∀ s p i a, ¬ <span class="const token" data-verso-hover="545">valid</span> s p i → <span class="const token" data-verso-hover="553">rmr</span> s p i a</span>
+<span id="L126">  <span class="const token" data-verso-hover="554">valid_of_step</span> : ∀ s q j a p i, <span class="const token" data-verso-hover="545">valid</span> (<span class="const token" data-verso-hover="552">step</span> s q j a) p i → q ≠ p ∨ j ≠ i → <span class="const token" data-verso-hover="545">valid</span> s p i</span>
+<span id="L127">  <span class="const token" data-verso-hover="564">not_valid_step</span> : ∀ s q i a p, a.<span class="const token" data-verso-hover="541">changes</span> = <span class="const token" data-verso-hover="179">true</span> → q ≠ p → ¬ <span class="const token" data-verso-hover="545">valid</span> (<span class="const token" data-verso-hover="552">step</span> s q i a) p i</span>
+<span id="L128"></span>
+<span id="L129"><span class="dc">/-- Modes of a cached copy in the write-back protocol. -/</span></span>
+<span id="L130"><span class="kw">inductive</span> <span class="const token" data-verso-hover="594">Mode</span></span>
+<span id="L131">  | <span class="const token" data-verso-hover="595">inv</span></span>
+<span id="L132">  | <span class="const token" data-verso-hover="596">sh</span></span>
+<span id="L133">  | <span class="const token" data-verso-hover="597">ex</span></span>
+<span id="L134">  <span class="kw">deriving</span> <span class="const token" data-verso-hover="132">DecidableEq</span></span>
+<span id="L135"></span>
+<span id="L136"><span class="kw">section</span> Protocols</span>
+<span id="L137"></span>
+<span id="L138"><span class="kw">variable</span> {P ι : <span class="kw">Type</span>} [<span class="const token" data-verso-hover="132">DecidableEq</span> P] [<span class="const token" data-verso-hover="132">DecidableEq</span> ι]</span>
+<span id="L139"></span>
+<span id="L140"><span class="dc">/-- The **write-back** protocol, as quoted in the paper from Golab et al.: a read needs a copy in</span></span>
+<span id="L141"><span class="dc">shared or exclusive mode (otherwise an RMR downgrades exclusive copies and creates a shared one);</span></span>
+<span id="L142"><span class="dc">a write or CAS needs an exclusive copy (otherwise an RMR invalidates all other copies and creates</span></span>
+<span id="L143"><span class="dc">an exclusive one). -/</span></span>
+<span id="L144"><span class="kw">def</span> <span class="const token" data-verso-hover="19">writeBack</span> : <span class="const token" data-verso-hover="18">CacheModel</span> P ι <span class="kw">where</span></span>
+<span id="L145">  <span class="const token" data-verso-hover="592">σ</span> := P → ι → <span class="const token" data-verso-hover="594">Mode</span></span>
+<span id="L146">  <span class="const token" data-verso-hover="593">init</span> := <span class="kw">fun</span> _ _ =&gt; <span class="const token" data-verso-hover="595">.</span>inv</span>
+<span id="L147">  <span class="const token" data-verso-hover="552">step</span> s p i a :=</span>
+<span id="L148">    <span class="kw">match</span> a <span class="kw">with</span></span>
+<span id="L149">    | <span class="const token" data-verso-hover="589">.</span>read =&gt;</span>
+<span id="L150">      <span class="kw">if</span> s p i = <span class="const token" data-verso-hover="595">.</span>inv <span class="kw">then</span></span>
+<span id="L151">        <span class="kw">fun</span> q j =&gt; <span class="kw">if</span> j = i <span class="kw">then</span> (<span class="kw">if</span> q = p <span class="kw">then</span> <span class="const token" data-verso-hover="596">.</span>sh <span class="kw">else</span> <span class="kw">if</span> s q j = <span class="const token" data-verso-hover="597">.</span>ex <span class="kw">then</span> <span class="const token" data-verso-hover="596">.</span>sh <span class="kw">else</span> s q j)</span>
+<span id="L152">          <span class="kw">else</span> s q j</span>
+<span id="L153">      <span class="kw">else</span> s</span>
+<span id="L154">    | _ =&gt; <span class="kw">fun</span> q j =&gt; <span class="kw">if</span> j = i <span class="kw">then</span> (<span class="kw">if</span> q = p <span class="kw">then</span> <span class="const token" data-verso-hover="597">.</span>ex <span class="kw">else</span> <span class="const token" data-verso-hover="595">.</span>inv) <span class="kw">else</span> s q j</span>
+<span id="L155">  <span class="const token" data-verso-hover="553">rmr</span> s p i a :=</span>
+<span id="L156">    <span class="kw">match</span> a <span class="kw">with</span></span>
+<span id="L157">    | <span class="const token" data-verso-hover="589">.</span>read =&gt; s p i = <span class="const token" data-verso-hover="595">.</span>inv</span>
+<span id="L158">    | _ =&gt; s p i ≠ <span class="const token" data-verso-hover="597">.</span>ex</span>
+<span id="L159">  <span class="const token" data-verso-hover="545">valid</span> s p i := s p i ≠ <span class="const token" data-verso-hover="595">.</span>inv</span>
+<span id="L160">  <span class="const token" data-verso-hover="559">rmr_of_not_valid</span> s p i a h := <span class="kw">by</span></span>
+<span id="L161">    push <span class="const token" data-verso-hover="487">Not</span> <span class="kw">at</span> h</span>
+<span id="L162">    <span class="kw">cases</span> a &lt;;&gt; <span class="kw">simp</span> [h]</span>
+<span id="L163">  <span class="const token" data-verso-hover="554">valid_of_step</span> s q j a p i h hne := <span class="kw">by</span></span>
+<span id="L164">    <span class="kw">cases</span> a <span class="kw">with</span></span>
+<span id="L165">    | <span class="const token" data-verso-hover="589">read</span> =&gt;</span>
+<span id="L166">      <span class="kw">simp</span> only <span class="kw">at</span> h</span>
+<span id="L167">      <span class="kw">split_ifs</span> <span class="kw">at</span> h <span class="kw">with</span> h1</span>
+<span id="L168">      · <span class="kw">by_cases</span> hj : i = j</span>
+<span id="L169">        · <span class="kw">subst</span> hj</span>
+<span id="L170">          <span class="kw">have</span> hqp : q ≠ p := <span class="kw">by</span> <span class="kw">tauto</span></span>
+<span id="L171">          <span class="kw">simp</span> only [<span class="const token" data-verso-hover="413">ite_true</span>, <span class="const token" data-verso-hover="271">Ne.symm</span> hqp, <span class="const token" data-verso-hover="551">ite_false</span>] <span class="kw">at</span> h</span>
+<span id="L172">          <span class="kw">split_ifs</span> <span class="kw">at</span> h <span class="kw">with</span> h2</span>
+<span id="L173">          · <span class="kw">simp</span> [h2]</span>
+<span id="L174">          · <span class="kw">exact</span> h</span>
+<span id="L175">        · <span class="kw">simpa</span> [hj] <span class="kw">using</span> h</span>
+<span id="L176">      · <span class="kw">exact</span> h</span>
+<span id="L177">    | <span class="const token" data-verso-hover="590">write</span> c =&gt;</span>
+<span id="L178">      <span class="kw">by_cases</span> hj : i = j</span>
+<span id="L179">      · <span class="kw">subst</span> hj</span>
+<span id="L180">        <span class="kw">have</span> hqp : q ≠ p := <span class="kw">by</span> <span class="kw">tauto</span></span>
+<span id="L181">        <span class="kw">simp</span> [<span class="const token" data-verso-hover="271">Ne.symm</span> hqp] <span class="kw">at</span> h</span>
+<span id="L182">      · <span class="kw">simpa</span> [hj] <span class="kw">using</span> h</span>
+<span id="L183">    | <span class="const token" data-verso-hover="591">cas</span> b c =&gt;</span>
+<span id="L184">      <span class="kw">by_cases</span> hj : i = j</span>
+<span id="L185">      · <span class="kw">subst</span> hj</span>
+<span id="L186">        <span class="kw">have</span> hqp : q ≠ p := <span class="kw">by</span> <span class="kw">tauto</span></span>
+<span id="L187">        <span class="kw">simp</span> [<span class="const token" data-verso-hover="271">Ne.symm</span> hqp] <span class="kw">at</span> h</span>
+<span id="L188">      · <span class="kw">simpa</span> [hj] <span class="kw">using</span> h</span>
+<span id="L189">  <span class="const token" data-verso-hover="564">not_valid_step</span> s q i a p ha hqp := <span class="kw">by</span></span>
+<span id="L190">    <span class="kw">cases</span> a <span class="kw">with</span></span>
+<span id="L191">    | <span class="const token" data-verso-hover="589">read</span> =&gt; <span class="kw">simp</span> [<span class="const token" data-verso-hover="541">Access.changes</span>] <span class="kw">at</span> ha</span>
+<span id="L192">    | <span class="const token" data-verso-hover="590">write</span> c =&gt; <span class="kw">simp</span> [<span class="const token" data-verso-hover="271">Ne.symm</span> hqp]</span>
+<span id="L193">    | <span class="const token" data-verso-hover="591">cas</span> b c =&gt; <span class="kw">simp</span> [<span class="const token" data-verso-hover="271">Ne.symm</span> hqp]</span>
+<span id="L194"></span>
+<span id="L195"><span class="dc">/-- The **write-through** protocol: a read without a valid copy is an RMR that creates one; every</span></span>
+<span id="L196"><span class="dc">write or CAS is an RMR that invalidates all other copies (the writer keeps a valid copy). -/</span></span>
+<span id="L197"><span class="kw">def</span> <span class="const token" data-verso-hover="20">writeThrough</span> : <span class="const token" data-verso-hover="18">CacheModel</span> P ι <span class="kw">where</span></span>
+<span id="L198">  <span class="const token" data-verso-hover="592">σ</span> := P → ι → <span class="const token" data-verso-hover="161">Bool</span></span>
+<span id="L199">  <span class="const token" data-verso-hover="593">init</span> := <span class="kw">fun</span> _ _ =&gt; <span class="const token" data-verso-hover="164">false</span></span>
+<span id="L200">  <span class="const token" data-verso-hover="552">step</span> s p i a :=</span>
+<span id="L201">    <span class="kw">match</span> a <span class="kw">with</span></span>
+<span id="L202">    | <span class="const token" data-verso-hover="589">.</span>read =&gt; <span class="const token" data-verso-hover="175">Function.update</span> s p (<span class="const token" data-verso-hover="175">Function.update</span> (s p) i <span class="const token" data-verso-hover="179">true</span>)</span>
+<span id="L203">    | _ =&gt; <span class="kw">fun</span> q j =&gt; <span class="kw">if</span> j = i <span class="kw">then</span> <span class="const token" data-verso-hover="530">decide</span> (q = p) <span class="kw">else</span> s q j</span>
+<span id="L204">  <span class="const token" data-verso-hover="553">rmr</span> s p i a :=</span>
+<span id="L205">    <span class="kw">match</span> a <span class="kw">with</span></span>
+<span id="L206">    | <span class="const token" data-verso-hover="589">.</span>read =&gt; s p i = <span class="const token" data-verso-hover="164">false</span></span>
+<span id="L207">    | _ =&gt; <span class="const token" data-verso-hover="188">True</span></span>
+<span id="L208">  <span class="const token" data-verso-hover="545">valid</span> s p i := s p i = <span class="const token" data-verso-hover="179">true</span></span>
+<span id="L209">  <span class="const token" data-verso-hover="559">rmr_of_not_valid</span> s p i a h := <span class="kw">by</span> <span class="kw">cases</span> a &lt;;&gt; <span class="kw">simp_all</span></span>
+<span id="L210">  <span class="const token" data-verso-hover="554">valid_of_step</span> s q j a p i h hne := <span class="kw">by</span></span>
+<span id="L211">    <span class="kw">cases</span> a <span class="kw">with</span></span>
+<span id="L212">    | <span class="const token" data-verso-hover="589">read</span> =&gt;</span>
+<span id="L213">      <span class="kw">simp</span> only <span class="kw">at</span> h</span>
+<span id="L214">      <span class="kw">by_cases</span> hq : q = p</span>
+<span id="L215">      · <span class="kw">subst</span> hq</span>
+<span id="L216">        <span class="kw">have</span> hj : j ≠ i := <span class="kw">by</span> <span class="kw">tauto</span></span>
+<span id="L217">        <span class="kw">simpa</span> [<span class="const token" data-verso-hover="206">Function.update_of_ne</span> (<span class="const token" data-verso-hover="271">Ne.symm</span> hj)] <span class="kw">using</span> h</span>
+<span id="L218">      · <span class="kw">simpa</span> [<span class="const token" data-verso-hover="206">Function.update_of_ne</span> (<span class="const token" data-verso-hover="271">Ne.symm</span> hq)] <span class="kw">using</span> h</span>
+<span id="L219">    | <span class="const token" data-verso-hover="590">write</span> c =&gt;</span>
+<span id="L220">      <span class="kw">by_cases</span> hj : i = j</span>
+<span id="L221">      · <span class="kw">subst</span> hj</span>
+<span id="L222">        <span class="kw">have</span> hqp : q ≠ p := <span class="kw">by</span> <span class="kw">tauto</span></span>
+<span id="L223">        <span class="kw">simp</span> [<span class="const token" data-verso-hover="271">Ne.symm</span> hqp] <span class="kw">at</span> h</span>
+<span id="L224">      · <span class="kw">simpa</span> [hj] <span class="kw">using</span> h</span>
+<span id="L225">    | <span class="const token" data-verso-hover="591">cas</span> b c =&gt;</span>
+<span id="L226">      <span class="kw">by_cases</span> hj : i = j</span>
+<span id="L227">      · <span class="kw">subst</span> hj</span>
+<span id="L228">        <span class="kw">have</span> hqp : q ≠ p := <span class="kw">by</span> <span class="kw">tauto</span></span>
+<span id="L229">        <span class="kw">simp</span> [<span class="const token" data-verso-hover="271">Ne.symm</span> hqp] <span class="kw">at</span> h</span>
+<span id="L230">      · <span class="kw">simpa</span> [hj] <span class="kw">using</span> h</span>
+<span id="L231">  <span class="const token" data-verso-hover="564">not_valid_step</span> s q i a p ha hqp := <span class="kw">by</span></span>
+<span id="L232">    <span class="kw">cases</span> a <span class="kw">with</span></span>
+<span id="L233">    | <span class="const token" data-verso-hover="589">read</span> =&gt; <span class="kw">simp</span> [<span class="const token" data-verso-hover="541">Access.changes</span>] <span class="kw">at</span> ha</span>
+<span id="L234">    | <span class="const token" data-verso-hover="590">write</span> c =&gt; <span class="kw">simp</span> [<span class="const token" data-verso-hover="271">Ne.symm</span> hqp]</span>
+<span id="L235">    | <span class="const token" data-verso-hover="591">cas</span> b c =&gt; <span class="kw">simp</span> [<span class="const token" data-verso-hover="271">Ne.symm</span> hqp]</span>
+<span id="L236"></span>
+<span id="L237"><span class="kw">end</span> Protocols</span>
+<span id="L238"></span>
+<span id="L239"><span class="dc">/-! ### Augmented runs: configuration, knowledge, cache -/</span></span>
+<span id="L240"></span>
+<span id="L241"><span class="kw">section</span> Runs</span>
+<span id="L242"></span>
+<span id="L243"><span class="kw">variable</span> {A : <span class="const token" data-verso-hover="332">ObjSpec</span>} {ι V P L : <span class="kw">Type</span>} [<span class="const token" data-verso-hover="132">DecidableEq</span> ι] [<span class="const token" data-verso-hover="132">DecidableEq</span> V] [<span class="const token" data-verso-hover="132">DecidableEq</span> P] {v₀ : V}</span>
+<span id="L244"><span class="kw">variable</span> (I : <span class="const token" data-verso-hover="15">Impl</span> A (<span class="const token" data-verso-hover="333">Regs</span> ι V v₀) P L) (cm : <span class="const token" data-verso-hover="18">CacheModel</span> P ι)</span>
+<span id="L245"></span>
+<span id="L246"><span class="dc">/-- The cache view of an operation applied to a register holding `x`. -/</span></span>
+<span id="L247"><span class="kw">def</span> <span class="const token" data-verso-hover="463">accessOf</span> (x : V) : <span class="const token" data-verso-hover="343">CASOp</span> V → <span class="const token" data-verso-hover="588">Access</span></span>
+<span id="L248">  | <span class="const token" data-verso-hover="342">.</span>read =&gt; <span class="const token" data-verso-hover="589">.</span>read</span>
+<span id="L249">  | <span class="const token" data-verso-hover="348">.</span>write v =&gt; <span class="const token" data-verso-hover="590">.</span>write (<span class="const token" data-verso-hover="530">decide</span> (x ≠ v))</span>
+<span id="L250">  | <span class="const token" data-verso-hover="351">.</span>cas a b =&gt; <span class="const token" data-verso-hover="591">.</span>cas (<span class="const token" data-verso-hover="530">decide</span> (x = a)) (<span class="const token" data-verso-hover="530">decide</span> (x = a ∧ b ≠ a))</span>
+<span id="L251"></span>
+<span id="L252"><span class="dc">/-- The variable accessed by a label and the kind of access (`none` for invocations, responses). -/</span></span>
+<span id="L253"><span class="kw">def</span> <span class="const token" data-verso-hover="462">accessAt</span> (C : <span class="const token" data-verso-hover="335">Config</span> A (<span class="const token" data-verso-hover="333">Regs</span> ι V v₀) P L) : <span class="const token" data-verso-hover="353">Label</span> P A → <span class="const token" data-verso-hover="45">Option</span> (ι × <span class="const token" data-verso-hover="588">Access</span>)</span>
+<span id="L254">  | <span class="const token" data-verso-hover="344">.</span>tau p =&gt;</span>
+<span id="L255">    <span class="kw">match</span> I.<span class="const token" data-verso-hover="339">act</span> p (C.<span class="const token" data-verso-hover="340">loc</span> p) <span class="kw">with</span></span>
+<span id="L256">    | <span class="const token" data-verso-hover="341">.</span>access i o _ =&gt; <span class="const token" data-verso-hover="48">some</span> (i, <span class="const token" data-verso-hover="463">accessOf</span> (C.<span class="const token" data-verso-hover="349">mem</span> i) (o : <span class="const token" data-verso-hover="343">CASOp</span> V))</span>
+<span id="L257">    | <span class="const token" data-verso-hover="356">.</span>ret _ _ =&gt; <span class="const token" data-verso-hover="55">none</span></span>
+<span id="L258">  | _ =&gt; <span class="const token" data-verso-hover="55">none</span></span>
+<span id="L259"></span>
+<span id="L260"><span class="dc">/-- Effect of a label on the cache. -/</span></span>
+<span id="L261"><span class="kw">def</span> <span class="const token" data-verso-hover="461">cacheStep</span> (C : <span class="const token" data-verso-hover="335">Config</span> A (<span class="const token" data-verso-hover="333">Regs</span> ι V v₀) P L) (s : cm.<span class="const token" data-verso-hover="592">σ</span>) (ℓ : <span class="const token" data-verso-hover="353">Label</span> P A) : cm.<span class="const token" data-verso-hover="592">σ</span> :=</span>
+<span id="L262">  <span class="kw">match</span> <span class="const token" data-verso-hover="462">accessAt</span> I C ℓ <span class="kw">with</span></span>
+<span id="L263">  | <span class="const token" data-verso-hover="48">some</span> (i, a) =&gt; cm.<span class="const token" data-verso-hover="552">step</span> s ℓ.<span class="const token" data-verso-hover="357">proc</span> i a</span>
+<span id="L264">  | <span class="const token" data-verso-hover="55">none</span> =&gt; s</span>
+<span id="L265"></span>
+<span id="L266"><span class="dc">/-- The label is a remote memory reference. -/</span></span>
+<span id="L267"><span class="kw">def</span> <span class="const token" data-verso-hover="459">IsRMR</span> (C : <span class="const token" data-verso-hover="335">Config</span> A (<span class="const token" data-verso-hover="333">Regs</span> ι V v₀) P L) (s : cm.<span class="const token" data-verso-hover="592">σ</span>) (ℓ : <span class="const token" data-verso-hover="353">Label</span> P A) : <span class="kw">Prop</span> :=</span>
+<span id="L268">  <span class="kw">match</span> <span class="const token" data-verso-hover="462">accessAt</span> I C ℓ <span class="kw">with</span></span>
+<span id="L269">  | <span class="const token" data-verso-hover="48">some</span> (i, a) =&gt; cm.<span class="const token" data-verso-hover="553">rmr</span> s ℓ.<span class="const token" data-verso-hover="357">proc</span> i a</span>
+<span id="L270">  | <span class="const token" data-verso-hover="55">none</span> =&gt; <span class="const token" data-verso-hover="189">False</span></span>
+<span id="L271"></span>
+<span id="L272"><span class="dc">/-- An augmented configuration: configuration, knowledge (relative to the beginning of the current</span></span>
+<span id="L273"><span class="dc">execution fragment) and cache state. -/</span></span>
+<span id="L274"><span class="kw">structure</span> <span class="const token" data-verso-hover="371">Ext</span> (I : <span class="const token" data-verso-hover="15">Impl</span> A (<span class="const token" data-verso-hover="333">Regs</span> ι V v₀) P L) (cm : <span class="const token" data-verso-hover="18">CacheModel</span> P ι) <span class="kw">where</span></span>
+<span id="L275">  <span class="dc">/-- The configuration. -/</span></span>
+<span id="L276">  <span class="const token" data-verso-hover="373">cfg</span> : <span class="const token" data-verso-hover="335">Config</span> A (<span class="const token" data-verso-hover="333">Regs</span> ι V v₀) P L</span>
+<span id="L277">  <span class="dc">/-- Awareness and familiarity sets. -/</span></span>
+<span id="L278">  <span class="const token" data-verso-hover="374">kn</span> : <span class="const token" data-verso-hover="336">Know</span> P ι</span>
+<span id="L279">  <span class="dc">/-- The cache. -/</span></span>
+<span id="L280">  <span class="const token" data-verso-hover="394">cache</span> : cm.<span class="const token" data-verso-hover="592">σ</span></span>
+<span id="L281"></span>
+<span id="L282"><span class="kw">variable</span> {I cm}</span>
+<span id="L283"></span>
+<span id="L284"><span class="dc">/-- Augmented step. -/</span></span>
+<span id="L285"><span class="kw">noncomputable</span> <span class="kw">def</span> <span class="const token" data-verso-hover="386">xstep</span> (X : <span class="const token" data-verso-hover="371">Ext</span> I cm) (ℓ : <span class="const token" data-verso-hover="353">Label</span> P A) : <span class="const token" data-verso-hover="45">Option</span> (<span class="const token" data-verso-hover="371">Ext</span> I cm) :=</span>
+<span id="L286">  (I.<span class="const token" data-verso-hover="398">step</span> X.<span class="const token" data-verso-hover="373">cfg</span> ℓ).<span class="const token" data-verso-hover="598">map</span> <span class="kw">fun</span> C' =&gt; ⟨C', <span class="const token" data-verso-hover="23">kstep</span> I X.<span class="const token" data-verso-hover="373">cfg</span> X.<span class="const token" data-verso-hover="374">kn</span> ℓ, <span class="const token" data-verso-hover="461">cacheStep</span> I cm X.<span class="const token" data-verso-hover="373">cfg</span> X.<span class="const token" data-verso-hover="394">cache</span> ℓ⟩</span>
+<span id="L287"></span>
+<span id="L288"><span class="dc">/-- Augmented run. -/</span></span>
+<span id="L289"><span class="kw">noncomputable</span> <span class="kw">def</span> <span class="const token" data-verso-hover="381">xrun</span> : <span class="const token" data-verso-hover="371">Ext</span> I cm → <span class="const token" data-verso-hover="82">List</span> (<span class="const token" data-verso-hover="353">Label</span> P A) → <span class="const token" data-verso-hover="45">Option</span> (<span class="const token" data-verso-hover="371">Ext</span> I cm)</span>
+<span id="L290">  | X, [] =&gt; <span class="const token" data-verso-hover="48">some</span> X</span>
+<span id="L291">  | X, ℓ :: β =&gt; (<span class="const token" data-verso-hover="386">xstep</span> X ℓ).<span class="const token" data-verso-hover="472">bind</span> <span class="kw">fun</span> Y =&gt; <span class="const token" data-verso-hover="381">xrun</span> Y β</span>
+<span id="L292"></span>
+<span id="L293"><span class="dc">/-- The same configuration and cache with fresh knowledge: the beginning of a fragment `C ↪ ·`. -/</span></span>
+<span id="L294"><span class="kw">def</span> <span class="const token" data-verso-hover="24">Ext.fresh</span> (X : <span class="const token" data-verso-hover="371">Ext</span> I cm) : <span class="const token" data-verso-hover="371">Ext</span> I cm := ⟨X.<span class="const token" data-verso-hover="373">cfg</span>, <span class="const token" data-verso-hover="364">Know.init</span>, X.<span class="const token" data-verso-hover="394">cache</span>⟩</span>
+<span id="L295"></span>
+<span id="L296"><span class="kw">variable</span> (I cm) <span class="kw">in</span></span>
+<span id="L297"><span class="dc">/-- The initial augmented configuration. -/</span></span>
+<span id="L298"><span class="kw">def</span> <span class="const token" data-verso-hover="417">Ext.init</span> : <span class="const token" data-verso-hover="371">Ext</span> I cm := ⟨I.<span class="const token" data-verso-hover="460">initCfg</span>, <span class="const token" data-verso-hover="364">Know.init</span>, cm.<span class="const token" data-verso-hover="593">init</span>⟩</span>
+<span id="L299"></span>
+<span id="L300"><span class="kw">open</span> Classical <span class="kw">in</span></span>
+<span id="L301"><span class="dc">/-- Number of labels of `β`, run from `X`, satisfying `f` (evaluated before the label). -/</span></span>
+<span id="L302"><span class="kw">noncomputable</span> <span class="kw">def</span> <span class="const token" data-verso-hover="396">xcount</span> (f : <span class="const token" data-verso-hover="371">Ext</span> I cm → <span class="const token" data-verso-hover="353">Label</span> P A → <span class="kw">Prop</span>) :</span>
+<span id="L303">    <span class="const token" data-verso-hover="371">Ext</span> I cm → <span class="const token" data-verso-hover="82">List</span> (<span class="const token" data-verso-hover="353">Label</span> P A) → <span class="const token" data-verso-hover="42">ℕ</span></span>
+<span id="L304">  | _, [] =&gt; <span class="nu">0</span></span>
+<span id="L305">  | X, ℓ :: β =&gt;</span>
+<span id="L306">    <span class="kw">match</span> <span class="const token" data-verso-hover="386">xstep</span> X ℓ <span class="kw">with</span></span>
+<span id="L307">    | <span class="const token" data-verso-hover="55">none</span> =&gt; <span class="nu">0</span></span>
+<span id="L308">    | <span class="const token" data-verso-hover="48">some</span> Y =&gt; (<span class="kw">if</span> f X ℓ <span class="kw">then</span> <span class="nu">1</span> <span class="kw">else</span> <span class="nu">0</span>) + <span class="const token" data-verso-hover="396">xcount</span> f Y β</span>
+<span id="L309"></span>
+<span id="L310"><span class="dc">/-- `ℓ` is a remote memory reference by `p`. -/</span></span>
+<span id="L311"><span class="kw">def</span> <span class="const token" data-verso-hover="397">RMRBy</span> (p : P) (X : <span class="const token" data-verso-hover="371">Ext</span> I cm) (ℓ : <span class="const token" data-verso-hover="353">Label</span> P A) : <span class="kw">Prop</span> :=</span>
+<span id="L312">  ℓ.<span class="const token" data-verso-hover="357">proc</span> = p ∧ <span class="const token" data-verso-hover="459">IsRMR</span> I cm X.<span class="const token" data-verso-hover="373">cfg</span> X.<span class="const token" data-verso-hover="394">cache</span> ℓ</span>
+<span id="L313"></span>
+<span id="L314"><span class="dc">/-- **Definition 3.** A step is *expanding* (w.r.t. the current fragment) if it increases the size</span></span>
+<span id="L315"><span class="dc">of some awareness set. -/</span></span>
+<span id="L316"><span class="kw">def</span> <span class="const token" data-verso-hover="372">Expanding</span> (X : <span class="const token" data-verso-hover="371">Ext</span> I cm) (ℓ : <span class="const token" data-verso-hover="353">Label</span> P A) : <span class="kw">Prop</span> :=</span>
+<span id="L317">  ∃ q, (X.<span class="const token" data-verso-hover="374">kn</span>.<span class="const token" data-verso-hover="345">aw</span> q).<span class="const token" data-verso-hover="369">card</span> &lt; ((<span class="const token" data-verso-hover="23">kstep</span> I X.<span class="const token" data-verso-hover="373">cfg</span> X.<span class="const token" data-verso-hover="374">kn</span> ℓ).<span class="const token" data-verso-hover="345">aw</span> q).<span class="const token" data-verso-hover="369">card</span></span>
+<span id="L318"></span>
+<span id="L319"><span class="dc">/-- `ℓ` is an expanding step of `p`. -/</span></span>
+<span id="L320"><span class="kw">def</span> <span class="const token" data-verso-hover="466">ExpBy</span> (p : P) (X : <span class="const token" data-verso-hover="371">Ext</span> I cm) (ℓ : <span class="const token" data-verso-hover="353">Label</span> P A) : <span class="kw">Prop</span> :=</span>
+<span id="L321">  ℓ.<span class="const token" data-verso-hover="357">proc</span> = p ∧ <span class="const token" data-verso-hover="372">Expanding</span> X ℓ</span>
+<span id="L322"></span>
+<span id="L323">@[<span class="kw">simp</span>] <span class="kw">lemma</span> <span class="const token" data-verso-hover="382">xrun_nil</span> (X : <span class="const token" data-verso-hover="371">Ext</span> I cm) : <span class="const token" data-verso-hover="381">xrun</span> X [] = <span class="const token" data-verso-hover="48">some</span> X := <span class="const token" data-verso-hover="81">rfl</span></span>
+<span id="L324"></span>
+<span id="L325"><span class="kw">lemma</span> <span class="const token" data-verso-hover="385">xrun_cons</span> (X : <span class="const token" data-verso-hover="371">Ext</span> I cm) (ℓ : <span class="const token" data-verso-hover="353">Label</span> P A) (β : <span class="const token" data-verso-hover="82">List</span> (<span class="const token" data-verso-hover="353">Label</span> P A)) :</span>
+<span id="L326">    <span class="const token" data-verso-hover="381">xrun</span> X (ℓ :: β) = (<span class="const token" data-verso-hover="386">xstep</span> X ℓ).<span class="const token" data-verso-hover="472">bind</span> <span class="kw">fun</span> Y =&gt; <span class="const token" data-verso-hover="381">xrun</span> Y β := <span class="const token" data-verso-hover="81">rfl</span></span>
+<span id="L327"></span>
+<span id="L328"><span class="kw">lemma</span> <span class="const token" data-verso-hover="599">xrun_append</span> (X : <span class="const token" data-verso-hover="371">Ext</span> I cm) (α β : <span class="const token" data-verso-hover="82">List</span> (<span class="const token" data-verso-hover="353">Label</span> P A)) :</span>
+<span id="L329">    <span class="const token" data-verso-hover="381">xrun</span> X (α ++ β) = (<span class="const token" data-verso-hover="381">xrun</span> X α).<span class="const token" data-verso-hover="472">bind</span> <span class="kw">fun</span> Y =&gt; <span class="const token" data-verso-hover="381">xrun</span> Y β := <span class="kw">by</span></span>
+<span id="L330">  <span class="kw">induction</span> α generalizing X <span class="kw">with</span></span>
+<span id="L331">  | <span class="const token" data-verso-hover="85">nil</span> =&gt; <span class="kw">simp</span></span>
+<span id="L332">  | <span class="const token" data-verso-hover="88">cons</span> ℓ α ih =&gt;</span>
+<span id="L333">    <span class="kw">simp</span> only [<span class="const token" data-verso-hover="600">List.cons_append</span>, <span class="const token" data-verso-hover="385">xrun_cons</span>, ih]</span>
+<span id="L334">    <span class="kw">cases</span> <span class="const token" data-verso-hover="386">xstep</span> X ℓ &lt;;&gt; <span class="kw">simp</span></span>
+<span id="L335"></span>
+<span id="L336"><span class="kw">lemma</span> <span class="const token" data-verso-hover="488">xrun_append_of_eq</span> {X Y : <span class="const token" data-verso-hover="371">Ext</span> I cm} {α : <span class="const token" data-verso-hover="82">List</span> (<span class="const token" data-verso-hover="353">Label</span> P A)} (h : <span class="const token" data-verso-hover="381">xrun</span> X α = <span class="const token" data-verso-hover="48">some</span> Y)</span>
+<span id="L337">    (β : <span class="const token" data-verso-hover="82">List</span> (<span class="const token" data-verso-hover="353">Label</span> P A)) : <span class="const token" data-verso-hover="381">xrun</span> X (α ++ β) = <span class="const token" data-verso-hover="381">xrun</span> Y β := <span class="kw">by</span></span>
+<span id="L338">  <span class="kw">rw</span> [<span class="const token" data-verso-hover="599">xrun_append</span>, h]; <span class="kw">rfl</span></span>
+<span id="L339"></span>
+<span id="L340"><span class="kw">lemma</span> <span class="const token" data-verso-hover="388">xstep_eq_some</span> {X Y : <span class="const token" data-verso-hover="371">Ext</span> I cm} {ℓ : <span class="const token" data-verso-hover="353">Label</span> P A} :</span>
+<span id="L341">    <span class="const token" data-verso-hover="386">xstep</span> X ℓ = <span class="const token" data-verso-hover="48">some</span> Y ↔ I.<span class="const token" data-verso-hover="398">step</span> X.<span class="const token" data-verso-hover="373">cfg</span> ℓ = <span class="const token" data-verso-hover="48">some</span> Y.<span class="const token" data-verso-hover="373">cfg</span> ∧ Y.<span class="const token" data-verso-hover="374">kn</span> = <span class="const token" data-verso-hover="23">kstep</span> I X.<span class="const token" data-verso-hover="373">cfg</span> X.<span class="const token" data-verso-hover="374">kn</span> ℓ ∧</span>
+<span id="L342">      Y.<span class="const token" data-verso-hover="394">cache</span> = <span class="const token" data-verso-hover="461">cacheStep</span> I cm X.<span class="const token" data-verso-hover="373">cfg</span> X.<span class="const token" data-verso-hover="394">cache</span> ℓ := <span class="kw">by</span></span>
+<span id="L343">  <span class="kw">unfold</span> <span class="const token" data-verso-hover="386">xstep</span></span>
+<span id="L344">  <span class="kw">constructor</span></span>
+<span id="L345">  · <span class="kw">intro</span> h</span>
+<span id="L346">    <span class="kw">obtain</span> ⟨C', h1, <span class="kw">rfl</span>⟩ := <span class="const token" data-verso-hover="601">Option.map_eq_some_iff</span>.<span class="const token" data-verso-hover="215">1</span> h</span>
+<span id="L347">    <span class="kw">exact</span> ⟨h1, <span class="const token" data-verso-hover="81">rfl</span>, <span class="const token" data-verso-hover="81">rfl</span>⟩</span>
+<span id="L348">  · <span class="kw">rintro</span> ⟨h1, h2, h3⟩</span>
+<span id="L349">    <span class="kw">rw</span> [h1]; <span class="kw">cases</span> Y; <span class="kw">simp_all</span></span>
+<span id="L350"></span>
+<span id="L351"><span class="kw">lemma</span> <span class="const token" data-verso-hover="419">xrun_cfg</span> {X Y : <span class="const token" data-verso-hover="371">Ext</span> I cm} {α : <span class="const token" data-verso-hover="82">List</span> (<span class="const token" data-verso-hover="353">Label</span> P A)} (h : <span class="const token" data-verso-hover="381">xrun</span> X α = <span class="const token" data-verso-hover="48">some</span> Y) :</span>
+<span id="L352">    I.<span class="const token" data-verso-hover="602">runFrom</span> X.<span class="const token" data-verso-hover="373">cfg</span> α = <span class="const token" data-verso-hover="48">some</span> Y.<span class="const token" data-verso-hover="373">cfg</span> := <span class="kw">by</span></span>
+<span id="L353">  <span class="kw">induction</span> α generalizing X <span class="kw">with</span></span>
+<span id="L354">  | <span class="const token" data-verso-hover="85">nil</span> =&gt; <span class="kw">simp</span> only [<span class="const token" data-verso-hover="382">xrun_nil</span>, <span class="const token" data-verso-hover="383">Option.some.injEq</span>] <span class="kw">at</span> h; <span class="kw">subst</span> h; <span class="kw">rfl</span></span>
+<span id="L355">  | <span class="const token" data-verso-hover="88">cons</span> ℓ α ih =&gt;</span>
+<span id="L356">    <span class="kw">simp</span> only [<span class="const token" data-verso-hover="385">xrun_cons</span>] <span class="kw">at</span> h</span>
+<span id="L357">    <span class="kw">cases</span> hs : <span class="const token" data-verso-hover="386">xstep</span> X ℓ <span class="kw">with</span></span>
+<span id="L358">    | <span class="const token" data-verso-hover="55">none</span> =&gt; <span class="kw">simp</span> [hs] <span class="kw">at</span> h</span>
+<span id="L359">    | <span class="const token" data-verso-hover="48">some</span> Z =&gt;</span>
+<span id="L360">      <span class="kw">simp</span> only [hs, <span class="const token" data-verso-hover="387">Option.bind_some</span>] <span class="kw">at</span> h</span>
+<span id="L361">      <span class="kw">simp</span> [<span class="const token" data-verso-hover="603">Impl.runFrom_cons</span>, (<span class="const token" data-verso-hover="388">xstep_eq_some</span>.<span class="const token" data-verso-hover="215">1</span> hs).<span class="const token" data-verso-hover="278">1</span>, ih h]</span>
+<span id="L362"></span>
+<span id="L363"><span class="kw">lemma</span> <span class="const token" data-verso-hover="441">exists_xrun</span> {X : <span class="const token" data-verso-hover="371">Ext</span> I cm} {α : <span class="const token" data-verso-hover="82">List</span> (<span class="const token" data-verso-hover="353">Label</span> P A)} {C : <span class="const token" data-verso-hover="335">Config</span> A (<span class="const token" data-verso-hover="333">Regs</span> ι V v₀) P L}</span>
+<span id="L364">    (h : I.<span class="const token" data-verso-hover="602">runFrom</span> X.<span class="const token" data-verso-hover="373">cfg</span> α = <span class="const token" data-verso-hover="48">some</span> C) : ∃ Y, <span class="const token" data-verso-hover="381">xrun</span> X α = <span class="const token" data-verso-hover="48">some</span> Y ∧ Y.<span class="const token" data-verso-hover="373">cfg</span> = C := <span class="kw">by</span></span>
+<span id="L365">  <span class="kw">induction</span> α generalizing X <span class="kw">with</span></span>
+<span id="L366">  | <span class="const token" data-verso-hover="85">nil</span> =&gt; <span class="kw">simp</span> only [<span class="const token" data-verso-hover="604">Impl.runFrom_nil</span>, <span class="const token" data-verso-hover="383">Option.some.injEq</span>] <span class="kw">at</span> h; <span class="kw">exact</span> ⟨X, <span class="const token" data-verso-hover="81">rfl</span>, h⟩</span>
+<span id="L367">  | <span class="const token" data-verso-hover="88">cons</span> ℓ α ih =&gt;</span>
+<span id="L368">    <span class="kw">simp</span> only [<span class="const token" data-verso-hover="603">Impl.runFrom_cons</span>] <span class="kw">at</span> h</span>
+<span id="L369">    <span class="kw">cases</span> hs : I.<span class="const token" data-verso-hover="398">step</span> X.<span class="const token" data-verso-hover="373">cfg</span> ℓ <span class="kw">with</span></span>
+<span id="L370">    | <span class="const token" data-verso-hover="55">none</span> =&gt; <span class="kw">simp</span> [hs] <span class="kw">at</span> h</span>
+<span id="L371">    | <span class="const token" data-verso-hover="48">some</span> C₁ =&gt;</span>
+<span id="L372">      <span class="kw">simp</span> only [hs, <span class="const token" data-verso-hover="387">Option.bind_some</span>] <span class="kw">at</span> h</span>
+<span id="L373">      <span class="kw">obtain</span> ⟨Y, h1, h2⟩ := ih (X := ⟨C₁, <span class="const token" data-verso-hover="23">kstep</span> I X.<span class="const token" data-verso-hover="373">cfg</span> X.<span class="const token" data-verso-hover="374">kn</span> ℓ, <span class="const token" data-verso-hover="461">cacheStep</span> I cm X.<span class="const token" data-verso-hover="373">cfg</span> X.<span class="const token" data-verso-hover="394">cache</span> ℓ⟩) h</span>
+<span id="L374">      <span class="kw">refine</span> ⟨Y, ?_, h2⟩</span>
+<span id="L375">      <span class="kw">rw</span> [<span class="const token" data-verso-hover="385">xrun_cons</span>, <span class="kw">show</span> <span class="const token" data-verso-hover="386">xstep</span> X ℓ = <span class="const token" data-verso-hover="48">some</span> ⟨C₁, _, _⟩ <span class="kw">from</span> <span class="const token" data-verso-hover="388">xstep_eq_some</span>.<span class="const token" data-verso-hover="376">2</span> ⟨hs, <span class="const token" data-verso-hover="81">rfl</span>, <span class="const token" data-verso-hover="81">rfl</span>⟩]</span>
+<span id="L376">      <span class="kw">exact</span> h1</span>
+<span id="L377"></span>
+<span id="L378"><span class="kw">lemma</span> <span class="const token" data-verso-hover="489">xcount_append</span> (f : <span class="const token" data-verso-hover="371">Ext</span> I cm → <span class="const token" data-verso-hover="353">Label</span> P A → <span class="kw">Prop</span>) {X Y : <span class="const token" data-verso-hover="371">Ext</span> I cm}</span>
+<span id="L379">    {α : <span class="const token" data-verso-hover="82">List</span> (<span class="const token" data-verso-hover="353">Label</span> P A)} (h : <span class="const token" data-verso-hover="381">xrun</span> X α = <span class="const token" data-verso-hover="48">some</span> Y) (β : <span class="const token" data-verso-hover="82">List</span> (<span class="const token" data-verso-hover="353">Label</span> P A)) :</span>
+<span id="L380">    <span class="const token" data-verso-hover="396">xcount</span> f X (α ++ β) = <span class="const token" data-verso-hover="396">xcount</span> f X α + <span class="const token" data-verso-hover="396">xcount</span> f Y β := <span class="kw">by</span></span>
+<span id="L381">  <span class="kw">induction</span> α generalizing X <span class="kw">with</span></span>
+<span id="L382">  | <span class="const token" data-verso-hover="85">nil</span> =&gt; <span class="kw">simp</span> only [<span class="const token" data-verso-hover="382">xrun_nil</span>, <span class="const token" data-verso-hover="383">Option.some.injEq</span>] <span class="kw">at</span> h; <span class="kw">subst</span> h; <span class="kw">simp</span> [<span class="const token" data-verso-hover="396">xcount</span>]</span>
+<span id="L383">  | <span class="const token" data-verso-hover="88">cons</span> ℓ α ih =&gt;</span>
+<span id="L384">    <span class="kw">simp</span> only [<span class="const token" data-verso-hover="385">xrun_cons</span>] <span class="kw">at</span> h</span>
+<span id="L385">    <span class="kw">cases</span> hs : <span class="const token" data-verso-hover="386">xstep</span> X ℓ <span class="kw">with</span></span>
+<span id="L386">    | <span class="const token" data-verso-hover="55">none</span> =&gt; <span class="kw">simp</span> [hs] <span class="kw">at</span> h</span>
+<span id="L387">    | <span class="const token" data-verso-hover="48">some</span> Z =&gt;</span>
+<span id="L388">      <span class="kw">simp</span> only [hs, <span class="const token" data-verso-hover="387">Option.bind_some</span>] <span class="kw">at</span> h</span>
+<span id="L389">      <span class="kw">simp</span> only [<span class="const token" data-verso-hover="600">List.cons_append</span>, <span class="const token" data-verso-hover="396">xcount</span>, hs, ih h]</span>
+<span id="L390">      <span class="kw">omega</span></span>
+<span id="L391"></span>
+<span id="L392"><span class="kw">lemma</span> <span class="const token" data-verso-hover="605">xcount_mono</span> {f g : <span class="const token" data-verso-hover="371">Ext</span> I cm → <span class="const token" data-verso-hover="353">Label</span> P A → <span class="kw">Prop</span>} (hfg : ∀ X ℓ, f X ℓ → g X ℓ)</span>
+<span id="L393">    (X : <span class="const token" data-verso-hover="371">Ext</span> I cm) (β : <span class="const token" data-verso-hover="82">List</span> (<span class="const token" data-verso-hover="353">Label</span> P A)) : <span class="const token" data-verso-hover="396">xcount</span> f X β ≤ <span class="const token" data-verso-hover="396">xcount</span> g X β := <span class="kw">by</span></span>
+<span id="L394">  <span class="kw">induction</span> β generalizing X <span class="kw">with</span></span>
+<span id="L395">  | <span class="const token" data-verso-hover="85">nil</span> =&gt; <span class="kw">simp</span> [<span class="const token" data-verso-hover="396">xcount</span>]</span>
+<span id="L396">  | <span class="const token" data-verso-hover="88">cons</span> ℓ β ih =&gt;</span>
+<span id="L397">    <span class="kw">simp</span> only [<span class="const token" data-verso-hover="396">xcount</span>]</span>
+<span id="L398">    <span class="kw">split</span></span>
+<span id="L399">    · <span class="kw">exact</span> <span class="const token" data-verso-hover="317">le_rfl</span></span>
+<span id="L400">    · <span class="kw">rename_i</span> Y _</span>
+<span id="L401">      <span class="kw">have</span> := ih Y</span>
+<span id="L402">      <span class="kw">split_ifs</span> <span class="kw">with</span> h1 h2 &lt;;&gt; <span class="kw">first</span> | <span class="kw">omega</span> | <span class="kw">exact</span> <span class="const token" data-verso-hover="223">absurd</span> (hfg _ _ h1) h2</span>
+<span id="L403"></span>
+<span id="L404"><span class="kw">lemma</span> <span class="const token" data-verso-hover="606">xcount_le_length</span> (f : <span class="const token" data-verso-hover="371">Ext</span> I cm → <span class="const token" data-verso-hover="353">Label</span> P A → <span class="kw">Prop</span>) (X : <span class="const token" data-verso-hover="371">Ext</span> I cm)</span>
+<span id="L405">    (β : <span class="const token" data-verso-hover="82">List</span> (<span class="const token" data-verso-hover="353">Label</span> P A)) : <span class="const token" data-verso-hover="396">xcount</span> f X β ≤ β.<span class="const token" data-verso-hover="607">length</span> := <span class="kw">by</span></span>
+<span id="L406">  <span class="kw">induction</span> β generalizing X <span class="kw">with</span></span>
+<span id="L407">  | <span class="const token" data-verso-hover="85">nil</span> =&gt; <span class="kw">simp</span> [<span class="const token" data-verso-hover="396">xcount</span>]</span>
+<span id="L408">  | <span class="const token" data-verso-hover="88">cons</span> ℓ β ih =&gt;</span>
+<span id="L409">    <span class="kw">simp</span> only [<span class="const token" data-verso-hover="396">xcount</span>, <span class="const token" data-verso-hover="608">List.length_cons</span>]</span>
+<span id="L410">    <span class="kw">split</span></span>
+<span id="L411">    · <span class="kw">omega</span></span>
+<span id="L412">    · <span class="kw">rename_i</span> Y _; <span class="kw">have</span> := ih Y; <span class="kw">split_ifs</span> &lt;;&gt; <span class="kw">omega</span></span>
+<span id="L413"></span>
+<span id="L414"><span class="kw">end</span> Runs</span>
+<span id="L415"></span>
+<span id="L416"><span class="kw">end</span> Podc.RWLockRMRTradeoff</span>
+<span id="L417"></span>
+</code></div>
+        <script>
+          window.versoHoversUrl = "PODC2016/RWLockRMRTradeoff/-hovers.json";</script>
+        <script src="static/lean/popper.js"></script>
+        <script src="static/lean/tippy.js"></script>
+        <script src="static/lean/marked.js"></script>
+        <script src="static/lean/highlighting.js"></script>
+        <script src="static/lean/lean.js"></script>
+        </article></main><footer class="site-footer"><div class="wrap">
+        Machine-checked formalizations of PODC papers in Lean 4. Generated with <a href="https://github.com/leanprover/verso">Verso</a> from the README files of <a href="https://github.com/vasnesterov/formal_podc">vasnesterov/formal_podc</a>.</div>
+      </footer></body>
+  </html>
+

@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="light dark">
+    <link rel="icon" href="data:,">
+    <title>CrashConsensusDigraph: AsyncCrash.lean · Formal PODC</title><base href="../../../.././"><link rel="stylesheet" href="static/lean/verso-vars.css">
+    <link rel="stylesheet" href="static/lean/highlighting.css">
+    <link rel="stylesheet" href="static/lean/tippy-border.css">
+    <link rel="stylesheet" href="static/style.css">
+    <script defer="defer" src="static/site.js"></script>
+    </head>
+  <body>
+    <header class="site-header">
+      <div class="wrap">
+        <a class="brand" href=".">Formal PODC</a><nav class="top">
+          <a href=".">Search</a><a href="about/">About</a><a href="https://github.com/vasnesterov/formal_podc">GitHub</a></nav>
+        </div>
+      </header>
+    <main class="wrap"><article><nav class="breadcrumbs" aria-label="Breadcrumb">
+          <a href=".">Search</a><span class="sep">›</span><a href="PODC2015/">PODC 2015</a><span class="sep">›</span><a href="PODC2015/CrashConsensusDigraph/">CrashConsensusDigraph</a><span class="sep">›</span><a href="PODC2015/CrashConsensusDigraph/src/">Lean source</a><span class="sep">›</span><span aria-current="page">AsyncCrash</span></nav>
+        <h1>
+          <code>AsyncCrash.lean</code></h1>
+        <div class="paper-links">
+          <p>
+            Source of <a href="PODC2015/CrashConsensusDigraph/">Crash-Tolerant Consensus in Directed Graphs — PODC 2015</a> · <a href="https://github.com/vasnesterov/formal_podc/blob/main/Papers/PODC2015/CrashConsensusDigraph/AsyncCrash.lean">GitHub</a> · hover over a name for its type and documentation</p>
+          </div>
+        <div class="lean-code lean-src">
+          <code class="hl lean block" data-lean-context="AsyncCrash"><span id="L1"><span class="kw">import</span> Papers.PODC2015.CrashConsensusDigraph.Async</span>
+<span id="L2"></span>
+<span id="L3"><span class="dc">/-!</span></span>
+<span id="L4"><span class="dc"># Asynchronous crash-prone message passing on a digraph (crashes at arbitrary times)</span></span>
+<span id="L5"></span>
+<span id="L6"><span class="dc">The model of Section 4 with general crash faults. We reuse the asynchronous model of</span></span>
+<span id="L7"><span class="dc">`Cslib/Computability/Distributed/ApproxConsensus/Async/Model.lean` (deterministic event-driven algorithms,</span></span>
+<span id="L8"><span class="dc">reliable FIFO links with adversarial finite delays, irrevocable outputs) with a *time-varying*</span></span>
+<span id="L9"><span class="dc">set of crashed nodes:</span></span>
+<span id="L10"></span>
+<span id="L11"><span class="dc">* a crash schedule `ct : V → Option ℕ`: `ct x = some c` means that `x` crashes at time `c`;</span></span>
+<span id="L12"><span class="dc">  `crashedAt ct t` is the set of nodes crashed at time `t`. Step `t` of the execution is the</span></span>
+<span id="L13"><span class="dc">  PODC 2020 step with faulty set `crashedAt ct t`: a crashed node takes no step (it processes no</span></span>
+<span id="L14"><span class="dc">  message, hence sends nothing new), messages to crashed nodes are dropped, but messages a node</span></span>
+<span id="L15"><span class="dc">  sent before crashing stay in the channels and may (or may not) be delivered. Since fairness is</span></span>
+<span id="L16"><span class="dc">  only required for links between nodes that never crash, this covers crashes in the middle of a</span></span>
+<span id="L17"><span class="dc">  broadcast. A node with `ct x = some 0` never starts (initially dead).</span></span>
+<span id="L18"><span class="dc">* Event sequences contain no Byzantine events (`.byz`).</span></span>
+<span id="L19"><span class="dc">* `FairC`: on every link between nodes that never crash, a non-empty channel is eventually served.</span></span>
+<span id="L20"><span class="dc">* `CrashSolvesGenOn I A G f ε`: for every crash schedule with at most `f` faulty nodes, all inputs</span></span>
+<span id="L21"><span class="dc">  in `I` and every event sequence: ε-agreement and validity (outputs in the convex hull of all</span></span>
+<span id="L22"><span class="dc">  inputs) for the nodes that never crash, and termination in fair executions.</span></span>
+<span id="L23"></span>
+<span id="L24"><span class="dc">`crashSolvesOn_of_gen`: this specializes to the initially-dead model `CrashSolvesOn` of</span></span>
+<span id="L25"><span class="dc">`Async.lean` (constant schedule), so Theorem 6 holds in this model too (`theorem6_gen`).</span></span>
+<span id="L26"><span class="dc">-/</span></span>
+<span id="L27"></span>
+<span id="L28"><span class="kw">open</span> Finset</span>
+<span id="L29"></span>
+<span id="L30"><span class="kw">set_option</span> <span class="const token" data-verso-hover="30">linter.unusedSectionVars</span> false</span>
+<span id="L31"></span>
+<span id="L32"><span class="cm">--</span><span class="cm"> CSLib candidate (asynchronous crash-prone message passing on digraphs)</span></span>
+<span id="L33"></span>
+<span id="L34"><span class="kw">namespace</span> CrashConsensusDigraph</span>
+<span id="L35"></span>
+<span id="L36"><span class="kw">open</span> Cslib.ApproxConsensus Cslib.ApproxConsensus.Async</span>
+<span id="L37"></span>
+<span id="L38"><span class="kw">variable</span> {V M S : <span class="kw">Type</span>*} [<span class="const token" data-verso-hover="31">DecidableEq</span> V] [<span class="const token" data-verso-hover="49">Fintype</span> V]</span>
+<span id="L39"></span>
+<span id="L40"><span class="kw">open</span> Classical <span class="kw">in</span></span>
+<span id="L41"><span class="dc">/-- The nodes crashed at time `t` under the crash schedule `ct`. -/</span></span>
+<span id="L42"><span class="kw">noncomputable</span> <span class="kw">def</span> <span class="const token" data-verso-hover="74">crashedAt</span> (ct : V → <span class="const token" data-verso-hover="75">Option</span> <span class="const token" data-verso-hover="39">ℕ</span>) (t : <span class="const token" data-verso-hover="39">ℕ</span>) : <span class="const token" data-verso-hover="40">Finset</span> V :=</span>
+<span id="L43">  <span class="const token" data-verso-hover="52">univ</span>.<span class="const token" data-verso-hover="53">filter</span> <span class="kw">fun</span> x =&gt; ∃ c, ct x = <span class="const token" data-verso-hover="46">some</span> c ∧ c ≤ t</span>
+<span id="L44"></span>
+<span id="L45"><span class="kw">theorem</span> <span class="const token" data-verso-hover="76">mem_crashedAt</span> {ct : V → <span class="const token" data-verso-hover="75">Option</span> <span class="const token" data-verso-hover="39">ℕ</span>} {t : <span class="const token" data-verso-hover="39">ℕ</span>} {x : V} :</span>
+<span id="L46">    x ∈ <span class="const token" data-verso-hover="74">crashedAt</span> ct t ↔ ∃ c, ct x = <span class="const token" data-verso-hover="46">some</span> c ∧ c ≤ t := <span class="kw">by</span></span>
+<span id="L47">  <span class="kw">classical</span></span>
+<span id="L48">  <span class="kw">unfold</span> <span class="const token" data-verso-hover="74">crashedAt</span></span>
+<span id="L49">  <span class="kw">rw</span> [<span class="const token" data-verso-hover="58">mem_filter</span>]</span>
+<span id="L50">  <span class="kw">simp</span></span>
+<span id="L51"></span>
+<span id="L52"><span class="kw">theorem</span> <span class="const token" data-verso-hover="77">notMem_crashedAt_of_none</span> {ct : V → <span class="const token" data-verso-hover="75">Option</span> <span class="const token" data-verso-hover="39">ℕ</span>} {t : <span class="const token" data-verso-hover="39">ℕ</span>} {x : V} (h : ct x = <span class="const token" data-verso-hover="78">none</span>) :</span>
+<span id="L53">    x ∉ <span class="const token" data-verso-hover="74">crashedAt</span> ct t := <span class="kw">by</span></span>
+<span id="L54">  <span class="kw">rw</span> [<span class="const token" data-verso-hover="76">mem_crashedAt</span>]; <span class="kw">simp</span> [h]</span>
+<span id="L55"></span>
+<span id="L56"><span class="kw">theorem</span> <span class="const token" data-verso-hover="79">crashedAt_mono</span> {ct : V → <span class="const token" data-verso-hover="75">Option</span> <span class="const token" data-verso-hover="39">ℕ</span>} {t t' : <span class="const token" data-verso-hover="39">ℕ</span>} (h : t ≤ t') {x : V}</span>
+<span id="L57">    (hx : x ∈ <span class="const token" data-verso-hover="74">crashedAt</span> ct t) : x ∈ <span class="const token" data-verso-hover="74">crashedAt</span> ct t' := <span class="kw">by</span></span>
+<span id="L58">  <span class="kw">rw</span> [<span class="const token" data-verso-hover="76">mem_crashedAt</span>] <span class="kw">at</span> hx ⊢</span>
+<span id="L59">  <span class="kw">obtain</span> ⟨c, hc, hct⟩ := hx</span>
+<span id="L60">  <span class="kw">exact</span> ⟨c, hc, hct.<span class="const token" data-verso-hover="80">trans</span> h⟩</span>
+<span id="L61"></span>
+<span id="L62"><span class="dc">/-- At most `f` nodes ever crash. -/</span></span>
+<span id="L63"><span class="kw">def</span> <span class="const token" data-verso-hover="81">CrashAdm</span> (ct : V → <span class="const token" data-verso-hover="75">Option</span> <span class="const token" data-verso-hover="39">ℕ</span>) (f : <span class="const token" data-verso-hover="39">ℕ</span>) : <span class="kw">Prop</span> :=</span>
+<span id="L64">  ∃ F : <span class="const token" data-verso-hover="40">Finset</span> V, F.<span class="const token" data-verso-hover="41">card</span> ≤ f ∧ ∀ x c, ct x = <span class="const token" data-verso-hover="46">some</span> c → x ∈ F</span>
+<span id="L65"></span>
+<span id="L66"><span class="kw">section</span> Run</span>
+<span id="L67"></span>
+<span id="L68"><span class="kw">variable</span> (A : <span class="const token" data-verso-hover="32">Algorithm</span> V M S) (G : <span class="const token" data-verso-hover="33">Digraph</span> V) [<span class="const token" data-verso-hover="34">DecidableRel</span> G.<span class="const token" data-verso-hover="35">Adj</span>] (ct : V → <span class="const token" data-verso-hover="75">Option</span> <span class="const token" data-verso-hover="39">ℕ</span>)</span>
+<span id="L69"></span>
+<span id="L70"><span class="dc">/-- The execution determined by the crash schedule, the inputs and the event sequence. -/</span></span>
+<span id="L71"><span class="kw">noncomputable</span> <span class="kw">def</span> <span class="const token" data-verso-hover="82">runC</span> (inp : V → <span class="const token" data-verso-hover="38">ℝ</span>) (ev : <span class="const token" data-verso-hover="39">ℕ</span> → <span class="const token" data-verso-hover="42">Event</span> V M) : <span class="const token" data-verso-hover="39">ℕ</span> → <span class="const token" data-verso-hover="83">Config</span> V M S</span>
+<span id="L72">  | <span class="nu">0</span> =&gt; <span class="const token" data-verso-hover="84">init</span> A G (<span class="const token" data-verso-hover="74">crashedAt</span> ct <span class="nu">0</span>) inp</span>
+<span id="L73">  | t + <span class="nu">1</span> =&gt; <span class="const token" data-verso-hover="85">step</span> A G (<span class="const token" data-verso-hover="74">crashedAt</span> ct t) (<span class="const token" data-verso-hover="82">runC</span> inp ev t) (ev t)</span>
+<span id="L74"></span>
+<span id="L75"><span class="kw">theorem</span> <span class="const token" data-verso-hover="86">runC_zero</span> (inp : V → <span class="const token" data-verso-hover="38">ℝ</span>) (ev : <span class="const token" data-verso-hover="39">ℕ</span> → <span class="const token" data-verso-hover="42">Event</span> V M) :</span>
+<span id="L76">    <span class="const token" data-verso-hover="82">runC</span> A G ct inp ev <span class="nu">0</span> = <span class="const token" data-verso-hover="84">init</span> A G (<span class="const token" data-verso-hover="74">crashedAt</span> ct <span class="nu">0</span>) inp := <span class="const token" data-verso-hover="87">rfl</span></span>
+<span id="L77"></span>
+<span id="L78"><span class="kw">theorem</span> <span class="const token" data-verso-hover="88">runC_succ</span> (inp : V → <span class="const token" data-verso-hover="38">ℝ</span>) (ev : <span class="const token" data-verso-hover="39">ℕ</span> → <span class="const token" data-verso-hover="42">Event</span> V M) (t : <span class="const token" data-verso-hover="39">ℕ</span>) :</span>
+<span id="L79">    <span class="const token" data-verso-hover="82">runC</span> A G ct inp ev (t + <span class="nu">1</span>) = <span class="const token" data-verso-hover="85">step</span> A G (<span class="const token" data-verso-hover="74">crashedAt</span> ct t) (<span class="const token" data-verso-hover="82">runC</span> A G ct inp ev t) (ev t) := <span class="const token" data-verso-hover="87">rfl</span></span>
+<span id="L80"></span>
+<span id="L81"><span class="dc">/-- Fairness: on every link between nodes that never crash, a non-empty channel is eventually</span></span>
+<span id="L82"><span class="dc">served. -/</span></span>
+<span id="L83"><span class="kw">def</span> <span class="const token" data-verso-hover="89">FairC</span> (inp : V → <span class="const token" data-verso-hover="38">ℝ</span>) (ev : <span class="const token" data-verso-hover="39">ℕ</span> → <span class="const token" data-verso-hover="42">Event</span> V M) : <span class="kw">Prop</span> :=</span>
+<span id="L84">  ∀ x y, ct x = <span class="const token" data-verso-hover="78">none</span> → ct y = <span class="const token" data-verso-hover="78">none</span> → ∀ t, (<span class="const token" data-verso-hover="82">runC</span> A G ct inp ev t).<span class="const token" data-verso-hover="90">chan</span> x y ≠ [] →</span>
+<span id="L85">    ∃ t' ≥ t, ev t' = <span class="const token" data-verso-hover="91">.</span>deliver x y</span>
+<span id="L86"></span>
+<span id="L87"><span class="kw">end</span> Run</span>
+<span id="L88"></span>
+<span id="L89"><span class="dc">/-- **Asynchronous approximate crash consensus** (Section 4) for inputs in `I`, tolerating up to</span></span>
+<span id="L90"><span class="dc">`f` crashes at arbitrary times. -/</span></span>
+<span id="L91"><span class="kw">def</span> <span class="const token" data-verso-hover="92">CrashSolvesGenOn</span> (I : <span class="const token" data-verso-hover="37">Set</span> <span class="const token" data-verso-hover="38">ℝ</span>) (A : <span class="const token" data-verso-hover="32">Algorithm</span> V M S) (G : <span class="const token" data-verso-hover="33">Digraph</span> V) [<span class="const token" data-verso-hover="34">DecidableRel</span> G.<span class="const token" data-verso-hover="35">Adj</span>]</span>
+<span id="L92">    (f : <span class="const token" data-verso-hover="39">ℕ</span>) (ε : <span class="const token" data-verso-hover="38">ℝ</span>) : <span class="kw">Prop</span> :=</span>
+<span id="L93">  ∀ ct : V → <span class="const token" data-verso-hover="75">Option</span> <span class="const token" data-verso-hover="39">ℕ</span>, <span class="const token" data-verso-hover="81">CrashAdm</span> ct f → ∀ (inp : V → <span class="const token" data-verso-hover="38">ℝ</span>), (∀ w, inp w ∈ I) →</span>
+<span id="L94">    ∀ (ev : <span class="const token" data-verso-hover="39">ℕ</span> → <span class="const token" data-verso-hover="42">Event</span> V M), (∀ t x y m, ev t ≠ <span class="const token" data-verso-hover="43">.</span>byz x y m) →</span>
+<span id="L95">    <span class="cm">--</span><span class="cm"> ε-agreement</span></span>
+<span id="L96">    (∀ t v u y z, ct v = <span class="const token" data-verso-hover="78">none</span> → ct u = <span class="const token" data-verso-hover="78">none</span> → (<span class="const token" data-verso-hover="82">runC</span> A G ct inp ev t).<span class="const token" data-verso-hover="45">dec</span> v = <span class="const token" data-verso-hover="46">some</span> y →</span>
+<span id="L97">      (<span class="const token" data-verso-hover="82">runC</span> A G ct inp ev t).<span class="const token" data-verso-hover="45">dec</span> u = <span class="const token" data-verso-hover="46">some</span> z → |y - z| ≤ ε) ∧</span>
+<span id="L98">    <span class="cm">--</span><span class="cm"> validity: in the convex hull of all inputs</span></span>
+<span id="L99">    (∀ t v y, ct v = <span class="const token" data-verso-hover="78">none</span> → (<span class="const token" data-verso-hover="82">runC</span> A G ct inp ev t).<span class="const token" data-verso-hover="45">dec</span> v = <span class="const token" data-verso-hover="46">some</span> y →</span>
+<span id="L100">      (∃ w, inp w ≤ y) ∧ ∃ w, y ≤ inp w) ∧</span>
+<span id="L101">    <span class="cm">--</span><span class="cm"> termination</span></span>
+<span id="L102">    (<span class="const token" data-verso-hover="89">FairC</span> A G ct inp ev → ∀ v, ct v = <span class="const token" data-verso-hover="78">none</span> → ∃ t y, (<span class="const token" data-verso-hover="82">runC</span> A G ct inp ev t).<span class="const token" data-verso-hover="45">dec</span> v = <span class="const token" data-verso-hover="46">some</span> y)</span>
+<span id="L103"></span>
+<span id="L104"><span class="dc">/-! ## Initially dead nodes as a special case -/</span></span>
+<span id="L105"></span>
+<span id="L106"><span class="dc">/-- The schedule in which exactly the nodes of `B` are crashed from the start. -/</span></span>
+<span id="L107"><span class="kw">def</span> <span class="const token" data-verso-hover="93">deadAt</span> (B : <span class="const token" data-verso-hover="40">Finset</span> V) : V → <span class="const token" data-verso-hover="75">Option</span> <span class="const token" data-verso-hover="39">ℕ</span> := <span class="kw">fun</span> x =&gt; <span class="kw">if</span> x ∈ B <span class="kw">then</span> <span class="const token" data-verso-hover="46">some</span> <span class="nu">0</span> <span class="kw">else</span> <span class="const token" data-verso-hover="78">none</span></span>
+<span id="L108"></span>
+<span id="L109"><span class="kw">theorem</span> <span class="const token" data-verso-hover="94">crashedAt_deadAt</span> (B : <span class="const token" data-verso-hover="40">Finset</span> V) (t : <span class="const token" data-verso-hover="39">ℕ</span>) : <span class="const token" data-verso-hover="74">crashedAt</span> (<span class="const token" data-verso-hover="93">deadAt</span> B) t = B := <span class="kw">by</span></span>
+<span id="L110">  <span class="kw">ext</span> x</span>
+<span id="L111">  <span class="kw">rw</span> [<span class="const token" data-verso-hover="76">mem_crashedAt</span>]</span>
+<span id="L112">  <span class="kw">by_cases</span> hx : x ∈ B &lt;;&gt; <span class="kw">simp</span> [<span class="const token" data-verso-hover="93">deadAt</span>, hx]</span>
+<span id="L113"></span>
+<span id="L114"><span class="kw">theorem</span> <span class="const token" data-verso-hover="95">deadAt_eq_none</span> {B : <span class="const token" data-verso-hover="40">Finset</span> V} {x : V} : <span class="const token" data-verso-hover="93">deadAt</span> B x = <span class="const token" data-verso-hover="78">none</span> ↔ x ∉ B := <span class="kw">by</span></span>
+<span id="L115">  <span class="kw">by_cases</span> hx : x ∈ B &lt;;&gt; <span class="kw">simp</span> [<span class="const token" data-verso-hover="93">deadAt</span>, hx]</span>
+<span id="L116"></span>
+<span id="L117"><span class="kw">theorem</span> <span class="const token" data-verso-hover="96">runC_deadAt</span> {A : <span class="const token" data-verso-hover="32">Algorithm</span> V M S} {G : <span class="const token" data-verso-hover="33">Digraph</span> V} [<span class="const token" data-verso-hover="34">DecidableRel</span> G.<span class="const token" data-verso-hover="35">Adj</span>] (B : <span class="const token" data-verso-hover="40">Finset</span> V)</span>
+<span id="L118">    (inp : V → <span class="const token" data-verso-hover="38">ℝ</span>) (ev : <span class="const token" data-verso-hover="39">ℕ</span> → <span class="const token" data-verso-hover="42">Event</span> V M) (t : <span class="const token" data-verso-hover="39">ℕ</span>) :</span>
+<span id="L119">    <span class="const token" data-verso-hover="82">runC</span> A G (<span class="const token" data-verso-hover="93">deadAt</span> B) inp ev t = <span class="const token" data-verso-hover="44">run</span> A G B inp ev t := <span class="kw">by</span></span>
+<span id="L120">  <span class="kw">induction</span> t <span class="kw">with</span></span>
+<span id="L121">  | <span class="const token" data-verso-hover="97">zero</span> =&gt; <span class="kw">simp</span> only [<span class="const token" data-verso-hover="86">runC_zero</span>, <span class="const token" data-verso-hover="94">crashedAt_deadAt</span>]; <span class="kw">rfl</span></span>
+<span id="L122">  | <span class="const token" data-verso-hover="98">succ</span> t ih =&gt; <span class="kw">rw</span> [<span class="const token" data-verso-hover="88">runC_succ</span>, ih, <span class="const token" data-verso-hover="94">crashedAt_deadAt</span>]; <span class="kw">rfl</span></span>
+<span id="L123"></span>
+<span id="L124"><span class="dc">/-- An algorithm tolerating crashes at arbitrary times tolerates initially dead nodes. -/</span></span>
+<span id="L125"><span class="kw">theorem</span> <span class="const token" data-verso-hover="9">crashSolvesOn_of_gen</span> {I : <span class="const token" data-verso-hover="37">Set</span> <span class="const token" data-verso-hover="38">ℝ</span>} {A : <span class="const token" data-verso-hover="32">Algorithm</span> V M S} {G : <span class="const token" data-verso-hover="33">Digraph</span> V}</span>
+<span id="L126">    [<span class="const token" data-verso-hover="34">DecidableRel</span> G.<span class="const token" data-verso-hover="35">Adj</span>] {f : <span class="const token" data-verso-hover="39">ℕ</span>} {ε : <span class="const token" data-verso-hover="38">ℝ</span>} (h : <span class="const token" data-verso-hover="92">CrashSolvesGenOn</span> I A G f ε) :</span>
+<span id="L127">    <span class="const token" data-verso-hover="36">CrashSolvesOn</span> I A G f ε := <span class="kw">by</span></span>
+<span id="L128">  <span class="kw">intro</span> B hB inp hinp ev hev</span>
+<span id="L129">  <span class="kw">have</span> hadm : <span class="const token" data-verso-hover="81">CrashAdm</span> (<span class="const token" data-verso-hover="93">deadAt</span> B) f :=</span>
+<span id="L130">    ⟨B, hB, <span class="kw">fun</span> x c hc =&gt; <span class="kw">by</span> <span class="kw">by_contra</span> hx; <span class="kw">simp</span> [<span class="const token" data-verso-hover="93">deadAt</span>, hx] <span class="kw">at</span> hc⟩</span>
+<span id="L131">  <span class="kw">obtain</span> ⟨h1, h2, h3⟩ := h (<span class="const token" data-verso-hover="93">deadAt</span> B) hadm inp hinp ev hev</span>
+<span id="L132">  <span class="kw">refine</span> ⟨<span class="kw">fun</span> t v u y z hv hu hy hz =&gt; ?_, <span class="kw">fun</span> t v y hv hy =&gt; ?_, <span class="kw">fun</span> hfair v hv =&gt; ?_⟩</span>
+<span id="L133">  · <span class="kw">rw</span> [← <span class="const token" data-verso-hover="96">runC_deadAt</span>] <span class="kw">at</span> hy hz</span>
+<span id="L134">    <span class="kw">exact</span> h1 t v u y z (<span class="const token" data-verso-hover="95">deadAt_eq_none</span>.<span class="const token" data-verso-hover="57">mpr</span> hv) (<span class="const token" data-verso-hover="95">deadAt_eq_none</span>.<span class="const token" data-verso-hover="57">mpr</span> hu) hy hz</span>
+<span id="L135">  · <span class="kw">rw</span> [← <span class="const token" data-verso-hover="96">runC_deadAt</span>] <span class="kw">at</span> hy</span>
+<span id="L136">    <span class="kw">exact</span> h2 t v y (<span class="const token" data-verso-hover="95">deadAt_eq_none</span>.<span class="const token" data-verso-hover="57">mpr</span> hv) hy</span>
+<span id="L137">  · <span class="kw">have</span> hfair' : <span class="const token" data-verso-hover="89">FairC</span> A G (<span class="const token" data-verso-hover="93">deadAt</span> B) inp ev := <span class="kw">by</span></span>
+<span id="L138">      <span class="kw">intro</span> x y hx hy t hne</span>
+<span id="L139">      <span class="kw">rw</span> [<span class="const token" data-verso-hover="96">runC_deadAt</span>] <span class="kw">at</span> hne</span>
+<span id="L140">      <span class="kw">exact</span> hfair x y (<span class="const token" data-verso-hover="95">deadAt_eq_none</span>.<span class="const token" data-verso-hover="68">mp</span> hx) (<span class="const token" data-verso-hover="95">deadAt_eq_none</span>.<span class="const token" data-verso-hover="68">mp</span> hy) t hne</span>
+<span id="L141">    <span class="kw">obtain</span> ⟨t, z, hz⟩ := h3 hfair' v (<span class="const token" data-verso-hover="95">deadAt_eq_none</span>.<span class="const token" data-verso-hover="57">mpr</span> hv)</span>
+<span id="L142">    <span class="kw">exact</span> ⟨t, z, <span class="kw">by</span> <span class="kw">rwa</span> [<span class="const token" data-verso-hover="96">runC_deadAt</span>] <span class="kw">at</span> hz⟩</span>
+<span id="L143"></span>
+<span id="L144"><span class="dc">/-- **Theorem 6** in the model with crashes at arbitrary times. -/</span></span>
+<span id="L145"><span class="kw">theorem</span> <span class="const token" data-verso-hover="22">theorem6_gen</span> {A : <span class="const token" data-verso-hover="32">Algorithm</span> V M S} {G : <span class="const token" data-verso-hover="33">Digraph</span> V} [<span class="const token" data-verso-hover="34">DecidableRel</span> G.<span class="const token" data-verso-hover="35">Adj</span>] {f : <span class="const token" data-verso-hover="39">ℕ</span>} {ε : <span class="const token" data-verso-hover="38">ℝ</span>}</span>
+<span id="L146">    {I : <span class="const token" data-verso-hover="37">Set</span> <span class="const token" data-verso-hover="38">ℝ</span>} {a b : <span class="const token" data-verso-hover="38">ℝ</span>} (ha : a ∈ I) (hb : b ∈ I) (hab : ε &lt; b - a)</span>
+<span id="L147">    (hA : <span class="const token" data-verso-hover="92">CrashSolvesGenOn</span> I A G f ε) : <span class="const token" data-verso-hover="71">CCA</span> G f :=</span>
+<span id="L148">  <span class="const token" data-verso-hover="19">theorem6</span> ha hb hab (<span class="const token" data-verso-hover="9">crashSolvesOn_of_gen</span> hA)</span>
+<span id="L149"></span>
+<span id="L150"><span class="kw">end</span> CrashConsensusDigraph</span>
+<span id="L151"></span>
+</code></div>
+        <script>
+          window.versoHoversUrl = "PODC2015/CrashConsensusDigraph/-hovers.json";</script>
+        <script src="static/lean/popper.js"></script>
+        <script src="static/lean/tippy.js"></script>
+        <script src="static/lean/marked.js"></script>
+        <script src="static/lean/highlighting.js"></script>
+        <script src="static/lean/lean.js"></script>
+        </article></main><footer class="site-footer"><div class="wrap">
+        Machine-checked formalizations of PODC papers in Lean 4. Generated with <a href="https://github.com/leanprover/verso">Verso</a> from the README files of <a href="https://github.com/vasnesterov/formal_podc">vasnesterov/formal_podc</a>.</div>
+      </footer></body>
+  </html>
+

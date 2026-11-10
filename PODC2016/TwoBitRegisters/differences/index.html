@@ -1,0 +1,435 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="light dark">
+    <link rel="icon" href="data:,">
+    <title>TwoBitRegisters (PODC 2016): Differences between the formalization and the paper · Formal PODC</title><base href="../../.././"><link rel="stylesheet" href="static/lean/verso-vars.css">
+    <link rel="stylesheet" href="static/lean/highlighting.css">
+    <link rel="stylesheet" href="static/lean/tippy-border.css">
+    <link rel="stylesheet" href="static/style.css">
+    <script defer="defer" src="static/site.js"></script>
+    </head>
+  <body>
+    <header class="site-header">
+      <div class="wrap">
+        <a class="brand" href=".">Formal PODC</a><nav class="top">
+          <a href=".">Search</a><a href="about/">About</a><a href="https://github.com/vasnesterov/formal_podc">GitHub</a></nav>
+        </div>
+      </header>
+    <main class="wrap"><article><nav class="breadcrumbs" aria-label="Breadcrumb">
+          <a href=".">Search</a><span class="sep">›</span><a href="PODC2016/">PODC 2016</a><span class="sep">›</span><a href="PODC2016/TwoBitRegisters/">TwoBitRegisters</a><span class="sep">›</span><span aria-current="page">Differences</span></nav>
+        <h1>
+          Differences between the formalization and the paper</h1>
+        <div class="paper-links">
+          <p>
+            Rendered from <a href="https://github.com/vasnesterov/formal_podc/blob/main/Papers/PODC2016/TwoBitRegisters/differencies.md"><code>differencies.md</code></a> of <a href="PODC2016/TwoBitRegisters/">Two-Bit Messages Suffice for Atomic Registers — PODC 2016</a>.</p>
+          </div>
+        <p>
+          Paper: A. Mostéfaoui, M. Raynal, <em>Two-Bit Messages are Sufficient to Implement Atomic Read/Write
+Registers in Crash-prone Systems</em>, PODC 2016 (arXiv:1602.02695v1; the arXiv version has a single
+version, identical in content to the local copy). Numbering follows the arXiv version.</p>
+        <p>
+          <strong>Summary.</strong> The main result is correct. The algorithm of Figure 1 implements an atomic
+(linearizable) SWMR register in <code>CAMP_{n,t}[t &lt; n/2]</code> with four message types, and every
+operation of a correct process terminates. <strong>FIFO channels are not needed.</strong> Screening asked
+whether the paper silently relies on FIFO channels. It does not. Channels are modelled as
+unordered multisets, and the parity bit plus the <code>wait</code> at line 11 (an alternating-bit protocol)
+handle reordering. The pairwise invariant behind this (our <code>InvW</code>, Lemma 5 in exact form) shows
+that at most two <code>WRITE</code> messages are unprocessed per channel, with different parities.</p>
+        <p>
+          The algorithm relies on an <strong>implicit convention</strong>: code between two <code>wait</code>s executes atomically
+(§1). This is the standard convention of Raynal's pseudo-code, an implied assumption (✏️), and we record it
+because the algorithm is incorrect without it. The other items are proof imprecisions or gaps that
+the formal proof closes, small slips, harmless generalizations and modelling choices.</p>
+        <section>
+          <h2 id="1-implicit-convention-code-blocks-between-waits-are-atomic-necessary">
+            1. Implicit convention: code blocks between <code>wait</code>s are atomic (necessary)</h2>
+          <p>
+            The paper does not say explicitly how the code of an operation interleaves with the message
+handlers (<code>when ... is received do</code>). We follow the standard convention of this style of
+pseudo-code: each block of code between two <code>wait</code> statements runs atomically. So lines 1–2, lines 5–6, lines 8, 10, lines 11–18, line 19,
+lines 20–21 and line 22 are each one transition (<a href="https://github.com/vasnesterov/formal_podc/blob/main/Papers/PODC2016/TwoBitRegisters/Algorithm.lean"><code>Algorithm.lean</code></a>).</p>
+          <p>
+            <strong>This convention is necessary.</strong> Suppose a <code>WRITE</code> handler may run between lines 1 and 2 of
+<code>write()</code>. Then the writer can send the same <code>WRITE(b, v_x)</code> twice to the same process: once at
+line 16, while it handles a late echo of <code>v_{x-1}</code>, and once more at line 2. The stale copy later
+passes the parity test as message number <code>x + 2</code>, and the receiver appends a wrong value to its
+history.</p>
+          <p>
+            Our explicit-state model checker (<a href="https://github.com/vasnesterov/formal_podc/blob/main/Papers/PODC2016/TwoBitRegisters/scripts/twobit_mc.py"><code>scripts/twobit_mc.py</code></a>, variant <code>split12</code>) finds this
+14-step counterexample with <code>n = 3</code>, <code>t = 1</code>, no crashes and no reads:</p>
+          <ol start="1">
+            <li>
+              <p>
+                The writer completes <code>write(v1)</code>.</p>
+              </li>
+            <li>
+              <p>
+                It starts <code>write(v2)</code>: line 1 sets <code>w_sync_w[w] = 2</code>.</p>
+              </li>
+            <li>
+              <p>
+                It processes <code>p2</code>'s echo <code>WRITE(1, v1)</code>. Since <code>wsn = 1 &lt; 2</code>, line 16 sends <code>WRITE(0, v2)</code> to
+<code>p2</code>.</p>
+              </li>
+            <li>
+              <p>
+                Line 2 sends <code>WRITE(0, v2)</code> to <code>p2</code> again, because <code>w_sync_w[2] = 1</code>.</p>
+              </li>
+            <li>
+              <p>
+                <code>p2</code> processes one copy of <code>WRITE(0, v2)</code>.</p>
+              </li>
+            <li>
+              <p>
+                After <code>write(v3)</code>, <code>p2</code> accepts the stale <code>WRITE(0, v2)</code> as its 4th value, before <code>write(v4)</code>
+is even invoked.</p>
+              </li>
+            </ol>
+          <p>
+            With atomic blocks (variant <code>paper</code>), the checker finds no violation of safety or liveness on all
+instances we tried:</p>
+          <ul>
+            <li>
+              <p>
+                <code>n = 3</code>: up to 3 writes; 1–2 readers; up to 2 reads per reader; 0–1 crashes.</p>
+              </li>
+            <li>
+              <p>
+                <code>n = 4</code>: 1 write and 1 read.</p>
+              </li>
+            </ul>
+          <p>
+            The theorems in Lean prove correctness in general.</p>
+          </section>
+        <section>
+          <h2 id="2-model-choices-generalizations-or-equivalent-reformulations">
+            2. Model choices (generalizations or equivalent reformulations)</h2>
+          <ul>
+            <li>
+              <p>
+                <strong>Channels.</strong> A channel is the multiset <code>net</code> of in-transit messages <code>(sender, receiver, msg)</code>.
+It is unordered, does not lose messages and does not create them.</p>
+              <ul>
+                <li>
+                  <p>
+                    Messages <em>of a crashed sender</em> may be dropped (step <code>drop</code>). This models a crash in the
+middle of a broadcast, which the paper mentions for line 6. It is a generalization:
+dropping is never forced.</p>
+                  </li>
+                </ul>
+              </li>
+            <li>
+              <p>
+                <strong>Handlers blocked at a <code>wait</code>.</strong> A received <code>WRITE(b, v)</code> whose parity test (line 11) fails
+stays in the channel. This cannot be distinguished from a handler blocked at line 11, because
+the handler has done nothing yet.</p>
+              <ul>
+                <li>
+                  <p>
+                    A <code>READ()</code> handler blocked at line 20 is an explicit pending task <code>(j, sn)</code>. Its <code>sn</code> is
+saved at reception (line 19), as in the paper.</p>
+                  </li>
+                </ul>
+              </li>
+            <li>
+              <p>
+                <strong>Crashes.</strong> A crash step stops a process forever. Safety holds for <em>any</em> number of crashes;
+only the quorum size <code>n - t &gt; n/2</code> is used. Liveness assumes that at most <code>t</code> processes crash
+(<code>Exec.Resilient t</code>).</p>
+              </li>
+            <li>
+              <p>
+                <strong>Fairness / reliable delivery</strong> (<code>Exec.Fair</code>). Weak fairness for the steps of correct
+processes: an internal action (the end of a <code>wait</code>), or the reception of a message by a correct
+process, that stays enabled forever is eventually taken. For receptions this is exactly
+channel reliability; for internal actions it is "processes are not infinitely slow".</p>
+              </li>
+            <li>
+              <p>
+                <strong>Correct processes.</strong> A correct process is one that never crashes in the execution. The
+paper's Lemmas 8 and 9 say "if the process does not crash during the operation". In an
+infinite execution this is equivalent: an operation that never returns of a process that does
+not crash during it belongs to a process that never crashes.</p>
+              </li>
+            <li>
+              <p>
+                <strong>The writer does not read.</strong> Read operations are allowed for all processes except the writer
+<code>w</code>. The paper only remarks that "the writer can directly return <code>history_w[w_sync_w[w]]</code>"
+(Figure 1, comment of <code>read()</code>).</p>
+              <ul>
+                <li>
+                  <p>
+                    Any process <code>p ≠ w</code> may read; this is the paper's SWMR setting minus the writer's own reads.</p>
+                  </li>
+                <li>
+                  <p>
+                    Supporting the writer's reads would only need a slightly more general reads-from criterion
+(writes would have to be identified among the writer's operations).</p>
+                  </li>
+                </ul>
+              </li>
+            <li>
+              <p>
+                <strong>Values.</strong> The value type <code>V</code> must have decidable equality (<code>[DecidableEq V]</code>). This is a
+technical requirement: messages live in a <code>Multiset</code>, where membership and <code>erase</code> need
+decidable equality.</p>
+              </li>
+            <li>
+              <p>
+                <strong>Histories and atomicity.</strong> Atomicity is CSLib's <code>Cslib.SharedMemory.IsLinearization</code> on the
+history of invocations and responses. The paper's definition (§2.2) allows dropping the last
+operation of each faulty process; pending operations may or may not be linearized, which is the
+same thing. CSLib's notion is the amended Herlihy–Wing definition, see the LinearizabilityTypo
+paper (PODC 2021).</p>
+              </li>
+            </ul>
+          </section>
+        <section>
+          <h2 id="3-lemma-by-lemma">
+            3. Lemma by lemma</h2>
+          <div class="loose">
+            <ul>
+              <li>
+                <p>
+                  <strong>Lemma 1</strong> (increments by 1). Holds: <code>lemma1</code> (<a href="https://github.com/vasnesterov/formal_podc/blob/main/Papers/PODC2016/TwoBitRegisters/LivenessSteps.lean"><code>LivenessSteps.lean</code></a>; every step changes each
+<code>w_sync_i[j]</code> by <code>0</code> or <code>1</code>).</p>
+                </li>
+              <li>
+                <p>
+                  <strong>Lemma 2.</strong> Holds: <code>lemma2</code>.</p>
+                </li>
+              <li>
+                <p>
+                  <strong>Lemma 3.</strong> Holds: <code>lemma3</code>. The paper's induction is fine.</p>
+                </li>
+              <li>
+                <p>
+                  <strong>Lemma 4.</strong> Holds: <code>lemma4</code>. The paper's proof is an informal appeal to the "alternating bit"
+properties P1/P2. We replace it by an inductive invariant, <code>InvW</code> in <a href="https://github.com/vasnesterov/formal_podc/blob/main/Papers/PODC2016/TwoBitRegisters/InvWrite.lean"><code>InvWrite.lean</code></a>:</p>
+                <ul>
+                  <li>
+                    <p>
+                      the <code>k</code>-th <code>WRITE</code> message from <code>i</code> to <code>j</code> is <code>WRITE(k mod 2, v_k)</code>;</p>
+                    </li>
+                  <li>
+                    <p>
+                      it is sent exactly once;</p>
+                    </li>
+                  <li>
+                    <p>
+                      the unprocessed ones are exactly the numbers in <code>(w_sync_j[i], sent(i,j)]</code>, where
+<code>sent(i,j) = min(w_sync_i[i], w_sync_i[j] + 1)</code>;</p>
+                    </li>
+                  <li>
+                    <p>
+                      there are at most two of them (<code>sent ≤ w_sync_j[i] + 2</code>).</p>
+                    </li>
+                  </ul>
+                </li>
+              <li>
+                <p>
+                  <strong>Lemma 5.</strong> Holds.</p>
+                <ul>
+                  <li>
+                    <p>
+                      <code>R1</code>/<code>R2</code> about the messages <em>actually sent</em>: <code>lemma5_sent</code> (<a href="https://github.com/vasnesterov/formal_podc/blob/main/Papers/PODC2016/TwoBitRegisters/Messages.lean"><code>Messages.lean</code></a>). The number of
+<code>WRITE</code>s <code>p_i</code> has sent to <code>p_j</code>, counted on the ghost log <code>C.sent</code>, equals
+<code>sent C i j = min(w_sync_i[i], w_sync_i[j] + 1)</code>. Note that <code>sent</code> in <a href="https://github.com/vasnesterov/formal_podc/blob/main/Papers/PODC2016/TwoBitRegisters/InvWrite.lean"><code>InvWrite.lean</code></a> and
+<code>lemma5</code> (<a href="https://github.com/vasnesterov/formal_podc/blob/main/Papers/PODC2016/TwoBitRegisters/Safety.lean"><code>Safety.lean</code></a>) is this <em>formula</em> on local variables, not a count; <code>lemma5_sent</code>
+shows the two agree.</p>
+                    </li>
+                  <li>
+                    <p>
+                      Channel part (stronger "exact" form): <code>lemma5</code>. The unprocessed messages are exactly the
+numbers in <code>(w_sync_j[i], sent C i j]</code>, at most two, and only crashed senders' messages can be
+lost.</p>
+                    </li>
+                  <li>
+                    <p>
+                      The paper states it for <code>i ∈ C</code>, but it holds for every process.</p>
+                    </li>
+                  <li>
+                    <p>
+                      <strong>Gap in the paper's proof</strong> (🔧). The case analysis considers only a <code>write</code> invocation by
+<code>p_i</code> and the reception by <code>p_i</code> of a <code>WRITE</code> from <code>p_j</code>. It ignores the reception by <code>p_i</code>
+of a <code>WRITE</code> from a third process <code>p_k ≠ p_j</code>. Such a reception may increase <code>w_sync_i[i]</code>
+(line 14) and send a <code>WRITE</code> to <code>p_j</code> (line 15), changing the premises of <code>R1</code>/<code>R2</code> for the pair
+<code>(i, j)</code>. The statement remains true. Our invariant proof handles this case: in
+<code>InvW.of_recv_adopt</code> every <code>ℓ</code> with <code>w_sync_i[ℓ] = wsn − 1</code> gets exactly one new message.</p>
+                    </li>
+                  <li>
+                    <p>
+                      The paper's case analysis also needs, as an induction hypothesis, the property "at most two
+unprocessed messages, of different parities". That property is what makes the parity test
+of line 11 select the right message. We include it in the invariant.</p>
+                    </li>
+                  </ul>
+                </li>
+              <li>
+                <p>
+                  <strong>Lemma 6</strong> (pairwise progress) and <strong>Lemma 7</strong> (no process blocks forever at line 11): see
+<a href="https://github.com/vasnesterov/formal_podc/blob/main/Papers/PODC2016/TwoBitRegisters/Liveness.lean"><code>Liveness.lean</code></a>. The paper's proof of Lemma 6 forward-references Lemma 7. In our proof both
+follow from one "progress" argument: the next unprocessed <code>WRITE</code> of a channel passes the
+parity test, stays enabled, and fairness delivers it.</p>
+                <ul>
+                  <li>
+                    <p>
+                      Our Lemma 7 (<code>Liveness.recv_progress</code>) assumes that the <em>sender</em> is also correct. The
+paper states it for every sender. This is harmless: it is only used for pairs of correct
+processes. Moreover, messages of crashed senders may be lost in our model (<code>drop</code>), so a
+receiver may legitimately wait forever at line 11 for a lost message; such a blocked
+handler does not block the process.</p>
+                    </li>
+                  </ul>
+                </li>
+              <li>
+                <p>
+                  <strong>Lemmas 8 and 9</strong> (termination): see <a href="https://github.com/vasnesterov/formal_podc/blob/main/Papers/PODC2016/TwoBitRegisters/Liveness.lean"><code>Liveness.lean</code></a>.</p>
+                </li>
+              <li>
+                <p>
+                  <strong>Lemma 9 (the <code>PROCEED</code> counting).</strong> Channels are not FIFO and <code>READ()</code>/<code>PROCEED()</code> carry no
+sequence number, so "<code>r_sync_i[j] = rsn</code> means <code>p_j</code> answered the current request" needs an
+argument; the paper only asserts it. Our invariant <code>InvP.pipe</code>: every <code>READ()</code> from <code>i</code> to
+<code>j</code> is, at any time, in exactly one place:</p>
+                <ul>
+                  <li>
+                    <p>
+                      in transit;</p>
+                    </li>
+                  <li>
+                    <p>
+                      a pending handler at <code>j</code>;</p>
+                    </li>
+                  <li>
+                    <p>
+                      a <code>PROCEED()</code> in transit;</p>
+                    </li>
+                  <li>
+                    <p>
+                      already counted in <code>r_sync_i[j]</code>.</p>
+                    </li>
+                  </ul>
+                <p>
+                  Messages can only be lost when their sender crashed. So <code>r_sync_i[j] = rsn</code> implies that the
+current request has been answered (<code>InvH.of_r8</code>).</p>
+                </li>
+              <li>
+                <p>
+                  <strong>Lemma 10.</strong> Holds: <code>lemma10</code> (the three claims) and <code>linearizable</code>. Two harmless
+imprecisions in the paper's proof:</p>
+                <div class="loose">
+                  <ul>
+                    <li>
+                      <p>
+                        <strong>Claim 2</strong> says "we have <code>w_sync_k[k] = x</code> when <code>read[i,y]</code> starts". Only <code>≥ x</code> is true:
+later writes may have started. Only <code>≥ x</code> is used.</p>
+                      </li>
+                    <li>
+                      <p>
+                        <strong>Claim 3</strong> says that "as each of <code>Q_ri</code> and <code>Q_rj</code> contains at least <code>n − t</code> processes, and
+there is a majority of correct processes, there is at least one correct process in their
+intersection". This is a non sequitur: two quorums of size <code>n − t</code> intersect, but not
+necessarily in a correct process. For example, <code>n = 3</code>, <code>t = 1</code>, quorums <code>{1,2}</code> and
+<code>{2,3}</code>, and <code>p_2</code> faulty. Correctness of the common process is never used, so the proof
+goes through with "a process in the intersection".</p>
+                      </li>
+                    <li>
+                      <p>
+                        Small slips:</p>
+                      <ul>
+                        <li>
+                          <p>
+                            At the end of the proof of Claim 3, "the index <code>sn</code> computed by <code>p_i</code>" should be <code>p_j</code>.</p>
+                          </li>
+                        <li>
+                          <p>
+                            In the proof of Claim 2, "a quorum <code>Q_w</code> of at least <code>(n−t)</code> processes <code>p_i</code> such that
+<code>w_sync_w[j] = x</code>" mixes the indices <code>i</code> and <code>j</code>.</p>
+                          </li>
+                        <li>
+                          <p>
+                            In the proof of Lemma 8, "<code>w_sync_i[i] ≥ w_sync_w[i] = wsn</code> at each correct process
+<code>p_i</code>" is awkward, though every part of it is true (Lemmas 2 and 6). What is needed (and true by
+Lemma 6) is <code>w_sync_w[i] ≥ wsn</code>.</p>
+                          </li>
+                        </ul>
+                      </li>
+                    <li>
+                      <p>
+                        Our proof makes the ghost information explicit (<code>InvH</code> in <a href="https://github.com/vasnesterov/formal_podc/blob/main/Papers/PODC2016/TwoBitRegisters/InvHist.lean"><code>InvHist.lean</code></a>):</p>
+                      <ul>
+                        <li>
+                          <p>
+                            the snapshot of all <code>w_sync_j[j]</code> at the invocation of each read (<code>snap</code>);</p>
+                          </li>
+                        <li>
+                          <p>
+                            the reads-from map (<code>rf</code>).</p>
+                          </li>
+                        </ul>
+                      <p>
+                        The linearization comes from a general SWMR reads-from criterion
+(<a href="https://github.com/vasnesterov/cslib/blob/8357cd8a78b710d3ec49abfd38d85d138edf73a3/Cslib/Computability/Distributed/SharedMemory/SWMRRegister.lean"><code>Cslib/Computability/Distributed/SharedMemory/SWMRRegister.lean</code></a>).</p>
+                      </li>
+                    </ul>
+                  </div>
+                </li>
+              <li>
+                <p>
+                  <strong>Theorem 1.</strong> Safety part: <code>linearizable</code>. Liveness part: <code>live</code> (<a href="https://github.com/vasnesterov/formal_podc/blob/main/Papers/PODC2016/TwoBitRegisters/Liveness.lean"><code>Liveness.lean</code></a>).</p>
+                </li>
+              <li>
+                <p>
+                  <strong>Theorem 2</strong> (message content). The control information is two bits:
+<code>Msg.ext_ctrl_payload</code> (a message is determined by <code>Msg.ctrl : Bool × Bool</code> and its optional
+data value). Two of the four types carry a value.</p>
+                <ul>
+                  <li>
+                    <p>
+                      Message complexity, "<code>O(n)</code> messages per read, <code>O(n²)</code> per write", only holds in the
+amortized sense.</p>
+                    <ul>
+                      <li>
+                        <p>
+                          A single write may trigger fewer messages.</p>
+                        </li>
+                      <li>
+                        <p>
+                          Catch-up messages (line 16) for old values may be sent long after the write returned.</p>
+                        </li>
+                      </ul>
+                    </li>
+                  <li>
+                    <p>
+                      We prove the amortized bounds on the ghost log of all sent messages (<a href="https://github.com/vasnesterov/formal_podc/blob/main/Papers/PODC2016/TwoBitRegisters/Messages.lean"><code>Messages.lean</code></a>):</p>
+                    <ul>
+                      <li>
+                        <p>
+                          <code>write_messages</code>: at most <code>n(n−1)</code> <code>WRITE</code> messages per invoked write. Process <code>i</code> sends
+at most <code>w_sync_i[i]</code> <code>WRITE</code>s to each <code>j</code>.</p>
+                        </li>
+                      <li>
+                        <p>
+                          <code>read_messages</code>: at most <code>2(n−1)</code> <code>READ</code>/<code>PROCEED</code> messages per invoked read.</p>
+                        </li>
+                      </ul>
+                    </li>
+                  </ul>
+                </li>
+              <li>
+                <p>
+                  <strong>Time complexity</strong> (<code>2Δ</code> per write, <code>4Δ</code> per read in failure-free runs with delays <code>≤ Δ</code>;
+§1 and Table 1) is not formalized: our model is untimed.</p>
+                </li>
+              </ul>
+            </div>
+          </section>
+        </article></main><footer class="site-footer"><div class="wrap">
+        Machine-checked formalizations of PODC papers in Lean 4. Generated with <a href="https://github.com/leanprover/verso">Verso</a> from the README files of <a href="https://github.com/vasnesterov/formal_podc">vasnesterov/formal_podc</a>.</div>
+      </footer></body>
+  </html>
+

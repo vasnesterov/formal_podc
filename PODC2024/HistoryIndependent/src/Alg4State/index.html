@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="light dark">
+    <link rel="icon" href="data:,">
+    <title>HistoryIndependent: Alg4State.lean · Formal PODC</title><base href="../../../.././"><link rel="stylesheet" href="static/lean/verso-vars.css">
+    <link rel="stylesheet" href="static/lean/highlighting.css">
+    <link rel="stylesheet" href="static/lean/tippy-border.css">
+    <link rel="stylesheet" href="static/style.css">
+    <script defer="defer" src="static/site.js"></script>
+    </head>
+  <body>
+    <header class="site-header">
+      <div class="wrap">
+        <a class="brand" href=".">Formal PODC</a><nav class="top">
+          <a href=".">Search</a><a href="about/">About</a><a href="https://github.com/vasnesterov/formal_podc">GitHub</a></nav>
+        </div>
+      </header>
+    <main class="wrap"><article><nav class="breadcrumbs" aria-label="Breadcrumb">
+          <a href=".">Search</a><span class="sep">›</span><a href="PODC2024/">PODC 2024</a><span class="sep">›</span><a href="PODC2024/HistoryIndependent/">HistoryIndependent</a><span class="sep">›</span><a href="PODC2024/HistoryIndependent/src/">Lean source</a><span class="sep">›</span><span aria-current="page">Alg4State</span></nav>
+        <h1>
+          <code>Alg4State.lean</code></h1>
+        <div class="paper-links">
+          <p>
+            Source of <a href="PODC2024/HistoryIndependent/">History-Independent Concurrent Objects — PODC 2024</a> · <a href="https://github.com/vasnesterov/formal_podc/blob/main/Papers/PODC2024/HistoryIndependent/Alg4State.lean">GitHub</a> · hover over a name for its type and documentation</p>
+          </div>
+        <div class="lean-code lean-src">
+          <code class="hl lean block" data-lean-context="Alg4State"><span id="L1"><span class="kw">import</span> Papers.PODC2024.HistoryIndependent.Alg4</span>
+<span id="L2"></span>
+<span id="L3"><span class="dc">/-!</span></span>
+<span id="L4"><span class="dc"># Algorithm 4: abstract state with ghost variables</span></span>
+<span id="L5"></span>
+<span id="L6"><span class="dc">`St K` is the state of Algorithm 4 (memory, writer's and reader's local state) together with</span></span>
+<span id="L7"><span class="dc">*ghost* variables, and `sstep` its (total) transition function on labels. The ghost state of an</span></span>
+<span id="L8"><span class="dc">execution `α` is `sOf v₀ α = α.foldl sstep init`, a function of the execution. The simulation</span></span>
+<span id="L9"><span class="dc">lemma `rel_run` shows that the concrete part of `sOf v₀ α` is the configuration reached by `α`.</span></span>
+<span id="L10"></span>
+<span id="L11"><span class="dc">Ghost variables (writes are numbered `1, 2, …` in invocation order, `0` is the initial value):</span></span>
+<span id="L12"></span>
+<span id="L13"><span class="dc">* `wv` — the values of the invoked writes; `n = wv.length`;</span></span>
+<span id="L14"><span class="dc">* `tagA j` / `tagB j` — number of the write that last wrote `1` to `A[j]` / `B[j]`;</span></span>
+<span id="L15"><span class="dc">* `sN1` — `n` when the current `Read` executed Line 1; `sT` — `nA` (number of writes that</span></span>
+<span id="L16"><span class="dc">  executed Line 16) when the current `TryRead` started;</span></span>
+<span id="L17"><span class="dc">* `lo` — number of completed writes when the current `Read` was invoked;</span></span>
+<span id="L18"><span class="dc">* `rf` — the *reads-from* candidate of the current `Read`: when the reader sets `val ← j`</span></span>
+<span id="L19"><span class="dc">  after reading `A[j] = 1` it records `tagA j`; after reading `B[j] = 1` it records</span></span>
+<span id="L20"><span class="dc">  `tagB j - 1` (the write *preceding* the one that wrote `B[j]`, whose value is `last-val`);</span></span>
+<span id="L21"><span class="dc">* `fl` — reads-from value of the last completed `Read`; `pis` — reads-from values of all</span></span>
+<span id="L22"><span class="dc">  completed `Read`s.</span></span>
+<span id="L23"><span class="dc">-/</span></span>
+<span id="L24"></span>
+<span id="L25"><span class="kw">set_option</span> <span class="const token" data-verso-hover="331">linter.unusedSectionVars</span> false</span>
+<span id="L26"></span>
+<span id="L27"><span class="kw">namespace</span> Cslib.SharedMemory</span>
+<span id="L28"></span>
+<span id="L29"><span class="kw">namespace</span> Alg4</span>
+<span id="L30"></span>
+<span id="L31"><span class="kw">variable</span> {K : <span class="const token" data-verso-hover="28">ℕ</span>} [<span class="const token" data-verso-hover="309">NeZero</span> K]</span>
+<span id="L32"></span>
+<span id="L33"><span class="dc">/-- Abstract state with ghost variables. -/</span></span>
+<span id="L34"><span class="kw">structure</span> <span class="const token" data-verso-hover="350">St</span> (K : <span class="const token" data-verso-hover="28">ℕ</span>) <span class="kw">where</span></span>
+<span id="L35">  <span class="const token" data-verso-hover="360">A</span> : <span class="const token" data-verso-hover="30">Fin</span> K → <span class="const token" data-verso-hover="243">Bool</span></span>
+<span id="L36">  <span class="const token" data-verso-hover="369">Bm</span> : <span class="const token" data-verso-hover="30">Fin</span> K → <span class="const token" data-verso-hover="243">Bool</span></span>
+<span id="L37">  <span class="const token" data-verso-hover="364">f1</span> : <span class="const token" data-verso-hover="243">Bool</span></span>
+<span id="L38">  <span class="const token" data-verso-hover="367">f2</span> : <span class="const token" data-verso-hover="243">Bool</span></span>
+<span id="L39">  <span class="const token" data-verso-hover="357">last</span> : <span class="const token" data-verso-hover="30">Fin</span> K</span>
+<span id="L40">  <span class="const token" data-verso-hover="352">wpc</span> : <span class="const token" data-verso-hover="293">WPC</span> K</span>
+<span id="L41">  <span class="const token" data-verso-hover="365">rpc</span> : <span class="const token" data-verso-hover="281">RPC</span> K</span>
+<span id="L42">  <span class="const token" data-verso-hover="410">wv</span> : <span class="const token" data-verso-hover="78">List</span> (<span class="const token" data-verso-hover="30">Fin</span> K)</span>
+<span id="L43">  <span class="const token" data-verso-hover="362">tagA</span> : <span class="const token" data-verso-hover="30">Fin</span> K → <span class="const token" data-verso-hover="28">ℕ</span></span>
+<span id="L44">  <span class="const token" data-verso-hover="372">tagB</span> : <span class="const token" data-verso-hover="30">Fin</span> K → <span class="const token" data-verso-hover="28">ℕ</span></span>
+<span id="L45">  <span class="const token" data-verso-hover="378">sN1</span> : <span class="const token" data-verso-hover="28">ℕ</span></span>
+<span id="L46">  <span class="const token" data-verso-hover="382">sT</span> : <span class="const token" data-verso-hover="28">ℕ</span></span>
+<span id="L47">  <span class="const token" data-verso-hover="375">lo</span> : <span class="const token" data-verso-hover="28">ℕ</span></span>
+<span id="L48">  <span class="const token" data-verso-hover="390">rf</span> : <span class="const token" data-verso-hover="28">ℕ</span></span>
+<span id="L49">  <span class="const token" data-verso-hover="391">fl</span> : <span class="const token" data-verso-hover="28">ℕ</span></span>
+<span id="L50">  <span class="const token" data-verso-hover="401">pis</span> : <span class="const token" data-verso-hover="78">List</span> <span class="const token" data-verso-hover="28">ℕ</span></span>
+<span id="L51"></span>
+<span id="L52"><span class="dc">/-- The writer is before Line 16 of a `Write`. -/</span></span>
+<span id="L53"><span class="kw">def</span> <span class="const token" data-verso-hover="406">WPC.preA</span> : <span class="const token" data-verso-hover="293">WPC</span> K → <span class="const token" data-verso-hover="243">Bool</span></span>
+<span id="L54">  | <span class="const token" data-verso-hover="295">.</span>scanB .. | <span class="const token" data-verso-hover="296">.</span>rdF1 _ | <span class="const token" data-verso-hover="297">.</span>setB _ | <span class="const token" data-verso-hover="298">.</span>rdF2 _ | <span class="const token" data-verso-hover="299">.</span>rdF1' _ | <span class="const token" data-verso-hover="300">.</span>clrB _ | <span class="const token" data-verso-hover="301">.</span>setA _ =&gt; <span class="const token" data-verso-hover="56">true</span></span>
+<span id="L55">  | _ =&gt; <span class="const token" data-verso-hover="321">false</span></span>
+<span id="L56"></span>
+<span id="L57"><span class="dc">/-- The writer is after Line 16 of a `Write`. -/</span></span>
+<span id="L58"><span class="kw">def</span> <span class="const token" data-verso-hover="392">WPC.postA</span> : <span class="const token" data-verso-hover="293">WPC</span> K → <span class="const token" data-verso-hover="243">Bool</span></span>
+<span id="L59">  | <span class="const token" data-verso-hover="302">.</span>down .. | <span class="const token" data-verso-hover="303">.</span>up .. | <span class="const token" data-verso-hover="304">.</span>done _ =&gt; <span class="const token" data-verso-hover="56">true</span></span>
+<span id="L60">  | _ =&gt; <span class="const token" data-verso-hover="321">false</span></span>
+<span id="L61"></span>
+<span id="L62"><span class="kw">namespace</span> St</span>
+<span id="L63"></span>
+<span id="L64"><span class="dc">/-- Number of invoked writes. -/</span></span>
+<span id="L65"><span class="kw">def</span> <span class="const token" data-verso-hover="355">n</span> (s : <span class="const token" data-verso-hover="350">St</span> K) : <span class="const token" data-verso-hover="28">ℕ</span> := s.<span class="const token" data-verso-hover="410">wv</span>.<span class="const token" data-verso-hover="109">length</span></span>
+<span id="L66"></span>
+<span id="L67"><span class="dc">/-- Number of writes that executed Line 16. -/</span></span>
+<span id="L68"><span class="kw">def</span> <span class="const token" data-verso-hover="379">nA</span> (s : <span class="const token" data-verso-hover="350">St</span> K) : <span class="const token" data-verso-hover="28">ℕ</span> := <span class="kw">if</span> s.<span class="const token" data-verso-hover="352">wpc</span>.<span class="const token" data-verso-hover="406">preA</span> <span class="kw">then</span> s.<span class="const token" data-verso-hover="355">n</span> - <span class="nu">1</span> <span class="kw">else</span> s.<span class="const token" data-verso-hover="355">n</span></span>
+<span id="L69"></span>
+<span id="L70"><span class="dc">/-- Number of completed writes. -/</span></span>
+<span id="L71"><span class="kw">def</span> <span class="const token" data-verso-hover="358">c</span> (s : <span class="const token" data-verso-hover="350">St</span> K) : <span class="const token" data-verso-hover="28">ℕ</span> := <span class="kw">if</span> s.<span class="const token" data-verso-hover="352">wpc</span> = <span class="const token" data-verso-hover="294">.</span>idle <span class="kw">then</span> s.<span class="const token" data-verso-hover="355">n</span> <span class="kw">else</span> s.<span class="const token" data-verso-hover="355">n</span> - <span class="nu">1</span></span>
+<span id="L72"></span>
+<span id="L73"><span class="dc">/-- Value of write number `m` (`0`: initial value). -/</span></span>
+<span id="L74"><span class="kw">def</span> <span class="const token" data-verso-hover="354">vals</span> (v₀ : <span class="const token" data-verso-hover="30">Fin</span> K) (s : <span class="const token" data-verso-hover="350">St</span> K) (m : <span class="const token" data-verso-hover="28">ℕ</span>) : <span class="const token" data-verso-hover="30">Fin</span> K := (v₀ :: s.<span class="const token" data-verso-hover="410">wv</span>).<span class="const token" data-verso-hover="94">getD</span> m v₀</span>
+<span id="L75"></span>
+<span id="L76"><span class="kw">end</span> St</span>
+<span id="L77"></span>
+<span id="L78"><span class="dc">/-- Initial abstract state. -/</span></span>
+<span id="L79"><span class="kw">def</span> <span class="const token" data-verso-hover="404">St.init</span> (v₀ : <span class="const token" data-verso-hover="30">Fin</span> K) : <span class="const token" data-verso-hover="350">St</span> K <span class="kw">where</span></span>
+<span id="L80">  <span class="const token" data-verso-hover="360">A</span> j := <span class="const token" data-verso-hover="54">decide</span> (j = v₀)</span>
+<span id="L81">  <span class="const token" data-verso-hover="369">Bm</span> _ := <span class="const token" data-verso-hover="321">false</span></span>
+<span id="L82">  <span class="const token" data-verso-hover="364">f1</span> := <span class="const token" data-verso-hover="321">false</span></span>
+<span id="L83">  <span class="const token" data-verso-hover="367">f2</span> := <span class="const token" data-verso-hover="321">false</span></span>
+<span id="L84">  <span class="const token" data-verso-hover="357">last</span> := v₀</span>
+<span id="L85">  <span class="const token" data-verso-hover="352">wpc</span> := <span class="const token" data-verso-hover="294">.</span>idle</span>
+<span id="L86">  <span class="const token" data-verso-hover="365">rpc</span> := <span class="const token" data-verso-hover="282">.</span>idle</span>
+<span id="L87">  <span class="const token" data-verso-hover="410">wv</span> := []</span>
+<span id="L88">  <span class="const token" data-verso-hover="362">tagA</span> _ := <span class="nu">0</span></span>
+<span id="L89">  <span class="const token" data-verso-hover="372">tagB</span> _ := <span class="nu">0</span></span>
+<span id="L90">  <span class="const token" data-verso-hover="378">sN1</span> := <span class="nu">0</span></span>
+<span id="L91">  <span class="const token" data-verso-hover="382">sT</span> := <span class="nu">0</span></span>
+<span id="L92">  <span class="const token" data-verso-hover="375">lo</span> := <span class="nu">0</span></span>
+<span id="L93">  <span class="const token" data-verso-hover="390">rf</span> := <span class="nu">0</span></span>
+<span id="L94">  <span class="const token" data-verso-hover="391">fl</span> := <span class="nu">0</span></span>
+<span id="L95">  <span class="const token" data-verso-hover="401">pis</span> := []</span>
+<span id="L96"></span>
+<span id="L97"><span class="dc">/-- Writer's internal step. -/</span></span>
+<span id="L98"><span class="kw">def</span> <span class="const token" data-verso-hover="433">stepW</span> (s : <span class="const token" data-verso-hover="350">St</span> K) : <span class="const token" data-verso-hover="350">St</span> K :=</span>
+<span id="L99">  <span class="kw">match</span> s.<span class="const token" data-verso-hover="352">wpc</span> <span class="kw">with</span></span>
+<span id="L100">  | <span class="const token" data-verso-hover="295">.</span>scanB v j =&gt; { s <span class="kw">with</span> <span class="const token" data-verso-hover="352">wpc</span> := <span class="const token" data-verso-hover="315">WPC.scanNext</span> v j (s.<span class="const token" data-verso-hover="369">Bm</span> j) }</span>
+<span id="L101">  | <span class="const token" data-verso-hover="296">.</span>rdF1 v =&gt; { s <span class="kw">with</span> <span class="const token" data-verso-hover="352">wpc</span> := <span class="kw">if</span> s.<span class="const token" data-verso-hover="364">f1</span> <span class="kw">then</span> <span class="const token" data-verso-hover="297">.</span>setB v <span class="kw">else</span> <span class="const token" data-verso-hover="301">.</span>setA v }</span>
+<span id="L102">  | <span class="const token" data-verso-hover="297">.</span>setB v =&gt; { s <span class="kw">with</span> <span class="const token" data-verso-hover="369">Bm</span> := <span class="const token" data-verso-hover="84">Function.update</span> s.<span class="const token" data-verso-hover="369">Bm</span> s.<span class="const token" data-verso-hover="357">last</span> <span class="const token" data-verso-hover="56">true</span>,</span>
+<span id="L103">                        <span class="const token" data-verso-hover="372">tagB</span> := <span class="const token" data-verso-hover="84">Function.update</span> s.<span class="const token" data-verso-hover="372">tagB</span> s.<span class="const token" data-verso-hover="357">last</span> s.<span class="const token" data-verso-hover="355">n</span>, <span class="const token" data-verso-hover="352">wpc</span> := <span class="const token" data-verso-hover="298">.</span>rdF2 v }</span>
+<span id="L104">  | <span class="const token" data-verso-hover="298">.</span>rdF2 v =&gt; { s <span class="kw">with</span> <span class="const token" data-verso-hover="352">wpc</span> := <span class="kw">if</span> s.<span class="const token" data-verso-hover="367">f2</span> <span class="kw">then</span> <span class="const token" data-verso-hover="300">.</span>clrB v <span class="kw">else</span> <span class="const token" data-verso-hover="299">.</span>rdF1' v }</span>
+<span id="L105">  | <span class="const token" data-verso-hover="299">.</span>rdF1' v =&gt; { s <span class="kw">with</span> <span class="const token" data-verso-hover="352">wpc</span> := <span class="kw">if</span> s.<span class="const token" data-verso-hover="364">f1</span> <span class="kw">then</span> <span class="const token" data-verso-hover="301">.</span>setA v <span class="kw">else</span> <span class="const token" data-verso-hover="300">.</span>clrB v }</span>
+<span id="L106">  | <span class="const token" data-verso-hover="300">.</span>clrB v =&gt; { s <span class="kw">with</span> <span class="const token" data-verso-hover="369">Bm</span> := <span class="const token" data-verso-hover="84">Function.update</span> s.<span class="const token" data-verso-hover="369">Bm</span> s.<span class="const token" data-verso-hover="357">last</span> <span class="const token" data-verso-hover="321">false</span>, <span class="const token" data-verso-hover="352">wpc</span> := <span class="const token" data-verso-hover="301">.</span>setA v }</span>
+<span id="L107">  | <span class="const token" data-verso-hover="301">.</span>setA v =&gt; { s <span class="kw">with</span> <span class="const token" data-verso-hover="360">A</span> := <span class="const token" data-verso-hover="84">Function.update</span> s.<span class="const token" data-verso-hover="360">A</span> v <span class="const token" data-verso-hover="56">true</span>, <span class="const token" data-verso-hover="362">tagA</span> := <span class="const token" data-verso-hover="84">Function.update</span> s.<span class="const token" data-verso-hover="362">tagA</span> v s.<span class="const token" data-verso-hover="355">n</span>,</span>
+<span id="L108">                        <span class="const token" data-verso-hover="352">wpc</span> := <span class="const token" data-verso-hover="317">WPC.afterSetA</span> v }</span>
+<span id="L109">  | <span class="const token" data-verso-hover="302">.</span>down v j =&gt; { s <span class="kw">with</span> <span class="const token" data-verso-hover="360">A</span> := <span class="const token" data-verso-hover="84">Function.update</span> s.<span class="const token" data-verso-hover="360">A</span> j <span class="const token" data-verso-hover="321">false</span>, <span class="const token" data-verso-hover="352">wpc</span> := <span class="const token" data-verso-hover="318">WPC.downNext</span> v j }</span>
+<span id="L110">  | <span class="const token" data-verso-hover="303">.</span>up v j =&gt; { s <span class="kw">with</span> <span class="const token" data-verso-hover="360">A</span> := <span class="const token" data-verso-hover="84">Function.update</span> s.<span class="const token" data-verso-hover="360">A</span> j <span class="const token" data-verso-hover="321">false</span>, <span class="const token" data-verso-hover="352">wpc</span> := <span class="const token" data-verso-hover="319">WPC.upNext</span> v j }</span>
+<span id="L111">  | _ =&gt; s</span>
+<span id="L112"></span>
+<span id="L113"><span class="dc">/-- Reader's internal step. -/</span></span>
+<span id="L114"><span class="kw">def</span> <span class="const token" data-verso-hover="435">stepR</span> (s : <span class="const token" data-verso-hover="350">St</span> K) : <span class="const token" data-verso-hover="350">St</span> K :=</span>
+<span id="L115">  <span class="kw">match</span> s.<span class="const token" data-verso-hover="365">rpc</span> <span class="kw">with</span></span>
+<span id="L116">  | <span class="const token" data-verso-hover="283">.</span>start =&gt; { s <span class="kw">with</span> <span class="const token" data-verso-hover="364">f1</span> := <span class="const token" data-verso-hover="56">true</span>, <span class="const token" data-verso-hover="365">rpc</span> := <span class="const token" data-verso-hover="284">.</span>up <span class="const token" data-verso-hover="321">false</span> <span class="nu">0</span>, <span class="const token" data-verso-hover="378">sN1</span> := s.<span class="const token" data-verso-hover="355">n</span>, <span class="const token" data-verso-hover="382">sT</span> := s.<span class="const token" data-verso-hover="379">nA</span> }</span>
+<span id="L117">  | <span class="const token" data-verso-hover="284">.</span>up snd j =&gt; { s <span class="kw">with</span> <span class="const token" data-verso-hover="365">rpc</span> := <span class="kw">if</span> s.<span class="const token" data-verso-hover="360">A</span> j <span class="kw">then</span> <span class="const token" data-verso-hover="310">RPC.found</span> j <span class="kw">else</span> <span class="const token" data-verso-hover="311">RPC.upNext</span> snd j,</span>
+<span id="L118">                          <span class="const token" data-verso-hover="390">rf</span> := <span class="kw">if</span> s.<span class="const token" data-verso-hover="360">A</span> j <span class="kw">then</span> s.<span class="const token" data-verso-hover="362">tagA</span> j <span class="kw">else</span> s.<span class="const token" data-verso-hover="390">rf</span>,</span>
+<span id="L119">                          <span class="const token" data-verso-hover="382">sT</span> := <span class="kw">if</span> s.<span class="const token" data-verso-hover="360">A</span> j = <span class="const token" data-verso-hover="321">false</span> ∧ snd = <span class="const token" data-verso-hover="321">false</span> ∧ ¬ (j.<span class="const token" data-verso-hover="35">val</span> + <span class="nu">1</span> &lt; K) <span class="kw">then</span> s.<span class="const token" data-verso-hover="379">nA</span></span>
+<span id="L120">                            <span class="kw">else</span> s.<span class="const token" data-verso-hover="382">sT</span> }</span>
+<span id="L121">  | <span class="const token" data-verso-hover="285">.</span>down val j =&gt; { s <span class="kw">with</span> <span class="const token" data-verso-hover="365">rpc</span> := <span class="const token" data-verso-hover="312">RPC.downNext</span> val j (s.<span class="const token" data-verso-hover="360">A</span> j),</span>
+<span id="L122">                            <span class="const token" data-verso-hover="390">rf</span> := <span class="kw">if</span> s.<span class="const token" data-verso-hover="360">A</span> j <span class="kw">then</span> s.<span class="const token" data-verso-hover="362">tagA</span> j <span class="kw">else</span> s.<span class="const token" data-verso-hover="390">rf</span> }</span>
+<span id="L123">  | <span class="const token" data-verso-hover="286">.</span>bscan j val =&gt; { s <span class="kw">with</span> <span class="const token" data-verso-hover="365">rpc</span> := <span class="const token" data-verso-hover="313">RPC.bscanNext</span> j val (s.<span class="const token" data-verso-hover="369">Bm</span> j),</span>
+<span id="L124">                             <span class="const token" data-verso-hover="390">rf</span> := <span class="kw">if</span> s.<span class="const token" data-verso-hover="369">Bm</span> j <span class="kw">then</span> s.<span class="const token" data-verso-hover="372">tagB</span> j - <span class="nu">1</span> <span class="kw">else</span> s.<span class="const token" data-verso-hover="390">rf</span> }</span>
+<span id="L125">  | <span class="const token" data-verso-hover="288">.</span>setF2 val =&gt; { s <span class="kw">with</span> <span class="const token" data-verso-hover="367">f2</span> := <span class="const token" data-verso-hover="56">true</span>, <span class="const token" data-verso-hover="365">rpc</span> := <span class="const token" data-verso-hover="289">.</span>clr <span class="nu">0</span> val }</span>
+<span id="L126">  | <span class="const token" data-verso-hover="289">.</span>clr j val =&gt; { s <span class="kw">with</span> <span class="const token" data-verso-hover="369">Bm</span> := <span class="const token" data-verso-hover="84">Function.update</span> s.<span class="const token" data-verso-hover="369">Bm</span> j <span class="const token" data-verso-hover="321">false</span>, <span class="const token" data-verso-hover="365">rpc</span> := <span class="const token" data-verso-hover="314">RPC.clrNext</span> j val }</span>
+<span id="L127">  | <span class="const token" data-verso-hover="290">.</span>resF1 val =&gt; { s <span class="kw">with</span> <span class="const token" data-verso-hover="364">f1</span> := <span class="const token" data-verso-hover="321">false</span>, <span class="const token" data-verso-hover="365">rpc</span> := <span class="const token" data-verso-hover="291">.</span>resF2 val }</span>
+<span id="L128">  | <span class="const token" data-verso-hover="291">.</span>resF2 val =&gt; { s <span class="kw">with</span> <span class="const token" data-verso-hover="367">f2</span> := <span class="const token" data-verso-hover="321">false</span>, <span class="const token" data-verso-hover="365">rpc</span> := <span class="const token" data-verso-hover="292">.</span>done val }</span>
+<span id="L129">  | _ =&gt; s</span>
+<span id="L130"></span>
+<span id="L131"><span class="kw">variable</span> (v₀ : <span class="const token" data-verso-hover="30">Fin</span> K)</span>
+<span id="L132"></span>
+<span id="L133"><span class="dc">/-- The abstract transition function. -/</span></span>
+<span id="L134"><span class="kw">def</span> <span class="const token" data-verso-hover="442">sstep</span> (s : <span class="const token" data-verso-hover="350">St</span> K) : <span class="const token" data-verso-hover="330">Lbl</span> v₀ → <span class="const token" data-verso-hover="350">St</span> K</span>
+<span id="L135">  | <span class="const token" data-verso-hover="81">.</span>inv <span class="const token" data-verso-hover="272">.</span>w (<span class="const token" data-verso-hover="53">.</span>write v) =&gt; { s <span class="kw">with</span> <span class="const token" data-verso-hover="352">wpc</span> := <span class="const token" data-verso-hover="295">.</span>scanB v <span class="nu">0</span>, <span class="const token" data-verso-hover="410">wv</span> := s.<span class="const token" data-verso-hover="410">wv</span> ++ [v] }</span>
+<span id="L136">  | <span class="const token" data-verso-hover="81">.</span>inv <span class="const token" data-verso-hover="273">.</span>r <span class="const token" data-verso-hover="55">.</span>read =&gt; { s <span class="kw">with</span> <span class="const token" data-verso-hover="365">rpc</span> := <span class="const token" data-verso-hover="283">.</span>start, <span class="const token" data-verso-hover="375">lo</span> := s.<span class="const token" data-verso-hover="358">c</span> }</span>
+<span id="L137">  | <span class="const token" data-verso-hover="81">.</span>inv _ _ =&gt; s</span>
+<span id="L138">  | <span class="const token" data-verso-hover="82">.</span>tau <span class="const token" data-verso-hover="272">.</span>w =&gt; <span class="const token" data-verso-hover="433">stepW</span> s</span>
+<span id="L139">  | <span class="const token" data-verso-hover="82">.</span>tau <span class="const token" data-verso-hover="273">.</span>r =&gt; <span class="const token" data-verso-hover="435">stepR</span> s</span>
+<span id="L140">  | <span class="const token" data-verso-hover="86">.</span>ret <span class="const token" data-verso-hover="272">.</span>w _ =&gt;</span>
+<span id="L141">    <span class="kw">match</span> s.<span class="const token" data-verso-hover="352">wpc</span> <span class="kw">with</span></span>
+<span id="L142">    | <span class="const token" data-verso-hover="304">.</span>done v =&gt; { s <span class="kw">with</span> <span class="const token" data-verso-hover="357">last</span> := v, <span class="const token" data-verso-hover="352">wpc</span> := <span class="const token" data-verso-hover="294">.</span>idle }</span>
+<span id="L143">    | _ =&gt; s</span>
+<span id="L144">  | <span class="const token" data-verso-hover="86">.</span>ret <span class="const token" data-verso-hover="273">.</span>r _ =&gt;</span>
+<span id="L145">    <span class="kw">match</span> s.<span class="const token" data-verso-hover="365">rpc</span> <span class="kw">with</span></span>
+<span id="L146">    | <span class="const token" data-verso-hover="292">.</span>done _ =&gt; { s <span class="kw">with</span> <span class="const token" data-verso-hover="365">rpc</span> := <span class="const token" data-verso-hover="282">.</span>idle, <span class="const token" data-verso-hover="401">pis</span> := s.<span class="const token" data-verso-hover="401">pis</span> ++ [s.<span class="const token" data-verso-hover="390">rf</span>], <span class="const token" data-verso-hover="391">fl</span> := s.<span class="const token" data-verso-hover="390">rf</span> }</span>
+<span id="L147">    | _ =&gt; s</span>
+<span id="L148"></span>
+<span id="L149"><span class="dc">/-- The abstract state (with ghost variables) at the end of an execution. -/</span></span>
+<span id="L150"><span class="kw">def</span> <span class="const token" data-verso-hover="443">sOf</span> (α : <span class="const token" data-verso-hover="78">List</span> (<span class="const token" data-verso-hover="330">Lbl</span> v₀)) : <span class="const token" data-verso-hover="350">St</span> K := α.<span class="const token" data-verso-hover="522">foldl</span> (<span class="const token" data-verso-hover="442">sstep</span> v₀) (<span class="const token" data-verso-hover="404">St.init</span> v₀)</span>
+<span id="L151"></span>
+<span id="L152"><span class="dc">/-- Which labels are enabled in an abstract state. -/</span></span>
+<span id="L153"><span class="kw">def</span> <span class="const token" data-verso-hover="441">Enabled</span> (s : <span class="const token" data-verso-hover="350">St</span> K) : <span class="const token" data-verso-hover="330">Lbl</span> v₀ → <span class="kw">Prop</span></span>
+<span id="L154">  | <span class="const token" data-verso-hover="81">.</span>inv <span class="const token" data-verso-hover="272">.</span>w o =&gt; s.<span class="const token" data-verso-hover="352">wpc</span> = <span class="const token" data-verso-hover="294">.</span>idle ∧ ∃ v, o = <span class="const token" data-verso-hover="53">.</span>write v</span>
+<span id="L155">  | <span class="const token" data-verso-hover="81">.</span>inv <span class="const token" data-verso-hover="273">.</span>r o =&gt; s.<span class="const token" data-verso-hover="365">rpc</span> = <span class="const token" data-verso-hover="282">.</span>idle ∧ o = <span class="const token" data-verso-hover="55">.</span>read</span>
+<span id="L156">  | <span class="const token" data-verso-hover="82">.</span>tau <span class="const token" data-verso-hover="272">.</span>w =&gt; s.<span class="const token" data-verso-hover="352">wpc</span> ≠ <span class="const token" data-verso-hover="294">.</span>idle ∧ ∀ v, s.<span class="const token" data-verso-hover="352">wpc</span> ≠ <span class="const token" data-verso-hover="304">.</span>done v</span>
+<span id="L157">  | <span class="const token" data-verso-hover="82">.</span>tau <span class="const token" data-verso-hover="273">.</span>r =&gt; s.<span class="const token" data-verso-hover="365">rpc</span> ≠ <span class="const token" data-verso-hover="282">.</span>idle ∧ ∀ val, s.<span class="const token" data-verso-hover="365">rpc</span> ≠ <span class="const token" data-verso-hover="292">.</span>done val</span>
+<span id="L158">  | <span class="const token" data-verso-hover="86">.</span>ret <span class="const token" data-verso-hover="272">.</span>w x =&gt; s.<span class="const token" data-verso-hover="352">wpc</span> = <span class="const token" data-verso-hover="304">.</span>done x</span>
+<span id="L159">  | <span class="const token" data-verso-hover="86">.</span>ret <span class="const token" data-verso-hover="273">.</span>r x =&gt; ∃ val, s.<span class="const token" data-verso-hover="365">rpc</span> = <span class="const token" data-verso-hover="292">.</span>done val ∧ x = val.<span class="const token" data-verso-hover="323">getD</span> v₀</span>
+<span id="L160"></span>
+<span id="L161"><span class="dc">/-- The concrete configuration corresponds to the abstract state. -/</span></span>
+<span id="L162"><span class="kw">structure</span> <span class="const token" data-verso-hover="523">Rel</span> (C : <span class="const token" data-verso-hover="329">Cfg</span> v₀) (s : <span class="const token" data-verso-hover="350">St</span> K) : <span class="kw">Prop</span> <span class="kw">where</span></span>
+<span id="L163">  <span class="const token" data-verso-hover="524">memA</span> : ∀ j, C.<span class="const token" data-verso-hover="85">mem</span> (<span class="const token" data-verso-hover="275">.</span>a j) = s.<span class="const token" data-verso-hover="360">A</span> j</span>
+<span id="L164">  <span class="const token" data-verso-hover="525">memB</span> : ∀ j, C.<span class="const token" data-verso-hover="85">mem</span> (<span class="const token" data-verso-hover="276">.</span>b j) = s.<span class="const token" data-verso-hover="369">Bm</span> j</span>
+<span id="L165">  <span class="const token" data-verso-hover="526">memF1</span> : C.<span class="const token" data-verso-hover="85">mem</span> <span class="const token" data-verso-hover="277">.</span>f1 = s.<span class="const token" data-verso-hover="364">f1</span></span>
+<span id="L166">  <span class="const token" data-verso-hover="527">memF2</span> : C.<span class="const token" data-verso-hover="85">mem</span> <span class="const token" data-verso-hover="278">.</span>f2 = s.<span class="const token" data-verso-hover="367">f2</span></span>
+<span id="L167">  <span class="const token" data-verso-hover="528">last</span> : (C.<span class="const token" data-verso-hover="83">loc</span> <span class="const token" data-verso-hover="272">.</span>w).<span class="const token" data-verso-hover="306">last</span> = s.<span class="const token" data-verso-hover="357">last</span></span>
+<span id="L168">  <span class="const token" data-verso-hover="529">wpc</span> : (C.<span class="const token" data-verso-hover="83">loc</span> <span class="const token" data-verso-hover="272">.</span>w).<span class="const token" data-verso-hover="307">wpc</span> = s.<span class="const token" data-verso-hover="352">wpc</span></span>
+<span id="L169">  <span class="const token" data-verso-hover="530">rpc</span> : (C.<span class="const token" data-verso-hover="83">loc</span> <span class="const token" data-verso-hover="273">.</span>r).<span class="const token" data-verso-hover="308">rpc</span> = s.<span class="const token" data-verso-hover="365">rpc</span></span>
+<span id="L170">  <span class="const token" data-verso-hover="531">pendW</span> : C.<span class="const token" data-verso-hover="113">pend</span> <span class="const token" data-verso-hover="272">.</span>w = <span class="const token" data-verso-hover="90">none</span> ↔ s.<span class="const token" data-verso-hover="352">wpc</span> = <span class="const token" data-verso-hover="294">.</span>idle</span>
+<span id="L171">  <span class="const token" data-verso-hover="532">pendR</span> : C.<span class="const token" data-verso-hover="113">pend</span> <span class="const token" data-verso-hover="273">.</span>r = <span class="const token" data-verso-hover="90">none</span> ↔ s.<span class="const token" data-verso-hover="365">rpc</span> = <span class="const token" data-verso-hover="282">.</span>idle</span>
+<span id="L172"></span>
+<span id="L173"><span class="kw">lemma</span> <span class="const token" data-verso-hover="533">rel_init</span> : <span class="const token" data-verso-hover="523">Rel</span> v₀ (<span class="const token" data-verso-hover="328">alg4</span> v₀).<span class="const token" data-verso-hover="92">initCfg</span> (<span class="const token" data-verso-hover="404">St.init</span> v₀) <span class="kw">where</span></span>
+<span id="L174">  <span class="const token" data-verso-hover="524">memA</span> j := <span class="const token" data-verso-hover="133">rfl</span></span>
+<span id="L175">  <span class="const token" data-verso-hover="525">memB</span> j := <span class="const token" data-verso-hover="133">rfl</span></span>
+<span id="L176">  <span class="const token" data-verso-hover="526">memF1</span> := <span class="const token" data-verso-hover="133">rfl</span></span>
+<span id="L177">  <span class="const token" data-verso-hover="527">memF2</span> := <span class="const token" data-verso-hover="133">rfl</span></span>
+<span id="L178">  <span class="const token" data-verso-hover="528">last</span> := <span class="const token" data-verso-hover="133">rfl</span></span>
+<span id="L179">  <span class="const token" data-verso-hover="529">wpc</span> := <span class="const token" data-verso-hover="133">rfl</span></span>
+<span id="L180">  <span class="const token" data-verso-hover="530">rpc</span> := <span class="const token" data-verso-hover="133">rfl</span></span>
+<span id="L181">  <span class="const token" data-verso-hover="531">pendW</span> := <span class="kw">by</span> <span class="kw">simp</span> [<span class="const token" data-verso-hover="92">Impl.initCfg</span>, <span class="const token" data-verso-hover="404">St.init</span>]</span>
+<span id="L182">  <span class="const token" data-verso-hover="532">pendR</span> := <span class="kw">by</span> <span class="kw">simp</span> [<span class="const token" data-verso-hover="92">Impl.initCfg</span>, <span class="const token" data-verso-hover="404">St.init</span>]</span>
+<span id="L183"></span>
+<span id="L184"><span class="dc">/-! ### Simulation -/</span></span>
+<span id="L185"></span>
+<span id="L186">@[<span class="kw">simp</span>] <span class="kw">lemma</span> <span class="const token" data-verso-hover="534">RPC.found_ne_idle</span> (j : <span class="const token" data-verso-hover="30">Fin</span> K) : <span class="const token" data-verso-hover="310">RPC.found</span> j ≠ <span class="const token" data-verso-hover="282">.</span>idle := <span class="kw">by</span></span>
+<span id="L187">  <span class="kw">unfold</span> <span class="const token" data-verso-hover="310">RPC.found</span>; <span class="kw">split</span> &lt;;&gt; <span class="kw">simp</span></span>
+<span id="L188">@[<span class="kw">simp</span>] <span class="kw">lemma</span> <span class="const token" data-verso-hover="535">RPC.upNext_ne_idle</span> (b : <span class="const token" data-verso-hover="243">Bool</span>) (j : <span class="const token" data-verso-hover="30">Fin</span> K) : <span class="const token" data-verso-hover="311">RPC.upNext</span> b j ≠ <span class="const token" data-verso-hover="282">.</span>idle := <span class="kw">by</span></span>
+<span id="L189">  <span class="kw">unfold</span> <span class="const token" data-verso-hover="311">RPC.upNext</span>; <span class="kw">split</span> &lt;;&gt; [<span class="kw">simp</span>; <span class="kw">split</span> &lt;;&gt; <span class="kw">simp</span>]</span>
+<span id="L190">@[<span class="kw">simp</span>] <span class="kw">lemma</span> <span class="const token" data-verso-hover="536">RPC.downNext_ne_idle</span> (val j : <span class="const token" data-verso-hover="30">Fin</span> K) (x : <span class="const token" data-verso-hover="243">Bool</span>) : <span class="const token" data-verso-hover="312">RPC.downNext</span> val j x ≠ <span class="const token" data-verso-hover="282">.</span>idle := <span class="kw">by</span></span>
+<span id="L191">  <span class="kw">unfold</span> <span class="const token" data-verso-hover="312">RPC.downNext</span>; <span class="kw">split</span> &lt;;&gt; <span class="kw">simp</span></span>
+<span id="L192">@[<span class="kw">simp</span>] <span class="kw">lemma</span> <span class="const token" data-verso-hover="537">RPC.bscanNext_ne_idle</span> (j : <span class="const token" data-verso-hover="30">Fin</span> K) (val) (x : <span class="const token" data-verso-hover="243">Bool</span>) :</span>
+<span id="L193">    <span class="const token" data-verso-hover="313">RPC.bscanNext</span> j val x ≠ <span class="const token" data-verso-hover="282">.</span>idle := <span class="kw">by</span></span>
+<span id="L194">  <span class="kw">unfold</span> <span class="const token" data-verso-hover="313">RPC.bscanNext</span>; <span class="kw">split</span> &lt;;&gt; <span class="kw">simp</span></span>
+<span id="L195">@[<span class="kw">simp</span>] <span class="kw">lemma</span> <span class="const token" data-verso-hover="538">RPC.clrNext_ne_idle</span> (j : <span class="const token" data-verso-hover="30">Fin</span> K) (val) : <span class="const token" data-verso-hover="314">RPC.clrNext</span> j val ≠ <span class="const token" data-verso-hover="282">.</span>idle := <span class="kw">by</span></span>
+<span id="L196">  <span class="kw">unfold</span> <span class="const token" data-verso-hover="314">RPC.clrNext</span>; <span class="kw">split</span> &lt;;&gt; <span class="kw">simp</span></span>
+<span id="L197">@[<span class="kw">simp</span>] <span class="kw">lemma</span> <span class="const token" data-verso-hover="539">WPC.scanNext_ne_idle</span> (v j : <span class="const token" data-verso-hover="30">Fin</span> K) (x : <span class="const token" data-verso-hover="243">Bool</span>) : <span class="const token" data-verso-hover="315">WPC.scanNext</span> v j x ≠ <span class="const token" data-verso-hover="294">.</span>idle := <span class="kw">by</span></span>
+<span id="L198">  <span class="kw">unfold</span> <span class="const token" data-verso-hover="315">WPC.scanNext</span>; <span class="kw">split</span> &lt;;&gt; [<span class="kw">simp</span>; <span class="kw">split</span> &lt;;&gt; <span class="kw">simp</span>]</span>
+<span id="L199">@[<span class="kw">simp</span>] <span class="kw">lemma</span> <span class="const token" data-verso-hover="540">WPC.upFrom_ne_idle</span> (v : <span class="const token" data-verso-hover="30">Fin</span> K) (j : <span class="const token" data-verso-hover="28">ℕ</span>) : <span class="const token" data-verso-hover="316">WPC.upFrom</span> v j ≠ <span class="const token" data-verso-hover="294">.</span>idle := <span class="kw">by</span></span>
+<span id="L200">  <span class="kw">unfold</span> <span class="const token" data-verso-hover="316">WPC.upFrom</span>; <span class="kw">split</span> &lt;;&gt; <span class="kw">simp</span></span>
+<span id="L201">@[<span class="kw">simp</span>] <span class="kw">lemma</span> <span class="const token" data-verso-hover="541">WPC.afterSetA_ne_idle</span> (v : <span class="const token" data-verso-hover="30">Fin</span> K) : <span class="const token" data-verso-hover="317">WPC.afterSetA</span> v ≠ <span class="const token" data-verso-hover="294">.</span>idle := <span class="kw">by</span></span>
+<span id="L202">  <span class="kw">unfold</span> <span class="const token" data-verso-hover="317">WPC.afterSetA</span>; <span class="kw">split</span> &lt;;&gt; <span class="kw">simp</span></span>
+<span id="L203">@[<span class="kw">simp</span>] <span class="kw">lemma</span> <span class="const token" data-verso-hover="542">WPC.downNext_ne_idle</span> (v j : <span class="const token" data-verso-hover="30">Fin</span> K) : <span class="const token" data-verso-hover="318">WPC.downNext</span> v j ≠ <span class="const token" data-verso-hover="294">.</span>idle := <span class="kw">by</span></span>
+<span id="L204">  <span class="kw">unfold</span> <span class="const token" data-verso-hover="318">WPC.downNext</span>; <span class="kw">split</span> &lt;;&gt; <span class="kw">simp</span></span>
+<span id="L205">@[<span class="kw">simp</span>] <span class="kw">lemma</span> <span class="const token" data-verso-hover="543">WPC.upNext_ne_idle</span> (v j : <span class="const token" data-verso-hover="30">Fin</span> K) : <span class="const token" data-verso-hover="319">WPC.upNext</span> v j ≠ <span class="const token" data-verso-hover="294">.</span>idle := <span class="kw">by</span></span>
+<span id="L206">  <span class="kw">unfold</span> <span class="const token" data-verso-hover="319">WPC.upNext</span>; <span class="kw">simp</span></span>
+<span id="L207"></span>
+<span id="L208"><span class="kw">lemma</span> <span class="const token" data-verso-hover="544">rel_step</span> {C C' : <span class="const token" data-verso-hover="329">Cfg</span> v₀} {s : <span class="const token" data-verso-hover="350">St</span> K} {ℓ : <span class="const token" data-verso-hover="330">Lbl</span> v₀} (hR : <span class="const token" data-verso-hover="523">Rel</span> v₀ C s)</span>
+<span id="L209">    (h : (<span class="const token" data-verso-hover="328">alg4</span> v₀).<span class="const token" data-verso-hover="88">step</span> C ℓ = <span class="const token" data-verso-hover="89">some</span> C') : <span class="const token" data-verso-hover="441">Enabled</span> v₀ s ℓ ∧ <span class="const token" data-verso-hover="523">Rel</span> v₀ C' (<span class="const token" data-verso-hover="442">sstep</span> v₀ s ℓ) := <span class="kw">by</span></span>
+<span id="L210">  <span class="kw">cases</span> ℓ <span class="kw">with</span></span>
+<span id="L211">  | <span class="const token" data-verso-hover="81">inv</span> p o =&gt;</span>
+<span id="L212">    <span class="kw">obtain</span> ⟨hp, hal, hpend, hloc, hmem⟩ := <span class="const token" data-verso-hover="160">Impl.step_inv</span> h</span>
+<span id="L213">    <span class="kw">rcases</span> hal <span class="kw">with</span> ⟨<span class="kw">rfl</span>, v, <span class="kw">rfl</span>⟩ | ⟨<span class="kw">rfl</span>, <span class="kw">rfl</span>⟩</span>
+<span id="L214">    · <span class="kw">have</span> hw := hR.<span class="const token" data-verso-hover="531">pendW</span>.<span class="const token" data-verso-hover="145">1</span> hp</span>
+<span id="L215">      <span class="kw">refine</span> ⟨⟨hw, v, <span class="const token" data-verso-hover="133">rfl</span>⟩, ?_⟩</span>
+<span id="L216">      <span class="kw">constructor</span> &lt;;&gt; <span class="kw">simp</span> [<span class="const token" data-verso-hover="442">sstep</span>, hmem, hloc, hpend, hR.<span class="const token" data-verso-hover="524">memA</span>, hR.<span class="const token" data-verso-hover="525">memB</span>, hR.<span class="const token" data-verso-hover="526">memF1</span>, hR.<span class="const token" data-verso-hover="527">memF2</span>,</span>
+<span id="L217">        hR.<span class="const token" data-verso-hover="528">last</span>, hR.<span class="const token" data-verso-hover="530">rpc</span>, hR.<span class="const token" data-verso-hover="532">pendR</span>, <span class="const token" data-verso-hover="328">alg4</span>, <span class="const token" data-verso-hover="325">invoke</span>]</span>
+<span id="L218">    · <span class="kw">have</span> hr := hR.<span class="const token" data-verso-hover="532">pendR</span>.<span class="const token" data-verso-hover="145">1</span> hp</span>
+<span id="L219">      <span class="kw">refine</span> ⟨⟨hr, <span class="const token" data-verso-hover="133">rfl</span>⟩, ?_⟩</span>
+<span id="L220">      <span class="kw">constructor</span> &lt;;&gt; <span class="kw">simp</span> [<span class="const token" data-verso-hover="442">sstep</span>, hmem, hloc, hpend, hR.<span class="const token" data-verso-hover="524">memA</span>, hR.<span class="const token" data-verso-hover="525">memB</span>, hR.<span class="const token" data-verso-hover="526">memF1</span>, hR.<span class="const token" data-verso-hover="527">memF2</span>,</span>
+<span id="L221">        hR.<span class="const token" data-verso-hover="528">last</span>, hR.<span class="const token" data-verso-hover="529">wpc</span>, hR.<span class="const token" data-verso-hover="531">pendW</span>, <span class="const token" data-verso-hover="328">alg4</span>, <span class="const token" data-verso-hover="325">invoke</span>]</span>
+<span id="L222">  | <span class="const token" data-verso-hover="82">tau</span> p =&gt;</span>
+<span id="L223">    <span class="kw">obtain</span> ⟨hp, hpend, i, o, k, hact, hmem, hloc⟩ := <span class="const token" data-verso-hover="195">Impl.step_tau</span> h</span>
+<span id="L224">    <span class="kw">cases</span> p <span class="kw">with</span></span>
+<span id="L225">    | <span class="const token" data-verso-hover="272">w</span> =&gt;</span>
+<span id="L226">      <span class="kw">have</span> hw : s.<span class="const token" data-verso-hover="352">wpc</span> ≠ <span class="const token" data-verso-hover="294">.</span>idle := <span class="kw">fun</span> h' =&gt; hp (hR.<span class="const token" data-verso-hover="531">pendW</span>.<span class="const token" data-verso-hover="252">2</span> h')</span>
+<span id="L227">      <span class="kw">simp</span> only [<span class="const token" data-verso-hover="328">alg4</span>, <span class="const token" data-verso-hover="324">act</span>, <span class="const token" data-verso-hover="320">actW</span>, hR.<span class="const token" data-verso-hover="529">wpc</span>] <span class="kw">at</span> hact</span>
+<span id="L228">      <span class="kw">cases</span> hs : s.<span class="const token" data-verso-hover="352">wpc</span> &lt;;&gt; <span class="kw">simp</span> only [hs] <span class="kw">at</span> hact &lt;;&gt; <span class="kw">cases</span> hact</span>
+<span id="L229">      <span class="kw">all_goals</span> <span class="kw">refine</span> ⟨⟨hw, <span class="kw">by</span> <span class="kw">simp</span> [hs]⟩, ?_⟩</span>
+<span id="L230">      <span class="kw">all_goals</span> <span class="kw">constructor</span> &lt;;&gt; <span class="kw">simp</span> [<span class="const token" data-verso-hover="442">sstep</span>, <span class="const token" data-verso-hover="433">stepW</span>, hs, hmem, hloc, hpend, hR.<span class="const token" data-verso-hover="524">memA</span>, hR.<span class="const token" data-verso-hover="525">memB</span>,</span>
+<span id="L231">        hR.<span class="const token" data-verso-hover="526">memF1</span>, hR.<span class="const token" data-verso-hover="527">memF2</span>, hR.<span class="const token" data-verso-hover="528">last</span>, hR.<span class="const token" data-verso-hover="530">rpc</span>, hR.<span class="const token" data-verso-hover="532">pendR</span>, hR.<span class="const token" data-verso-hover="531">pendW</span>, <span class="const token" data-verso-hover="197">Function.update_apply</span>] &lt;;&gt;</span>
+<span id="L232">        <span class="kw">split</span> &lt;;&gt; <span class="kw">simp</span></span>
+<span id="L233">    | <span class="const token" data-verso-hover="273">r</span> =&gt;</span>
+<span id="L234">      <span class="kw">have</span> hr : s.<span class="const token" data-verso-hover="365">rpc</span> ≠ <span class="const token" data-verso-hover="282">.</span>idle := <span class="kw">fun</span> h' =&gt; hp (hR.<span class="const token" data-verso-hover="532">pendR</span>.<span class="const token" data-verso-hover="252">2</span> h')</span>
+<span id="L235">      <span class="kw">simp</span> only [<span class="const token" data-verso-hover="328">alg4</span>, <span class="const token" data-verso-hover="324">act</span>, <span class="const token" data-verso-hover="322">actR</span>, hR.<span class="const token" data-verso-hover="530">rpc</span>] <span class="kw">at</span> hact</span>
+<span id="L236">      <span class="kw">cases</span> hs : s.<span class="const token" data-verso-hover="365">rpc</span> &lt;;&gt; <span class="kw">simp</span> only [hs] <span class="kw">at</span> hact &lt;;&gt; <span class="kw">cases</span> hact</span>
+<span id="L237">      <span class="kw">all_goals</span> <span class="kw">refine</span> ⟨⟨hr, <span class="kw">by</span> <span class="kw">simp</span> [hs]⟩, ?_⟩</span>
+<span id="L238">      <span class="kw">all_goals</span> <span class="kw">constructor</span> &lt;;&gt; <span class="kw">simp</span> [<span class="const token" data-verso-hover="442">sstep</span>, <span class="const token" data-verso-hover="435">stepR</span>, hs, hmem, hloc, hpend, hR.<span class="const token" data-verso-hover="524">memA</span>, hR.<span class="const token" data-verso-hover="525">memB</span>,</span>
+<span id="L239">        hR.<span class="const token" data-verso-hover="526">memF1</span>, hR.<span class="const token" data-verso-hover="527">memF2</span>, hR.<span class="const token" data-verso-hover="528">last</span>, hR.<span class="const token" data-verso-hover="529">wpc</span>, hR.<span class="const token" data-verso-hover="532">pendR</span>, hR.<span class="const token" data-verso-hover="531">pendW</span>, <span class="const token" data-verso-hover="197">Function.update_apply</span>] &lt;;&gt;</span>
+<span id="L240">        <span class="kw">split</span> &lt;;&gt; <span class="kw">simp</span></span>
+<span id="L241">  | <span class="const token" data-verso-hover="86">ret</span> p x =&gt;</span>
+<span id="L242">    <span class="kw">obtain</span> ⟨hp, hpend, hmem, l, hact, hloc⟩ := <span class="const token" data-verso-hover="173">Impl.step_ret</span> h</span>
+<span id="L243">    <span class="kw">cases</span> p <span class="kw">with</span></span>
+<span id="L244">    | <span class="const token" data-verso-hover="272">w</span> =&gt;</span>
+<span id="L245">      <span class="kw">simp</span> only [<span class="const token" data-verso-hover="328">alg4</span>, <span class="const token" data-verso-hover="324">act</span>, <span class="const token" data-verso-hover="320">actW</span>, hR.<span class="const token" data-verso-hover="529">wpc</span>] <span class="kw">at</span> hact</span>
+<span id="L246">      <span class="kw">cases</span> hs : s.<span class="const token" data-verso-hover="352">wpc</span></span>
+<span id="L247">      · <span class="kw">exact</span> <span class="const token" data-verso-hover="169">absurd</span> (hR.<span class="const token" data-verso-hover="531">pendW</span>.<span class="const token" data-verso-hover="252">2</span> hs) hp</span>
+<span id="L248">      <span class="kw">all_goals</span> <span class="kw">simp</span> only [hs] <span class="kw">at</span> hact; <span class="kw">cases</span> hact</span>
+<span id="L249">      <span class="kw">refine</span> ⟨hs, ?_⟩</span>
+<span id="L250">      <span class="kw">constructor</span> &lt;;&gt; <span class="kw">simp</span> [<span class="const token" data-verso-hover="442">sstep</span>, hs, hmem, hloc, hpend, hR.<span class="const token" data-verso-hover="524">memA</span>, hR.<span class="const token" data-verso-hover="525">memB</span>,</span>
+<span id="L251">        hR.<span class="const token" data-verso-hover="526">memF1</span>, hR.<span class="const token" data-verso-hover="527">memF2</span>, hR.<span class="const token" data-verso-hover="530">rpc</span>, hR.<span class="const token" data-verso-hover="532">pendR</span>]</span>
+<span id="L252">    | <span class="const token" data-verso-hover="273">r</span> =&gt;</span>
+<span id="L253">      <span class="kw">simp</span> only [<span class="const token" data-verso-hover="328">alg4</span>, <span class="const token" data-verso-hover="324">act</span>, <span class="const token" data-verso-hover="322">actR</span>, hR.<span class="const token" data-verso-hover="530">rpc</span>] <span class="kw">at</span> hact</span>
+<span id="L254">      <span class="kw">cases</span> hs : s.<span class="const token" data-verso-hover="365">rpc</span></span>
+<span id="L255">      · <span class="kw">exact</span> <span class="const token" data-verso-hover="169">absurd</span> (hR.<span class="const token" data-verso-hover="532">pendR</span>.<span class="const token" data-verso-hover="252">2</span> hs) hp</span>
+<span id="L256">      <span class="kw">all_goals</span> <span class="kw">simp</span> only [hs] <span class="kw">at</span> hact; <span class="kw">cases</span> hact</span>
+<span id="L257">      <span class="kw">refine</span> ⟨⟨_, hs, <span class="const token" data-verso-hover="133">rfl</span>⟩, ?_⟩</span>
+<span id="L258">      <span class="kw">constructor</span> &lt;;&gt; <span class="kw">simp</span> [<span class="const token" data-verso-hover="442">sstep</span>, hs, hmem, hloc, hpend, hR.<span class="const token" data-verso-hover="524">memA</span>, hR.<span class="const token" data-verso-hover="525">memB</span>,</span>
+<span id="L259">        hR.<span class="const token" data-verso-hover="526">memF1</span>, hR.<span class="const token" data-verso-hover="527">memF2</span>, hR.<span class="const token" data-verso-hover="528">last</span>, hR.<span class="const token" data-verso-hover="529">wpc</span>, hR.<span class="const token" data-verso-hover="531">pendW</span>]</span>
+<span id="L260"></span>
+<span id="L261"><span class="dc">/-- The abstract state of an execution corresponds to its final configuration, and every step</span></span>
+<span id="L262"><span class="dc">of a valid execution is enabled in the abstract state before it. -/</span></span>
+<span id="L263"><span class="kw">lemma</span> <span class="const token" data-verso-hover="545">rel_runFrom</span> {C C' : <span class="const token" data-verso-hover="329">Cfg</span> v₀} {s : <span class="const token" data-verso-hover="350">St</span> K} (hR : <span class="const token" data-verso-hover="523">Rel</span> v₀ C s) {α : <span class="const token" data-verso-hover="78">List</span> (<span class="const token" data-verso-hover="330">Lbl</span> v₀)}</span>
+<span id="L264">    (h : (<span class="const token" data-verso-hover="328">alg4</span> v₀).<span class="const token" data-verso-hover="96">runFrom</span> C α = <span class="const token" data-verso-hover="89">some</span> C') : <span class="const token" data-verso-hover="523">Rel</span> v₀ C' (α.<span class="const token" data-verso-hover="522">foldl</span> (<span class="const token" data-verso-hover="442">sstep</span> v₀) s) := <span class="kw">by</span></span>
+<span id="L265">  <span class="kw">induction</span> α generalizing C s <span class="kw">with</span></span>
+<span id="L266">  | <span class="const token" data-verso-hover="97">nil</span> =&gt; <span class="kw">simp</span> <span class="kw">at</span> h; <span class="kw">subst</span> h; <span class="kw">exact</span> hR</span>
+<span id="L267">  | <span class="const token" data-verso-hover="98">cons</span> ℓ α ih =&gt;</span>
+<span id="L268">    <span class="kw">simp</span> only [<span class="const token" data-verso-hover="99">Impl.runFrom_cons</span>] <span class="kw">at</span> h</span>
+<span id="L269">    <span class="kw">cases</span> hs : (<span class="const token" data-verso-hover="328">alg4</span> v₀).<span class="const token" data-verso-hover="88">step</span> C ℓ <span class="kw">with</span></span>
+<span id="L270">    | <span class="const token" data-verso-hover="90">none</span> =&gt; <span class="kw">simp</span> [hs] <span class="kw">at</span> h</span>
+<span id="L271">    | <span class="const token" data-verso-hover="89">some</span> C₁ =&gt;</span>
+<span id="L272">      <span class="kw">simp</span> only [hs, <span class="const token" data-verso-hover="100">Option.bind_some</span>] <span class="kw">at</span> h</span>
+<span id="L273">      <span class="kw">exact</span> ih (<span class="const token" data-verso-hover="544">rel_step</span> v₀ hR hs).<span class="const token" data-verso-hover="142">2</span> h</span>
+<span id="L274"></span>
+<span id="L275"><span class="kw">lemma</span> <span class="const token" data-verso-hover="546">rel_run</span> {C : <span class="const token" data-verso-hover="329">Cfg</span> v₀} {α : <span class="const token" data-verso-hover="78">List</span> (<span class="const token" data-verso-hover="330">Lbl</span> v₀)} (h : (<span class="const token" data-verso-hover="328">alg4</span> v₀).<span class="const token" data-verso-hover="103">run</span> α = <span class="const token" data-verso-hover="89">some</span> C) :</span>
+<span id="L276">    <span class="const token" data-verso-hover="523">Rel</span> v₀ C (<span class="const token" data-verso-hover="443">sOf</span> v₀ α) := <span class="const token" data-verso-hover="545">rel_runFrom</span> v₀ (<span class="const token" data-verso-hover="533">rel_init</span> v₀) h</span>
+<span id="L277"></span>
+<span id="L278"><span class="kw">lemma</span> <span class="const token" data-verso-hover="547">sOf_append</span> (α β : <span class="const token" data-verso-hover="78">List</span> (<span class="const token" data-verso-hover="330">Lbl</span> v₀)) :</span>
+<span id="L279">    <span class="const token" data-verso-hover="443">sOf</span> v₀ (α ++ β) = β.<span class="const token" data-verso-hover="522">foldl</span> (<span class="const token" data-verso-hover="442">sstep</span> v₀) (<span class="const token" data-verso-hover="443">sOf</span> v₀ α) := <span class="kw">by</span></span>
+<span id="L280">  <span class="kw">simp</span> [<span class="const token" data-verso-hover="443">sOf</span>, <span class="const token" data-verso-hover="548">List.foldl_append</span>]</span>
+<span id="L281"></span>
+<span id="L282"><span class="kw">lemma</span> <span class="const token" data-verso-hover="448">sOf_snoc</span> (α : <span class="const token" data-verso-hover="78">List</span> (<span class="const token" data-verso-hover="330">Lbl</span> v₀)) (ℓ : <span class="const token" data-verso-hover="330">Lbl</span> v₀) :</span>
+<span id="L283">    <span class="const token" data-verso-hover="443">sOf</span> v₀ (α ++ [ℓ]) = <span class="const token" data-verso-hover="442">sstep</span> v₀ (<span class="const token" data-verso-hover="443">sOf</span> v₀ α) ℓ := <span class="kw">by</span></span>
+<span id="L284">  <span class="kw">simp</span> [<span class="const token" data-verso-hover="443">sOf</span>, <span class="const token" data-verso-hover="548">List.foldl_append</span>]</span>
+<span id="L285"></span>
+<span id="L286"><span class="dc">/-- Every step of a valid execution is enabled in the abstract state. -/</span></span>
+<span id="L287"><span class="kw">lemma</span> <span class="const token" data-verso-hover="450">enabled_of_valid</span> {α : <span class="const token" data-verso-hover="78">List</span> (<span class="const token" data-verso-hover="330">Lbl</span> v₀)} {ℓ : <span class="const token" data-verso-hover="330">Lbl</span> v₀} (h : (<span class="const token" data-verso-hover="328">alg4</span> v₀).<span class="const token" data-verso-hover="218">Valid</span> (α ++ [ℓ])) :</span>
+<span id="L288">    <span class="const token" data-verso-hover="441">Enabled</span> v₀ (<span class="const token" data-verso-hover="443">sOf</span> v₀ α) ℓ := <span class="kw">by</span></span>
+<span id="L289">  <span class="kw">obtain</span> ⟨C, hC⟩ := h</span>
+<span id="L290">  <span class="kw">obtain</span> ⟨C₁, h1, h2⟩ := (<span class="const token" data-verso-hover="328">alg4</span> v₀).<span class="const token" data-verso-hover="549">runFrom_eq_some_of_append</span> hC</span>
+<span id="L291">  <span class="kw">rw</span> [<span class="const token" data-verso-hover="550">Impl.runFrom_singleton</span>] <span class="kw">at</span> h2</span>
+<span id="L292">  <span class="kw">exact</span> (<span class="const token" data-verso-hover="544">rel_step</span> v₀ (<span class="const token" data-verso-hover="546">rel_run</span> v₀ h1) h2).<span class="const token" data-verso-hover="214">1</span></span>
+<span id="L293"></span>
+<span id="L294"><span class="kw">end</span> Alg4</span>
+<span id="L295"></span>
+<span id="L296"><span class="kw">end</span> Cslib.SharedMemory</span>
+<span id="L297"></span>
+</code></div>
+        <script>
+          window.versoHoversUrl = "PODC2024/HistoryIndependent/-hovers.json";</script>
+        <script src="static/lean/popper.js"></script>
+        <script src="static/lean/tippy.js"></script>
+        <script src="static/lean/marked.js"></script>
+        <script src="static/lean/highlighting.js"></script>
+        <script src="static/lean/lean.js"></script>
+        </article></main><footer class="site-footer"><div class="wrap">
+        Machine-checked formalizations of PODC papers in Lean 4. Generated with <a href="https://github.com/leanprover/verso">Verso</a> from the README files of <a href="https://github.com/vasnesterov/formal_podc">vasnesterov/formal_podc</a>.</div>
+      </footer></body>
+  </html>
+
