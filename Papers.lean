@@ -2830,3 +2830,17 @@ import Papers.PODC2022.AdaptiveBAFewerWords.StrongBAExamples
 import Papers.PODC2022.AdaptiveBAFewerWords.WeakBACounterexample
 import Papers.PODC2022.AdaptiveBAFewerWords.WeakBAFallback
 import Papers.PODC2022.AdaptiveBAFewerWords.WeakBAPhaseCount
+import Papers.PODC2012.OrderPreservingByzRenaming.Spec
+import Papers.PODC2012.OrderPreservingByzRenaming.Impossibility
+import Papers.PODC2012.OrderPreservingByzRenaming.TwoRound
+import Papers.PODC2012.OrderPreservingByzRenaming.Counterexample8
+import Papers.PODC2012.OrderPreservingByzRenaming.Alg5
+import Papers.PODC2012.OrderPreservingByzRenaming.IdSelection
+import Papers.PODC2012.OrderPreservingByzRenaming.Spacing
+import Papers.PODC2012.OrderPreservingByzRenaming.Counterexample5
+import Papers.PODC2012.OrderPreservingByzRenaming.PseudocodeIds
+import Papers.PODC2012.OrderPreservingByzRenaming.Lemma38
+import Papers.PODC2012.OrderPreservingByzRenaming.ConstTime
+import Papers.PODC2012.OrderPreservingByzRenaming.ConstTimeCex
+import Papers.PODC2012.OrderPreservingByzRenaming.Alg2
+import Papers.PODC2012.OrderPreservingByzRenaming.Alg2Cex
