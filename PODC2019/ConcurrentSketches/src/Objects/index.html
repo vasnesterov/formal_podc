@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="light dark">
+    <link rel="icon" href="data:,">
+    <title>ConcurrentSketches: Objects.lean · Formal PODC</title><base href="../../../.././"><link rel="stylesheet" href="static/lean/verso-vars.css">
+    <link rel="stylesheet" href="static/lean/highlighting.css">
+    <link rel="stylesheet" href="static/lean/tippy-border.css">
+    <link rel="stylesheet" href="static/style.css">
+    <script defer="defer" src="static/site.js"></script>
+    </head>
+  <body>
+    <header class="site-header">
+      <div class="wrap">
+        <a class="brand" href=".">Formal PODC</a><nav class="top">
+          <a href=".">Search</a><a href="about/">About</a><a href="https://github.com/vasnesterov/formal_podc">GitHub</a></nav>
+        </div>
+      </header>
+    <main class="wrap"><article><nav class="breadcrumbs" aria-label="Breadcrumb">
+          <a href=".">Search</a><span class="sep">›</span><a href="PODC2019/">PODC 2019</a><span class="sep">›</span><a href="PODC2019/ConcurrentSketches/">ConcurrentSketches</a><span class="sep">›</span><a href="PODC2019/ConcurrentSketches/src/">Lean source</a><span class="sep">›</span><span aria-current="page">Objects</span></nav>
+        <h1>
+          <code>Objects.lean</code></h1>
+        <div class="paper-links">
+          <p>
+            Source of <a href="PODC2019/ConcurrentSketches/">Fast Concurrent Data Sketches — PODC 2019</a> · <a href="https://github.com/vasnesterov/formal_podc/blob/main/Papers/PODC2019/ConcurrentSketches/Objects.lean">GitHub</a> · hover over a name for its type and documentation</p>
+          </div>
+        <div class="lean-code lean-src">
+          <code class="hl lean block" data-lean-context="Objects"><span id="L1"><span class="kw">import</span> Papers.PODC2019.ConcurrentSketches.Sketch</span>
+<span id="L2"></span>
+<span id="L3"><span class="dc">/-!</span></span>
+<span id="L4"><span class="dc"># Fast Concurrent Data Sketches (PODC 2019): processes and base objects</span></span>
+<span id="L5"></span>
+<span id="L6"><span class="dc">Common ingredients of the two concurrent algorithms of Section 5.2 (Algorithm 2 of the PODC</span></span>
+<span id="L7"><span class="dc">version, Algorithm 3 of the full version), in CSLib's asynchronous shared-memory model</span></span>
+<span id="L8"><span class="dc">(`Cslib.SharedMemory.Impl`: interleaving of atomic steps on base objects).</span></span>
+<span id="L9"></span>
+<span id="L10"><span class="dc">* Processes `Proc N Q`: `N` update threads `upd i` (`t₁, …, t_N`), the propagator `prop` (`t₀`)</span></span>
+<span id="L11"><span class="dc">  and query threads `qry q` (`q : Q`, any number of them).</span></span>
+<span id="L12"><span class="dc">* Base objects:</span></span>
+<span id="L13"><span class="dc">  - the composable global sketch `globalS` (`globObj`): `merge(t)`, `snapshot()`, `calcHint()`;</span></span>
+<span id="L14"><span class="dc">    the paper requires concurrent executions of `snapshot` and `merge` to be strongly</span></span>
+<span id="L15"><span class="dc">    linearisable and treats them as atomic steps; we take the global sketch to be atomic;</span></span>
+<span id="L16"><span class="dc">  - local sketches `localS` (`locObj`): `update(a)`, `read` (the propagator reads the local</span></span>
+<span id="L17"><span class="dc">    sketch in order to merge it), `reset` (`localS ← empty sketch`);</span></span>
+<span id="L18"><span class="dc">  - atomic registers `prop_i` (`regObj`): `Option Hint`, where `none` encodes the paper's value</span></span>
+<span id="L19"><span class="dc">    `0` and `some h` a hint (the paper requires `calcHint() ≠ 0`);</span></span>
+<span id="L20"><span class="dc">  - (optimised algorithm only) registers `cur_i` holding a `Bool`.</span></span>
+<span id="L21"><span class="dc">-/</span></span>
+<span id="L22"></span>
+<span id="L23"><span class="kw">namespace</span> Podc.ConcurrentSketches</span>
+<span id="L24"></span>
+<span id="L25"><span class="kw">open</span> Cslib.SharedMemory</span>
+<span id="L26"></span>
+<span id="L27"><span class="dc">/-- Processes: update threads, the propagator thread `t₀`, and query threads. -/</span></span>
+<span id="L28"><span class="kw">inductive</span> <span class="const token" data-verso-hover="86">Proc</span> (N : <span class="const token" data-verso-hover="30">ℕ</span>) (Q : <span class="kw">Type</span>) <span class="kw">where</span></span>
+<span id="L29">  | <span class="const token" data-verso-hover="57">upd</span> (i : <span class="const token" data-verso-hover="275">Fin</span> N)</span>
+<span id="L30">  | <span class="const token" data-verso-hover="276">prop</span></span>
+<span id="L31">  | <span class="const token" data-verso-hover="62">qry</span> (q : Q)</span>
+<span id="L32">  <span class="kw">deriving</span> <span class="const token" data-verso-hover="223">DecidableEq</span></span>
+<span id="L33"></span>
+<span id="L34"><span class="dc">/-- Which operations a process may invoke: update threads `update`, the propagator `propagate`,</span></span>
+<span id="L35"><span class="dc">query threads `query`. -/</span></span>
+<span id="L36"><span class="kw">def</span> <span class="const token" data-verso-hover="76">Proc.allowed</span> {S : <span class="const token" data-verso-hover="12">Composable</span>} {N : <span class="const token" data-verso-hover="30">ℕ</span>} {Q : <span class="kw">Type</span>} : <span class="const token" data-verso-hover="86">Proc</span> N Q → <span class="const token" data-verso-hover="277">SkOp</span> S.<span class="const token" data-verso-hover="87">toSketch</span> → <span class="kw">Prop</span></span>
+<span id="L37">  | <span class="const token" data-verso-hover="57">.</span>upd _, <span class="const token" data-verso-hover="58">.</span>update _ =&gt; <span class="const token" data-verso-hover="278">True</span></span>
+<span id="L38">  | <span class="const token" data-verso-hover="276">.</span>prop, <span class="const token" data-verso-hover="10">.</span>propagate =&gt; <span class="const token" data-verso-hover="278">True</span></span>
+<span id="L39">  | <span class="const token" data-verso-hover="62">.</span>qry _, <span class="const token" data-verso-hover="63">.</span>query _ =&gt; <span class="const token" data-verso-hover="278">True</span></span>
+<span id="L40">  | _, _ =&gt; <span class="const token" data-verso-hover="279">False</span></span>
+<span id="L41"></span>
+<span id="L42"><span class="dc">/-- Operations on the global (composable) sketch. -/</span></span>
+<span id="L43"><span class="kw">inductive</span> <span class="const token" data-verso-hover="280">GOp</span> (S : <span class="const token" data-verso-hover="12">Composable</span>) <span class="kw">where</span></span>
+<span id="L44">  | <span class="const token" data-verso-hover="281">merge</span> (t : S.<span class="const token" data-verso-hover="29">State</span>)</span>
+<span id="L45">  | <span class="const token" data-verso-hover="282">snapshot</span></span>
+<span id="L46">  | <span class="const token" data-verso-hover="283">calcHint</span></span>
+<span id="L47"></span>
+<span id="L48"><span class="dc">/-- Responses of the global sketch. -/</span></span>
+<span id="L49"><span class="kw">inductive</span> <span class="const token" data-verso-hover="284">GResp</span> (S : <span class="const token" data-verso-hover="12">Composable</span>) <span class="kw">where</span></span>
+<span id="L50">  | <span class="const token" data-verso-hover="285">unit</span></span>
+<span id="L51">  | <span class="const token" data-verso-hover="286">snap</span> (x : S.<span class="const token" data-verso-hover="39">Snap</span>)</span>
+<span id="L52">  | <span class="const token" data-verso-hover="287">hint</span> (h : S.<span class="const token" data-verso-hover="43">Hint</span>)</span>
+<span id="L53"></span>
+<span id="L54"><span class="dc">/-- Operations on a local sketch. -/</span></span>
+<span id="L55"><span class="kw">inductive</span> <span class="const token" data-verso-hover="288">LOp</span> (S : <span class="const token" data-verso-hover="12">Composable</span>) <span class="kw">where</span></span>
+<span id="L56">  | <span class="const token" data-verso-hover="289">update</span> (a : S.<span class="const token" data-verso-hover="31">Elem</span>)</span>
+<span id="L57">  | <span class="const token" data-verso-hover="290">read</span></span>
+<span id="L58">  | <span class="const token" data-verso-hover="291">reset</span></span>
+<span id="L59"></span>
+<span id="L60"><span class="dc">/-- Responses of a local sketch. -/</span></span>
+<span id="L61"><span class="kw">inductive</span> <span class="const token" data-verso-hover="292">LResp</span> (S : <span class="const token" data-verso-hover="12">Composable</span>) <span class="kw">where</span></span>
+<span id="L62">  | <span class="const token" data-verso-hover="293">unit</span></span>
+<span id="L63">  | <span class="const token" data-verso-hover="294">state</span> (s : S.<span class="const token" data-verso-hover="29">State</span>)</span>
+<span id="L64"></span>
+<span id="L65"><span class="dc">/-- Operations on a register. -/</span></span>
+<span id="L66"><span class="kw">inductive</span> <span class="const token" data-verso-hover="295">ROp</span> (V : <span class="kw">Type</span>) <span class="kw">where</span></span>
+<span id="L67">  | <span class="const token" data-verso-hover="296">read</span></span>
+<span id="L68">  | <span class="const token" data-verso-hover="297">write</span> (v : V)</span>
+<span id="L69"></span>
+<span id="L70"><span class="dc">/-- The global composable sketch as an atomic base object. -/</span></span>
+<span id="L71"><span class="kw">abbrev</span> <span class="const token" data-verso-hover="298">globObj</span> (S : <span class="const token" data-verso-hover="12">Composable</span>) : <span class="const token" data-verso-hover="233">ObjSpec</span> <span class="kw">where</span></span>
+<span id="L72">  <span class="const token" data-verso-hover="299">State</span> := S.<span class="const token" data-verso-hover="29">State</span></span>
+<span id="L73">  <span class="const token" data-verso-hover="236">Op</span> := <span class="const token" data-verso-hover="280">GOp</span> S</span>
+<span id="L74">  <span class="const token" data-verso-hover="237">Resp</span> := <span class="const token" data-verso-hover="284">GResp</span> S</span>
+<span id="L75">  <span class="const token" data-verso-hover="300">init</span> := S.<span class="const token" data-verso-hover="35">init</span></span>
+<span id="L76">  <span class="const token" data-verso-hover="244">δ</span> s o := <span class="kw">match</span> o <span class="kw">with</span></span>
+<span id="L77">    | <span class="const token" data-verso-hover="281">.</span>merge t =&gt; (S.<span class="const token" data-verso-hover="38">merge</span> s t, <span class="const token" data-verso-hover="285">.</span>unit)</span>
+<span id="L78">    | <span class="const token" data-verso-hover="282">.</span>snapshot =&gt; (s, <span class="const token" data-verso-hover="286">.</span>snap (S.<span class="const token" data-verso-hover="40">snapshot</span> s))</span>
+<span id="L79">    | <span class="const token" data-verso-hover="283">.</span>calcHint =&gt; (s, <span class="const token" data-verso-hover="287">.</span>hint (S.<span class="const token" data-verso-hover="44">calcHint</span> s))</span>
+<span id="L80"></span>
+<span id="L81"><span class="dc">/-- A local sketch as a base object. -/</span></span>
+<span id="L82"><span class="kw">abbrev</span> <span class="const token" data-verso-hover="301">locObj</span> (S : <span class="const token" data-verso-hover="12">Composable</span>) : <span class="const token" data-verso-hover="233">ObjSpec</span> <span class="kw">where</span></span>
+<span id="L83">  <span class="const token" data-verso-hover="299">State</span> := S.<span class="const token" data-verso-hover="29">State</span></span>
+<span id="L84">  <span class="const token" data-verso-hover="236">Op</span> := <span class="const token" data-verso-hover="288">LOp</span> S</span>
+<span id="L85">  <span class="const token" data-verso-hover="237">Resp</span> := <span class="const token" data-verso-hover="292">LResp</span> S</span>
+<span id="L86">  <span class="const token" data-verso-hover="300">init</span> := S.<span class="const token" data-verso-hover="35">init</span></span>
+<span id="L87">  <span class="const token" data-verso-hover="244">δ</span> s o := <span class="kw">match</span> o <span class="kw">with</span></span>
+<span id="L88">    | <span class="const token" data-verso-hover="289">.</span>update a =&gt; (S.<span class="const token" data-verso-hover="36">update</span> s a, <span class="const token" data-verso-hover="293">.</span>unit)</span>
+<span id="L89">    | <span class="const token" data-verso-hover="290">.</span>read =&gt; (s, <span class="const token" data-verso-hover="294">.</span>state s)</span>
+<span id="L90">    | <span class="const token" data-verso-hover="291">.</span>reset =&gt; (S.<span class="const token" data-verso-hover="35">init</span>, <span class="const token" data-verso-hover="293">.</span>unit)</span>
+<span id="L91"></span>
+<span id="L92"><span class="dc">/-- An atomic register with values in `V` (`write` returns its argument; irrelevant). -/</span></span>
+<span id="L93"><span class="kw">abbrev</span> <span class="const token" data-verso-hover="302">regObj</span> (V : <span class="kw">Type</span>) (v₀ : V) : <span class="const token" data-verso-hover="233">ObjSpec</span> <span class="kw">where</span></span>
+<span id="L94">  <span class="const token" data-verso-hover="299">State</span> := V</span>
+<span id="L95">  <span class="const token" data-verso-hover="236">Op</span> := <span class="const token" data-verso-hover="295">ROp</span> V</span>
+<span id="L96">  <span class="const token" data-verso-hover="237">Resp</span> := V</span>
+<span id="L97">  <span class="const token" data-verso-hover="300">init</span> := v₀</span>
+<span id="L98">  <span class="const token" data-verso-hover="244">δ</span> v o := <span class="kw">match</span> o <span class="kw">with</span></span>
+<span id="L99">    | <span class="const token" data-verso-hover="296">.</span>read =&gt; (v, v)</span>
+<span id="L100">    | <span class="const token" data-verso-hover="297">.</span>write w =&gt; (w, w)</span>
+<span id="L101"></span>
+<span id="L102"><span class="kw">end</span> Podc.ConcurrentSketches</span>
+<span id="L103"></span>
+</code></div>
+        <script>
+          window.versoHoversUrl = "PODC2019/ConcurrentSketches/-hovers.json";</script>
+        <script src="static/lean/popper.js"></script>
+        <script src="static/lean/tippy.js"></script>
+        <script src="static/lean/marked.js"></script>
+        <script src="static/lean/highlighting.js"></script>
+        <script src="static/lean/lean.js"></script>
+        </article></main><footer class="site-footer"><div class="wrap">
+        Machine-checked formalizations of PODC papers in Lean 4. Generated with <a href="https://github.com/leanprover/verso">Verso</a> from the README files of <a href="https://github.com/vasnesterov/formal_podc">vasnesterov/formal_podc</a>.</div>
+      </footer></body>
+  </html>
+

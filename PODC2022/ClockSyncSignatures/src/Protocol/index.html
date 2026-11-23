@@ -1,0 +1,513 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="light dark">
+    <link rel="icon" href="data:,">
+    <title>ClockSyncSignatures: Protocol.lean · Formal PODC</title><base href="../../../.././"><link rel="stylesheet" href="static/lean/verso-vars.css">
+    <link rel="stylesheet" href="static/lean/highlighting.css">
+    <link rel="stylesheet" href="static/lean/tippy-border.css">
+    <link rel="stylesheet" href="static/style.css">
+    <script defer="defer" src="static/site.js"></script>
+    </head>
+  <body>
+    <header class="site-header">
+      <div class="wrap">
+        <a class="brand" href=".">Formal PODC</a><nav class="top">
+          <a href=".">Search</a><a href="about/">About</a><a href="https://github.com/vasnesterov/formal_podc">GitHub</a></nav>
+        </div>
+      </header>
+    <main class="wrap"><article><nav class="breadcrumbs" aria-label="Breadcrumb">
+          <a href=".">Search</a><span class="sep">›</span><a href="PODC2022/">PODC 2022</a><span class="sep">›</span><a href="PODC2022/ClockSyncSignatures/">ClockSyncSignatures</a><span class="sep">›</span><a href="PODC2022/ClockSyncSignatures/src/">Lean source</a><span class="sep">›</span><span aria-current="page">Protocol</span></nav>
+        <h1>
+          <code>Protocol.lean</code></h1>
+        <div class="paper-links">
+          <p>
+            Source of <a href="PODC2022/ClockSyncSignatures/">Approximate Agreement with Signatures (from Optimal Clock Synchronization with Signatures) — PODC 2022</a> · <a href="https://github.com/vasnesterov/formal_podc/blob/main/Papers/PODC2022/ClockSyncSignatures/Protocol.lean">GitHub</a> · hover over a name for its type and documentation</p>
+          </div>
+        <div class="lean-code lean-src">
+          <code class="hl lean block" data-lean-context="Protocol"><span id="L1"><span class="kw">import</span> Papers.PODC2022.ClockSyncSignatures.APA</span>
+<span id="L2"><span class="kw">import</span> Cslib.Computability.Distributed.Byzantine.LockStep.Auth</span>
+<span id="L3"><span class="kw">import</span> Cslib.Computability.Distributed.Byzantine.LockStep.Agreement</span>
+<span id="L4"><span class="kw">import</span> Cslib.Computability.Distributed.Byzantine.Specs</span>
+<span id="L5"><span class="kw">import</span> Cslib.Computability.Distributed.ApproxConsensus.Contraction</span>
+<span id="L6"><span class="kw">import</span> Cslib.Foundations.Data.Real.Logb</span>
+<span id="L7"></span>
+<span id="L8"><span class="dc">/-!</span></span>
+<span id="L9"><span class="dc"># Iterated APA with signature-based crusader broadcast in the synchronous model</span></span>
+<span id="L10"></span>
+<span id="L11"><span class="dc">Lenzen–Loss, *Optimal Clock Synchronization with Signatures* (PODC 2022): Algorithm CB (Figure 4),</span></span>
+<span id="L12"><span class="dc">Algorithm APA (Figure 1), Theorem 9 and Corollary 2.</span></span>
+<span id="L13"></span>
+<span id="L14"><span class="dc">## The protocol</span></span>
+<span id="L15"></span>
+<span id="L16"><span class="dc">We use CSLib's synchronous lock-step model (`Cslib.Byzantine.LockStep`) on the complete network</span></span>
+<span id="L17"><span class="dc">`⊤` of the `n = Fintype.card P` nodes, with ideal signatures (`LockStep.Auth`: abstract tokens;</span></span>
+<span id="L18"><span class="dc">honest nodes are `Unforging`, the rushing adversary only uses signatures of corrupted nodes or</span></span>
+<span id="L19"><span class="dc">signatures already emitted by honest nodes, `Scenario.AuthValid`).</span></span>
+<span id="L20"></span>
+<span id="L21"><span class="dc">A signature token `(d, j, v)` is `d`'s signature on "my value in iteration `j` is `v`" (the</span></span>
+<span id="L22"><span class="dc">iteration number prevents replaying old signatures). `alg f K` runs `K` iterations of APA; iteration</span></span>
+<span id="L23"><span class="dc">`j` takes rounds `2j` and `2j + 1` and runs `n` crusader-broadcast instances in parallel, one per</span></span>
+<span id="L24"><span class="dc">dealer:</span></span>
+<span id="L25"></span>
+<span id="L26"><span class="dc">* round `2j` (CB step 1): every node `p` signs its current value `val_j(p)` and sends</span></span>
+<span id="L27"><span class="dc">  `init (p, j, val_j(p))` to all;</span></span>
+<span id="L28"><span class="dc">* round `2j + 1` (CB step 2): every node forwards to all, for every dealer `d`, the token it received</span></span>
+<span id="L29"><span class="dc">  from `d` in round `2j` (`echo`);</span></span>
+<span id="L30"><span class="dc">* after round `2j + 1`, node `w` computes the output of the instance of dealer `d` (`cbOut`): `⊥` if</span></span>
+<span id="L31"><span class="dc">  the token received from `d` is not a valid signature of `d` on iteration `j`, or if some echo</span></span>
+<span id="L32"><span class="dc">  contains a valid signature of `d` on iteration `j` with a different value; otherwise the signed</span></span>
+<span id="L33"><span class="dc">  value. Then (APA) `val_{j+1}(w) = apaOut f (cbOut …)` (`APA.lean`).</span></span>
+<span id="L34"></span>
+<span id="L35"><span class="dc">After `2K` rounds every node decides `val_K`.</span></span>
+<span id="L36"></span>
+<span id="L37"><span class="dc">## Main results</span></span>
+<span id="L38"></span>
+<span id="L39"><span class="dc">* `cb_isCrusader`: in every iteration, the CB outputs satisfy validity and crusader consistency</span></span>
+<span id="L40"><span class="dc">  (Definition 6) for any number of corrupted nodes.</span></span>
+<span id="L41"><span class="dc">* `theorem_9`: `alg f 1` (with `f = ⌈n/2⌉ - 1`) is an `(ℓ, ℓ/2, ⌈n/2⌉ - 1)`-secure two-round</span></span>
+<span id="L42"><span class="dc">  protocol for approximate agreement, for every `ℓ`.</span></span>
+<span id="L43"><span class="dc">* `corollary_2`: `K = ⌈log₂(ℓ/ε)⌉` iterations give an `(ℓ, ε, ⌈n/2⌉ - 1)`-secure protocol running in</span></span>
+<span id="L44"><span class="dc">  `2K` rounds.</span></span>
+<span id="L45"><span class="dc">-/</span></span>
+<span id="L46"></span>
+<span id="L47"><span class="kw">open</span> Cslib.Byzantine Cslib.Byzantine.LockStep</span>
+<span id="L48"></span>
+<span id="L49"><span class="kw">set_option</span> <span class="const token" data-verso-hover="21">linter.unusedSectionVars</span> false</span>
+<span id="L50"></span>
+<span id="L51"><span class="kw">noncomputable</span> <span class="kw">section</span></span>
+<span id="L52"></span>
+<span id="L53"><span class="kw">open</span> Classical</span>
+<span id="L54"></span>
+<span id="L55"><span class="kw">namespace</span> Podc.ClockSyncSignatures</span>
+<span id="L56"></span>
+<span id="L57"><span class="kw">variable</span> {P : <span class="kw">Type</span>*} [<span class="const token" data-verso-hover="22">Fintype</span> P] [<span class="const token" data-verso-hover="23">DecidableEq</span> P]</span>
+<span id="L58"></span>
+<span id="L59"><span class="dc">/-! ### Messages and signatures -/</span></span>
+<span id="L60"></span>
+<span id="L61"><span class="dc">/-- A signature token `(d, j, v)`: the signature of `d` on "my value in iteration `j` is `v`". -/</span></span>
+<span id="L62"><span class="kw">abbrev</span> <span class="const token" data-verso-hover="145">Tok</span> (P : <span class="kw">Type</span>*) := P × <span class="const token" data-verso-hover="33">ℕ</span> × <span class="const token" data-verso-hover="26">ℝ</span></span>
+<span id="L63"></span>
+<span id="L64"><span class="dc">/-- Messages: a signed value (first CB round) or a vector of forwarded tokens, one per dealer</span></span>
+<span id="L65"><span class="dc">(second CB round). -/</span></span>
+<span id="L66"><span class="kw">inductive</span> <span class="const token" data-verso-hover="146">Msg</span> (P : <span class="kw">Type</span>*)</span>
+<span id="L67">  | <span class="const token" data-verso-hover="147">init</span> (σ : <span class="const token" data-verso-hover="145">Tok</span> P)</span>
+<span id="L68">  | <span class="const token" data-verso-hover="148">echo</span> (e : P → <span class="const token" data-verso-hover="25">Option</span> (<span class="const token" data-verso-hover="145">Tok</span> P))</span>
+<span id="L69"></span>
+<span id="L70"><span class="dc">/-- The signature structure: a token is signed by its first component. -/</span></span>
+<span id="L71"><span class="kw">def</span> <span class="const token" data-verso-hover="149">auth</span> : <span class="const token" data-verso-hover="2">LockStep.Auth</span> P (<span class="const token" data-verso-hover="146">Msg</span> P) (<span class="const token" data-verso-hover="145">Tok</span> P) <span class="kw">where</span></span>
+<span id="L72">  <span class="const token" data-verso-hover="150">signer</span> τ := τ.<span class="const token" data-verso-hover="151">1</span></span>
+<span id="L73">  <span class="const token" data-verso-hover="152">tokens</span></span>
+<span id="L74">    | <span class="const token" data-verso-hover="147">.</span>init σ =&gt; {σ}</span>
+<span id="L75">    | <span class="const token" data-verso-hover="148">.</span>echo e =&gt; {τ | ∃ d, e d = <span class="const token" data-verso-hover="50">some</span> τ}</span>
+<span id="L76"></span>
+<span id="L77"><span class="dc">/-- The token carried by a first-round message. -/</span></span>
+<span id="L78"><span class="kw">def</span> <span class="const token" data-verso-hover="153">Msg.initTok</span> : <span class="const token" data-verso-hover="146">Msg</span> P → <span class="const token" data-verso-hover="25">Option</span> (<span class="const token" data-verso-hover="145">Tok</span> P)</span>
+<span id="L79">  | <span class="const token" data-verso-hover="147">.</span>init σ =&gt; <span class="const token" data-verso-hover="50">some</span> σ</span>
+<span id="L80">  | <span class="const token" data-verso-hover="148">.</span>echo _ =&gt; <span class="const token" data-verso-hover="35">none</span></span>
+<span id="L81"></span>
+<span id="L82"><span class="dc">/-- The token forwarded for dealer `d` by a second-round message. -/</span></span>
+<span id="L83"><span class="kw">def</span> <span class="const token" data-verso-hover="154">Msg.echoTok</span> (d : P) : <span class="const token" data-verso-hover="146">Msg</span> P → <span class="const token" data-verso-hover="25">Option</span> (<span class="const token" data-verso-hover="145">Tok</span> P)</span>
+<span id="L84">  | <span class="const token" data-verso-hover="147">.</span>init _ =&gt; <span class="const token" data-verso-hover="35">none</span></span>
+<span id="L85">  | <span class="const token" data-verso-hover="148">.</span>echo e =&gt; e d</span>
+<span id="L86"></span>
+<span id="L87"><span class="dc">/-! ### The local computation -/</span></span>
+<span id="L88"></span>
+<span id="L89"><span class="dc">/-- The inbox of round `k` in a history (empty if not received yet). -/</span></span>
+<span id="L90"><span class="kw">def</span> <span class="const token" data-verso-hover="155">inboxAt</span> (h : <span class="const token" data-verso-hover="156">History</span> P (<span class="const token" data-verso-hover="146">Msg</span> P)) (k : <span class="const token" data-verso-hover="33">ℕ</span>) : <span class="const token" data-verso-hover="157">Inbox</span> P (<span class="const token" data-verso-hover="146">Msg</span> P) := h[k]?.<span class="const token" data-verso-hover="158">getD</span> <span class="kw">fun</span> _ =&gt; <span class="const token" data-verso-hover="35">none</span></span>
+<span id="L91"></span>
+<span id="L92"><span class="dc">/-- The token node `p` (with own current value `own`) received from dealer `d` in the first round of</span></span>
+<span id="L93"><span class="dc">iteration `j`; for `d = p` it is `p`'s own signed value (a node also sends to itself). -/</span></span>
+<span id="L94"><span class="kw">def</span> <span class="const token" data-verso-hover="159">recvInit</span> (p : P) (own : <span class="const token" data-verso-hover="26">ℝ</span>) (h : <span class="const token" data-verso-hover="156">History</span> P (<span class="const token" data-verso-hover="146">Msg</span> P)) (j : <span class="const token" data-verso-hover="33">ℕ</span>) (d : P) : <span class="const token" data-verso-hover="25">Option</span> (<span class="const token" data-verso-hover="145">Tok</span> P) :=</span>
+<span id="L95">  <span class="kw">if</span> d = p <span class="kw">then</span> <span class="const token" data-verso-hover="50">some</span> (p, j, own) <span class="kw">else</span> (<span class="const token" data-verso-hover="155">inboxAt</span> h (<span class="nu">2</span> * j) d).<span class="const token" data-verso-hover="160">bind</span> <span class="const token" data-verso-hover="153">Msg.initTok</span></span>
+<span id="L96"></span>
+<span id="L97"><span class="dc">/-- Some echo of iteration `j` contains a valid signature of `d` on iteration `j` with a value</span></span>
+<span id="L98"><span class="dc">different from `b`. -/</span></span>
+<span id="L99"><span class="kw">def</span> <span class="const token" data-verso-hover="161">Conflict</span> (h : <span class="const token" data-verso-hover="156">History</span> P (<span class="const token" data-verso-hover="146">Msg</span> P)) (j : <span class="const token" data-verso-hover="33">ℕ</span>) (d : P) (b : <span class="const token" data-verso-hover="26">ℝ</span>) : <span class="kw">Prop</span> :=</span>
+<span id="L100">  ∃ u σ, (<span class="const token" data-verso-hover="155">inboxAt</span> h (<span class="nu">2</span> * j + <span class="nu">1</span>) u).<span class="const token" data-verso-hover="160">bind</span> (<span class="const token" data-verso-hover="154">Msg.echoTok</span> d) = <span class="const token" data-verso-hover="50">some</span> σ ∧ σ.<span class="const token" data-verso-hover="151">1</span> = d ∧ σ.<span class="const token" data-verso-hover="162">2</span><span class="nu">.</span><span class="const token" data-verso-hover="151">1</span> = j ∧ σ.<span class="const token" data-verso-hover="162">2</span><span class="nu">.</span><span class="const token" data-verso-hover="162">2</span> ≠ b</span>
+<span id="L101"></span>
+<span id="L102"><span class="dc">/-- Algorithm CB (Figure 4) at node `p`, instance of dealer `d`, iteration `j`: output `⊥` if the</span></span>
+<span id="L103"><span class="dc">token received from `d` is not a valid signature of `d` (for iteration `j`) or if a conflicting</span></span>
+<span id="L104"><span class="dc">valid signature was echoed; otherwise output the signed value. -/</span></span>
+<span id="L105"><span class="kw">def</span> <span class="const token" data-verso-hover="163">cbOut</span> (p : P) (own : <span class="const token" data-verso-hover="26">ℝ</span>) (h : <span class="const token" data-verso-hover="156">History</span> P (<span class="const token" data-verso-hover="146">Msg</span> P)) (j : <span class="const token" data-verso-hover="33">ℕ</span>) (d : P) : <span class="const token" data-verso-hover="25">Option</span> <span class="const token" data-verso-hover="26">ℝ</span> :=</span>
+<span id="L106">  (<span class="const token" data-verso-hover="159">recvInit</span> p own h j d).<span class="const token" data-verso-hover="160">bind</span> <span class="kw">fun</span> σ =&gt;</span>
+<span id="L107">    <span class="kw">if</span> σ.<span class="const token" data-verso-hover="151">1</span> = d ∧ σ.<span class="const token" data-verso-hover="162">2</span><span class="nu">.</span><span class="const token" data-verso-hover="151">1</span> = j ∧ ¬ <span class="const token" data-verso-hover="161">Conflict</span> h j d σ.<span class="const token" data-verso-hover="162">2</span><span class="nu">.</span><span class="const token" data-verso-hover="162">2</span> <span class="kw">then</span> <span class="const token" data-verso-hover="50">some</span> σ.<span class="const token" data-verso-hover="162">2</span><span class="nu">.</span><span class="const token" data-verso-hover="162">2</span> <span class="kw">else</span> <span class="const token" data-verso-hover="35">none</span></span>
+<span id="L108"></span>
+<span id="L109"><span class="dc">/-- The value of node `p` (input `x`) in iteration `j`, computed from its history: `val 0 = x`,</span></span>
+<span id="L110"><span class="dc">`val (j + 1)` is the APA output on the CB outputs of iteration `j`. -/</span></span>
+<span id="L111"><span class="kw">def</span> <span class="const token" data-verso-hover="164">val</span> (f : <span class="const token" data-verso-hover="33">ℕ</span>) (p : P) (x : <span class="const token" data-verso-hover="26">ℝ</span>) (h : <span class="const token" data-verso-hover="156">History</span> P (<span class="const token" data-verso-hover="146">Msg</span> P)) : <span class="const token" data-verso-hover="33">ℕ</span> → <span class="const token" data-verso-hover="26">ℝ</span></span>
+<span id="L112">  | <span class="nu">0</span> =&gt; x</span>
+<span id="L113">  | j + <span class="nu">1</span> =&gt; <span class="const token" data-verso-hover="9">apaOut</span> f (<span class="const token" data-verso-hover="163">cbOut</span> p (<span class="const token" data-verso-hover="164">val</span> f p x h j) h j)</span>
+<span id="L114"></span>
+<span id="L115"><span class="dc">/-- `K` iterations of APA over CB, tolerating `f` faults; two rounds per iteration. -/</span></span>
+<span id="L116"><span class="kw">def</span> <span class="const token" data-verso-hover="165">alg</span> (f K : <span class="const token" data-verso-hover="33">ℕ</span>) : <span class="const token" data-verso-hover="166">Protocol</span> P <span class="const token" data-verso-hover="26">ℝ</span> (<span class="const token" data-verso-hover="146">Msg</span> P) <span class="const token" data-verso-hover="26">ℝ</span> <span class="kw">where</span></span>
+<span id="L117">  <span class="const token" data-verso-hover="167">send</span> p x h _ :=</span>
+<span id="L118">    <span class="kw">if</span> h.<span class="const token" data-verso-hover="71">length</span> &lt; <span class="nu">2</span> * K <span class="kw">then</span></span>
+<span id="L119">      <span class="kw">if</span> h.<span class="const token" data-verso-hover="71">length</span> % <span class="nu">2</span> = <span class="nu">0</span> <span class="kw">then</span> <span class="const token" data-verso-hover="50">some</span> (<span class="const token" data-verso-hover="147">.</span>init (p, h.<span class="const token" data-verso-hover="71">length</span> / <span class="nu">2</span>, <span class="const token" data-verso-hover="164">val</span> f p x h (h.<span class="const token" data-verso-hover="71">length</span> / <span class="nu">2</span>)))</span>
+<span id="L120">      <span class="kw">else</span> <span class="const token" data-verso-hover="50">some</span> (<span class="const token" data-verso-hover="148">.</span>echo (<span class="const token" data-verso-hover="159">recvInit</span> p (<span class="const token" data-verso-hover="164">val</span> f p x h (h.<span class="const token" data-verso-hover="71">length</span> / <span class="nu">2</span>)) h (h.<span class="const token" data-verso-hover="71">length</span> / <span class="nu">2</span>)))</span>
+<span id="L121">    <span class="kw">else</span> <span class="const token" data-verso-hover="35">none</span></span>
+<span id="L122">  <span class="const token" data-verso-hover="168">decide</span> p x h := <span class="kw">if</span> <span class="nu">2</span> * K ≤ h.<span class="const token" data-verso-hover="71">length</span> <span class="kw">then</span> <span class="const token" data-verso-hover="50">some</span> (<span class="const token" data-verso-hover="164">val</span> f p x h K) <span class="kw">else</span> <span class="const token" data-verso-hover="35">none</span></span>
+<span id="L123"></span>
+<span id="L124"><span class="dc">/-! ### Locality: values only depend on the relevant inboxes -/</span></span>
+<span id="L125"></span>
+<span id="L126"><span class="kw">theorem</span> <span class="const token" data-verso-hover="169">recvInit_congr</span> {p : P} {own : <span class="const token" data-verso-hover="26">ℝ</span>} {h h' : <span class="const token" data-verso-hover="156">History</span> P (<span class="const token" data-verso-hover="146">Msg</span> P)} {j : <span class="const token" data-verso-hover="33">ℕ</span>}</span>
+<span id="L127">    (hh : <span class="const token" data-verso-hover="155">inboxAt</span> h (<span class="nu">2</span> * j) = <span class="const token" data-verso-hover="155">inboxAt</span> h' (<span class="nu">2</span> * j)) : <span class="const token" data-verso-hover="159">recvInit</span> p own h j = <span class="const token" data-verso-hover="159">recvInit</span> p own h' j := <span class="kw">by</span></span>
+<span id="L128">  <span class="kw">funext</span> d; <span class="kw">simp</span> only [<span class="const token" data-verso-hover="159">recvInit</span>, hh]</span>
+<span id="L129"></span>
+<span id="L130"><span class="kw">theorem</span> <span class="const token" data-verso-hover="170">conflict_congr</span> {h h' : <span class="const token" data-verso-hover="156">History</span> P (<span class="const token" data-verso-hover="146">Msg</span> P)} {j : <span class="const token" data-verso-hover="33">ℕ</span>} {d : P} {b : <span class="const token" data-verso-hover="26">ℝ</span>}</span>
+<span id="L131">    (hh : <span class="const token" data-verso-hover="155">inboxAt</span> h (<span class="nu">2</span> * j + <span class="nu">1</span>) = <span class="const token" data-verso-hover="155">inboxAt</span> h' (<span class="nu">2</span> * j + <span class="nu">1</span>)) : <span class="const token" data-verso-hover="161">Conflict</span> h j d b ↔ <span class="const token" data-verso-hover="161">Conflict</span> h' j d b := <span class="kw">by</span></span>
+<span id="L132">  <span class="kw">simp</span> only [<span class="const token" data-verso-hover="161">Conflict</span>, hh]</span>
+<span id="L133"></span>
+<span id="L134"><span class="kw">theorem</span> <span class="const token" data-verso-hover="171">cbOut_congr</span> {p : P} {own : <span class="const token" data-verso-hover="26">ℝ</span>} {h h' : <span class="const token" data-verso-hover="156">History</span> P (<span class="const token" data-verso-hover="146">Msg</span> P)} {j : <span class="const token" data-verso-hover="33">ℕ</span>}</span>
+<span id="L135">    (h0 : <span class="const token" data-verso-hover="155">inboxAt</span> h (<span class="nu">2</span> * j) = <span class="const token" data-verso-hover="155">inboxAt</span> h' (<span class="nu">2</span> * j))</span>
+<span id="L136">    (h1 : <span class="const token" data-verso-hover="155">inboxAt</span> h (<span class="nu">2</span> * j + <span class="nu">1</span>) = <span class="const token" data-verso-hover="155">inboxAt</span> h' (<span class="nu">2</span> * j + <span class="nu">1</span>)) : <span class="const token" data-verso-hover="163">cbOut</span> p own h j = <span class="const token" data-verso-hover="163">cbOut</span> p own h' j := <span class="kw">by</span></span>
+<span id="L137">  <span class="kw">funext</span> d</span>
+<span id="L138">  <span class="kw">simp</span> only [<span class="const token" data-verso-hover="163">cbOut</span>, <span class="const token" data-verso-hover="169">recvInit_congr</span> (p := p) (own := own) h0]</span>
+<span id="L139">  <span class="kw">congr</span> <span class="nu">1</span>; <span class="kw">funext</span> σ</span>
+<span id="L140">  <span class="kw">simp</span> only [<span class="const token" data-verso-hover="170">conflict_congr</span> (d := d) (b := σ.<span class="const token" data-verso-hover="162">2</span><span class="nu">.</span><span class="const token" data-verso-hover="162">2</span>) h1]</span>
+<span id="L141"></span>
+<span id="L142"><span class="kw">theorem</span> <span class="const token" data-verso-hover="172">val_congr</span> {f : <span class="const token" data-verso-hover="33">ℕ</span>} {p : P} {x : <span class="const token" data-verso-hover="26">ℝ</span>} {h h' : <span class="const token" data-verso-hover="156">History</span> P (<span class="const token" data-verso-hover="146">Msg</span> P)} {j : <span class="const token" data-verso-hover="33">ℕ</span>}</span>
+<span id="L143">    (hh : ∀ k &lt; <span class="nu">2</span> * j, <span class="const token" data-verso-hover="155">inboxAt</span> h k = <span class="const token" data-verso-hover="155">inboxAt</span> h' k) : <span class="const token" data-verso-hover="164">val</span> f p x h j = <span class="const token" data-verso-hover="164">val</span> f p x h' j := <span class="kw">by</span></span>
+<span id="L144">  <span class="kw">induction</span> j <span class="kw">with</span></span>
+<span id="L145">  | <span class="const token" data-verso-hover="115">zero</span> =&gt; <span class="kw">rfl</span></span>
+<span id="L146">  | <span class="const token" data-verso-hover="121">succ</span> j ih =&gt;</span>
+<span id="L147">    <span class="kw">simp</span> only [<span class="const token" data-verso-hover="164">val</span>]</span>
+<span id="L148">    <span class="kw">rw</span> [ih <span class="kw">fun</span> k hk =&gt; hh k (<span class="kw">by</span> <span class="kw">omega</span>), <span class="const token" data-verso-hover="171">cbOut_congr</span> (hh _ (<span class="kw">by</span> <span class="kw">omega</span>)) (hh _ (<span class="kw">by</span> <span class="kw">omega</span>))]</span>
+<span id="L149"></span>
+<span id="L150"><span class="dc">/-! ### Runs -/</span></span>
+<span id="L151"></span>
+<span id="L152"><span class="kw">variable</span> (f K : <span class="const token" data-verso-hover="33">ℕ</span>) (s : <span class="const token" data-verso-hover="173">Scenario</span> P <span class="const token" data-verso-hover="26">ℝ</span> (<span class="const token" data-verso-hover="146">Msg</span> P))</span>
+<span id="L153"></span>
+<span id="L154"><span class="dc">/-- The complete network. -/</span></span>
+<span id="L155"><span class="kw">abbrev</span> <span class="const token" data-verso-hover="174">net</span> : <span class="const token" data-verso-hover="175">SimpleGraph</span> P := ⊤</span>
+<span id="L156"></span>
+<span id="L157"><span class="dc">/-- The history of `p` after `r` rounds. -/</span></span>
+<span id="L158"><span class="kw">abbrev</span> <span class="const token" data-verso-hover="176">H</span> (r : <span class="const token" data-verso-hover="33">ℕ</span>) (p : P) : <span class="const token" data-verso-hover="156">History</span> P (<span class="const token" data-verso-hover="146">Msg</span> P) := <span class="const token" data-verso-hover="177">hist</span> <span class="const token" data-verso-hover="174">net</span> (<span class="const token" data-verso-hover="165">alg</span> f K) s r p</span>
+<span id="L159"></span>
+<span id="L160"><span class="dc">/-- The value of `p` in iteration `j` of the run. -/</span></span>
+<span id="L161"><span class="kw">def</span> <span class="const token" data-verso-hover="178">V</span> (j : <span class="const token" data-verso-hover="33">ℕ</span>) (p : P) : <span class="const token" data-verso-hover="26">ℝ</span> := <span class="const token" data-verso-hover="164">val</span> f p (s.<span class="const token" data-verso-hover="179">input</span> p) (<span class="const token" data-verso-hover="176">H</span> f K s (<span class="nu">2</span> * j) p) j</span>
+<span id="L162"></span>
+<span id="L163"><span class="dc">/-- The CB outputs of iteration `j` at node `w` (instance of dealer `d`). -/</span></span>
+<span id="L164"><span class="kw">def</span> <span class="const token" data-verso-hover="180">O</span> (j : <span class="const token" data-verso-hover="33">ℕ</span>) (w d : P) : <span class="const token" data-verso-hover="25">Option</span> <span class="const token" data-verso-hover="26">ℝ</span> := <span class="const token" data-verso-hover="163">cbOut</span> w (<span class="const token" data-verso-hover="178">V</span> f K s j w) (<span class="const token" data-verso-hover="176">H</span> f K s (<span class="nu">2</span> * j + <span class="nu">2</span>) w) j d</span>
+<span id="L165"></span>
+<span id="L166"><span class="kw">variable</span> {f K s}</span>
+<span id="L167"></span>
+<span id="L168"><span class="kw">theorem</span> <span class="const token" data-verso-hover="181">inboxAt_hist</span> {k R : <span class="const token" data-verso-hover="33">ℕ</span>} (hk : k &lt; R) (p : P) :</span>
+<span id="L169">    <span class="const token" data-verso-hover="155">inboxAt</span> (<span class="const token" data-verso-hover="176">H</span> f K s R p) k = <span class="kw">fun</span> q =&gt; <span class="const token" data-verso-hover="182">deliver</span> <span class="const token" data-verso-hover="174">net</span> (<span class="const token" data-verso-hover="165">alg</span> f K) s (<span class="const token" data-verso-hover="176">H</span> f K s k) k q p := <span class="kw">by</span></span>
+<span id="L170">  <span class="kw">simp</span> [<span class="const token" data-verso-hover="155">inboxAt</span>, <span class="const token" data-verso-hover="176">H</span>, <span class="const token" data-verso-hover="183">getElem?_hist</span> _ _ s hk]</span>
+<span id="L171"></span>
+<span id="L172"><span class="kw">theorem</span> <span class="const token" data-verso-hover="184">inboxAt_hist_eq</span> {k R R' : <span class="const token" data-verso-hover="33">ℕ</span>} (hk : k &lt; R) (hk' : k &lt; R') (p : P) :</span>
+<span id="L173">    <span class="const token" data-verso-hover="155">inboxAt</span> (<span class="const token" data-verso-hover="176">H</span> f K s R p) k = <span class="const token" data-verso-hover="155">inboxAt</span> (<span class="const token" data-verso-hover="176">H</span> f K s R' p) k := <span class="kw">by</span></span>
+<span id="L174">  <span class="kw">rw</span> [<span class="const token" data-verso-hover="181">inboxAt_hist</span> hk, <span class="const token" data-verso-hover="181">inboxAt_hist</span> hk']</span>
+<span id="L175"></span>
+<span id="L176"><span class="kw">theorem</span> <span class="const token" data-verso-hover="185">val_hist</span> {j R : <span class="const token" data-verso-hover="33">ℕ</span>} (hR : <span class="nu">2</span> * j ≤ R) (p : P) :</span>
+<span id="L177">    <span class="const token" data-verso-hover="164">val</span> f p (s.<span class="const token" data-verso-hover="179">input</span> p) (<span class="const token" data-verso-hover="176">H</span> f K s R p) j = <span class="const token" data-verso-hover="178">V</span> f K s j p :=</span>
+<span id="L178">  <span class="const token" data-verso-hover="172">val_congr</span> <span class="kw">fun</span> k hk =&gt; <span class="const token" data-verso-hover="184">inboxAt_hist_eq</span> (<span class="kw">by</span> <span class="kw">omega</span>) hk p</span>
+<span id="L179"></span>
+<span id="L180"><span class="kw">theorem</span> <span class="const token" data-verso-hover="186">V_succ</span> (j : <span class="const token" data-verso-hover="33">ℕ</span>) (w : P) : <span class="const token" data-verso-hover="178">V</span> f K s (j + <span class="nu">1</span>) w = <span class="const token" data-verso-hover="9">apaOut</span> f (<span class="const token" data-verso-hover="180">O</span> f K s j w) := <span class="kw">by</span></span>
+<span id="L181">  <span class="kw">simp</span> only [<span class="const token" data-verso-hover="178">V</span>, <span class="const token" data-verso-hover="164">val</span>]</span>
+<span id="L182">  <span class="kw">rw</span> [<span class="kw">show</span> <span class="nu">2</span> * (j + <span class="nu">1</span>) = <span class="nu">2</span> * j + <span class="nu">2</span> <span class="kw">by</span> <span class="kw">ring</span>, <span class="const token" data-verso-hover="185">val_hist</span> (<span class="kw">by</span> <span class="kw">omega</span>)]</span>
+<span id="L183">  <span class="kw">rfl</span></span>
+<span id="L184"></span>
+<span id="L185"><span class="kw">theorem</span> <span class="const token" data-verso-hover="187">send_init</span> {j : <span class="const token" data-verso-hover="33">ℕ</span>} (hj : j &lt; K) (p : P) (x : <span class="const token" data-verso-hover="26">ℝ</span>) (h : <span class="const token" data-verso-hover="156">History</span> P (<span class="const token" data-verso-hover="146">Msg</span> P))</span>
+<span id="L186">    (hl : h.<span class="const token" data-verso-hover="71">length</span> = <span class="nu">2</span> * j) (q : P) :</span>
+<span id="L187">    (<span class="const token" data-verso-hover="165">alg</span> f K).<span class="const token" data-verso-hover="167">send</span> p x h q = <span class="const token" data-verso-hover="50">some</span> (<span class="const token" data-verso-hover="147">.</span>init (p, j, <span class="const token" data-verso-hover="164">val</span> f p x h j)) := <span class="kw">by</span></span>
+<span id="L188">  <span class="kw">have</span> h2 : h.<span class="const token" data-verso-hover="71">length</span> / <span class="nu">2</span> = j := <span class="kw">by</span> <span class="kw">omega</span></span>
+<span id="L189">  <span class="kw">simp</span> [<span class="const token" data-verso-hover="165">alg</span>, hl, <span class="kw">show</span> <span class="nu">2</span> * j &lt; <span class="nu">2</span> * K <span class="kw">by</span> <span class="kw">omega</span>]</span>
+<span id="L190"></span>
+<span id="L191"><span class="kw">theorem</span> <span class="const token" data-verso-hover="188">send_echo</span> {j : <span class="const token" data-verso-hover="33">ℕ</span>} (hj : j &lt; K) (p : P) (x : <span class="const token" data-verso-hover="26">ℝ</span>) (h : <span class="const token" data-verso-hover="156">History</span> P (<span class="const token" data-verso-hover="146">Msg</span> P))</span>
+<span id="L192">    (hl : h.<span class="const token" data-verso-hover="71">length</span> = <span class="nu">2</span> * j + <span class="nu">1</span>) (q : P) :</span>
+<span id="L193">    (<span class="const token" data-verso-hover="165">alg</span> f K).<span class="const token" data-verso-hover="167">send</span> p x h q = <span class="const token" data-verso-hover="50">some</span> (<span class="const token" data-verso-hover="148">.</span>echo (<span class="const token" data-verso-hover="159">recvInit</span> p (<span class="const token" data-verso-hover="164">val</span> f p x h j) h j)) := <span class="kw">by</span></span>
+<span id="L194">  <span class="kw">have</span> h2 : h.<span class="const token" data-verso-hover="71">length</span> / <span class="nu">2</span> = j := <span class="kw">by</span> <span class="kw">omega</span></span>
+<span id="L195">  <span class="kw">have</span> h3 : h.<span class="const token" data-verso-hover="71">length</span> % <span class="nu">2</span> ≠ <span class="nu">0</span> := <span class="kw">by</span> <span class="kw">omega</span></span>
+<span id="L196">  <span class="kw">simp</span> only [<span class="const token" data-verso-hover="165">alg</span>]</span>
+<span id="L197">  <span class="kw">simp</span> only [<span class="kw">show</span> h.<span class="const token" data-verso-hover="71">length</span> &lt; <span class="nu">2</span> * K <span class="kw">by</span> <span class="kw">omega</span>, h3, ↓<span class="const token" data-verso-hover="55">reduceIte</span>, h2]</span>
+<span id="L198"></span>
+<span id="L199"><span class="dc">/-! ### Unforgeability -/</span></span>
+<span id="L200"></span>
+<span id="L201"></span>
+<span id="L202"><span class="kw">theorem</span> <span class="const token" data-verso-hover="189">mem_tokens_send</span> {p : P} {x : <span class="const token" data-verso-hover="26">ℝ</span>} {h : <span class="const token" data-verso-hover="156">History</span> P (<span class="const token" data-verso-hover="146">Msg</span> P)} {q : P} {m : <span class="const token" data-verso-hover="146">Msg</span> P}</span>
+<span id="L203">    (hm : (<span class="const token" data-verso-hover="165">alg</span> f K).<span class="const token" data-verso-hover="167">send</span> p x h q = <span class="const token" data-verso-hover="50">some</span> m) {τ : <span class="const token" data-verso-hover="145">Tok</span> P} (hτ : τ ∈ <span class="const token" data-verso-hover="149">auth</span>.<span class="const token" data-verso-hover="152">tokens</span> m) :</span>
+<span id="L204">    τ = (p, h.<span class="const token" data-verso-hover="71">length</span> / <span class="nu">2</span>, <span class="const token" data-verso-hover="164">val</span> f p x h (h.<span class="const token" data-verso-hover="71">length</span> / <span class="nu">2</span>)) ∨</span>
+<span id="L205">      h.<span class="const token" data-verso-hover="71">length</span> % <span class="nu">2</span> = <span class="nu">1</span> ∧</span>
+<span id="L206">        ∃ d, d ≠ p ∧ (<span class="const token" data-verso-hover="155">inboxAt</span> h (<span class="nu">2</span> * (h.<span class="const token" data-verso-hover="71">length</span> / <span class="nu">2</span>)) d).<span class="const token" data-verso-hover="160">bind</span> <span class="const token" data-verso-hover="153">Msg.initTok</span> = <span class="const token" data-verso-hover="50">some</span> τ := <span class="kw">by</span></span>
+<span id="L207">  <span class="kw">simp</span> only [<span class="const token" data-verso-hover="165">alg</span>] <span class="kw">at</span> hm</span>
+<span id="L208">  <span class="kw">split_ifs</span> <span class="kw">at</span> hm <span class="kw">with</span> h1 h2</span>
+<span id="L209">  · <span class="kw">cases</span> hm; <span class="kw">exact</span> <span class="const token" data-verso-hover="129">Or.inl</span> hτ</span>
+<span id="L210">  · <span class="kw">cases</span> hm</span>
+<span id="L211">    <span class="kw">obtain</span> ⟨d, hd⟩ := hτ</span>
+<span id="L212">    <span class="kw">simp</span> only [<span class="const token" data-verso-hover="159">recvInit</span>] <span class="kw">at</span> hd</span>
+<span id="L213">    <span class="kw">split_ifs</span> <span class="kw">at</span> hd <span class="kw">with</span> hdp</span>
+<span id="L214">    · <span class="kw">cases</span> hd; <span class="kw">exact</span> <span class="const token" data-verso-hover="129">Or.inl</span> <span class="const token" data-verso-hover="83">rfl</span></span>
+<span id="L215">    · <span class="kw">exact</span> <span class="const token" data-verso-hover="127">Or.inr</span> ⟨<span class="kw">by</span> <span class="kw">omega</span>, d, hdp, hd⟩</span>
+<span id="L216"></span>
+<span id="L217"><span class="kw">theorem</span> <span class="const token" data-verso-hover="190">mem_histTokens_of_initTok</span> {h : <span class="const token" data-verso-hover="156">History</span> P (<span class="const token" data-verso-hover="146">Msg</span> P)} {k : <span class="const token" data-verso-hover="33">ℕ</span>} (hk : k &lt; h.<span class="const token" data-verso-hover="71">length</span>) {d : P}</span>
+<span id="L218">    {τ : <span class="const token" data-verso-hover="145">Tok</span> P} (hτ : (<span class="const token" data-verso-hover="155">inboxAt</span> h k d).<span class="const token" data-verso-hover="160">bind</span> <span class="const token" data-verso-hover="153">Msg.initTok</span> = <span class="const token" data-verso-hover="50">some</span> τ) :</span>
+<span id="L219">    τ ∈ <span class="const token" data-verso-hover="191">LockStep.Auth.histTokens</span> <span class="const token" data-verso-hover="149">auth</span> h := <span class="kw">by</span></span>
+<span id="L220">  <span class="kw">obtain</span> ⟨m, hm, hmτ⟩ := <span class="const token" data-verso-hover="192">Option.bind_eq_some_iff</span>.<span class="const token" data-verso-hover="68">1</span> hτ</span>
+<span id="L221">  <span class="kw">refine</span> ⟨h[k], <span class="const token" data-verso-hover="193">List.getElem_mem</span> hk, d, m, ?_, ?_⟩</span>
+<span id="L222">  · <span class="kw">simpa</span> [<span class="const token" data-verso-hover="155">inboxAt</span>, <span class="const token" data-verso-hover="194">List.getElem?_eq_getElem</span> hk] <span class="kw">using</span> hm</span>
+<span id="L223">  · <span class="kw">cases</span> m <span class="kw">with</span></span>
+<span id="L224">    | <span class="const token" data-verso-hover="147">init</span> σ =&gt; <span class="kw">cases</span> hmτ; <span class="kw">rfl</span></span>
+<span id="L225">    | <span class="const token" data-verso-hover="148">echo</span> e =&gt; <span class="kw">cases</span> hmτ</span>
+<span id="L226"></span>
+<span id="L227"><span class="dc">/-- Honest nodes only emit their own signatures and signatures they received. -/</span></span>
+<span id="L228"><span class="kw">theorem</span> <span class="const token" data-verso-hover="4">alg_unforging</span> : (<span class="const token" data-verso-hover="165">alg</span> (P := P) f K).<span class="const token" data-verso-hover="3">Unforging</span> <span class="const token" data-verso-hover="149">auth</span> := <span class="kw">by</span></span>
+<span id="L229">  <span class="kw">intro</span> p x h q m hm τ hτ</span>
+<span id="L230">  <span class="kw">rcases</span> <span class="const token" data-verso-hover="189">mem_tokens_send</span> hm hτ <span class="kw">with</span> <span class="kw">rfl</span> | ⟨hodd, d, -, hd⟩</span>
+<span id="L231">  · <span class="kw">exact</span> <span class="const token" data-verso-hover="129">Or.inl</span> <span class="const token" data-verso-hover="83">rfl</span></span>
+<span id="L232">  · <span class="kw">exact</span> <span class="const token" data-verso-hover="127">Or.inr</span> (<span class="const token" data-verso-hover="190">mem_histTokens_of_initTok</span> (<span class="kw">by</span> <span class="kw">omega</span>) hd)</span>
+<span id="L233"></span>
+<span id="L234"><span class="kw">theorem</span> <span class="const token" data-verso-hover="195">mem_histTokens_of_inboxAt</span> {h : <span class="const token" data-verso-hover="156">History</span> P (<span class="const token" data-verso-hover="146">Msg</span> P)} {k : <span class="const token" data-verso-hover="33">ℕ</span>} (hk : k &lt; h.<span class="const token" data-verso-hover="71">length</span>) {u : P}</span>
+<span id="L235">    {m : <span class="const token" data-verso-hover="146">Msg</span> P} (hm : <span class="const token" data-verso-hover="155">inboxAt</span> h k u = <span class="const token" data-verso-hover="50">some</span> m) {τ : <span class="const token" data-verso-hover="145">Tok</span> P} (hτ : τ ∈ (<span class="const token" data-verso-hover="149">auth</span> (P := P)).<span class="const token" data-verso-hover="152">tokens</span> m) :</span>
+<span id="L236">    τ ∈ <span class="const token" data-verso-hover="191">LockStep.Auth.histTokens</span> <span class="const token" data-verso-hover="149">auth</span> h :=</span>
+<span id="L237">  ⟨h[k], <span class="const token" data-verso-hover="193">List.getElem_mem</span> hk, u, m, <span class="kw">by</span> <span class="kw">simpa</span> [<span class="const token" data-verso-hover="155">inboxAt</span>, <span class="const token" data-verso-hover="194">List.getElem?_eq_getElem</span> hk] <span class="kw">using</span> hm, hτ⟩</span>
+<span id="L238"></span>
+<span id="L239"><span class="kw">theorem</span> <span class="const token" data-verso-hover="196">mem_tokens_of_echoTok</span> {d : P} {m : <span class="const token" data-verso-hover="146">Msg</span> P} {τ : <span class="const token" data-verso-hover="145">Tok</span> P} (h : m.<span class="const token" data-verso-hover="154">echoTok</span> d = <span class="const token" data-verso-hover="50">some</span> τ) :</span>
+<span id="L240">    τ ∈ (<span class="const token" data-verso-hover="149">auth</span> (P := P)).<span class="const token" data-verso-hover="152">tokens</span> m := <span class="kw">by</span></span>
+<span id="L241">  <span class="kw">cases</span> m <span class="kw">with</span></span>
+<span id="L242">  | <span class="const token" data-verso-hover="147">init</span> σ =&gt; <span class="kw">cases</span> h</span>
+<span id="L243">  | <span class="const token" data-verso-hover="148">echo</span> e =&gt; <span class="kw">exact</span> ⟨d, h⟩</span>
+<span id="L244"></span>
+<span id="L245"><span class="dc">/-! ### The token invariant: honest signatures are never forged -/</span></span>
+<span id="L246"></span>
+<span id="L247"><span class="kw">variable</span> (f K s) <span class="kw">in</span></span>
+<span id="L248"><span class="dc">/-- A token is *good* if, when its signer is honest, it carries the signer's actual value in the</span></span>
+<span id="L249"><span class="dc">token's iteration. -/</span></span>
+<span id="L250"><span class="kw">def</span> <span class="const token" data-verso-hover="197">Good</span> (τ : <span class="const token" data-verso-hover="145">Tok</span> P) : <span class="kw">Prop</span> := τ.<span class="const token" data-verso-hover="151">1</span> ∉ s.<span class="const token" data-verso-hover="198">byz</span> → τ.<span class="const token" data-verso-hover="162">2</span><span class="nu">.</span><span class="const token" data-verso-hover="162">2</span> = <span class="const token" data-verso-hover="178">V</span> f K s τ.<span class="const token" data-verso-hover="162">2</span><span class="nu">.</span><span class="const token" data-verso-hover="151">1</span> τ.<span class="const token" data-verso-hover="151">1</span></span>
+<span id="L251"></span>
+<span id="L252"><span class="kw">theorem</span> <span class="const token" data-verso-hover="199">good_of_send</span> {r : <span class="const token" data-verso-hover="33">ℕ</span>} {p : P}</span>
+<span id="L253">    (hinv : ∀ τ ∈ <span class="const token" data-verso-hover="191">LockStep.Auth.histTokens</span> <span class="const token" data-verso-hover="149">auth</span> (<span class="const token" data-verso-hover="176">H</span> f K s r p), <span class="const token" data-verso-hover="197">Good</span> f K s τ) {q : P} {m : <span class="const token" data-verso-hover="146">Msg</span> P}</span>
+<span id="L254">    (hm : (<span class="const token" data-verso-hover="165">alg</span> f K).<span class="const token" data-verso-hover="167">send</span> p (s.<span class="const token" data-verso-hover="179">input</span> p) (<span class="const token" data-verso-hover="176">H</span> f K s r p) q = <span class="const token" data-verso-hover="50">some</span> m) {τ : <span class="const token" data-verso-hover="145">Tok</span> P}</span>
+<span id="L255">    (hτ : τ ∈ (<span class="const token" data-verso-hover="149">auth</span> (P := P)).<span class="const token" data-verso-hover="152">tokens</span> m) : <span class="const token" data-verso-hover="197">Good</span> f K s τ := <span class="kw">by</span></span>
+<span id="L256">  <span class="kw">rcases</span> <span class="const token" data-verso-hover="189">mem_tokens_send</span> hm hτ <span class="kw">with</span> <span class="kw">rfl</span> | ⟨hodd, d, -, hd⟩</span>
+<span id="L257">  · <span class="kw">intro</span> _</span>
+<span id="L258">    <span class="kw">show</span> <span class="const token" data-verso-hover="164">val</span> f p (s.<span class="const token" data-verso-hover="179">input</span> p) (<span class="const token" data-verso-hover="176">H</span> f K s r p) ((<span class="const token" data-verso-hover="176">H</span> f K s r p).<span class="const token" data-verso-hover="71">length</span> / <span class="nu">2</span>) =</span>
+<span id="L259">      <span class="const token" data-verso-hover="178">V</span> f K s ((<span class="const token" data-verso-hover="176">H</span> f K s r p).<span class="const token" data-verso-hover="71">length</span> / <span class="nu">2</span>) p</span>
+<span id="L260">    <span class="kw">rw</span> [<span class="kw">show</span> (<span class="const token" data-verso-hover="176">H</span> f K s r p).<span class="const token" data-verso-hover="71">length</span> = r <span class="kw">from</span> <span class="const token" data-verso-hover="200">length_hist</span> _ _ _ _ _]</span>
+<span id="L261">    <span class="kw">exact</span> <span class="const token" data-verso-hover="185">val_hist</span> (<span class="kw">by</span> <span class="kw">omega</span>) p</span>
+<span id="L262">  · <span class="kw">exact</span> hinv τ (<span class="const token" data-verso-hover="190">mem_histTokens_of_initTok</span> (<span class="kw">by</span> <span class="kw">omega</span>) hd)</span>
+<span id="L263"></span>
+<span id="L264"><span class="dc">/-- Every token in the history of an honest node is good. -/</span></span>
+<span id="L265"><span class="kw">theorem</span> <span class="const token" data-verso-hover="201">good_hist</span> (hauth : s.<span class="const token" data-verso-hover="5">AuthValid</span> <span class="const token" data-verso-hover="174">net</span> (<span class="const token" data-verso-hover="165">alg</span> f K) <span class="const token" data-verso-hover="149">auth</span>) :</span>
+<span id="L266">    ∀ r q, q ∉ s.<span class="const token" data-verso-hover="198">byz</span> → ∀ τ ∈ <span class="const token" data-verso-hover="191">LockStep.Auth.histTokens</span> <span class="const token" data-verso-hover="149">auth</span> (<span class="const token" data-verso-hover="176">H</span> f K s r q), <span class="const token" data-verso-hover="197">Good</span> f K s τ := <span class="kw">by</span></span>
+<span id="L267">  <span class="kw">intro</span> r</span>
+<span id="L268">  <span class="kw">induction</span> r <span class="kw">using</span> <span class="const token" data-verso-hover="202">Nat.strong_induction_on</span> <span class="kw">with</span></span>
+<span id="L269">  | _ r ih =&gt;</span>
+<span id="L270">  <span class="kw">intro</span> q hq τ hτ</span>
+<span id="L271">  <span class="kw">cases</span> r <span class="kw">with</span></span>
+<span id="L272">  | <span class="const token" data-verso-hover="115">zero</span> =&gt; <span class="kw">simp</span> [<span class="const token" data-verso-hover="191">LockStep.Auth.histTokens</span>] <span class="kw">at</span> hτ</span>
+<span id="L273">  | <span class="const token" data-verso-hover="121">succ</span> r =&gt;</span>
+<span id="L274">    <span class="kw">rw</span> [<span class="const token" data-verso-hover="176">H</span>, <span class="const token" data-verso-hover="203">hist_succ</span>, <span class="const token" data-verso-hover="204">LockStep.Auth.histTokens_append</span>] <span class="kw">at</span> hτ</span>
+<span id="L275">    <span class="kw">rcases</span> hτ <span class="kw">with</span> hτ | hτ</span>
+<span id="L276">    · <span class="kw">exact</span> ih r (<span class="kw">by</span> <span class="kw">omega</span>) q hq τ hτ</span>
+<span id="L277">    · <span class="kw">obtain</span> ⟨ib, hib, p, m, hm, hτm⟩ := hτ</span>
+<span id="L278">      <span class="kw">simp</span> only [<span class="const token" data-verso-hover="205">List.mem_singleton</span>] <span class="kw">at</span> hib</span>
+<span id="L279">      <span class="kw">subst</span> hib</span>
+<span id="L280">      <span class="kw">simp</span> only [<span class="const token" data-verso-hover="182">deliver</span>] <span class="kw">at</span> hm</span>
+<span id="L281">      <span class="kw">split_ifs</span> <span class="kw">at</span> hm <span class="kw">with</span> hadj hpb hdrop</span>
+<span id="L282">      · <span class="kw">rcases</span> hauth r p q m hpb hq hadj hm τ hτm <span class="kw">with</span> hs | ⟨r', hr', p', hp', q', -, m', hm', hτ'⟩</span>
+<span id="L283">        · <span class="kw">exact</span> <span class="kw">fun</span> h =&gt; <span class="const token" data-verso-hover="206">absurd</span> hs h</span>
+<span id="L284">        · <span class="kw">exact</span> <span class="const token" data-verso-hover="199">good_of_send</span> (ih r' (<span class="kw">by</span> <span class="kw">omega</span>) p' hp') hm' hτ'</span>
+<span id="L285">      · <span class="kw">exact</span> <span class="const token" data-verso-hover="199">good_of_send</span> (ih r (<span class="kw">by</span> <span class="kw">omega</span>) p hpb) hm hτm</span>
+<span id="L286"></span>
+<span id="L287"><span class="dc">/-! ### Crusader broadcast: validity and crusader consistency (Definition 6) -/</span></span>
+<span id="L288"></span>
+<span id="L289"><span class="kw">theorem</span> <span class="const token" data-verso-hover="207">inboxAt_init</span> (hrel : s.<span class="const token" data-verso-hover="208">Reliable</span>) {j : <span class="const token" data-verso-hover="33">ℕ</span>} (hj : j &lt; K) {d w : P} (hd : d ∉ s.<span class="const token" data-verso-hover="198">byz</span>)</span>
+<span id="L290">    (hdw : d ≠ w) {R : <span class="const token" data-verso-hover="33">ℕ</span>} (hR : <span class="nu">2</span> * j &lt; R) :</span>
+<span id="L291">    <span class="const token" data-verso-hover="155">inboxAt</span> (<span class="const token" data-verso-hover="176">H</span> f K s R w) (<span class="nu">2</span> * j) d = <span class="const token" data-verso-hover="50">some</span> (<span class="const token" data-verso-hover="147">.</span>init (d, j, <span class="const token" data-verso-hover="178">V</span> f K s j d)) := <span class="kw">by</span></span>
+<span id="L292">  <span class="kw">rw</span> [<span class="const token" data-verso-hover="181">inboxAt_hist</span> hR]</span>
+<span id="L293">  <span class="kw">simp</span> only</span>
+<span id="L294">  <span class="kw">rw</span> [<span class="const token" data-verso-hover="209">deliver_honest</span> _ _ s hrel hd (<span class="kw">by</span> <span class="kw">simpa</span> <span class="kw">using</span> hdw), <span class="const token" data-verso-hover="187">send_init</span> hj _ _ _ (<span class="kw">by</span> <span class="kw">simp</span>)]</span>
+<span id="L295">  <span class="kw">rfl</span></span>
+<span id="L296"></span>
+<span id="L297"><span class="kw">theorem</span> <span class="const token" data-verso-hover="210">inboxAt_echo</span> (hrel : s.<span class="const token" data-verso-hover="208">Reliable</span>) {j : <span class="const token" data-verso-hover="33">ℕ</span>} (hj : j &lt; K) {u w : P} (hu : u ∉ s.<span class="const token" data-verso-hover="198">byz</span>)</span>
+<span id="L298">    (huw : u ≠ w) {R : <span class="const token" data-verso-hover="33">ℕ</span>} (hR : <span class="nu">2</span> * j + <span class="nu">1</span> &lt; R) :</span>
+<span id="L299">    <span class="const token" data-verso-hover="155">inboxAt</span> (<span class="const token" data-verso-hover="176">H</span> f K s R w) (<span class="nu">2</span> * j + <span class="nu">1</span>) u =</span>
+<span id="L300">      <span class="const token" data-verso-hover="50">some</span> (<span class="const token" data-verso-hover="148">.</span>echo (<span class="const token" data-verso-hover="159">recvInit</span> u (<span class="const token" data-verso-hover="178">V</span> f K s j u) (<span class="const token" data-verso-hover="176">H</span> f K s R u) j)) := <span class="kw">by</span></span>
+<span id="L301">  <span class="kw">rw</span> [<span class="const token" data-verso-hover="181">inboxAt_hist</span> hR]</span>
+<span id="L302">  <span class="kw">simp</span> only</span>
+<span id="L303">  <span class="kw">rw</span> [<span class="const token" data-verso-hover="209">deliver_honest</span> _ _ s hrel hu (<span class="kw">by</span> <span class="kw">simpa</span> <span class="kw">using</span> huw), <span class="const token" data-verso-hover="188">send_echo</span> hj _ _ _ (<span class="kw">by</span> <span class="kw">simp</span>),</span>
+<span id="L304">    <span class="const token" data-verso-hover="185">val_hist</span> (R := <span class="nu">2</span> * j + <span class="nu">1</span>) (<span class="kw">by</span> <span class="kw">omega</span>),</span>
+<span id="L305">    <span class="const token" data-verso-hover="169">recvInit_congr</span> (<span class="const token" data-verso-hover="184">inboxAt_hist_eq</span> (k := <span class="nu">2</span> * j) (R := <span class="nu">2</span> * j + <span class="nu">1</span>) (R' := R) (<span class="kw">by</span> <span class="kw">omega</span>) (<span class="kw">by</span> <span class="kw">omega</span>) u)]</span>
+<span id="L306"></span>
+<span id="L307"><span class="dc">/-- In every iteration `j &lt; K`, the outputs of the `n` parallel CB instances satisfy validity and</span></span>
+<span id="L308"><span class="dc">crusader consistency (Definition 6), whatever the number of corrupted nodes. -/</span></span>
+<span id="L309"><span class="kw">theorem</span> <span class="const token" data-verso-hover="15">cb_isCrusader</span> (hrel : s.<span class="const token" data-verso-hover="208">Reliable</span>) (hauth : s.<span class="const token" data-verso-hover="5">AuthValid</span> <span class="const token" data-verso-hover="174">net</span> (<span class="const token" data-verso-hover="165">alg</span> f K) <span class="const token" data-verso-hover="149">auth</span>) {F : <span class="const token" data-verso-hover="29">Finset</span> P}</span>
+<span id="L310">    (hF : (F : <span class="const token" data-verso-hover="45">Set</span> P) = s.<span class="const token" data-verso-hover="198">byz</span>) {j : <span class="const token" data-verso-hover="33">ℕ</span>} (hj : j &lt; K) : <span class="const token" data-verso-hover="6">IsCrusader</span> F (<span class="const token" data-verso-hover="178">V</span> f K s j) (<span class="const token" data-verso-hover="180">O</span> f K s j) := <span class="kw">by</span></span>
+<span id="L311">  <span class="kw">have</span> hmem : ∀ p, p ∈ F ↔ p ∈ s.<span class="const token" data-verso-hover="198">byz</span> := <span class="kw">fun</span> p =&gt; <span class="kw">by</span> <span class="kw">rw</span> [← hF]; <span class="kw">rfl</span></span>
+<span id="L312">  <span class="kw">constructor</span></span>
+<span id="L313">  · <span class="kw">intro</span> w hw d hd</span>
+<span id="L314">    <span class="kw">rw</span> [hmem] <span class="kw">at</span> hw hd</span>
+<span id="L315">    <span class="kw">have</span> hrecv : <span class="const token" data-verso-hover="159">recvInit</span> w (<span class="const token" data-verso-hover="178">V</span> f K s j w) (<span class="const token" data-verso-hover="176">H</span> f K s (<span class="nu">2</span> * j + <span class="nu">2</span>) w) j d = <span class="const token" data-verso-hover="50">some</span> (d, j, <span class="const token" data-verso-hover="178">V</span> f K s j d) := <span class="kw">by</span></span>
+<span id="L316">      <span class="kw">unfold</span> <span class="const token" data-verso-hover="159">recvInit</span></span>
+<span id="L317">      <span class="kw">split_ifs</span> <span class="kw">with</span> hdw</span>
+<span id="L318">      · <span class="kw">subst</span> hdw; <span class="kw">rfl</span></span>
+<span id="L319">      · <span class="kw">rw</span> [<span class="const token" data-verso-hover="207">inboxAt_init</span> hrel hj hd hdw (<span class="kw">by</span> <span class="kw">omega</span>)]; <span class="kw">rfl</span></span>
+<span id="L320">    <span class="kw">have</span> hnc : ¬ <span class="const token" data-verso-hover="161">Conflict</span> (<span class="const token" data-verso-hover="176">H</span> f K s (<span class="nu">2</span> * j + <span class="nu">2</span>) w) j d (<span class="const token" data-verso-hover="178">V</span> f K s j d) := <span class="kw">by</span></span>
+<span id="L321">      <span class="kw">rintro</span> ⟨u, σ, hσ, h1, h2, h3⟩</span>
+<span id="L322">      <span class="kw">obtain</span> ⟨m, hm, hmσ⟩ := <span class="const token" data-verso-hover="192">Option.bind_eq_some_iff</span>.<span class="const token" data-verso-hover="68">1</span> hσ</span>
+<span id="L323">      <span class="kw">have</span> := <span class="const token" data-verso-hover="201">good_hist</span> hauth _ w hw σ</span>
+<span id="L324">        (<span class="const token" data-verso-hover="195">mem_histTokens_of_inboxAt</span> (<span class="kw">by</span> <span class="kw">simp</span>) hm (<span class="const token" data-verso-hover="196">mem_tokens_of_echoTok</span> hmσ))</span>
+<span id="L325">      <span class="kw">have</span> := this (<span class="kw">by</span> <span class="kw">rw</span> [h1]; <span class="kw">exact</span> hd)</span>
+<span id="L326">      <span class="kw">rw</span> [h1, h2] <span class="kw">at</span> this</span>
+<span id="L327">      <span class="kw">exact</span> h3 this</span>
+<span id="L328">    <span class="kw">simp</span> [<span class="const token" data-verso-hover="180">O</span>, <span class="const token" data-verso-hover="163">cbOut</span>, hrecv, hnc]</span>
+<span id="L329">  · <span class="kw">intro</span> u hu w hw d a b hua hwb</span>
+<span id="L330">    <span class="kw">rw</span> [hmem] <span class="kw">at</span> hu hw</span>
+<span id="L331">    <span class="kw">by_cases</span> huw : u = w</span>
+<span id="L332">    · <span class="kw">subst</span> huw; <span class="kw">rw</span> [hua] <span class="kw">at</span> hwb; <span class="kw">exact</span> <span class="const token" data-verso-hover="211">Option.some_injective</span> _ hwb</span>
+<span id="L333">    <span class="kw">simp</span> only [<span class="const token" data-verso-hover="180">O</span>, <span class="const token" data-verso-hover="163">cbOut</span>] <span class="kw">at</span> hua hwb</span>
+<span id="L334">    <span class="kw">obtain</span> ⟨σ, hσ, hσa⟩ := <span class="const token" data-verso-hover="192">Option.bind_eq_some_iff</span>.<span class="const token" data-verso-hover="68">1</span> hua</span>
+<span id="L335">    <span class="kw">obtain</span> ⟨σ', hσ', hσb⟩ := <span class="const token" data-verso-hover="192">Option.bind_eq_some_iff</span>.<span class="const token" data-verso-hover="68">1</span> hwb</span>
+<span id="L336">    <span class="kw">split_ifs</span> <span class="kw">at</span> hσa <span class="kw">with</span> hc</span>
+<span id="L337">    <span class="kw">split_ifs</span> <span class="kw">at</span> hσb <span class="kw">with</span> hc'</span>
+<span id="L338">    <span class="kw">cases</span> hσa; <span class="kw">cases</span> hσb</span>
+<span id="L339">    <span class="kw">by_contra</span> hab</span>
+<span id="L340">    <span class="kw">refine</span> hc'.<span class="const token" data-verso-hover="69">2</span><span class="nu">.</span><span class="const token" data-verso-hover="69">2</span> ⟨u, σ, ?_, hc.<span class="const token" data-verso-hover="105">1</span>, hc.<span class="const token" data-verso-hover="69">2</span><span class="nu">.</span><span class="const token" data-verso-hover="105">1</span>, hab⟩</span>
+<span id="L341">    <span class="kw">rw</span> [<span class="const token" data-verso-hover="210">inboxAt_echo</span> hrel hj hu huw (<span class="kw">by</span> <span class="kw">omega</span>)]</span>
+<span id="L342">    <span class="kw">simpa</span> [<span class="const token" data-verso-hover="154">Msg.echoTok</span>] <span class="kw">using</span> hσ</span>
+<span id="L343"></span>
+<span id="L344"><span class="dc">/-! ### Decisions -/</span></span>
+<span id="L345"></span>
+<span id="L346"><span class="kw">theorem</span> <span class="const token" data-verso-hover="212">decides_V</span> (p : P) : <span class="const token" data-verso-hover="213">Decides</span> <span class="const token" data-verso-hover="174">net</span> (<span class="const token" data-verso-hover="165">alg</span> f K) s p (<span class="const token" data-verso-hover="178">V</span> f K s K p) := <span class="kw">by</span></span>
+<span id="L347">  <span class="kw">refine</span> ⟨<span class="nu">2</span> * K, ?_, <span class="kw">fun</span> r hr =&gt; ?_⟩</span>
+<span id="L348">  · <span class="kw">simp</span> only [<span class="const token" data-verso-hover="214">status</span>, <span class="const token" data-verso-hover="165">alg</span>, <span class="const token" data-verso-hover="200">length_hist</span>, <span class="const token" data-verso-hover="215">le_refl</span>, ↓<span class="const token" data-verso-hover="55">reduceIte</span>]</span>
+<span id="L349">    <span class="kw">exact</span> <span class="const token" data-verso-hover="90">congrArg</span> <span class="const token" data-verso-hover="50">some</span> (<span class="const token" data-verso-hover="185">val_hist</span> <span class="const token" data-verso-hover="82">le_rfl</span> p)</span>
+<span id="L350">  · <span class="kw">simp</span> only [<span class="const token" data-verso-hover="214">status</span>, <span class="const token" data-verso-hover="165">alg</span>, <span class="const token" data-verso-hover="200">length_hist</span>]</span>
+<span id="L351">    <span class="kw">simp</span> only [<span class="kw">show</span> ¬ <span class="nu">2</span> * K ≤ r <span class="kw">by</span> <span class="kw">omega</span>, ↓<span class="const token" data-verso-hover="55">reduceIte</span>]</span>
+<span id="L352"></span>
+<span id="L353"><span class="kw">theorem</span> <span class="const token" data-verso-hover="216">decides_iff</span> (p : P) (o : <span class="const token" data-verso-hover="26">ℝ</span>) : <span class="const token" data-verso-hover="213">Decides</span> <span class="const token" data-verso-hover="174">net</span> (<span class="const token" data-verso-hover="165">alg</span> f K) s p o ↔ o = <span class="const token" data-verso-hover="178">V</span> f K s K p :=</span>
+<span id="L354">  ⟨<span class="kw">fun</span> h =&gt; h.<span class="const token" data-verso-hover="217">unique</span> _ _ (<span class="const token" data-verso-hover="212">decides_V</span> p), <span class="kw">fun</span> h =&gt; h ▸ <span class="const token" data-verso-hover="212">decides_V</span> p⟩</span>
+<span id="L355"></span>
+<span id="L356"><span class="kw">theorem</span> <span class="const token" data-verso-hover="218">terminatesBy</span> : <span class="const token" data-verso-hover="219">TerminatesBy</span> <span class="const token" data-verso-hover="174">net</span> (<span class="const token" data-verso-hover="165">alg</span> f K) s (<span class="nu">2</span> * K) :=</span>
+<span id="L357">  <span class="kw">fun</span> p _ =&gt; ⟨<span class="nu">2</span> * K, <span class="const token" data-verso-hover="82">le_rfl</span>, <span class="const token" data-verso-hover="164">val</span> f p (s.<span class="const token" data-verso-hover="179">input</span> p) (<span class="const token" data-verso-hover="176">H</span> f K s (<span class="nu">2</span> * K) p) K, <span class="kw">by</span></span>
+<span id="L358">    <span class="kw">simp</span> only [<span class="const token" data-verso-hover="214">status</span>, <span class="const token" data-verso-hover="165">alg</span>, <span class="const token" data-verso-hover="200">length_hist</span>, <span class="const token" data-verso-hover="215">le_refl</span>, ↓<span class="const token" data-verso-hover="55">reduceIte</span>]; <span class="kw">rfl</span>⟩</span>
+<span id="L359"></span>
+<span id="L360"><span class="dc">/-! ### Approximate agreement -/</span></span>
+<span id="L361"></span>
+<span id="L362"><span class="dc">/-- **Definition 1** (with the resilience given by the adversary structure): if the honest inputs</span></span>
+<span id="L363"><span class="dc">have range at most `ℓ`, then every honest node decides (termination), every honest decision lies</span></span>
+<span id="L364"><span class="dc">between two honest inputs (validity) and any two honest decisions are at most `ε` apart</span></span>
+<span id="L365"><span class="dc">(`ε`-consistency). -/</span></span>
+<span id="L366"><span class="kw">def</span> <span class="const token" data-verso-hover="220">AASpec</span> (ℓ ε : <span class="const token" data-verso-hover="26">ℝ</span>) : <span class="const token" data-verso-hover="221">Spec</span> P <span class="const token" data-verso-hover="26">ℝ</span> <span class="const token" data-verso-hover="26">ℝ</span> := <span class="kw">fun</span> inp Hs dec =&gt;</span>
+<span id="L367">  (∀ p ∈ Hs, ∀ q ∈ Hs, inp p - inp q ≤ ℓ) → <span class="const token" data-verso-hover="222">Problem.ApproxAgreement</span> ε inp Hs dec</span>
+<span id="L368"></span>
+<span id="L369"><span class="dc">/-- `A` is an `(ℓ, ε, t)`-secure protocol for approximate agreement running in `T` rounds: it is</span></span>
+<span id="L370"><span class="dc">unforging and solves `AASpec ℓ ε` against every unforgeability-respecting adversary corrupting at</span></span>
+<span id="L371"><span class="dc">most `t` nodes, and all honest nodes decide within `T` rounds. -/</span></span>
+<span id="L372"><span class="kw">def</span> <span class="const token" data-verso-hover="19">Secure</span> (t : <span class="const token" data-verso-hover="33">ℕ</span>) (ℓ ε : <span class="const token" data-verso-hover="26">ℝ</span>) (A : <span class="const token" data-verso-hover="166">Protocol</span> P <span class="const token" data-verso-hover="26">ℝ</span> (<span class="const token" data-verso-hover="146">Msg</span> P) <span class="const token" data-verso-hover="26">ℝ</span>) (T : <span class="const token" data-verso-hover="33">ℕ</span>) : <span class="kw">Prop</span> :=</span>
+<span id="L373">  A.<span class="const token" data-verso-hover="3">Unforging</span> <span class="const token" data-verso-hover="149">auth</span> ∧ <span class="const token" data-verso-hover="223">SolvesAuth</span> <span class="const token" data-verso-hover="174">net</span> A <span class="const token" data-verso-hover="149">auth</span> (<span class="const token" data-verso-hover="224">atMost</span> t) (<span class="const token" data-verso-hover="220">AASpec</span> ℓ ε) ∧</span>
+<span id="L374">    ∀ s : <span class="const token" data-verso-hover="173">Scenario</span> P <span class="const token" data-verso-hover="26">ℝ</span> (<span class="const token" data-verso-hover="146">Msg</span> P), s.<span class="const token" data-verso-hover="198">byz</span> ∈ <span class="const token" data-verso-hover="224">atMost</span> t → s.<span class="const token" data-verso-hover="208">Reliable</span> → s.<span class="const token" data-verso-hover="5">AuthValid</span> <span class="const token" data-verso-hover="174">net</span> A <span class="const token" data-verso-hover="149">auth</span> →</span>
+<span id="L375">      <span class="const token" data-verso-hover="219">TerminatesBy</span> <span class="const token" data-verso-hover="174">net</span> A s T</span>
+<span id="L376"></span>
+<span id="L377"><span class="dc">/-- Range contraction over the iterations: by Theorem 9 (`apa_step`) each iteration keeps the</span></span>
+<span id="L378"><span class="dc">honest values in `[a, b]` and halves their spread. -/</span></span>
+<span id="L379"><span class="kw">theorem</span> <span class="const token" data-verso-hover="225">iterate_range</span> (hrel : s.<span class="const token" data-verso-hover="208">Reliable</span>) (hauth : s.<span class="const token" data-verso-hover="5">AuthValid</span> <span class="const token" data-verso-hover="174">net</span> (<span class="const token" data-verso-hover="165">alg</span> f K) <span class="const token" data-verso-hover="149">auth</span>)</span>
+<span id="L380">    (hf : s.<span class="const token" data-verso-hover="198">byz</span>.<span class="const token" data-verso-hover="226">ncard</span> ≤ f) (hn : <span class="nu">2</span> * f &lt; <span class="const token" data-verso-hover="61">Fintype.card</span> P) {a b : <span class="const token" data-verso-hover="26">ℝ</span>} (hab : a ≤ b)</span>
+<span id="L381">    (hin : ∀ p, p ∉ s.<span class="const token" data-verso-hover="198">byz</span> → s.<span class="const token" data-verso-hover="179">input</span> p ∈ <span class="const token" data-verso-hover="46">Set.Icc</span> a b) :</span>
+<span id="L382">    (∀ p, p ∉ s.<span class="const token" data-verso-hover="198">byz</span> → <span class="const token" data-verso-hover="178">V</span> f K s K p ∈ <span class="const token" data-verso-hover="46">Set.Icc</span> a b) ∧</span>
+<span id="L383">      ∀ p, p ∉ s.<span class="const token" data-verso-hover="198">byz</span> → ∀ q, q ∉ s.<span class="const token" data-verso-hover="198">byz</span> → |<span class="const token" data-verso-hover="178">V</span> f K s K p - <span class="const token" data-verso-hover="178">V</span> f K s K q| ≤ (<span class="nu">1</span> / <span class="nu">2</span>) ^ K * (b - a) := <span class="kw">by</span></span>
+<span id="L384">  <span class="kw">set</span> F : <span class="const token" data-verso-hover="29">Finset</span> P := s.<span class="const token" data-verso-hover="198">byz</span>.<span class="const token" data-verso-hover="227">toFinset</span> <span class="kw">with</span> hFdef</span>
+<span id="L385">  <span class="kw">have</span> hF : (F : <span class="const token" data-verso-hover="45">Set</span> P) = s.<span class="const token" data-verso-hover="198">byz</span> := <span class="kw">by</span> <span class="kw">simp</span> [F]</span>
+<span id="L386">  <span class="kw">have</span> hFc : F.<span class="const token" data-verso-hover="36">card</span> ≤ f := <span class="kw">by</span></span>
+<span id="L387">    <span class="kw">rw</span> [← <span class="const token" data-verso-hover="228">Set.ncard_coe_finset</span>, hF]; <span class="kw">exact</span> hf</span>
+<span id="L388">  <span class="kw">have</span> hmem : ∀ p, p ∈ F ↔ p ∈ s.<span class="const token" data-verso-hover="198">byz</span> := <span class="kw">fun</span> p =&gt; <span class="kw">by</span> <span class="kw">rw</span> [← hF]; <span class="kw">rfl</span></span>
+<span id="L389">  <span class="kw">have</span> key := <span class="const token" data-verso-hover="229">Cslib.ApproxConsensus.mem_Icc_and_abs_sub_le_pow_mul_of_step</span></span>
+<span id="L390">    (H := <span class="kw">fun</span> t =&gt; {p | t ≤ K ∧ p ∉ s.<span class="const token" data-verso-hover="198">byz</span>}) (x := <span class="kw">fun</span> t p =&gt; <span class="const token" data-verso-hover="178">V</span> f K s t p) (c := <span class="nu">1</span> / <span class="nu">2</span>)</span>
+<span id="L391">    (<span class="kw">by</span> <span class="kw">norm_num</span>) hab (<span class="kw">fun</span> p hp =&gt; hin p hp.<span class="const token" data-verso-hover="69">2</span>) ?_ K</span>
+<span id="L392">  · <span class="kw">exact</span> ⟨<span class="kw">fun</span> p hp =&gt; key.<span class="const token" data-verso-hover="105">1</span> p ⟨<span class="const token" data-verso-hover="82">le_rfl</span>, hp⟩, <span class="kw">fun</span> p hp q hq =&gt; key.<span class="const token" data-verso-hover="69">2</span> p ⟨<span class="const token" data-verso-hover="82">le_rfl</span>, hp⟩ q ⟨<span class="const token" data-verso-hover="82">le_rfl</span>, hq⟩⟩</span>
+<span id="L393">  <span class="kw">intro</span> t a' b' _ hval</span>
+<span id="L394">  <span class="kw">by_cases</span> ht : t + <span class="nu">1</span> ≤ K</span>
+<span id="L395">  · <span class="kw">have</span> hcr := <span class="const token" data-verso-hover="15">cb_isCrusader</span> hrel hauth hF (<span class="kw">show</span> t &lt; K <span class="kw">by</span> <span class="kw">omega</span>)</span>
+<span id="L396">    <span class="kw">obtain</span> ⟨h1, h2⟩ := <span class="const token" data-verso-hover="14">apa_step</span> hFc hn hcr (a := a') (b := b')</span>
+<span id="L397">      (<span class="kw">fun</span> p hp =&gt; hval p ⟨<span class="kw">by</span> <span class="kw">omega</span>, (hmem p).<span class="const token" data-verso-hover="230">not</span>.<span class="const token" data-verso-hover="68">1</span> hp⟩)</span>
+<span id="L398">    <span class="kw">refine</span> ⟨<span class="kw">fun</span> p hp =&gt; ?_, <span class="kw">fun</span> p hp q hq =&gt; ?_⟩</span>
+<span id="L399">    · <span class="kw">simp</span> only [<span class="const token" data-verso-hover="186">V_succ</span>]; <span class="kw">exact</span> h1 p ((hmem p).<span class="const token" data-verso-hover="230">not</span>.<span class="const token" data-verso-hover="81">2</span> hp.<span class="const token" data-verso-hover="69">2</span>)</span>
+<span id="L400">    · <span class="kw">simp</span> only [<span class="const token" data-verso-hover="186">V_succ</span>]</span>
+<span id="L401">      <span class="kw">have</span> := h2 p ((hmem p).<span class="const token" data-verso-hover="230">not</span>.<span class="const token" data-verso-hover="81">2</span> hp.<span class="const token" data-verso-hover="69">2</span>) q ((hmem q).<span class="const token" data-verso-hover="230">not</span>.<span class="const token" data-verso-hover="81">2</span> hq.<span class="const token" data-verso-hover="69">2</span>); <span class="kw">linarith</span></span>
+<span id="L402">  · <span class="kw">exact</span> ⟨<span class="kw">fun</span> p hp =&gt; <span class="const token" data-verso-hover="206">absurd</span> hp.<span class="const token" data-verso-hover="105">1</span> ht, <span class="kw">fun</span> p hp =&gt; <span class="const token" data-verso-hover="206">absurd</span> hp.<span class="const token" data-verso-hover="105">1</span> ht⟩</span>
+<span id="L403"></span>
+<span id="L404"><span class="dc">/-- `K` iterations of APA: an `(ℓ, ℓ/2^K, f)`-secure protocol running in `2K` rounds, for every</span></span>
+<span id="L405"><span class="dc">`f` with `2f &lt; n`. -/</span></span>
+<span id="L406"><span class="kw">theorem</span> <span class="const token" data-verso-hover="17">alg_secure</span> (hn : <span class="nu">2</span> * f &lt; <span class="const token" data-verso-hover="61">Fintype.card</span> P) (K : <span class="const token" data-verso-hover="33">ℕ</span>) (ℓ : <span class="const token" data-verso-hover="26">ℝ</span>) :</span>
+<span id="L407">    <span class="const token" data-verso-hover="19">Secure</span> (P := P) f ℓ ((<span class="nu">1</span> / <span class="nu">2</span>) ^ K * ℓ) (<span class="const token" data-verso-hover="165">alg</span> f K) (<span class="nu">2</span> * K) := <span class="kw">by</span></span>
+<span id="L408">  <span class="kw">refine</span> ⟨<span class="const token" data-verso-hover="4">alg_unforging</span>, <span class="kw">fun</span> s hZ hrel hauth hℓ =&gt; ?_, <span class="kw">fun</span> s _ _ _ =&gt; <span class="const token" data-verso-hover="218">terminatesBy</span>⟩</span>
+<span id="L409">  <span class="kw">have</span> hf : s.<span class="const token" data-verso-hover="198">byz</span>.<span class="const token" data-verso-hover="226">ncard</span> ≤ f := hZ</span>
+<span id="L410">  <span class="cm">--</span><span class="cm"> the honest parties form a nonempty finite set</span></span>
+<span id="L411">  <span class="kw">have</span> hne : (<span class="const token" data-verso-hover="28">Finset.univ</span>.<span class="const token" data-verso-hover="34">filter</span> (· ∉ s.<span class="const token" data-verso-hover="198">byz</span>)).<span class="const token" data-verso-hover="139">Nonempty</span> := <span class="kw">by</span></span>
+<span id="L412">    <span class="kw">by_contra</span> hall</span>
+<span id="L413">    <span class="kw">rw</span> [<span class="const token" data-verso-hover="140">Finset.not_nonempty_iff_eq_empty</span>, <span class="const token" data-verso-hover="141">Finset.filter_eq_empty_iff</span>] <span class="kw">at</span> hall</span>
+<span id="L414">    <span class="kw">have</span> : s.<span class="const token" data-verso-hover="198">byz</span> = <span class="const token" data-verso-hover="231">Set.univ</span> := <span class="const token" data-verso-hover="232">Set.eq_univ_of_forall</span> <span class="kw">fun</span> p =&gt; <span class="kw">by</span></span>
+<span id="L415">      <span class="kw">simpa</span> <span class="kw">using</span> hall (<span class="const token" data-verso-hover="97">Finset.mem_univ</span> p)</span>
+<span id="L416">    <span class="kw">rw</span> [this, <span class="const token" data-verso-hover="233">Set.ncard_univ</span>, <span class="const token" data-verso-hover="234">Nat.card_eq_fintype_card</span>] <span class="kw">at</span> hf; <span class="kw">omega</span></span>
+<span id="L417">  <span class="kw">obtain</span> ⟨pmin, hpmin, hmin⟩ := <span class="const token" data-verso-hover="142">Finset.exists_min_image</span> _ s.<span class="const token" data-verso-hover="179">input</span> hne</span>
+<span id="L418">  <span class="kw">obtain</span> ⟨pmax, hpmax, hmax⟩ := <span class="const token" data-verso-hover="143">Finset.exists_max_image</span> _ s.<span class="const token" data-verso-hover="179">input</span> hne</span>
+<span id="L419">  <span class="kw">have</span> hpmin' : pmin ∉ s.<span class="const token" data-verso-hover="198">byz</span> := (<span class="const token" data-verso-hover="67">Finset.mem_filter</span>.<span class="const token" data-verso-hover="68">1</span> hpmin).<span class="const token" data-verso-hover="69">2</span></span>
+<span id="L420">  <span class="kw">have</span> hpmax' : pmax ∉ s.<span class="const token" data-verso-hover="198">byz</span> := (<span class="const token" data-verso-hover="67">Finset.mem_filter</span>.<span class="const token" data-verso-hover="68">1</span> hpmax).<span class="const token" data-verso-hover="69">2</span></span>
+<span id="L421">  <span class="kw">have</span> hin : ∀ p, p ∉ s.<span class="const token" data-verso-hover="198">byz</span> → s.<span class="const token" data-verso-hover="179">input</span> p ∈ <span class="const token" data-verso-hover="46">Set.Icc</span> (s.<span class="const token" data-verso-hover="179">input</span> pmin) (s.<span class="const token" data-verso-hover="179">input</span> pmax) := <span class="kw">fun</span> p hp =&gt;</span>
+<span id="L422">    ⟨hmin p (<span class="const token" data-verso-hover="67">Finset.mem_filter</span>.<span class="const token" data-verso-hover="81">2</span> ⟨<span class="const token" data-verso-hover="97">Finset.mem_univ</span> _, hp⟩),</span>
+<span id="L423">      hmax p (<span class="const token" data-verso-hover="67">Finset.mem_filter</span>.<span class="const token" data-verso-hover="81">2</span> ⟨<span class="const token" data-verso-hover="97">Finset.mem_univ</span> _, hp⟩)⟩</span>
+<span id="L424">  <span class="kw">obtain</span> ⟨h1, h2⟩ := <span class="const token" data-verso-hover="225">iterate_range</span> hrel hauth hf hn (hin pmin hpmin').<span class="const token" data-verso-hover="69">2</span> hin</span>
+<span id="L425">  <span class="kw">have</span> hℓ' : s.<span class="const token" data-verso-hover="179">input</span> pmax - s.<span class="const token" data-verso-hover="179">input</span> pmin ≤ ℓ := hℓ pmax hpmax' pmin hpmin'</span>
+<span id="L426">  <span class="kw">refine</span> ⟨<span class="kw">fun</span> p _ =&gt; ⟨_, <span class="const token" data-verso-hover="212">decides_V</span> p⟩, <span class="kw">fun</span> p hp v hv =&gt; ?_, <span class="kw">fun</span> p hp q hq v w hv hw =&gt; ?_⟩</span>
+<span id="L427">  · <span class="kw">rw</span> [<span class="const token" data-verso-hover="216">decides_iff</span>] <span class="kw">at</span> hv; <span class="kw">subst</span> hv</span>
+<span id="L428">    <span class="kw">exact</span> ⟨⟨pmin, hpmin', (h1 p hp).<span class="const token" data-verso-hover="105">1</span>⟩, pmax, hpmax', (h1 p hp).<span class="const token" data-verso-hover="69">2</span>⟩</span>
+<span id="L429">  · <span class="kw">rw</span> [<span class="const token" data-verso-hover="216">decides_iff</span>] <span class="kw">at</span> hv hw; <span class="kw">subst</span> hv hw</span>
+<span id="L430">    <span class="kw">exact</span> (h2 p hp q hq).<span class="const token" data-verso-hover="120">trans</span> (<span class="const token" data-verso-hover="235">mul_le_mul_of_nonneg_left</span> hℓ' (<span class="kw">by</span> <span class="kw">positivity</span>))</span>
+<span id="L431"></span>
+<span id="L432"><span class="dc">/-- `⌈n/2⌉ - 1` (as `(n + 1)/2 - 1` in `ℕ`) satisfies `2f &lt; n` for `n ≥ 1`. -/</span></span>
+<span id="L433"><span class="kw">theorem</span> <span class="const token" data-verso-hover="236">two_mul_ceil_half_sub_one_lt</span> [<span class="const token" data-verso-hover="237">Nonempty</span> P] :</span>
+<span id="L434">    <span class="nu">2</span> * ((<span class="const token" data-verso-hover="61">Fintype.card</span> P + <span class="nu">1</span>) / <span class="nu">2</span> - <span class="nu">1</span>) &lt; <span class="const token" data-verso-hover="61">Fintype.card</span> P := <span class="kw">by</span></span>
+<span id="L435">  <span class="kw">have</span> := <span class="const token" data-verso-hover="238">Fintype.card_pos</span> (α := P); <span class="kw">omega</span></span>
+<span id="L436"></span>
+<span id="L437"><span class="dc">/-- **Theorem 9.** Algorithm APA (one iteration of `alg`, i.e. two rounds: the two rounds of CB)</span></span>
+<span id="L438"><span class="dc">is an `(ℓ, ℓ/2, ⌈n/2⌉ - 1)`-secure two-round protocol for approximate agreement, for every `ℓ`. -/</span></span>
+<span id="L439"><span class="kw">theorem</span> <span class="const token" data-verso-hover="16">theorem_9</span> [<span class="const token" data-verso-hover="237">Nonempty</span> P] (ℓ : <span class="const token" data-verso-hover="26">ℝ</span>) :</span>
+<span id="L440">    <span class="const token" data-verso-hover="19">Secure</span> (P := P) ((<span class="const token" data-verso-hover="61">Fintype.card</span> P + <span class="nu">1</span>) / <span class="nu">2</span> - <span class="nu">1</span>) ℓ (ℓ / <span class="nu">2</span>) (<span class="const token" data-verso-hover="165">alg</span> ((<span class="const token" data-verso-hover="61">Fintype.card</span> P + <span class="nu">1</span>) / <span class="nu">2</span> - <span class="nu">1</span>) <span class="nu">1</span>) <span class="nu">2</span> := <span class="kw">by</span></span>
+<span id="L441">  <span class="kw">have</span> := <span class="const token" data-verso-hover="17">alg_secure</span> (P := P) <span class="const token" data-verso-hover="236">two_mul_ceil_half_sub_one_lt</span> <span class="nu">1</span> ℓ</span>
+<span id="L442">  <span class="kw">rwa</span> [<span class="const token" data-verso-hover="239">pow_one</span>, <span class="const token" data-verso-hover="240">one_div_mul_eq_div</span>] <span class="kw">at</span> this</span>
+<span id="L443"></span>
+<span id="L444"><span class="dc">/-- **Corollary 2.** For `ε &gt; 0`, `⌈log₂(ℓ/ε)⌉` iterations of APA form an</span></span>
+<span id="L445"><span class="dc">`(ℓ, ε, ⌈n/2⌉ - 1)`-secure protocol for approximate agreement running in `2⌈log₂(ℓ/ε)⌉` rounds. -/</span></span>
+<span id="L446"><span class="kw">theorem</span> <span class="const token" data-verso-hover="0">corollary_2</span> [<span class="const token" data-verso-hover="237">Nonempty</span> P] (ℓ : <span class="const token" data-verso-hover="26">ℝ</span>) {ε : <span class="const token" data-verso-hover="26">ℝ</span>} (hε : <span class="nu">0</span> &lt; ε) :</span>
+<span id="L447">    <span class="const token" data-verso-hover="19">Secure</span> (P := P) ((<span class="const token" data-verso-hover="61">Fintype.card</span> P + <span class="nu">1</span>) / <span class="nu">2</span> - <span class="nu">1</span>) ℓ ε</span>
+<span id="L448">      (<span class="const token" data-verso-hover="165">alg</span> ((<span class="const token" data-verso-hover="61">Fintype.card</span> P + <span class="nu">1</span>) / <span class="nu">2</span> - <span class="nu">1</span>) ⌈<span class="const token" data-verso-hover="241">Real.logb</span> <span class="nu">2</span> (ℓ / ε)⌉₊)</span>
+<span id="L449">      (<span class="nu">2</span> * ⌈<span class="const token" data-verso-hover="241">Real.logb</span> <span class="nu">2</span> (ℓ / ε)⌉₊) := <span class="kw">by</span></span>
+<span id="L450">  <span class="kw">obtain</span> ⟨hU, hS, hT⟩ := <span class="const token" data-verso-hover="17">alg_secure</span> (P := P) <span class="const token" data-verso-hover="236">two_mul_ceil_half_sub_one_lt</span> ⌈<span class="const token" data-verso-hover="241">Real.logb</span> <span class="nu">2</span> (ℓ / ε)⌉₊ ℓ</span>
+<span id="L451">  <span class="kw">refine</span> ⟨hU, <span class="kw">fun</span> s hZ hrel hauth hℓ =&gt; ?_, hT⟩</span>
+<span id="L452">  <span class="kw">obtain</span> ⟨h1, h2, h3⟩ := hS s hZ hrel hauth hℓ</span>
+<span id="L453">  <span class="kw">refine</span> ⟨h1, h2, h3.<span class="const token" data-verso-hover="242">mono</span> ?_⟩</span>
+<span id="L454">  <span class="kw">have</span> h := <span class="const token" data-verso-hover="243">Real.le_pow_natCeil_logb_div_mul</span> (b := <span class="nu">2</span>) (<span class="kw">by</span> <span class="kw">norm_num</span>) ℓ hε</span>
+<span id="L455">  <span class="kw">set</span> k := ⌈<span class="const token" data-verso-hover="241">Real.logb</span> <span class="nu">2</span> (ℓ / ε)⌉₊</span>
+<span id="L456">  <span class="kw">have</span> hk : (<span class="nu">0</span> : <span class="const token" data-verso-hover="26">ℝ</span>) &lt; <span class="nu">2</span> ^ k := <span class="kw">by</span> <span class="kw">positivity</span></span>
+<span id="L457">  <span class="kw">rw</span> [<span class="const token" data-verso-hover="244">one_div_pow</span>, <span class="const token" data-verso-hover="240">one_div_mul_eq_div</span>, <span class="const token" data-verso-hover="245">div_le_iff₀</span> hk]</span>
+<span id="L458">  <span class="kw">linarith</span></span>
+<span id="L459"></span>
+<span id="L460"><span class="dc">/-- Non-vacuity of the adversary hypotheses of `Secure`: for any Byzantine set `B` and inputs, the</span></span>
+<span id="L461"><span class="dc">scenario in which the corrupted nodes stay silent is reliable and respects unforgeability. -/</span></span>
+<span id="L462"><span class="kw">theorem</span> <span class="const token" data-verso-hover="18">exists_authValid</span> (B : <span class="const token" data-verso-hover="45">Set</span> P) (x : P → <span class="const token" data-verso-hover="26">ℝ</span>) (f K : <span class="const token" data-verso-hover="33">ℕ</span>) :</span>
+<span id="L463">    ∃ s : <span class="const token" data-verso-hover="173">Scenario</span> P <span class="const token" data-verso-hover="26">ℝ</span> (<span class="const token" data-verso-hover="146">Msg</span> P), s.<span class="const token" data-verso-hover="198">byz</span> = B ∧ s.<span class="const token" data-verso-hover="179">input</span> = x ∧ s.<span class="const token" data-verso-hover="208">Reliable</span> ∧</span>
+<span id="L464">      s.<span class="const token" data-verso-hover="5">AuthValid</span> <span class="const token" data-verso-hover="174">net</span> (<span class="const token" data-verso-hover="165">alg</span> f K) <span class="const token" data-verso-hover="149">auth</span> :=</span>
+<span id="L465">  ⟨{ <span class="const token" data-verso-hover="198">byz</span> := B, <span class="const token" data-verso-hover="179">input</span> := x, <span class="const token" data-verso-hover="246">adv</span> := <span class="kw">fun</span> _ _ _ =&gt; <span class="const token" data-verso-hover="35">none</span> }, <span class="const token" data-verso-hover="83">rfl</span>, <span class="const token" data-verso-hover="83">rfl</span>, <span class="kw">fun</span> _ _ _ h =&gt; h,</span>
+<span id="L466">    <span class="kw">fun</span> _ _ _ _ _ _ _ hm =&gt; <span class="kw">by</span> <span class="kw">simp</span> <span class="kw">at</span> hm⟩</span>
+<span id="L467"></span>
+<span id="L468"><span class="kw">end</span> Podc.ClockSyncSignatures</span>
+<span id="L469"></span>
+<span id="L470"><span class="kw">end</span></span>
+<span id="L471"></span>
+</code></div>
+        <script>
+          window.versoHoversUrl = "PODC2022/ClockSyncSignatures/-hovers.json";</script>
+        <script src="static/lean/popper.js"></script>
+        <script src="static/lean/tippy.js"></script>
+        <script src="static/lean/marked.js"></script>
+        <script src="static/lean/highlighting.js"></script>
+        <script src="static/lean/lean.js"></script>
+        </article></main><footer class="site-footer"><div class="wrap">
+        Machine-checked formalizations of PODC papers in Lean 4. Generated with <a href="https://github.com/leanprover/verso">Verso</a> from the README files of <a href="https://github.com/vasnesterov/formal_podc">vasnesterov/formal_podc</a>.</div>
+      </footer></body>
+  </html>
+

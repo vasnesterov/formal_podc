@@ -1,0 +1,597 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="light dark">
+    <link rel="icon" href="data:,">
+    <title>BFTInBlockDAG: Gossip.lean · Formal PODC</title><base href="../../../.././"><link rel="stylesheet" href="static/lean/verso-vars.css">
+    <link rel="stylesheet" href="static/lean/highlighting.css">
+    <link rel="stylesheet" href="static/lean/tippy-border.css">
+    <link rel="stylesheet" href="static/style.css">
+    <script defer="defer" src="static/site.js"></script>
+    </head>
+  <body>
+    <header class="site-header">
+      <div class="wrap">
+        <a class="brand" href=".">Formal PODC</a><nav class="top">
+          <a href=".">Search</a><a href="about/">About</a><a href="https://github.com/vasnesterov/formal_podc">GitHub</a></nav>
+        </div>
+      </header>
+    <main class="wrap"><article><nav class="breadcrumbs" aria-label="Breadcrumb">
+          <a href=".">Search</a><span class="sep">›</span><a href="PODC2021/">PODC 2021</a><span class="sep">›</span><a href="PODC2021/BFTInBlockDAG/">BFTInBlockDAG</a><span class="sep">›</span><a href="PODC2021/BFTInBlockDAG/src/">Lean source</a><span class="sep">›</span><span aria-current="page">Gossip</span></nav>
+        <h1>
+          <code>Gossip.lean</code></h1>
+        <div class="paper-links">
+          <p>
+            Source of <a href="PODC2021/BFTInBlockDAG/">Embedding a Deterministic BFT Protocol in a Block DAG — PODC 2021</a> · <a href="https://github.com/vasnesterov/formal_podc/blob/main/Papers/PODC2021/BFTInBlockDAG/Gossip.lean">GitHub</a> · hover over a name for its type and documentation</p>
+          </div>
+        <div class="lean-code lean-src">
+          <code class="hl lean block" data-lean-context="Gossip"><span id="L1"><span class="kw">import</span> Papers.PODC2021.BFTInBlockDAG.Block</span>
+<span id="L2"></span>
+<span id="L3"><span class="dc">/-!</span></span>
+<span id="L4"><span class="dc"># Building the block DAG: Algorithm 1 (with the request buffer of Algorithm 3)</span></span>
+<span id="L5"></span>
+<span id="L6"><span class="dc">The asynchronous system of Section 3. Servers `S`; the Byzantine servers form the set `Byz`, all</span></span>
+<span id="L7"><span class="dc">other servers are correct. The network is a set `sent` of point-to-point messages</span></span>
+<span id="L8"><span class="dc">`(from, to, payload)` that have been sent; a correct server may receive any message sent to it, any</span></span>
+<span id="L9"><span class="dc">number of times and in any order (so the model covers arbitrary delays, reordering and duplication;</span></span>
+<span id="L10"><span class="dc">Assumption 1, reliable delivery, is a fairness condition on runs, see `GossipLive.lean`).</span></span>
+<span id="L11"></span>
+<span id="L12"><span class="dc">**Correct servers** run Algorithm 1; every handler is one atomic event:</span></span>
+<span id="L13"><span class="dc">* `request s ℓ r`: the user calls `request(ℓ, r)` on `shim(P)` (Algorithm 3, lines 6–7);</span></span>
+<span id="L14"><span class="dc">* `recv s src (blk B)`: lines 4–5 (put `B` into `blks` unless `B ∈ G`);</span></span>
+<span id="L15"><span class="dc">* `recv s src (fwd B)`: lines 12–13 (answer a forwarding request if `B ∈ G`);</span></span>
+<span id="L16"><span class="dc">* `validate s B`: lines 6–9 (for `B ∈ blks` that `s` considers valid: insert it into `G` and add a</span></span>
+<span id="L17"><span class="dc">  reference to the current block);</span></span>
+<span id="L18"><span class="dc">* `askFwd s B' B`: lines 10–11 (ask `B'.n` for a missing predecessor `B` of `B' ∈ blks`);</span></span>
+<span id="L19"><span class="dc">* `disseminate s`: lines 14–18 (seal the current block with all buffered requests, insert it,</span></span>
+<span id="L20"><span class="dc">  send it to every server, and start the next block). Algorithm 3 lines 10–11 call it repeatedly.</span></span>
+<span id="L21"></span>
+<span id="L22"><span class="dc">The local block DAG `G` is kept as the list `log` of its blocks in insertion order.</span></span>
+<span id="L23"></span>
+<span id="L24"><span class="dc">**`valid(s, B)`** (Definition 3.3) is read as: `B` is locally valid (genesis or exactly one parent)</span></span>
+<span id="L25"><span class="dc">and `s` has already validated (inserted) all predecessors of `B`. This is the only reading under</span></span>
+<span id="L26"><span class="dc">which line 7 always inserts into a block DAG, as Lemma A.5 claims: with a purely recursive reading</span></span>
+<span id="L27"><span class="dc">("all predecessors are valid", whether inserted or still in `blks`) line 6 may pick a block before</span></span>
+<span id="L28"><span class="dc">its predecessor and `G` stops being closed under predecessors.</span></span>
+<span id="L29"></span>
+<span id="L30"><span class="dc">**Byzantine servers** may send anything, except that they cannot forge signatures: a block they</span></span>
+<span id="L31"><span class="dc">send must be *authentic* (`Authentic`), i.e. every block with a correct builder in its causal past</span></span>
+<span id="L32"><span class="dc">was created by that builder.</span></span>
+<span id="L33"></span>
+<span id="L34"><span class="dc">Ghost variables: `own` (the blocks `s` disseminated) and `reqs` (all requests from the user).</span></span>
+<span id="L35"></span>
+<span id="L36"><span class="dc">Main results: the invariant `Inv` (`reachable_inv`), which contains Lemma A.4 (`lemma_A_4`),</span></span>
+<span id="L37"><span class="dc">Lemma A.5 (`lemma_A_5`) and Lemma A.6 (`lemma_A_6`).</span></span>
+<span id="L38"><span class="dc">-/</span></span>
+<span id="L39"></span>
+<span id="L40"><span class="kw">set_option</span> <span class="const token" data-verso-hover="56">linter.unusedSectionVars</span> false</span>
+<span id="L41"></span>
+<span id="L42"><span class="kw">namespace</span> Podc.BFTInBlockDAG</span>
+<span id="L43"></span>
+<span id="L44"><span class="kw">open</span> Block</span>
+<span id="L45"></span>
+<span id="L46"><span class="dc">/-- Network payloads: a block, or a forwarding request `FWD ref(B)`. -/</span></span>
+<span id="L47"><span class="kw">inductive</span> <span class="const token" data-verso-hover="432">Payload</span> (S L R : <span class="kw">Type</span>) <span class="kw">where</span></span>
+<span id="L48">  | <span class="const token" data-verso-hover="245">blk</span> (B : <span class="const token" data-verso-hover="7">Block</span> S L R)</span>
+<span id="L49">  | <span class="const token" data-verso-hover="327">fwd</span> (B : <span class="const token" data-verso-hover="7">Block</span> S L R)</span>
+<span id="L50"></span>
+<span id="L51"><span class="dc">/-- The local state of a server running Algorithm 1 (and the buffer of Algorithm 3). -/</span></span>
+<span id="L52"><span class="kw">structure</span> <span class="const token" data-verso-hover="433">Local</span> (S L R : <span class="kw">Type</span>) <span class="kw">where</span></span>
+<span id="L53">  <span class="dc">/-- The block DAG `G`, as the list of its blocks in insertion order. -/</span></span>
+<span id="L54">  <span class="const token" data-verso-hover="257">log</span> : <span class="const token" data-verso-hover="59">List</span> (<span class="const token" data-verso-hover="7">Block</span> S L R) := []</span>
+<span id="L55">  <span class="dc">/-- The buffer `blks` of received candidate blocks. -/</span></span>
+<span id="L56">  <span class="const token" data-verso-hover="434">blks</span> : <span class="const token" data-verso-hover="59">List</span> (<span class="const token" data-verso-hover="7">Block</span> S L R) := []</span>
+<span id="L57">  <span class="dc">/-- The sequence number `B.k` of the current block `B`. -/</span></span>
+<span id="L58">  <span class="const token" data-verso-hover="435">k</span> : <span class="const token" data-verso-hover="58">ℕ</span> := <span class="nu">0</span></span>
+<span id="L59">  <span class="dc">/-- The predecessors `B.preds` of the current block. -/</span></span>
+<span id="L60">  <span class="const token" data-verso-hover="436">preds</span> : <span class="const token" data-verso-hover="59">List</span> (<span class="const token" data-verso-hover="7">Block</span> S L R) := []</span>
+<span id="L61">  <span class="dc">/-- The buffer `rqsts` of labelled requests. -/</span></span>
+<span id="L62">  <span class="const token" data-verso-hover="437">rqsts</span> : <span class="const token" data-verso-hover="59">List</span> (L × R) := []</span>
+<span id="L63">  <span class="dc">/-- Ghost: the blocks disseminated so far, in order. -/</span></span>
+<span id="L64">  <span class="const token" data-verso-hover="336">own</span> : <span class="const token" data-verso-hover="59">List</span> (<span class="const token" data-verso-hover="7">Block</span> S L R) := []</span>
+<span id="L65">  <span class="dc">/-- Ghost: all requests received from the user, in order. -/</span></span>
+<span id="L66">  <span class="const token" data-verso-hover="316">reqs</span> : <span class="const token" data-verso-hover="59">List</span> (L × R) := []</span>
+<span id="L67"></span>
+<span id="L68"><span class="dc">/-- The global state: local states and the set of sent messages `(from, to, payload)`. -/</span></span>
+<span id="L69"><span class="kw">structure</span> <span class="const token" data-verso-hover="233">Sys</span> (S L R : <span class="kw">Type</span>) <span class="kw">where</span></span>
+<span id="L70">  <span class="dc">/-- Local states. -/</span></span>
+<span id="L71">  <span class="const token" data-verso-hover="256">loc</span> : S → <span class="const token" data-verso-hover="433">Local</span> S L R</span>
+<span id="L72">  <span class="dc">/-- Messages sent so far. -/</span></span>
+<span id="L73">  <span class="const token" data-verso-hover="438">sent</span> : <span class="const token" data-verso-hover="149">Set</span> (S × S × <span class="const token" data-verso-hover="432">Payload</span> S L R)</span>
+<span id="L74"></span>
+<span id="L75"><span class="dc">/-- The initial state. -/</span></span>
+<span id="L76"><span class="kw">def</span> <span class="const token" data-verso-hover="249">Sys.init</span> {S L R : <span class="kw">Type</span>} : <span class="const token" data-verso-hover="233">Sys</span> S L R := ⟨<span class="kw">fun</span> _ =&gt; {}, ∅⟩</span>
+<span id="L77"></span>
+<span id="L78"><span class="dc">/-- Events. -/</span></span>
+<span id="L79"><span class="kw">inductive</span> <span class="const token" data-verso-hover="234">Ev</span> (S L R : <span class="kw">Type</span>) <span class="kw">where</span></span>
+<span id="L80">  | <span class="const token" data-verso-hover="242">request</span> (s : S) (ℓ : L) (r : R)</span>
+<span id="L81">  | <span class="const token" data-verso-hover="246">recv</span> (s src : S) (p : <span class="const token" data-verso-hover="432">Payload</span> S L R)</span>
+<span id="L82">  | <span class="const token" data-verso-hover="247">validate</span> (s : S) (B : <span class="const token" data-verso-hover="7">Block</span> S L R)</span>
+<span id="L83">  | <span class="const token" data-verso-hover="330">askFwd</span> (s : S) (B' B : <span class="const token" data-verso-hover="7">Block</span> S L R)</span>
+<span id="L84">  | <span class="const token" data-verso-hover="243">disseminate</span> (s : S)</span>
+<span id="L85">  | <span class="const token" data-verso-hover="244">byz</span> (b dst : S) (p : <span class="const token" data-verso-hover="432">Payload</span> S L R)</span>
+<span id="L86"></span>
+<span id="L87"><span class="kw">variable</span> {S L R : <span class="kw">Type</span>} [<span class="const token" data-verso-hover="70">DecidableEq</span> S] [<span class="const token" data-verso-hover="70">DecidableEq</span> L] [<span class="const token" data-verso-hover="70">DecidableEq</span> R]</span>
+<span id="L88"></span>
+<span id="L89"><span class="dc">/-- The local block DAG `G` of a local state. -/</span></span>
+<span id="L90"><span class="kw">def</span> <span class="const token" data-verso-hover="439">Local.G</span> (l : <span class="const token" data-verso-hover="433">Local</span> S L R) : <span class="const token" data-verso-hover="149">Set</span> (<span class="const token" data-verso-hover="7">Block</span> S L R) := {B | B ∈ l.<span class="const token" data-verso-hover="257">log</span>}</span>
+<span id="L91"></span>
+<span id="L92"><span class="dc">/-- The block a server seals at `disseminate` (line 15). -/</span></span>
+<span id="L93"><span class="kw">def</span> <span class="const token" data-verso-hover="254">newBlock</span> (s : S) (l : <span class="const token" data-verso-hover="433">Local</span> S L R) : <span class="const token" data-verso-hover="7">Block</span> S L R := <span class="const token" data-verso-hover="57">.</span>mk s l.<span class="const token" data-verso-hover="435">k</span> l.<span class="const token" data-verso-hover="436">preds</span> l.<span class="const token" data-verso-hover="437">rqsts</span></span>
+<span id="L94"></span>
+<span id="L95"><span class="dc">/-- Replace the local state of `s`. -/</span></span>
+<span id="L96"><span class="kw">def</span> <span class="const token" data-verso-hover="253">Sys.upd</span> (σ : <span class="const token" data-verso-hover="233">Sys</span> S L R) (s : S) (l : <span class="const token" data-verso-hover="433">Local</span> S L R) : <span class="const token" data-verso-hover="233">Sys</span> S L R :=</span>
+<span id="L97">  { σ <span class="kw">with</span> <span class="const token" data-verso-hover="256">loc</span> := <span class="const token" data-verso-hover="368">Function.update</span> σ.<span class="const token" data-verso-hover="256">loc</span> s l }</span>
+<span id="L98"></span>
+<span id="L99"><span class="kw">variable</span> (Byz : <span class="const token" data-verso-hover="149">Set</span> S)</span>
+<span id="L100"></span>
+<span id="L101"><span class="dc">/-- The blocks created by correct servers. -/</span></span>
+<span id="L102"><span class="kw">def</span> <span class="const token" data-verso-hover="440">created</span> (σ : <span class="const token" data-verso-hover="233">Sys</span> S L R) : <span class="const token" data-verso-hover="149">Set</span> (<span class="const token" data-verso-hover="7">Block</span> S L R) := {B | ∃ s ∉ Byz, B ∈ (σ.<span class="const token" data-verso-hover="256">loc</span> s).<span class="const token" data-verso-hover="336">own</span>}</span>
+<span id="L103"></span>
+<span id="L104"><span class="dc">/-- A block is authentic: every block with a correct builder in its causal past was created by</span></span>
+<span id="L105"><span class="dc">that builder (signatures cannot be forged). -/</span></span>
+<span id="L106"><span class="kw">def</span> <span class="const token" data-verso-hover="8">Authentic</span> (σ : <span class="const token" data-verso-hover="233">Sys</span> S L R) (B : <span class="const token" data-verso-hover="7">Block</span> S L R) : <span class="kw">Prop</span> :=</span>
+<span id="L107">  ∀ C, <span class="const token" data-verso-hover="118">Relation.ReflTransGen</span> <span class="const token" data-verso-hover="77">Edge</span> C B → C.<span class="const token" data-verso-hover="60">n</span> ∉ Byz → C ∈ <span class="const token" data-verso-hover="440">created</span> Byz σ</span>
+<span id="L108"></span>
+<span id="L109"><span class="dc">/-- The guards of the events. -/</span></span>
+<span id="L110"><span class="kw">def</span> <span class="const token" data-verso-hover="236">Enabled</span> (σ : <span class="const token" data-verso-hover="233">Sys</span> S L R) : <span class="const token" data-verso-hover="234">Ev</span> S L R → <span class="kw">Prop</span></span>
+<span id="L111">  | <span class="const token" data-verso-hover="242">.</span>request s _ _ =&gt; s ∉ Byz</span>
+<span id="L112">  | <span class="const token" data-verso-hover="246">.</span>recv s src p =&gt; s ∉ Byz ∧ (src, s, p) ∈ σ.<span class="const token" data-verso-hover="438">sent</span></span>
+<span id="L113">  | <span class="const token" data-verso-hover="247">.</span>validate s B =&gt; s ∉ Byz ∧ B ∈ (σ.<span class="const token" data-verso-hover="256">loc</span> s).<span class="const token" data-verso-hover="434">blks</span> ∧ B.<span class="const token" data-verso-hover="20">LocallyValid</span> ∧</span>
+<span id="L114">      ∀ C ∈ B.<span class="const token" data-verso-hover="62">preds</span>, C ∈ (σ.<span class="const token" data-verso-hover="256">loc</span> s).<span class="const token" data-verso-hover="257">log</span></span>
+<span id="L115">  | <span class="const token" data-verso-hover="330">.</span>askFwd s B' B =&gt; s ∉ Byz ∧ B' ∈ (σ.<span class="const token" data-verso-hover="256">loc</span> s).<span class="const token" data-verso-hover="434">blks</span> ∧ B ∈ B'.<span class="const token" data-verso-hover="62">preds</span> ∧ B ∉ (σ.<span class="const token" data-verso-hover="256">loc</span> s).<span class="const token" data-verso-hover="434">blks</span> ∧</span>
+<span id="L116">      B ∉ (σ.<span class="const token" data-verso-hover="256">loc</span> s).<span class="const token" data-verso-hover="257">log</span></span>
+<span id="L117">  | <span class="const token" data-verso-hover="243">.</span>disseminate s =&gt; s ∉ Byz</span>
+<span id="L118">  | <span class="const token" data-verso-hover="244">.</span>byz b _ p =&gt; b ∈ Byz ∧ ∀ B, p = <span class="const token" data-verso-hover="245">.</span>blk B → <span class="const token" data-verso-hover="8">Authentic</span> Byz σ B</span>
+<span id="L119"></span>
+<span id="L120"><span class="dc">/-- The effects of the events. -/</span></span>
+<span id="L121"><span class="kw">def</span> <span class="const token" data-verso-hover="237">apply</span> (σ : <span class="const token" data-verso-hover="233">Sys</span> S L R) : <span class="const token" data-verso-hover="234">Ev</span> S L R → <span class="const token" data-verso-hover="233">Sys</span> S L R</span>
+<span id="L122">  | <span class="const token" data-verso-hover="242">.</span>request s ℓ r =&gt; σ.<span class="const token" data-verso-hover="253">upd</span> s</span>
+<span id="L123">      { σ.<span class="const token" data-verso-hover="256">loc</span> s <span class="kw">with</span> <span class="const token" data-verso-hover="437">rqsts</span> := (σ.<span class="const token" data-verso-hover="256">loc</span> s).<span class="const token" data-verso-hover="437">rqsts</span> ++ [(ℓ, r)], <span class="const token" data-verso-hover="316">reqs</span> := (σ.<span class="const token" data-verso-hover="256">loc</span> s).<span class="const token" data-verso-hover="316">reqs</span> ++ [(ℓ, r)] }</span>
+<span id="L124">  | <span class="const token" data-verso-hover="246">.</span>recv s _ (<span class="const token" data-verso-hover="245">.</span>blk B) =&gt;</span>
+<span id="L125">      <span class="kw">if</span> B ∈ (σ.<span class="const token" data-verso-hover="256">loc</span> s).<span class="const token" data-verso-hover="257">log</span> <span class="kw">then</span> σ <span class="kw">else</span> σ.<span class="const token" data-verso-hover="253">upd</span> s { σ.<span class="const token" data-verso-hover="256">loc</span> s <span class="kw">with</span> <span class="const token" data-verso-hover="434">blks</span> := (σ.<span class="const token" data-verso-hover="256">loc</span> s).<span class="const token" data-verso-hover="434">blks</span>.<span class="const token" data-verso-hover="441">insert</span> B }</span>
+<span id="L126">  | <span class="const token" data-verso-hover="246">.</span>recv s src (<span class="const token" data-verso-hover="327">.</span>fwd B) =&gt;</span>
+<span id="L127">      <span class="kw">if</span> B ∈ (σ.<span class="const token" data-verso-hover="256">loc</span> s).<span class="const token" data-verso-hover="257">log</span> <span class="kw">then</span> { σ <span class="kw">with</span> <span class="const token" data-verso-hover="438">sent</span> := <span class="const token" data-verso-hover="177">insert</span> (s, src, <span class="const token" data-verso-hover="245">.</span>blk B) σ.<span class="const token" data-verso-hover="438">sent</span> } <span class="kw">else</span> σ</span>
+<span id="L128">  | <span class="const token" data-verso-hover="247">.</span>validate s B =&gt; σ.<span class="const token" data-verso-hover="253">upd</span> s</span>
+<span id="L129">      { σ.<span class="const token" data-verso-hover="256">loc</span> s <span class="kw">with</span> <span class="const token" data-verso-hover="257">log</span> := (σ.<span class="const token" data-verso-hover="256">loc</span> s).<span class="const token" data-verso-hover="257">log</span> ++ [B], <span class="const token" data-verso-hover="436">preds</span> := (σ.<span class="const token" data-verso-hover="256">loc</span> s).<span class="const token" data-verso-hover="436">preds</span> ++ [B],</span>
+<span id="L130">                     <span class="const token" data-verso-hover="434">blks</span> := (σ.<span class="const token" data-verso-hover="256">loc</span> s).<span class="const token" data-verso-hover="434">blks</span>.<span class="const token" data-verso-hover="263">filter</span> <span class="kw">fun</span> C =&gt; <span class="const token" data-verso-hover="130">decide</span> (C ≠ B) }</span>
+<span id="L131">  | <span class="const token" data-verso-hover="330">.</span>askFwd s B' B =&gt; { σ <span class="kw">with</span> <span class="const token" data-verso-hover="438">sent</span> := <span class="const token" data-verso-hover="177">insert</span> (s, B'.<span class="const token" data-verso-hover="60">n</span>, <span class="const token" data-verso-hover="327">.</span>fwd B) σ.<span class="const token" data-verso-hover="438">sent</span> }</span>
+<span id="L132">  | <span class="const token" data-verso-hover="243">.</span>disseminate s =&gt;</span>
+<span id="L133">      ⟨<span class="const token" data-verso-hover="368">Function.update</span> σ.<span class="const token" data-verso-hover="256">loc</span> s</span>
+<span id="L134">        { σ.<span class="const token" data-verso-hover="256">loc</span> s <span class="kw">with</span> <span class="const token" data-verso-hover="257">log</span> := (σ.<span class="const token" data-verso-hover="256">loc</span> s).<span class="const token" data-verso-hover="257">log</span> ++ [<span class="const token" data-verso-hover="254">newBlock</span> s (σ.<span class="const token" data-verso-hover="256">loc</span> s)], <span class="const token" data-verso-hover="435">k</span> := (σ.<span class="const token" data-verso-hover="256">loc</span> s).<span class="const token" data-verso-hover="435">k</span> + <span class="nu">1</span>,</span>
+<span id="L135">                       <span class="const token" data-verso-hover="436">preds</span> := [<span class="const token" data-verso-hover="254">newBlock</span> s (σ.<span class="const token" data-verso-hover="256">loc</span> s)], <span class="const token" data-verso-hover="437">rqsts</span> := [],</span>
+<span id="L136">                       <span class="const token" data-verso-hover="336">own</span> := (σ.<span class="const token" data-verso-hover="256">loc</span> s).<span class="const token" data-verso-hover="336">own</span> ++ [<span class="const token" data-verso-hover="254">newBlock</span> s (σ.<span class="const token" data-verso-hover="256">loc</span> s)] },</span>
+<span id="L137">       σ.<span class="const token" data-verso-hover="438">sent</span> ∪ <span class="const token" data-verso-hover="442">Set.range</span> <span class="kw">fun</span> s' =&gt; (s, s', <span class="const token" data-verso-hover="245">.</span>blk (<span class="const token" data-verso-hover="254">newBlock</span> s (σ.<span class="const token" data-verso-hover="256">loc</span> s)))⟩</span>
+<span id="L138">  | <span class="const token" data-verso-hover="244">.</span>byz b dst p =&gt; { σ <span class="kw">with</span> <span class="const token" data-verso-hover="438">sent</span> := <span class="const token" data-verso-hover="177">insert</span> (b, dst, p) σ.<span class="const token" data-verso-hover="438">sent</span> }</span>
+<span id="L139"></span>
+<span id="L140"><span class="dc">/-- A step of the system. -/</span></span>
+<span id="L141"><span class="kw">def</span> <span class="const token" data-verso-hover="443">Step</span> (σ : <span class="const token" data-verso-hover="233">Sys</span> S L R) (e : <span class="const token" data-verso-hover="234">Ev</span> S L R) (σ' : <span class="const token" data-verso-hover="233">Sys</span> S L R) : <span class="kw">Prop</span> :=</span>
+<span id="L142">  <span class="const token" data-verso-hover="236">Enabled</span> Byz σ e ∧ σ' = <span class="const token" data-verso-hover="237">apply</span> σ e</span>
+<span id="L143"></span>
+<span id="L144"><span class="dc">/-- Reachable states. -/</span></span>
+<span id="L145"><span class="kw">def</span> <span class="const token" data-verso-hover="239">Reachable</span> : <span class="const token" data-verso-hover="233">Sys</span> S L R → <span class="kw">Prop</span> :=</span>
+<span id="L146">  <span class="const token" data-verso-hover="118">Relation.ReflTransGen</span> (<span class="kw">fun</span> σ σ' =&gt; ∃ e, <span class="const token" data-verso-hover="443">Step</span> Byz σ e σ') <span class="const token" data-verso-hover="249">Sys.init</span></span>
+<span id="L147"></span>
+<span id="L148"><span class="dc">/-! ### The invariant -/</span></span>
+<span id="L149"></span>
+<span id="L150"><span class="dc">/-- The local invariant of a correct server `s` with local state `l`. -/</span></span>
+<span id="L151"><span class="kw">structure</span> <span class="const token" data-verso-hover="444">LInvAt</span> (σ : <span class="const token" data-verso-hover="233">Sys</span> S L R) (s : S) (l : <span class="const token" data-verso-hover="433">Local</span> S L R) : <span class="kw">Prop</span> <span class="kw">where</span></span>
+<span id="L152">  <span class="dc">/-- Lemma A.5: `G` is a block DAG. -/</span></span>
+<span id="L153">  <span class="const token" data-verso-hover="329">dag</span> : <span class="const token" data-verso-hover="22">IsBlockDAG</span> l.<span class="const token" data-verso-hover="439">G</span></span>
+<span id="L154">  <span class="const token" data-verso-hover="376">log_nodup</span> : l.<span class="const token" data-verso-hover="257">log</span>.<span class="const token" data-verso-hover="297">Nodup</span></span>
+<span id="L155">  <span class="const token" data-verso-hover="445">preds_sub</span> : ∀ C ∈ l.<span class="const token" data-verso-hover="436">preds</span>, C ∈ l.<span class="const token" data-verso-hover="257">log</span></span>
+<span id="L156">  <span class="const token" data-verso-hover="337">own_k</span> : l.<span class="const token" data-verso-hover="336">own</span>.<span class="const token" data-verso-hover="98">map</span> <span class="const token" data-verso-hover="61">Block.k</span> = <span class="const token" data-verso-hover="446">List.range</span> l.<span class="const token" data-verso-hover="435">k</span></span>
+<span id="L157">  <span class="const token" data-verso-hover="345">own_n</span> : ∀ D ∈ l.<span class="const token" data-verso-hover="336">own</span>, D.<span class="const token" data-verso-hover="60">n</span> = s</span>
+<span id="L158">  <span class="const token" data-verso-hover="342">own_sub</span> : ∀ D ∈ l.<span class="const token" data-verso-hover="336">own</span>, D ∈ l.<span class="const token" data-verso-hover="257">log</span></span>
+<span id="L159">  <span class="const token" data-verso-hover="374">auth</span> : ∀ B, B ∈ l.<span class="const token" data-verso-hover="257">log</span> ∨ B ∈ l.<span class="const token" data-verso-hover="434">blks</span> → <span class="const token" data-verso-hover="8">Authentic</span> Byz σ B</span>
+<span id="L160">  <span class="const token" data-verso-hover="447">disj</span> : ∀ B ∈ l.<span class="const token" data-verso-hover="434">blks</span>, B ∉ l.<span class="const token" data-verso-hover="257">log</span></span>
+<span id="L161">  <span class="const token" data-verso-hover="448">par₁</span> : ∀ C ∈ l.<span class="const token" data-verso-hover="436">preds</span>, C.<span class="const token" data-verso-hover="60">n</span> = s → l.<span class="const token" data-verso-hover="336">own</span>.<span class="const token" data-verso-hover="449">getLast?</span> = <span class="const token" data-verso-hover="139">some</span> C</span>
+<span id="L162">  <span class="const token" data-verso-hover="450">par₂</span> : ∀ D, l.<span class="const token" data-verso-hover="336">own</span>.<span class="const token" data-verso-hover="449">getLast?</span> = <span class="const token" data-verso-hover="139">some</span> D → D ∈ l.<span class="const token" data-verso-hover="436">preds</span></span>
+<span id="L163">  <span class="dc">/-- Lemma A.6: every block is referenced at most once by the blocks of `s`. -/</span></span>
+<span id="L164">  <span class="const token" data-verso-hover="417">refs_nodup</span> : (l.<span class="const token" data-verso-hover="336">own</span>.<span class="const token" data-verso-hover="105">flatMap</span> <span class="const token" data-verso-hover="62">Block.preds</span> ++ l.<span class="const token" data-verso-hover="436">preds</span>).<span class="const token" data-verso-hover="297">Nodup</span></span>
+<span id="L165">  <span class="const token" data-verso-hover="451">ref</span> : ∀ B ∈ l.<span class="const token" data-verso-hover="257">log</span>, B ∈ l.<span class="const token" data-verso-hover="436">preds</span> ∨ ∃ D ∈ l.<span class="const token" data-verso-hover="336">own</span>, B ∈ D.<span class="const token" data-verso-hover="62">preds</span></span>
+<span id="L166">  <span class="const token" data-verso-hover="452">sent_own</span> : ∀ D ∈ l.<span class="const token" data-verso-hover="336">own</span>, ∀ s', (s, s', <span class="const token" data-verso-hover="245">Payload.blk</span> D) ∈ σ.<span class="const token" data-verso-hover="438">sent</span></span>
+<span id="L167">  <span class="const token" data-verso-hover="431">reqs</span> : l.<span class="const token" data-verso-hover="336">own</span>.<span class="const token" data-verso-hover="105">flatMap</span> <span class="const token" data-verso-hover="63">Block.rs</span> ++ l.<span class="const token" data-verso-hover="437">rqsts</span> = l.<span class="const token" data-verso-hover="316">reqs</span></span>
+<span id="L168"></span>
+<span id="L169"><span class="dc">/-- The local invariant of a correct server `s`. -/</span></span>
+<span id="L170"><span class="kw">abbrev</span> <span class="const token" data-verso-hover="335">LInv</span> (σ : <span class="const token" data-verso-hover="233">Sys</span> S L R) (s : S) : <span class="kw">Prop</span> := <span class="const token" data-verso-hover="444">LInvAt</span> Byz σ s (σ.<span class="const token" data-verso-hover="256">loc</span> s)</span>
+<span id="L171"></span>
+<span id="L172"><span class="dc">/-- The global invariant. -/</span></span>
+<span id="L173"><span class="kw">structure</span> <span class="const token" data-verso-hover="341">Inv</span> (σ : <span class="const token" data-verso-hover="233">Sys</span> S L R) : <span class="kw">Prop</span> <span class="kw">where</span></span>
+<span id="L174">  <span class="const token" data-verso-hover="328">loc</span> : ∀ s ∉ Byz, <span class="const token" data-verso-hover="335">LInv</span> Byz σ s</span>
+<span id="L175">  <span class="const token" data-verso-hover="453">sent_auth</span> : ∀ a b B, (a, b, <span class="const token" data-verso-hover="245">Payload.blk</span> B) ∈ σ.<span class="const token" data-verso-hover="438">sent</span> → <span class="const token" data-verso-hover="8">Authentic</span> Byz σ B</span>
+<span id="L176"></span>
+<span id="L177"><span class="kw">variable</span> {Byz}</span>
+<span id="L178"></span>
+<span id="L179"><span class="kw">theorem</span> <span class="const token" data-verso-hover="454">Authentic.mono</span> {σ σ' : <span class="const token" data-verso-hover="233">Sys</span> S L R} (h : <span class="const token" data-verso-hover="440">created</span> Byz σ ⊆ <span class="const token" data-verso-hover="440">created</span> Byz σ')</span>
+<span id="L180">    {B : <span class="const token" data-verso-hover="7">Block</span> S L R} (hB : <span class="const token" data-verso-hover="8">Authentic</span> Byz σ B) : <span class="const token" data-verso-hover="8">Authentic</span> Byz σ' B :=</span>
+<span id="L181">  <span class="kw">fun</span> C hC hn =&gt; h (hB C hC hn)</span>
+<span id="L182"></span>
+<span id="L183"><span class="kw">theorem</span> <span class="const token" data-verso-hover="455">Authentic.of_edge</span> {σ : <span class="const token" data-verso-hover="233">Sys</span> S L R} {B C : <span class="const token" data-verso-hover="7">Block</span> S L R} (hB : <span class="const token" data-verso-hover="8">Authentic</span> Byz σ B)</span>
+<span id="L184">    (hC : <span class="const token" data-verso-hover="77">Edge</span> C B) : <span class="const token" data-verso-hover="8">Authentic</span> Byz σ C :=</span>
+<span id="L185">  <span class="kw">fun</span> D hD hn =&gt; hB D (hD.<span class="const token" data-verso-hover="122">tail</span> hC) hn</span>
+<span id="L186"></span>
+<span id="L187"><span class="dc">/-- An authentic block built by a correct server `s` is one of `s`'s own blocks. -/</span></span>
+<span id="L188"><span class="kw">theorem</span> <span class="const token" data-verso-hover="373">Inv.mem_own</span> {σ : <span class="const token" data-verso-hover="233">Sys</span> S L R} (hI : <span class="const token" data-verso-hover="341">Inv</span> Byz σ) {B : <span class="const token" data-verso-hover="7">Block</span> S L R} {s : S} (hs : s ∉ Byz)</span>
+<span id="L189">    (hB : <span class="const token" data-verso-hover="8">Authentic</span> Byz σ B) (hn : B.<span class="const token" data-verso-hover="60">n</span> = s) : B ∈ (σ.<span class="const token" data-verso-hover="256">loc</span> s).<span class="const token" data-verso-hover="336">own</span> := <span class="kw">by</span></span>
+<span id="L190">  <span class="kw">obtain</span> ⟨s', hs', hB'⟩ := hB B <span class="const token" data-verso-hover="120">Relation.ReflTransGen.refl</span> (hn ▸ hs)</span>
+<span id="L191">  <span class="kw">have</span> : B.<span class="const token" data-verso-hover="60">n</span> = s' := (hI.<span class="const token" data-verso-hover="328">loc</span> s' hs').<span class="const token" data-verso-hover="345">own_n</span> B hB'</span>
+<span id="L192">  <span class="kw">rw</span> [hn] <span class="kw">at</span> this</span>
+<span id="L193">  <span class="kw">subst</span> this</span>
+<span id="L194">  <span class="kw">exact</span> hB'</span>
+<span id="L195"></span>
+<span id="L196"><span class="kw">theorem</span> <span class="const token" data-verso-hover="456">LInv.k_lt</span> {σ : <span class="const token" data-verso-hover="233">Sys</span> S L R} {s : S} (h : <span class="const token" data-verso-hover="335">LInv</span> Byz σ s) {D : <span class="const token" data-verso-hover="7">Block</span> S L R}</span>
+<span id="L197">    (hD : D ∈ (σ.<span class="const token" data-verso-hover="256">loc</span> s).<span class="const token" data-verso-hover="336">own</span>) : D.<span class="const token" data-verso-hover="61">k</span> &lt; (σ.<span class="const token" data-verso-hover="256">loc</span> s).<span class="const token" data-verso-hover="435">k</span> := <span class="kw">by</span></span>
+<span id="L198">  <span class="kw">have</span> : D.<span class="const token" data-verso-hover="61">k</span> ∈ (σ.<span class="const token" data-verso-hover="256">loc</span> s).<span class="const token" data-verso-hover="336">own</span>.<span class="const token" data-verso-hover="98">map</span> <span class="const token" data-verso-hover="61">Block.k</span> := <span class="const token" data-verso-hover="401">List.mem_map_of_mem</span> hD</span>
+<span id="L199">  <span class="kw">rw</span> [h.<span class="const token" data-verso-hover="337">own_k</span>] <span class="kw">at</span> this</span>
+<span id="L200">  <span class="kw">simpa</span> <span class="kw">using</span> this</span>
+<span id="L201"></span>
+<span id="L202"><span class="dc">/-- A block of `G` built by `s` itself is one of its own blocks. -/</span></span>
+<span id="L203"><span class="kw">theorem</span> <span class="const token" data-verso-hover="343">Inv.mem_own_of_log</span> {σ : <span class="const token" data-verso-hover="233">Sys</span> S L R} (hI : <span class="const token" data-verso-hover="341">Inv</span> Byz σ) {s : S} (hs : s ∉ Byz)</span>
+<span id="L204">    {B : <span class="const token" data-verso-hover="7">Block</span> S L R} (hB : B ∈ (σ.<span class="const token" data-verso-hover="256">loc</span> s).<span class="const token" data-verso-hover="257">log</span>) (hn : B.<span class="const token" data-verso-hover="60">n</span> = s) : B ∈ (σ.<span class="const token" data-verso-hover="256">loc</span> s).<span class="const token" data-verso-hover="336">own</span> :=</span>
+<span id="L205">  hI.<span class="const token" data-verso-hover="373">mem_own</span> hs ((hI.<span class="const token" data-verso-hover="328">loc</span> s hs).<span class="const token" data-verso-hover="374">auth</span> B (<span class="const token" data-verso-hover="171">Or.inl</span> hB)) hn</span>
+<span id="L206"></span>
+<span id="L207"><span class="dc">/-- The new block is not yet in `G`. -/</span></span>
+<span id="L208"><span class="kw">theorem</span> <span class="const token" data-verso-hover="457">Inv.newBlock_notMem</span> {σ : <span class="const token" data-verso-hover="233">Sys</span> S L R} (hI : <span class="const token" data-verso-hover="341">Inv</span> Byz σ) {s : S} (hs : s ∉ Byz) :</span>
+<span id="L209">    <span class="const token" data-verso-hover="254">newBlock</span> s (σ.<span class="const token" data-verso-hover="256">loc</span> s) ∉ (σ.<span class="const token" data-verso-hover="256">loc</span> s).<span class="const token" data-verso-hover="257">log</span> := <span class="kw">by</span></span>
+<span id="L210">  <span class="kw">intro</span> h</span>
+<span id="L211">  <span class="kw">have</span> := (hI.<span class="const token" data-verso-hover="328">loc</span> s hs).<span class="const token" data-verso-hover="456">k_lt</span> (hI.<span class="const token" data-verso-hover="343">mem_own_of_log</span> hs h <span class="const token" data-verso-hover="65">rfl</span>)</span>
+<span id="L212">  <span class="kw">simp</span> [<span class="const token" data-verso-hover="254">newBlock</span>] <span class="kw">at</span> this</span>
+<span id="L213"></span>
+<span id="L214"><span class="kw">theorem</span> <span class="const token" data-verso-hover="458">getLast?_own</span> {σ : <span class="const token" data-verso-hover="233">Sys</span> S L R} {s : S} (h : <span class="const token" data-verso-hover="335">LInv</span> Byz σ s) (hk : (σ.<span class="const token" data-verso-hover="256">loc</span> s).<span class="const token" data-verso-hover="435">k</span> ≠ <span class="nu">0</span>) :</span>
+<span id="L215">    ∃ D, (σ.<span class="const token" data-verso-hover="256">loc</span> s).<span class="const token" data-verso-hover="336">own</span>.<span class="const token" data-verso-hover="449">getLast?</span> = <span class="const token" data-verso-hover="139">some</span> D ∧ D.<span class="const token" data-verso-hover="61">k</span> + <span class="nu">1</span> = (σ.<span class="const token" data-verso-hover="256">loc</span> s).<span class="const token" data-verso-hover="435">k</span> := <span class="kw">by</span></span>
+<span id="L216">  <span class="kw">have</span> h1 := <span class="const token" data-verso-hover="459">congrArg</span> <span class="const token" data-verso-hover="449">List.getLast?</span> h.<span class="const token" data-verso-hover="337">own_k</span></span>
+<span id="L217">  <span class="kw">rw</span> [<span class="const token" data-verso-hover="460">List.getLast?_map</span>] <span class="kw">at</span> h1</span>
+<span id="L218">  <span class="kw">obtain</span> ⟨j, hj⟩ := <span class="const token" data-verso-hover="461">Nat.exists_eq_succ_of_ne_zero</span> hk</span>
+<span id="L219">  <span class="kw">rw</span> [hj, <span class="const token" data-verso-hover="462">List.range_succ</span>, <span class="const token" data-verso-hover="463">List.getLast?_append</span>, <span class="const token" data-verso-hover="464">List.getLast?_singleton</span>] <span class="kw">at</span> h1</span>
+<span id="L220">  <span class="kw">rw</span> [hj]</span>
+<span id="L221">  <span class="kw">simp</span> only [<span class="const token" data-verso-hover="465">Option.some_or</span>] <span class="kw">at</span> h1</span>
+<span id="L222">  <span class="kw">cases</span> hD : (σ.<span class="const token" data-verso-hover="256">loc</span> s).<span class="const token" data-verso-hover="336">own</span>.<span class="const token" data-verso-hover="449">getLast?</span> <span class="kw">with</span></span>
+<span id="L223">  | <span class="const token" data-verso-hover="145">none</span> =&gt; <span class="kw">rw</span> [hD] <span class="kw">at</span> h1; <span class="kw">simp</span> <span class="kw">at</span> h1</span>
+<span id="L224">  | <span class="const token" data-verso-hover="139">some</span> D =&gt;</span>
+<span id="L225">    <span class="kw">rw</span> [hD] <span class="kw">at</span> h1</span>
+<span id="L226">    <span class="kw">simp</span> only [<span class="const token" data-verso-hover="466">Option.map_some</span>, <span class="const token" data-verso-hover="467">Option.some.injEq</span>] <span class="kw">at</span> h1</span>
+<span id="L227">    <span class="kw">exact</span> ⟨D, <span class="const token" data-verso-hover="65">rfl</span>, <span class="kw">by</span> <span class="kw">omega</span>⟩</span>
+<span id="L228"></span>
+<span id="L229"><span class="dc">/-- Lemma A.4: when a correct server reaches line 16, its block is valid (locally valid, with all</span></span>
+<span id="L230"><span class="dc">predecessors already in `G`). -/</span></span>
+<span id="L231"><span class="kw">theorem</span> <span class="const token" data-verso-hover="28">lemma_A_4</span> {σ : <span class="const token" data-verso-hover="233">Sys</span> S L R} (hI : <span class="const token" data-verso-hover="341">Inv</span> Byz σ) {s : S} (hs : s ∉ Byz) :</span>
+<span id="L232">    (<span class="const token" data-verso-hover="254">newBlock</span> s (σ.<span class="const token" data-verso-hover="256">loc</span> s)).<span class="const token" data-verso-hover="20">LocallyValid</span> ∧ ∀ C ∈ (<span class="const token" data-verso-hover="254">newBlock</span> s (σ.<span class="const token" data-verso-hover="256">loc</span> s)).<span class="const token" data-verso-hover="62">preds</span>, C ∈ (σ.<span class="const token" data-verso-hover="256">loc</span> s).<span class="const token" data-verso-hover="257">log</span> := <span class="kw">by</span></span>
+<span id="L233">  <span class="kw">have</span> h := hI.<span class="const token" data-verso-hover="328">loc</span> s hs</span>
+<span id="L234">  <span class="kw">refine</span> ⟨?_, <span class="kw">fun</span> C hC =&gt; h.<span class="const token" data-verso-hover="445">preds_sub</span> C hC⟩</span>
+<span id="L235">  <span class="kw">by_cases</span> hk : (σ.<span class="const token" data-verso-hover="256">loc</span> s).<span class="const token" data-verso-hover="435">k</span> = <span class="nu">0</span></span>
+<span id="L236">  · <span class="kw">exact</span> <span class="const token" data-verso-hover="171">Or.inl</span> hk</span>
+<span id="L237">  · <span class="kw">obtain</span> ⟨D, hD, hDk⟩ := <span class="const token" data-verso-hover="458">getLast?_own</span> h hk</span>
+<span id="L238">    <span class="kw">have</span> hDown : D ∈ (σ.<span class="const token" data-verso-hover="256">loc</span> s).<span class="const token" data-verso-hover="336">own</span> := <span class="const token" data-verso-hover="468">List.mem_of_getLast?</span> hD</span>
+<span id="L239">    <span class="kw">refine</span> <span class="const token" data-verso-hover="172">Or.inr</span> ⟨D, ⟨h.<span class="const token" data-verso-hover="450">par₂</span> D hD, h.<span class="const token" data-verso-hover="345">own_n</span> D hDown, hDk⟩, <span class="kw">fun</span> C hC =&gt; ?_⟩</span>
+<span id="L240">    <span class="kw">have</span> := h.<span class="const token" data-verso-hover="448">par₁</span> C hC.<span class="const token" data-verso-hover="134">1</span> hC.<span class="const token" data-verso-hover="147">2</span><span class="nu">.</span><span class="const token" data-verso-hover="134">1</span></span>
+<span id="L241">    <span class="kw">rw</span> [hD] <span class="kw">at</span> this</span>
+<span id="L242">    <span class="kw">exact</span> (<span class="const token" data-verso-hover="469">Option.some.inj</span> this).<span class="const token" data-verso-hover="390">symm</span></span>
+<span id="L243"></span>
+<span id="L244"><span class="kw">end</span> Podc.BFTInBlockDAG</span>
+<span id="L245"></span>
+<span id="L246"><span class="kw">namespace</span> Podc.BFTInBlockDAG</span>
+<span id="L247"></span>
+<span id="L248"><span class="kw">open</span> Block</span>
+<span id="L249"></span>
+<span id="L250"><span class="kw">variable</span> {S L R : <span class="kw">Type</span>} [<span class="const token" data-verso-hover="70">DecidableEq</span> S] [<span class="const token" data-verso-hover="70">DecidableEq</span> L] [<span class="const token" data-verso-hover="70">DecidableEq</span> R] {Byz : <span class="const token" data-verso-hover="149">Set</span> S}</span>
+<span id="L251"></span>
+<span id="L252"><span class="dc">/-! ### Preservation of the invariant -/</span></span>
+<span id="L253"></span>
+<span id="L254"><span class="kw">theorem</span> <span class="const token" data-verso-hover="470">LInvAt.frame</span> {σ σ' : <span class="const token" data-verso-hover="233">Sys</span> S L R} {s : S} {l : <span class="const token" data-verso-hover="433">Local</span> S L R} (h : <span class="const token" data-verso-hover="444">LInvAt</span> Byz σ s l)</span>
+<span id="L255">    (hc : <span class="const token" data-verso-hover="440">created</span> Byz σ ⊆ <span class="const token" data-verso-hover="440">created</span> Byz σ') (hsent : σ.<span class="const token" data-verso-hover="438">sent</span> ⊆ σ'.<span class="const token" data-verso-hover="438">sent</span>) : <span class="const token" data-verso-hover="444">LInvAt</span> Byz σ' s l :=</span>
+<span id="L256">  { h <span class="kw">with</span></span>
+<span id="L257">    <span class="const token" data-verso-hover="374">auth</span> := <span class="kw">fun</span> B hB =&gt; (h.<span class="const token" data-verso-hover="374">auth</span> B hB).<span class="const token" data-verso-hover="454">mono</span> hc</span>
+<span id="L258">    <span class="const token" data-verso-hover="452">sent_own</span> := <span class="kw">fun</span> D hD s' =&gt; hsent (h.<span class="const token" data-verso-hover="452">sent_own</span> D hD s') }</span>
+<span id="L259"></span>
+<span id="L260"><span class="kw">theorem</span> <span class="const token" data-verso-hover="471">created_mono</span> {σ σ' : <span class="const token" data-verso-hover="233">Sys</span> S L R} (h : ∀ s, (σ.<span class="const token" data-verso-hover="256">loc</span> s).<span class="const token" data-verso-hover="336">own</span> ⊆ (σ'.<span class="const token" data-verso-hover="256">loc</span> s).<span class="const token" data-verso-hover="336">own</span>) :</span>
+<span id="L261">    <span class="const token" data-verso-hover="440">created</span> Byz σ ⊆ <span class="const token" data-verso-hover="440">created</span> Byz σ' := <span class="kw">by</span></span>
+<span id="L262">  <span class="kw">rintro</span> B ⟨s, hs, hB⟩</span>
+<span id="L263">  <span class="kw">exact</span> ⟨s, hs, h s hB⟩</span>
+<span id="L264"></span>
+<span id="L265"><span class="dc">/-- Building the invariant after a step that changes only the local state of `s` (and possibly</span></span>
+<span id="L266"><span class="dc">grows `sent`). -/</span></span>
+<span id="L267"><span class="kw">theorem</span> <span class="const token" data-verso-hover="472">Inv.of_upd</span> {σ σ' : <span class="const token" data-verso-hover="233">Sys</span> S L R} (hI : <span class="const token" data-verso-hover="341">Inv</span> Byz σ) {s : S} {l' : <span class="const token" data-verso-hover="433">Local</span> S L R}</span>
+<span id="L268">    (hloc : σ'.<span class="const token" data-verso-hover="256">loc</span> = <span class="const token" data-verso-hover="368">Function.update</span> σ.<span class="const token" data-verso-hover="256">loc</span> s l') (hsent : σ.<span class="const token" data-verso-hover="438">sent</span> ⊆ σ'.<span class="const token" data-verso-hover="438">sent</span>)</span>
+<span id="L269">    (hc : <span class="const token" data-verso-hover="440">created</span> Byz σ ⊆ <span class="const token" data-verso-hover="440">created</span> Byz σ') (hs : s ∉ Byz → <span class="const token" data-verso-hover="444">LInvAt</span> Byz σ' s l')</span>
+<span id="L270">    (hauth : ∀ a b B, (a, b, <span class="const token" data-verso-hover="245">Payload.blk</span> B) ∈ σ'.<span class="const token" data-verso-hover="438">sent</span> → (a, b, <span class="const token" data-verso-hover="245">Payload.blk</span> B) ∉ σ.<span class="const token" data-verso-hover="438">sent</span> →</span>
+<span id="L271">      <span class="const token" data-verso-hover="8">Authentic</span> Byz σ' B) : <span class="const token" data-verso-hover="341">Inv</span> Byz σ' := <span class="kw">by</span></span>
+<span id="L272">  <span class="kw">refine</span> ⟨<span class="kw">fun</span> s' hs' =&gt; ?_, <span class="kw">fun</span> a b B hB =&gt; ?_⟩</span>
+<span id="L273">  · <span class="kw">by_cases</span> h : s' = s</span>
+<span id="L274">    · <span class="kw">subst</span> h</span>
+<span id="L275">      <span class="kw">show</span> <span class="const token" data-verso-hover="444">LInvAt</span> Byz σ' s' (σ'.<span class="const token" data-verso-hover="256">loc</span> s')</span>
+<span id="L276">      <span class="kw">rw</span> [hloc, <span class="const token" data-verso-hover="277">Function.update_self</span>]</span>
+<span id="L277">      <span class="kw">exact</span> hs hs'</span>
+<span id="L278">    · <span class="kw">show</span> <span class="const token" data-verso-hover="444">LInvAt</span> Byz σ' s' (σ'.<span class="const token" data-verso-hover="256">loc</span> s')</span>
+<span id="L279">      <span class="kw">rw</span> [hloc, <span class="const token" data-verso-hover="278">Function.update_of_ne</span> h]</span>
+<span id="L280">      <span class="kw">exact</span> (hI.<span class="const token" data-verso-hover="328">loc</span> s' hs').<span class="const token" data-verso-hover="470">frame</span> hc hsent</span>
+<span id="L281">  · <span class="kw">by_cases</span> hB' : (a, b, <span class="const token" data-verso-hover="245">Payload.blk</span> B) ∈ σ.<span class="const token" data-verso-hover="438">sent</span></span>
+<span id="L282">    · <span class="kw">exact</span> (hI.<span class="const token" data-verso-hover="453">sent_auth</span> a b B hB').<span class="const token" data-verso-hover="454">mono</span> hc</span>
+<span id="L283">    · <span class="kw">exact</span> hauth a b B hB hB'</span>
+<span id="L284"></span>
+<span id="L285"><span class="dc">/-- Building the invariant after a step that changes only `sent`. -/</span></span>
+<span id="L286"><span class="kw">theorem</span> <span class="const token" data-verso-hover="473">Inv.of_sent</span> {σ σ' : <span class="const token" data-verso-hover="233">Sys</span> S L R} (hI : <span class="const token" data-verso-hover="341">Inv</span> Byz σ) (hloc : σ'.<span class="const token" data-verso-hover="256">loc</span> = σ.<span class="const token" data-verso-hover="256">loc</span>)</span>
+<span id="L287">    (hsent : σ.<span class="const token" data-verso-hover="438">sent</span> ⊆ σ'.<span class="const token" data-verso-hover="438">sent</span>)</span>
+<span id="L288">    (hauth : ∀ a b B, (a, b, <span class="const token" data-verso-hover="245">Payload.blk</span> B) ∈ σ'.<span class="const token" data-verso-hover="438">sent</span> → (a, b, <span class="const token" data-verso-hover="245">Payload.blk</span> B) ∉ σ.<span class="const token" data-verso-hover="438">sent</span> →</span>
+<span id="L289">      <span class="const token" data-verso-hover="8">Authentic</span> Byz σ B) : <span class="const token" data-verso-hover="341">Inv</span> Byz σ' := <span class="kw">by</span></span>
+<span id="L290">  <span class="kw">have</span> hc : <span class="const token" data-verso-hover="440">created</span> Byz σ ⊆ <span class="const token" data-verso-hover="440">created</span> Byz σ' := <span class="const token" data-verso-hover="471">created_mono</span> <span class="kw">fun</span> s =&gt; <span class="kw">by</span> <span class="kw">rw</span> [hloc]</span>
+<span id="L291">  <span class="kw">refine</span> ⟨<span class="kw">fun</span> s hs =&gt; ?_, <span class="kw">fun</span> a b B hB =&gt; ?_⟩</span>
+<span id="L292">  · <span class="kw">show</span> <span class="const token" data-verso-hover="444">LInvAt</span> Byz σ' s (σ'.<span class="const token" data-verso-hover="256">loc</span> s)</span>
+<span id="L293">    <span class="kw">rw</span> [hloc]</span>
+<span id="L294">    <span class="kw">exact</span> (hI.<span class="const token" data-verso-hover="328">loc</span> s hs).<span class="const token" data-verso-hover="470">frame</span> hc hsent</span>
+<span id="L295">  · <span class="kw">by_cases</span> hB' : (a, b, <span class="const token" data-verso-hover="245">Payload.blk</span> B) ∈ σ.<span class="const token" data-verso-hover="438">sent</span></span>
+<span id="L296">    · <span class="kw">exact</span> (hI.<span class="const token" data-verso-hover="453">sent_auth</span> a b B hB').<span class="const token" data-verso-hover="454">mono</span> hc</span>
+<span id="L297">    · <span class="kw">exact</span> (hauth a b B hB hB').<span class="const token" data-verso-hover="454">mono</span> hc</span>
+<span id="L298"></span>
+<span id="L299"><span class="kw">theorem</span> <span class="const token" data-verso-hover="474">LInvAt.refs_sub</span> {σ : <span class="const token" data-verso-hover="233">Sys</span> S L R} {s : S} {l : <span class="const token" data-verso-hover="433">Local</span> S L R} (h : <span class="const token" data-verso-hover="444">LInvAt</span> Byz σ s l) :</span>
+<span id="L300">    ∀ C ∈ l.<span class="const token" data-verso-hover="336">own</span>.<span class="const token" data-verso-hover="105">flatMap</span> <span class="const token" data-verso-hover="62">Block.preds</span> ++ l.<span class="const token" data-verso-hover="436">preds</span>, C ∈ l.<span class="const token" data-verso-hover="257">log</span> := <span class="kw">by</span></span>
+<span id="L301">  <span class="kw">intro</span> C hC</span>
+<span id="L302">  <span class="kw">rcases</span> <span class="const token" data-verso-hover="281">List.mem_append</span>.<span class="const token" data-verso-hover="111">1</span> hC <span class="kw">with</span> hC | hC</span>
+<span id="L303">  · <span class="kw">obtain</span> ⟨D, hD, hCD⟩ := <span class="const token" data-verso-hover="109">List.mem_flatMap</span>.<span class="const token" data-verso-hover="111">1</span> hC</span>
+<span id="L304">    <span class="kw">exact</span> h.<span class="const token" data-verso-hover="329">dag</span>.<span class="const token" data-verso-hover="147">2</span> D (h.<span class="const token" data-verso-hover="342">own_sub</span> D hD) C hCD</span>
+<span id="L305">  · <span class="kw">exact</span> h.<span class="const token" data-verso-hover="445">preds_sub</span> C hC</span>
+<span id="L306"></span>
+<span id="L307"><span class="kw">theorem</span> <span class="const token" data-verso-hover="475">setOf_mem_append_singleton</span> (l : <span class="const token" data-verso-hover="59">List</span> (<span class="const token" data-verso-hover="7">Block</span> S L R)) (B : <span class="const token" data-verso-hover="7">Block</span> S L R) :</span>
+<span id="L308">    {x | x ∈ l ++ [B]} = <span class="const token" data-verso-hover="177">insert</span> B {x | x ∈ l} := <span class="kw">by</span></span>
+<span id="L309">  <span class="kw">ext</span> x; <span class="kw">simp</span> [<span class="const token" data-verso-hover="476">or_comm</span>]</span>
+<span id="L310"></span>
+<span id="L311"><span class="kw">theorem</span> <span class="const token" data-verso-hover="477">Inv.step_request</span> {σ : <span class="const token" data-verso-hover="233">Sys</span> S L R} (hI : <span class="const token" data-verso-hover="341">Inv</span> Byz σ) {s : S} {ℓ : L} {r : R} :</span>
+<span id="L312">    <span class="const token" data-verso-hover="341">Inv</span> Byz (<span class="const token" data-verso-hover="237">apply</span> σ (<span class="const token" data-verso-hover="242">.</span>request s ℓ r)) := <span class="kw">by</span></span>
+<span id="L313">  <span class="kw">have</span> hc : <span class="const token" data-verso-hover="440">created</span> Byz σ = <span class="const token" data-verso-hover="440">created</span> Byz (<span class="const token" data-verso-hover="237">apply</span> σ (<span class="const token" data-verso-hover="242">.</span>request s ℓ r)) := <span class="kw">by</span></span>
+<span id="L314">    <span class="kw">ext</span> B; <span class="kw">simp</span> only [<span class="const token" data-verso-hover="440">created</span>, <span class="const token" data-verso-hover="237">apply</span>, <span class="const token" data-verso-hover="253">Sys.upd</span>, <span class="const token" data-verso-hover="163">Set.mem_ofPred_eq</span>]</span>
+<span id="L315">    <span class="kw">refine</span> <span class="const token" data-verso-hover="403">exists_congr</span> <span class="kw">fun</span> s' =&gt; <span class="const token" data-verso-hover="404">and_congr_right</span> <span class="kw">fun</span> _ =&gt; ?_</span>
+<span id="L316">    <span class="kw">by_cases</span> h : s' = s</span>
+<span id="L317">    · <span class="kw">subst</span> h; <span class="kw">simp</span></span>
+<span id="L318">    · <span class="kw">simp</span> [<span class="const token" data-verso-hover="278">Function.update_of_ne</span> h]</span>
+<span id="L319">  <span class="kw">refine</span> hI.<span class="const token" data-verso-hover="472">of_upd</span> <span class="const token" data-verso-hover="65">rfl</span> <span class="const token" data-verso-hover="478">subset_rfl</span> hc.<span class="const token" data-verso-hover="479">subset</span> (<span class="kw">fun</span> hs =&gt; ?_) (<span class="kw">fun</span> a b B h h' =&gt; <span class="const token" data-verso-hover="144">absurd</span> h h')</span>
+<span id="L320">  <span class="kw">have</span> h := hI.<span class="const token" data-verso-hover="328">loc</span> s hs</span>
+<span id="L321">  <span class="kw">exact</span> { h.<span class="const token" data-verso-hover="470">frame</span> hc.<span class="const token" data-verso-hover="479">subset</span> <span class="const token" data-verso-hover="478">subset_rfl</span> <span class="kw">with</span></span>
+<span id="L322">    <span class="const token" data-verso-hover="431">reqs</span> := <span class="kw">by</span> <span class="kw">simp</span> [← h.<span class="const token" data-verso-hover="431">reqs</span>] }</span>
+<span id="L323"></span>
+<span id="L324"><span class="kw">theorem</span> <span class="const token" data-verso-hover="480">Inv.step_recv_blk</span> {σ : <span class="const token" data-verso-hover="233">Sys</span> S L R} (hI : <span class="const token" data-verso-hover="341">Inv</span> Byz σ) {s src : S} {B : <span class="const token" data-verso-hover="7">Block</span> S L R}</span>
+<span id="L325">    (hen : (src, s, <span class="const token" data-verso-hover="245">Payload.blk</span> B) ∈ σ.<span class="const token" data-verso-hover="438">sent</span>) :</span>
+<span id="L326">    <span class="const token" data-verso-hover="341">Inv</span> Byz (<span class="const token" data-verso-hover="237">apply</span> σ (<span class="const token" data-verso-hover="246">.</span>recv s src (<span class="const token" data-verso-hover="245">.</span>blk B))) := <span class="kw">by</span></span>
+<span id="L327">  <span class="kw">simp</span> only [<span class="const token" data-verso-hover="237">apply</span>]</span>
+<span id="L328">  <span class="kw">split_ifs</span> <span class="kw">with</span> hB</span>
+<span id="L329">  · <span class="kw">exact</span> hI</span>
+<span id="L330">  <span class="kw">have</span> hc : <span class="const token" data-verso-hover="440">created</span> Byz σ = <span class="const token" data-verso-hover="440">created</span> Byz (σ.<span class="const token" data-verso-hover="253">upd</span> s { σ.<span class="const token" data-verso-hover="256">loc</span> s <span class="kw">with</span> <span class="const token" data-verso-hover="434">blks</span> := (σ.<span class="const token" data-verso-hover="256">loc</span> s).<span class="const token" data-verso-hover="434">blks</span>.<span class="const token" data-verso-hover="441">insert</span> B }) := <span class="kw">by</span></span>
+<span id="L331">    <span class="kw">ext</span> C; <span class="kw">simp</span> only [<span class="const token" data-verso-hover="440">created</span>, <span class="const token" data-verso-hover="253">Sys.upd</span>, <span class="const token" data-verso-hover="163">Set.mem_ofPred_eq</span>]</span>
+<span id="L332">    <span class="kw">refine</span> <span class="const token" data-verso-hover="403">exists_congr</span> <span class="kw">fun</span> s' =&gt; <span class="const token" data-verso-hover="404">and_congr_right</span> <span class="kw">fun</span> _ =&gt; ?_</span>
+<span id="L333">    <span class="kw">by_cases</span> h : s' = s</span>
+<span id="L334">    · <span class="kw">subst</span> h; <span class="kw">simp</span></span>
+<span id="L335">    · <span class="kw">simp</span> [<span class="const token" data-verso-hover="278">Function.update_of_ne</span> h]</span>
+<span id="L336">  <span class="kw">refine</span> hI.<span class="const token" data-verso-hover="472">of_upd</span> <span class="const token" data-verso-hover="65">rfl</span> <span class="const token" data-verso-hover="478">subset_rfl</span> hc.<span class="const token" data-verso-hover="479">subset</span> (<span class="kw">fun</span> hs =&gt; ?_) (<span class="kw">fun</span> a b B h h' =&gt; <span class="const token" data-verso-hover="144">absurd</span> h h')</span>
+<span id="L337">  <span class="kw">have</span> h := (hI.<span class="const token" data-verso-hover="328">loc</span> s hs).<span class="const token" data-verso-hover="470">frame</span> hc.<span class="const token" data-verso-hover="479">subset</span> <span class="const token" data-verso-hover="478">subset_rfl</span></span>
+<span id="L338">  <span class="kw">refine</span> { h <span class="kw">with</span> <span class="const token" data-verso-hover="374">auth</span> := ?_, <span class="const token" data-verso-hover="447">disj</span> := ?_ }</span>
+<span id="L339">  · <span class="kw">rintro</span> C (hC | hC)</span>
+<span id="L340">    · <span class="kw">exact</span> h.<span class="const token" data-verso-hover="374">auth</span> C (<span class="const token" data-verso-hover="171">Or.inl</span> hC)</span>
+<span id="L341">    · <span class="kw">rcases</span> <span class="const token" data-verso-hover="481">List.mem_insert_iff</span>.<span class="const token" data-verso-hover="111">1</span> hC <span class="kw">with</span> <span class="kw">rfl</span> | hC</span>
+<span id="L342">      · <span class="kw">exact</span> (hI.<span class="const token" data-verso-hover="453">sent_auth</span> _ _ _ hen).<span class="const token" data-verso-hover="454">mono</span> hc.<span class="const token" data-verso-hover="479">subset</span></span>
+<span id="L343">      · <span class="kw">exact</span> h.<span class="const token" data-verso-hover="374">auth</span> C (<span class="const token" data-verso-hover="172">Or.inr</span> hC)</span>
+<span id="L344">  · <span class="kw">intro</span> C hC</span>
+<span id="L345">    <span class="kw">rcases</span> <span class="const token" data-verso-hover="481">List.mem_insert_iff</span>.<span class="const token" data-verso-hover="111">1</span> hC <span class="kw">with</span> <span class="kw">rfl</span> | hC</span>
+<span id="L346">    · <span class="kw">exact</span> hB</span>
+<span id="L347">    · <span class="kw">exact</span> h.<span class="const token" data-verso-hover="447">disj</span> C hC</span>
+<span id="L348"></span>
+<span id="L349"><span class="kw">theorem</span> <span class="const token" data-verso-hover="482">Inv.step_recv_fwd</span> {σ : <span class="const token" data-verso-hover="233">Sys</span> S L R} (hI : <span class="const token" data-verso-hover="341">Inv</span> Byz σ) {s src : S} {B : <span class="const token" data-verso-hover="7">Block</span> S L R}</span>
+<span id="L350">    (hs : s ∉ Byz) : <span class="const token" data-verso-hover="341">Inv</span> Byz (<span class="const token" data-verso-hover="237">apply</span> σ (<span class="const token" data-verso-hover="246">.</span>recv s src (<span class="const token" data-verso-hover="327">.</span>fwd B))) := <span class="kw">by</span></span>
+<span id="L351">  <span class="kw">simp</span> only [<span class="const token" data-verso-hover="237">apply</span>]</span>
+<span id="L352">  <span class="kw">split_ifs</span> <span class="kw">with</span> hB</span>
+<span id="L353">  · <span class="kw">refine</span> hI.<span class="const token" data-verso-hover="473">of_sent</span> <span class="const token" data-verso-hover="65">rfl</span> (<span class="const token" data-verso-hover="483">Set.subset_insert</span> _ _) <span class="kw">fun</span> a b C hC hC' =&gt; ?_</span>
+<span id="L354">    <span class="kw">rcases</span> <span class="const token" data-verso-hover="484">Set.mem_insert_iff</span>.<span class="const token" data-verso-hover="111">1</span> hC <span class="kw">with</span> h | h</span>
+<span id="L355">    · <span class="kw">simp</span> only [<span class="const token" data-verso-hover="284">Prod.mk.injEq</span>, <span class="const token" data-verso-hover="485">Payload.blk.injEq</span>] <span class="kw">at</span> h</span>
+<span id="L356">      <span class="kw">obtain</span> ⟨-, -, <span class="kw">rfl</span>⟩ := h</span>
+<span id="L357">      <span class="kw">exact</span> (hI.<span class="const token" data-verso-hover="328">loc</span> s hs).<span class="const token" data-verso-hover="374">auth</span> C (<span class="const token" data-verso-hover="171">Or.inl</span> hB)</span>
+<span id="L358">    · <span class="kw">exact</span> <span class="const token" data-verso-hover="144">absurd</span> h hC'</span>
+<span id="L359">  · <span class="kw">exact</span> hI</span>
+<span id="L360"></span>
+<span id="L361"><span class="kw">theorem</span> <span class="const token" data-verso-hover="486">Inv.step_validate</span> {σ : <span class="const token" data-verso-hover="233">Sys</span> S L R} (hI : <span class="const token" data-verso-hover="341">Inv</span> Byz σ) {s : S} {B : <span class="const token" data-verso-hover="7">Block</span> S L R}</span>
+<span id="L362">    (hen : <span class="const token" data-verso-hover="236">Enabled</span> Byz σ (<span class="const token" data-verso-hover="247">.</span>validate s B)) : <span class="const token" data-verso-hover="341">Inv</span> Byz (<span class="const token" data-verso-hover="237">apply</span> σ (<span class="const token" data-verso-hover="247">.</span>validate s B)) := <span class="kw">by</span></span>
+<span id="L363">  <span class="kw">obtain</span> ⟨hs, hBb, hBv, hBp⟩ := hen</span>
+<span id="L364">  <span class="kw">simp</span> only [<span class="const token" data-verso-hover="237">apply</span>]</span>
+<span id="L365">  <span class="kw">set</span> l := σ.<span class="const token" data-verso-hover="256">loc</span> s</span>
+<span id="L366">  <span class="kw">set</span> l' : <span class="const token" data-verso-hover="433">Local</span> S L R := ⟨l.<span class="const token" data-verso-hover="257">log</span> ++ [B], l.<span class="const token" data-verso-hover="434">blks</span>.<span class="const token" data-verso-hover="263">filter</span> (<span class="kw">fun</span> C =&gt; <span class="const token" data-verso-hover="130">decide</span> (C ≠ B)), l.<span class="const token" data-verso-hover="435">k</span>,</span>
+<span id="L367">    l.<span class="const token" data-verso-hover="436">preds</span> ++ [B], l.<span class="const token" data-verso-hover="437">rqsts</span>, l.<span class="const token" data-verso-hover="336">own</span>, l.<span class="const token" data-verso-hover="316">reqs</span>⟩</span>
+<span id="L368">  <span class="kw">have</span> hc : <span class="const token" data-verso-hover="440">created</span> Byz σ = <span class="const token" data-verso-hover="440">created</span> Byz (σ.<span class="const token" data-verso-hover="253">upd</span> s l') := <span class="kw">by</span></span>
+<span id="L369">    <span class="kw">ext</span> C; <span class="kw">simp</span> only [<span class="const token" data-verso-hover="440">created</span>, <span class="const token" data-verso-hover="253">Sys.upd</span>, <span class="const token" data-verso-hover="163">Set.mem_ofPred_eq</span>]</span>
+<span id="L370">    <span class="kw">refine</span> <span class="const token" data-verso-hover="403">exists_congr</span> <span class="kw">fun</span> s' =&gt; <span class="const token" data-verso-hover="404">and_congr_right</span> <span class="kw">fun</span> _ =&gt; ?_</span>
+<span id="L371">    <span class="kw">by_cases</span> h : s' = s</span>
+<span id="L372">    · <span class="kw">subst</span> h; <span class="kw">simp</span> [l', l]</span>
+<span id="L373">    · <span class="kw">simp</span> [<span class="const token" data-verso-hover="278">Function.update_of_ne</span> h]</span>
+<span id="L374">  <span class="kw">refine</span> hI.<span class="const token" data-verso-hover="472">of_upd</span> <span class="const token" data-verso-hover="65">rfl</span> <span class="const token" data-verso-hover="478">subset_rfl</span> hc.<span class="const token" data-verso-hover="479">subset</span> (<span class="kw">fun</span> _ =&gt; ?_) (<span class="kw">fun</span> a b B h h' =&gt; <span class="const token" data-verso-hover="144">absurd</span> h h')</span>
+<span id="L375">  <span class="kw">have</span> h := (hI.<span class="const token" data-verso-hover="328">loc</span> s hs).<span class="const token" data-verso-hover="470">frame</span> hc.<span class="const token" data-verso-hover="479">subset</span> <span class="const token" data-verso-hover="478">subset_rfl</span></span>
+<span id="L376">  <span class="kw">have</span> hBlog : B ∉ l.<span class="const token" data-verso-hover="257">log</span> := h.<span class="const token" data-verso-hover="447">disj</span> B hBb</span>
+<span id="L377">  <span class="kw">have</span> hBauth : <span class="const token" data-verso-hover="8">Authentic</span> Byz σ B := (hI.<span class="const token" data-verso-hover="328">loc</span> s hs).<span class="const token" data-verso-hover="374">auth</span> B (<span class="const token" data-verso-hover="172">Or.inr</span> hBb)</span>
+<span id="L378">  <span class="kw">have</span> hBn : B.<span class="const token" data-verso-hover="60">n</span> ≠ s := <span class="kw">fun</span> hn =&gt; hBlog ((hI.<span class="const token" data-verso-hover="328">loc</span> s hs).<span class="const token" data-verso-hover="342">own_sub</span> B (hI.<span class="const token" data-verso-hover="373">mem_own</span> hs hBauth hn))</span>
+<span id="L379">  <span class="kw">refine</span> ⟨?_, ?_, ?_, h.<span class="const token" data-verso-hover="337">own_k</span>, h.<span class="const token" data-verso-hover="345">own_n</span>, ?_, ?_, ?_, ?_, ?_, ?_, ?_, h.<span class="const token" data-verso-hover="452">sent_own</span>, h.<span class="const token" data-verso-hover="431">reqs</span>⟩</span>
+<span id="L380">  · <span class="kw">show</span> <span class="const token" data-verso-hover="22">IsBlockDAG</span> {x | x ∈ l.<span class="const token" data-verso-hover="257">log</span> ++ [B]}</span>
+<span id="L381">    <span class="kw">rw</span> [<span class="const token" data-verso-hover="475">setOf_mem_append_singleton</span>]</span>
+<span id="L382">    <span class="kw">exact</span> h.<span class="const token" data-verso-hover="329">dag</span>.<span class="const token" data-verso-hover="176">insert</span> hBv hBp</span>
+<span id="L383">  · <span class="kw">exact</span> <span class="const token" data-verso-hover="333">List.nodup_append</span>.<span class="const token" data-verso-hover="116">2</span> ⟨h.<span class="const token" data-verso-hover="376">log_nodup</span>, <span class="const token" data-verso-hover="487">List.nodup_singleton</span> B, <span class="kw">by</span></span>
+<span id="L384">      <span class="kw">intro</span> a ha b hb; <span class="kw">rw</span> [<span class="const token" data-verso-hover="288">List.mem_singleton</span>] <span class="kw">at</span> hb; <span class="kw">subst</span> hb; <span class="kw">rintro</span> <span class="kw">rfl</span>; <span class="kw">exact</span> hBlog ha⟩</span>
+<span id="L385">  · <span class="kw">intro</span> C hC</span>
+<span id="L386">    <span class="kw">rcases</span> <span class="const token" data-verso-hover="281">List.mem_append</span>.<span class="const token" data-verso-hover="111">1</span> hC <span class="kw">with</span> hC | hC</span>
+<span id="L387">    · <span class="kw">exact</span> <span class="const token" data-verso-hover="283">List.mem_append_left</span> _ (h.<span class="const token" data-verso-hover="445">preds_sub</span> C hC)</span>
+<span id="L388">    · <span class="kw">exact</span> <span class="const token" data-verso-hover="285">List.mem_append_right</span> _ hC</span>
+<span id="L389">  · <span class="kw">exact</span> <span class="kw">fun</span> D hD =&gt; <span class="const token" data-verso-hover="283">List.mem_append_left</span> _ (h.<span class="const token" data-verso-hover="342">own_sub</span> D hD)</span>
+<span id="L390">  · <span class="kw">rintro</span> C (hC | hC)</span>
+<span id="L391">    · <span class="kw">rcases</span> <span class="const token" data-verso-hover="281">List.mem_append</span>.<span class="const token" data-verso-hover="111">1</span> hC <span class="kw">with</span> hC | hC</span>
+<span id="L392">      · <span class="kw">exact</span> h.<span class="const token" data-verso-hover="374">auth</span> C (<span class="const token" data-verso-hover="171">Or.inl</span> hC)</span>
+<span id="L393">      · <span class="kw">rw</span> [<span class="const token" data-verso-hover="288">List.mem_singleton</span>.<span class="const token" data-verso-hover="111">1</span> hC]; <span class="kw">exact</span> hBauth.<span class="const token" data-verso-hover="454">mono</span> hc.<span class="const token" data-verso-hover="479">subset</span></span>
+<span id="L394">    · <span class="kw">exact</span> h.<span class="const token" data-verso-hover="374">auth</span> C (<span class="const token" data-verso-hover="172">Or.inr</span> (<span class="const token" data-verso-hover="488">List.mem_of_mem_filter</span> hC))</span>
+<span id="L395">  · <span class="kw">intro</span> C hC hC'</span>
+<span id="L396">    <span class="kw">have</span> hCB : C ≠ B := <span class="kw">by</span> <span class="kw">simpa</span> <span class="kw">using</span> (<span class="const token" data-verso-hover="300">List.mem_filter</span>.<span class="const token" data-verso-hover="111">1</span> hC).<span class="const token" data-verso-hover="147">2</span></span>
+<span id="L397">    <span class="kw">rcases</span> <span class="const token" data-verso-hover="281">List.mem_append</span>.<span class="const token" data-verso-hover="111">1</span> hC' <span class="kw">with</span> hC' | hC'</span>
+<span id="L398">    · <span class="kw">exact</span> h.<span class="const token" data-verso-hover="447">disj</span> C (<span class="const token" data-verso-hover="488">List.mem_of_mem_filter</span> hC) hC'</span>
+<span id="L399">    · <span class="kw">exact</span> hCB (<span class="const token" data-verso-hover="288">List.mem_singleton</span>.<span class="const token" data-verso-hover="111">1</span> hC')</span>
+<span id="L400">  · <span class="kw">intro</span> C hC hCn</span>
+<span id="L401">    <span class="kw">rcases</span> <span class="const token" data-verso-hover="281">List.mem_append</span>.<span class="const token" data-verso-hover="111">1</span> hC <span class="kw">with</span> hC | hC</span>
+<span id="L402">    · <span class="kw">exact</span> h.<span class="const token" data-verso-hover="448">par₁</span> C hC hCn</span>
+<span id="L403">    · <span class="kw">rw</span> [<span class="const token" data-verso-hover="288">List.mem_singleton</span>.<span class="const token" data-verso-hover="111">1</span> hC] <span class="kw">at</span> hCn; <span class="kw">exact</span> <span class="const token" data-verso-hover="144">absurd</span> hCn hBn</span>
+<span id="L404">  · <span class="kw">exact</span> <span class="kw">fun</span> D hD =&gt; <span class="const token" data-verso-hover="283">List.mem_append_left</span> _ (h.<span class="const token" data-verso-hover="450">par₂</span> D hD)</span>
+<span id="L405">  · <span class="kw">show</span> (l.<span class="const token" data-verso-hover="336">own</span>.<span class="const token" data-verso-hover="105">flatMap</span> <span class="const token" data-verso-hover="62">Block.preds</span> ++ (l.<span class="const token" data-verso-hover="436">preds</span> ++ [B])).<span class="const token" data-verso-hover="297">Nodup</span></span>
+<span id="L406">    <span class="kw">rw</span> [← <span class="const token" data-verso-hover="371">List.append_assoc</span>]</span>
+<span id="L407">    <span class="kw">exact</span> <span class="const token" data-verso-hover="333">List.nodup_append</span>.<span class="const token" data-verso-hover="116">2</span> ⟨h.<span class="const token" data-verso-hover="417">refs_nodup</span>, <span class="const token" data-verso-hover="487">List.nodup_singleton</span> B, <span class="kw">by</span></span>
+<span id="L408">      <span class="kw">intro</span> a ha b hb; <span class="kw">rw</span> [<span class="const token" data-verso-hover="288">List.mem_singleton</span>] <span class="kw">at</span> hb; <span class="kw">subst</span> hb; <span class="kw">rintro</span> <span class="kw">rfl</span></span>
+<span id="L409">      <span class="kw">exact</span> hBlog (h.<span class="const token" data-verso-hover="474">refs_sub</span> a ha)⟩</span>
+<span id="L410">  · <span class="kw">intro</span> C hC</span>
+<span id="L411">    <span class="kw">rcases</span> <span class="const token" data-verso-hover="281">List.mem_append</span>.<span class="const token" data-verso-hover="111">1</span> hC <span class="kw">with</span> hC | hC</span>
+<span id="L412">    · <span class="kw">rcases</span> h.<span class="const token" data-verso-hover="451">ref</span> C hC <span class="kw">with</span> h1 | h1</span>
+<span id="L413">      · <span class="kw">exact</span> <span class="const token" data-verso-hover="171">Or.inl</span> (<span class="const token" data-verso-hover="283">List.mem_append_left</span> _ h1)</span>
+<span id="L414">      · <span class="kw">exact</span> <span class="const token" data-verso-hover="172">Or.inr</span> h1</span>
+<span id="L415">    · <span class="kw">exact</span> <span class="const token" data-verso-hover="171">Or.inl</span> (<span class="const token" data-verso-hover="285">List.mem_append_right</span> _ hC)</span>
+<span id="L416"></span>
+<span id="L417"><span class="kw">theorem</span> <span class="const token" data-verso-hover="489">Inv.step_askFwd</span> {σ : <span class="const token" data-verso-hover="233">Sys</span> S L R} (hI : <span class="const token" data-verso-hover="341">Inv</span> Byz σ) {s : S} {B' B : <span class="const token" data-verso-hover="7">Block</span> S L R} :</span>
+<span id="L418">    <span class="const token" data-verso-hover="341">Inv</span> Byz (<span class="const token" data-verso-hover="237">apply</span> σ (<span class="const token" data-verso-hover="330">.</span>askFwd s B' B)) :=</span>
+<span id="L419">  hI.<span class="const token" data-verso-hover="473">of_sent</span> <span class="const token" data-verso-hover="65">rfl</span> (<span class="const token" data-verso-hover="483">Set.subset_insert</span> _ _) <span class="kw">fun</span> a b C hC hC' =&gt; <span class="kw">by</span></span>
+<span id="L420">    <span class="kw">rcases</span> <span class="const token" data-verso-hover="484">Set.mem_insert_iff</span>.<span class="const token" data-verso-hover="111">1</span> hC <span class="kw">with</span> h | h</span>
+<span id="L421">    · <span class="kw">simp</span> <span class="kw">at</span> h</span>
+<span id="L422">    · <span class="kw">exact</span> <span class="const token" data-verso-hover="144">absurd</span> h hC'</span>
+<span id="L423"></span>
+<span id="L424"><span class="kw">theorem</span> <span class="const token" data-verso-hover="490">Inv.step_byz</span> {σ : <span class="const token" data-verso-hover="233">Sys</span> S L R} (hI : <span class="const token" data-verso-hover="341">Inv</span> Byz σ) {b dst : S} {p : <span class="const token" data-verso-hover="432">Payload</span> S L R}</span>
+<span id="L425">    (hen : <span class="const token" data-verso-hover="236">Enabled</span> Byz σ (<span class="const token" data-verso-hover="244">.</span>byz b dst p)) : <span class="const token" data-verso-hover="341">Inv</span> Byz (<span class="const token" data-verso-hover="237">apply</span> σ (<span class="const token" data-verso-hover="244">.</span>byz b dst p)) :=</span>
+<span id="L426">  hI.<span class="const token" data-verso-hover="473">of_sent</span> <span class="const token" data-verso-hover="65">rfl</span> (<span class="const token" data-verso-hover="483">Set.subset_insert</span> _ _) <span class="kw">fun</span> a b' C hC hC' =&gt; <span class="kw">by</span></span>
+<span id="L427">    <span class="kw">rcases</span> <span class="const token" data-verso-hover="484">Set.mem_insert_iff</span>.<span class="const token" data-verso-hover="111">1</span> hC <span class="kw">with</span> h | h</span>
+<span id="L428">    · <span class="kw">simp</span> only [<span class="const token" data-verso-hover="284">Prod.mk.injEq</span>] <span class="kw">at</span> h</span>
+<span id="L429">      <span class="kw">exact</span> hen.<span class="const token" data-verso-hover="147">2</span> C h.<span class="const token" data-verso-hover="147">2</span><span class="nu">.</span><span class="const token" data-verso-hover="147">2</span>.<span class="const token" data-verso-hover="390">symm</span></span>
+<span id="L430">    · <span class="kw">exact</span> <span class="const token" data-verso-hover="144">absurd</span> h hC'</span>
+<span id="L431"></span>
+<span id="L432"><span class="kw">theorem</span> <span class="const token" data-verso-hover="491">Inv.step_disseminate</span> {σ : <span class="const token" data-verso-hover="233">Sys</span> S L R} (hI : <span class="const token" data-verso-hover="341">Inv</span> Byz σ) {s : S} (hs : s ∉ Byz) :</span>
+<span id="L433">    <span class="const token" data-verso-hover="341">Inv</span> Byz (<span class="const token" data-verso-hover="237">apply</span> σ (<span class="const token" data-verso-hover="243">.</span>disseminate s)) := <span class="kw">by</span></span>
+<span id="L434">  <span class="kw">set</span> l := σ.<span class="const token" data-verso-hover="256">loc</span> s</span>
+<span id="L435">  <span class="kw">set</span> B := <span class="const token" data-verso-hover="254">newBlock</span> s l</span>
+<span id="L436">  <span class="kw">set</span> l' : <span class="const token" data-verso-hover="433">Local</span> S L R := ⟨l.<span class="const token" data-verso-hover="257">log</span> ++ [B], l.<span class="const token" data-verso-hover="434">blks</span>, l.<span class="const token" data-verso-hover="435">k</span> + <span class="nu">1</span>, [B], [], l.<span class="const token" data-verso-hover="336">own</span> ++ [B], l.<span class="const token" data-verso-hover="316">reqs</span>⟩</span>
+<span id="L437">  <span class="kw">have</span> hσ' : <span class="const token" data-verso-hover="237">apply</span> σ (<span class="const token" data-verso-hover="243">.</span>disseminate s) =</span>
+<span id="L438">      ⟨<span class="const token" data-verso-hover="368">Function.update</span> σ.<span class="const token" data-verso-hover="256">loc</span> s l', σ.<span class="const token" data-verso-hover="438">sent</span> ∪ <span class="const token" data-verso-hover="442">Set.range</span> <span class="kw">fun</span> s' =&gt; (s, s', <span class="const token" data-verso-hover="245">Payload.blk</span> B)⟩ := <span class="const token" data-verso-hover="65">rfl</span></span>
+<span id="L439">  <span class="kw">rw</span> [hσ']</span>
+<span id="L440">  <span class="kw">set</span> σ' : <span class="const token" data-verso-hover="233">Sys</span> S L R := ⟨<span class="const token" data-verso-hover="368">Function.update</span> σ.<span class="const token" data-verso-hover="256">loc</span> s l', σ.<span class="const token" data-verso-hover="438">sent</span> ∪ <span class="const token" data-verso-hover="442">Set.range</span> <span class="kw">fun</span> s' =&gt; (s, s', <span class="const token" data-verso-hover="245">.</span>blk B)⟩</span>
+<span id="L441">  <span class="kw">have</span> hc : <span class="const token" data-verso-hover="440">created</span> Byz σ ⊆ <span class="const token" data-verso-hover="440">created</span> Byz σ' := <span class="const token" data-verso-hover="471">created_mono</span> <span class="kw">fun</span> s' =&gt; <span class="kw">by</span></span>
+<span id="L442">    <span class="kw">by_cases</span> h : s' = s</span>
+<span id="L443">    · <span class="kw">subst</span> h; <span class="kw">simp</span> [σ', l', l]</span>
+<span id="L444">    · <span class="kw">simp</span> [σ', <span class="const token" data-verso-hover="278">Function.update_of_ne</span> h]</span>
+<span id="L445">  <span class="kw">have</span> hBc : B ∈ <span class="const token" data-verso-hover="440">created</span> Byz σ' := ⟨s, hs, <span class="kw">by</span> <span class="kw">simp</span> [σ', l']⟩</span>
+<span id="L446">  <span class="kw">have</span> h0 := hI.<span class="const token" data-verso-hover="328">loc</span> s hs</span>
+<span id="L447">  <span class="kw">have</span> h := h0.<span class="const token" data-verso-hover="470">frame</span> hc <span class="const token" data-verso-hover="174">Set.subset_union_left</span></span>
+<span id="L448">  <span class="kw">have</span> hBlog : B ∉ l.<span class="const token" data-verso-hover="257">log</span> := hI.<span class="const token" data-verso-hover="457">newBlock_notMem</span> hs</span>
+<span id="L449">  <span class="kw">have</span> hBauth : <span class="const token" data-verso-hover="8">Authentic</span> Byz σ' B := <span class="kw">by</span></span>
+<span id="L450">    <span class="kw">intro</span> C hC hCn</span>
+<span id="L451">    <span class="kw">rcases</span> <span class="const token" data-verso-hover="124">Relation.ReflTransGen.cases_tail</span> hC <span class="kw">with</span> <span class="kw">rfl</span> | ⟨D, hCD, hD⟩</span>
+<span id="L452">    · <span class="kw">exact</span> hBc</span>
+<span id="L453">    · <span class="kw">exact</span> h.<span class="const token" data-verso-hover="374">auth</span> D (<span class="const token" data-verso-hover="171">Or.inl</span> (h0.<span class="const token" data-verso-hover="445">preds_sub</span> D hD)) C hCD hCn</span>
+<span id="L454">  <span class="kw">have</span> hA4 := <span class="const token" data-verso-hover="28">lemma_A_4</span> hI hs</span>
+<span id="L455">  <span class="kw">refine</span> hI.<span class="const token" data-verso-hover="472">of_upd</span> <span class="const token" data-verso-hover="65">rfl</span> <span class="const token" data-verso-hover="174">Set.subset_union_left</span> hc (<span class="kw">fun</span> _ =&gt; ?_) (<span class="kw">fun</span> a b C hC hC' =&gt; ?_)</span>
+<span id="L456">  · <span class="kw">refine</span> ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩</span>
+<span id="L457">    · <span class="kw">show</span> <span class="const token" data-verso-hover="22">IsBlockDAG</span> {x | x ∈ l.<span class="const token" data-verso-hover="257">log</span> ++ [B]}</span>
+<span id="L458">      <span class="kw">rw</span> [<span class="const token" data-verso-hover="475">setOf_mem_append_singleton</span>]</span>
+<span id="L459">      <span class="kw">exact</span> h.<span class="const token" data-verso-hover="329">dag</span>.<span class="const token" data-verso-hover="176">insert</span> hA4.<span class="const token" data-verso-hover="134">1</span> hA4.<span class="const token" data-verso-hover="147">2</span></span>
+<span id="L460">    · <span class="kw">exact</span> <span class="const token" data-verso-hover="333">List.nodup_append</span>.<span class="const token" data-verso-hover="116">2</span> ⟨h.<span class="const token" data-verso-hover="376">log_nodup</span>, <span class="const token" data-verso-hover="487">List.nodup_singleton</span> B, <span class="kw">by</span></span>
+<span id="L461">        <span class="kw">intro</span> a ha b hb; <span class="kw">rw</span> [<span class="const token" data-verso-hover="288">List.mem_singleton</span>] <span class="kw">at</span> hb; <span class="kw">subst</span> hb; <span class="kw">rintro</span> <span class="kw">rfl</span>; <span class="kw">exact</span> hBlog ha⟩</span>
+<span id="L462">    · <span class="kw">intro</span> C hC</span>
+<span id="L463">      <span class="kw">rw</span> [<span class="const token" data-verso-hover="288">List.mem_singleton</span>.<span class="const token" data-verso-hover="111">1</span> hC]</span>
+<span id="L464">      <span class="kw">exact</span> <span class="const token" data-verso-hover="285">List.mem_append_right</span> _ (<span class="const token" data-verso-hover="286">List.mem_singleton_self</span> B)</span>
+<span id="L465">    · <span class="kw">show</span> (l.<span class="const token" data-verso-hover="336">own</span> ++ [B]).<span class="const token" data-verso-hover="98">map</span> <span class="const token" data-verso-hover="61">Block.k</span> = <span class="const token" data-verso-hover="446">List.range</span> (l.<span class="const token" data-verso-hover="435">k</span> + <span class="nu">1</span>)</span>
+<span id="L466">      <span class="kw">rw</span> [<span class="const token" data-verso-hover="407">List.map_append</span>, h.<span class="const token" data-verso-hover="337">own_k</span>, <span class="const token" data-verso-hover="462">List.range_succ</span>]</span>
+<span id="L467">      <span class="kw">rfl</span></span>
+<span id="L468">    · <span class="kw">intro</span> D hD</span>
+<span id="L469">      <span class="kw">rcases</span> <span class="const token" data-verso-hover="281">List.mem_append</span>.<span class="const token" data-verso-hover="111">1</span> hD <span class="kw">with</span> hD | hD</span>
+<span id="L470">      · <span class="kw">exact</span> h.<span class="const token" data-verso-hover="345">own_n</span> D hD</span>
+<span id="L471">      · <span class="kw">rw</span> [<span class="const token" data-verso-hover="288">List.mem_singleton</span>.<span class="const token" data-verso-hover="111">1</span> hD]; <span class="kw">rfl</span></span>
+<span id="L472">    · <span class="kw">intro</span> D hD</span>
+<span id="L473">      <span class="kw">rcases</span> <span class="const token" data-verso-hover="281">List.mem_append</span>.<span class="const token" data-verso-hover="111">1</span> hD <span class="kw">with</span> hD | hD</span>
+<span id="L474">      · <span class="kw">exact</span> <span class="const token" data-verso-hover="283">List.mem_append_left</span> _ (h.<span class="const token" data-verso-hover="342">own_sub</span> D hD)</span>
+<span id="L475">      · <span class="kw">exact</span> <span class="const token" data-verso-hover="285">List.mem_append_right</span> _ hD</span>
+<span id="L476">    · <span class="kw">rintro</span> C (hC | hC)</span>
+<span id="L477">      · <span class="kw">rcases</span> <span class="const token" data-verso-hover="281">List.mem_append</span>.<span class="const token" data-verso-hover="111">1</span> hC <span class="kw">with</span> hC | hC</span>
+<span id="L478">        · <span class="kw">exact</span> h.<span class="const token" data-verso-hover="374">auth</span> C (<span class="const token" data-verso-hover="171">Or.inl</span> hC)</span>
+<span id="L479">        · <span class="kw">rw</span> [<span class="const token" data-verso-hover="288">List.mem_singleton</span>.<span class="const token" data-verso-hover="111">1</span> hC]; <span class="kw">exact</span> hBauth</span>
+<span id="L480">      · <span class="kw">exact</span> h.<span class="const token" data-verso-hover="374">auth</span> C (<span class="const token" data-verso-hover="172">Or.inr</span> hC)</span>
+<span id="L481">    · <span class="kw">intro</span> C hC hC'</span>
+<span id="L482">      <span class="kw">rcases</span> <span class="const token" data-verso-hover="281">List.mem_append</span>.<span class="const token" data-verso-hover="111">1</span> hC' <span class="kw">with</span> hC' | hC'</span>
+<span id="L483">      · <span class="kw">exact</span> h.<span class="const token" data-verso-hover="447">disj</span> C hC hC'</span>
+<span id="L484">      · <span class="kw">rw</span> [<span class="const token" data-verso-hover="288">List.mem_singleton</span>.<span class="const token" data-verso-hover="111">1</span> hC'] <span class="kw">at</span> hC</span>
+<span id="L485">        <span class="kw">exact</span> hBlog (h0.<span class="const token" data-verso-hover="342">own_sub</span> B (hI.<span class="const token" data-verso-hover="373">mem_own</span> hs (h0.<span class="const token" data-verso-hover="374">auth</span> B (<span class="const token" data-verso-hover="172">Or.inr</span> hC)) <span class="const token" data-verso-hover="65">rfl</span>))</span>
+<span id="L486">    · <span class="kw">intro</span> C hC _</span>
+<span id="L487">      <span class="kw">rw</span> [<span class="const token" data-verso-hover="288">List.mem_singleton</span>.<span class="const token" data-verso-hover="111">1</span> hC]</span>
+<span id="L488">      <span class="kw">simp</span> [l']</span>
+<span id="L489">    · <span class="kw">intro</span> D hD</span>
+<span id="L490">      <span class="kw">simp</span> only [l', <span class="const token" data-verso-hover="463">List.getLast?_append</span>, <span class="const token" data-verso-hover="464">List.getLast?_singleton</span>, <span class="const token" data-verso-hover="465">Option.some_or</span>] <span class="kw">at</span> hD</span>
+<span id="L491">      <span class="kw">rw</span> [← <span class="const token" data-verso-hover="469">Option.some.inj</span> hD]</span>
+<span id="L492">      <span class="kw">exact</span> <span class="const token" data-verso-hover="286">List.mem_singleton_self</span> B</span>
+<span id="L493">    · <span class="kw">show</span> ((l.<span class="const token" data-verso-hover="336">own</span> ++ [B]).<span class="const token" data-verso-hover="105">flatMap</span> <span class="const token" data-verso-hover="62">Block.preds</span> ++ [B]).<span class="const token" data-verso-hover="297">Nodup</span></span>
+<span id="L494">      <span class="kw">rw</span> [<span class="const token" data-verso-hover="382">List.flatMap_append</span>, <span class="const token" data-verso-hover="492">List.flatMap_singleton</span>]</span>
+<span id="L495">      <span class="kw">exact</span> <span class="const token" data-verso-hover="333">List.nodup_append</span>.<span class="const token" data-verso-hover="116">2</span> ⟨h.<span class="const token" data-verso-hover="417">refs_nodup</span>, <span class="const token" data-verso-hover="487">List.nodup_singleton</span> B, <span class="kw">by</span></span>
+<span id="L496">        <span class="kw">intro</span> a ha b hb hab; <span class="kw">rw</span> [<span class="const token" data-verso-hover="288">List.mem_singleton</span>] <span class="kw">at</span> hb; <span class="kw">rw</span> [hab, hb] <span class="kw">at</span> ha</span>
+<span id="L497">        <span class="kw">exact</span> hBlog (h.<span class="const token" data-verso-hover="474">refs_sub</span> _ ha)⟩</span>
+<span id="L498">    · <span class="kw">intro</span> C hC</span>
+<span id="L499">      <span class="kw">rcases</span> <span class="const token" data-verso-hover="281">List.mem_append</span>.<span class="const token" data-verso-hover="111">1</span> hC <span class="kw">with</span> hC | hC</span>
+<span id="L500">      · <span class="kw">rcases</span> h.<span class="const token" data-verso-hover="451">ref</span> C hC <span class="kw">with</span> h1 | ⟨D, hD, h1⟩</span>
+<span id="L501">        · <span class="kw">exact</span> <span class="const token" data-verso-hover="172">Or.inr</span> ⟨B, <span class="const token" data-verso-hover="285">List.mem_append_right</span> _ (<span class="const token" data-verso-hover="286">List.mem_singleton_self</span> B), h1⟩</span>
+<span id="L502">        · <span class="kw">exact</span> <span class="const token" data-verso-hover="172">Or.inr</span> ⟨D, <span class="const token" data-verso-hover="283">List.mem_append_left</span> _ hD, h1⟩</span>
+<span id="L503">      · <span class="kw">exact</span> <span class="const token" data-verso-hover="171">Or.inl</span> hC</span>
+<span id="L504">    · <span class="kw">intro</span> D hD s'</span>
+<span id="L505">      <span class="kw">rcases</span> <span class="const token" data-verso-hover="281">List.mem_append</span>.<span class="const token" data-verso-hover="111">1</span> hD <span class="kw">with</span> hD | hD</span>
+<span id="L506">      · <span class="kw">exact</span> <span class="const token" data-verso-hover="171">Or.inl</span> (h0.<span class="const token" data-verso-hover="452">sent_own</span> D hD s')</span>
+<span id="L507">      · <span class="kw">rw</span> [<span class="const token" data-verso-hover="288">List.mem_singleton</span>.<span class="const token" data-verso-hover="111">1</span> hD]; <span class="kw">exact</span> <span class="const token" data-verso-hover="172">Or.inr</span> ⟨s', <span class="const token" data-verso-hover="65">rfl</span>⟩</span>
+<span id="L508">    · <span class="kw">show</span> (l.<span class="const token" data-verso-hover="336">own</span> ++ [B]).<span class="const token" data-verso-hover="105">flatMap</span> <span class="const token" data-verso-hover="63">Block.rs</span> ++ [] = l.<span class="const token" data-verso-hover="316">reqs</span></span>
+<span id="L509">      <span class="kw">rw</span> [<span class="const token" data-verso-hover="389">List.append_nil</span>, <span class="const token" data-verso-hover="382">List.flatMap_append</span>, <span class="const token" data-verso-hover="492">List.flatMap_singleton</span>, ← h.<span class="const token" data-verso-hover="431">reqs</span>]</span>
+<span id="L510">      <span class="kw">rfl</span></span>
+<span id="L511">  · <span class="kw">rcases</span> hC <span class="kw">with</span> hC | ⟨s', hs'⟩</span>
+<span id="L512">    · <span class="kw">exact</span> <span class="const token" data-verso-hover="144">absurd</span> hC hC'</span>
+<span id="L513">    · <span class="kw">simp</span> only [<span class="const token" data-verso-hover="284">Prod.mk.injEq</span>, <span class="const token" data-verso-hover="485">Payload.blk.injEq</span>] <span class="kw">at</span> hs'</span>
+<span id="L514">      <span class="kw">rw</span> [← hs'.<span class="const token" data-verso-hover="147">2</span><span class="nu">.</span><span class="const token" data-verso-hover="147">2</span>]</span>
+<span id="L515">      <span class="kw">exact</span> hBauth</span>
+<span id="L516"></span>
+<span id="L517"><span class="dc">/-- Every step preserves the invariant. -/</span></span>
+<span id="L518"><span class="kw">theorem</span> <span class="const token" data-verso-hover="493">Inv.step</span> {σ σ' : <span class="const token" data-verso-hover="233">Sys</span> S L R} {e : <span class="const token" data-verso-hover="234">Ev</span> S L R} (hI : <span class="const token" data-verso-hover="341">Inv</span> Byz σ) (h : <span class="const token" data-verso-hover="443">Step</span> Byz σ e σ') :</span>
+<span id="L519">    <span class="const token" data-verso-hover="341">Inv</span> Byz σ' := <span class="kw">by</span></span>
+<span id="L520">  <span class="kw">obtain</span> ⟨hen, <span class="kw">rfl</span>⟩ := h</span>
+<span id="L521">  <span class="kw">cases</span> e <span class="kw">with</span></span>
+<span id="L522">  | <span class="const token" data-verso-hover="242">request</span> s ℓ r =&gt; <span class="kw">exact</span> hI.<span class="const token" data-verso-hover="477">step_request</span></span>
+<span id="L523">  | <span class="const token" data-verso-hover="246">recv</span> s src p =&gt;</span>
+<span id="L524">    <span class="kw">cases</span> p <span class="kw">with</span></span>
+<span id="L525">    | <span class="const token" data-verso-hover="245">blk</span> B =&gt; <span class="kw">exact</span> hI.<span class="const token" data-verso-hover="480">step_recv_blk</span> hen.<span class="const token" data-verso-hover="147">2</span></span>
+<span id="L526">    | <span class="const token" data-verso-hover="327">fwd</span> B =&gt; <span class="kw">exact</span> hI.<span class="const token" data-verso-hover="482">step_recv_fwd</span> hen.<span class="const token" data-verso-hover="134">1</span></span>
+<span id="L527">  | <span class="const token" data-verso-hover="247">validate</span> s B =&gt; <span class="kw">exact</span> hI.<span class="const token" data-verso-hover="486">step_validate</span> hen</span>
+<span id="L528">  | <span class="const token" data-verso-hover="330">askFwd</span> s B' B =&gt; <span class="kw">exact</span> hI.<span class="const token" data-verso-hover="489">step_askFwd</span></span>
+<span id="L529">  | <span class="const token" data-verso-hover="243">disseminate</span> s =&gt; <span class="kw">exact</span> hI.<span class="const token" data-verso-hover="491">step_disseminate</span> hen</span>
+<span id="L530">  | <span class="const token" data-verso-hover="244">byz</span> b dst p =&gt; <span class="kw">exact</span> hI.<span class="const token" data-verso-hover="490">step_byz</span> hen</span>
+<span id="L531"></span>
+<span id="L532"><span class="kw">theorem</span> <span class="const token" data-verso-hover="494">inv_init</span> : <span class="const token" data-verso-hover="341">Inv</span> Byz (<span class="const token" data-verso-hover="249">Sys.init</span> : <span class="const token" data-verso-hover="233">Sys</span> S L R) := <span class="kw">by</span></span>
+<span id="L533">  <span class="kw">refine</span> ⟨<span class="kw">fun</span> s _ =&gt; ?_, <span class="kw">fun</span> a b B h =&gt; <span class="kw">by</span> <span class="kw">simp</span> [<span class="const token" data-verso-hover="249">Sys.init</span>] <span class="kw">at</span> h⟩</span>
+<span id="L534">  <span class="kw">refine</span> ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩ &lt;;&gt;</span>
+<span id="L535">    <span class="kw">simp</span> [<span class="const token" data-verso-hover="249">Sys.init</span>, <span class="const token" data-verso-hover="439">Local.G</span>, <span class="const token" data-verso-hover="178">isBlockDAG_empty</span>]</span>
+<span id="L536"></span>
+<span id="L537"><span class="kw">theorem</span> <span class="const token" data-verso-hover="30">reachable_inv</span> {σ : <span class="const token" data-verso-hover="233">Sys</span> S L R} (h : <span class="const token" data-verso-hover="239">Reachable</span> Byz σ) : <span class="const token" data-verso-hover="341">Inv</span> Byz σ := <span class="kw">by</span></span>
+<span id="L538">  <span class="kw">induction</span> h <span class="kw">with</span></span>
+<span id="L539">  | <span class="const token" data-verso-hover="120">refl</span> =&gt; <span class="kw">exact</span> <span class="const token" data-verso-hover="494">inv_init</span></span>
+<span id="L540">  | <span class="const token" data-verso-hover="122">tail</span> _ h ih =&gt; <span class="kw">obtain</span> ⟨e, he⟩ := h; <span class="kw">exact</span> ih.<span class="const token" data-verso-hover="493">step</span> he</span>
+<span id="L541"></span>
+<span id="L542"><span class="dc">/-- Lemma A.5: the local DAG `G` of every correct server is always a block DAG. -/</span></span>
+<span id="L543"><span class="kw">theorem</span> <span class="const token" data-verso-hover="6">lemma_A_5</span> {σ : <span class="const token" data-verso-hover="233">Sys</span> S L R} (h : <span class="const token" data-verso-hover="239">Reachable</span> Byz σ) {s : S} (hs : s ∉ Byz) :</span>
+<span id="L544">    <span class="const token" data-verso-hover="22">IsBlockDAG</span> (σ.<span class="const token" data-verso-hover="256">loc</span> s).<span class="const token" data-verso-hover="439">G</span> ∧ <span class="const token" data-verso-hover="23">PaperBlockDAG</span> (<span class="const token" data-verso-hover="150">toGraph</span> (σ.<span class="const token" data-verso-hover="256">loc</span> s).<span class="const token" data-verso-hover="439">G</span>) :=</span>
+<span id="L545">  ⟨((<span class="const token" data-verso-hover="30">reachable_inv</span> h).<span class="const token" data-verso-hover="328">loc</span> s hs).<span class="const token" data-verso-hover="329">dag</span>, ((<span class="const token" data-verso-hover="30">reachable_inv</span> h).<span class="const token" data-verso-hover="328">loc</span> s hs).<span class="const token" data-verso-hover="329">dag</span>.<span class="const token" data-verso-hover="24">paper</span>⟩</span>
+<span id="L546"></span>
+<span id="L547"><span class="dc">/-- Lemma A.6: a correct server references every block at most once in its blocks (the</span></span>
+<span id="L548"><span class="dc">concatenation of the predecessor lists of all its disseminated blocks and of its current block has</span></span>
+<span id="L549"><span class="dc">no duplicates). -/</span></span>
+<span id="L550"><span class="kw">theorem</span> <span class="const token" data-verso-hover="29">lemma_A_6</span> {σ : <span class="const token" data-verso-hover="233">Sys</span> S L R} (h : <span class="const token" data-verso-hover="239">Reachable</span> Byz σ) {s : S} (hs : s ∉ Byz) :</span>
+<span id="L551">    ((σ.<span class="const token" data-verso-hover="256">loc</span> s).<span class="const token" data-verso-hover="336">own</span>.<span class="const token" data-verso-hover="105">flatMap</span> <span class="const token" data-verso-hover="62">Block.preds</span> ++ (σ.<span class="const token" data-verso-hover="256">loc</span> s).<span class="const token" data-verso-hover="436">preds</span>).<span class="const token" data-verso-hover="297">Nodup</span> :=</span>
+<span id="L552">  ((<span class="const token" data-verso-hover="30">reachable_inv</span> h).<span class="const token" data-verso-hover="328">loc</span> s hs).<span class="const token" data-verso-hover="417">refs_nodup</span></span>
+<span id="L553"></span>
+<span id="L554"><span class="kw">end</span> Podc.BFTInBlockDAG</span>
+<span id="L555"></span>
+</code></div>
+        <script>
+          window.versoHoversUrl = "PODC2021/BFTInBlockDAG/-hovers.json";</script>
+        <script src="static/lean/popper.js"></script>
+        <script src="static/lean/tippy.js"></script>
+        <script src="static/lean/marked.js"></script>
+        <script src="static/lean/highlighting.js"></script>
+        <script src="static/lean/lean.js"></script>
+        </article></main><footer class="site-footer"><div class="wrap">
+        Machine-checked formalizations of PODC papers in Lean 4. Generated with <a href="https://github.com/leanprover/verso">Verso</a> from the README files of <a href="https://github.com/vasnesterov/formal_podc">vasnesterov/formal_podc</a>.</div>
+      </footer></body>
+  </html>
+

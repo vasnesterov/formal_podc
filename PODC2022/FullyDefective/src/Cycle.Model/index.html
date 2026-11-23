@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="light dark">
+    <link rel="icon" href="data:,">
+    <title>FullyDefective: Cycle/Model.lean · Formal PODC</title><base href="../../../.././"><link rel="stylesheet" href="static/lean/verso-vars.css">
+    <link rel="stylesheet" href="static/lean/highlighting.css">
+    <link rel="stylesheet" href="static/lean/tippy-border.css">
+    <link rel="stylesheet" href="static/style.css">
+    <script defer="defer" src="static/site.js"></script>
+    </head>
+  <body>
+    <header class="site-header">
+      <div class="wrap">
+        <a class="brand" href=".">Formal PODC</a><nav class="top">
+          <a href=".">Search</a><a href="about/">About</a><a href="https://github.com/vasnesterov/formal_podc">GitHub</a></nav>
+        </div>
+      </header>
+    <main class="wrap"><article><nav class="breadcrumbs" aria-label="Breadcrumb">
+          <a href=".">Search</a><span class="sep">›</span><a href="PODC2022/">PODC 2022</a><span class="sep">›</span><a href="PODC2022/FullyDefective/">FullyDefective</a><span class="sep">›</span><a href="PODC2022/FullyDefective/src/">Lean source</a><span class="sep">›</span><span aria-current="page">Cycle.Model</span></nav>
+        <h1>
+          <code>Cycle/Model.lean</code></h1>
+        <div class="paper-links">
+          <p>
+            Source of <a href="PODC2022/FullyDefective/">Distributed Computations in Fully-Defective Networks — PODC 2022</a> · <a href="https://github.com/vasnesterov/formal_podc/blob/main/Papers/PODC2022/FullyDefective/Cycle/Model.lean">GitHub</a> · hover over a name for its type and documentation</p>
+          </div>
+        <div class="lean-code lean-src">
+          <code class="hl lean block" data-lean-context="Cycle.Model"><span id="L1"><span class="kw">import</span> Mathlib</span>
+<span id="L2"></span>
+<span id="L3"><span class="dc">/-!</span></span>
+<span id="L4"><span class="dc"># Algorithm 1 of [CCGS22]: the content-oblivious simulator on a simple cycle (ring layer)</span></span>
+<span id="L5"></span>
+<span id="L6"><span class="dc">K. Censor-Hillel, S. Cohen, R. Gelles, G. Sela. *Distributed Computations in Fully-Defective</span></span>
+<span id="L7"><span class="dc">Networks.* PODC 2022 (full version arXiv:2205.11148).</span></span>
+<span id="L8"></span>
+<span id="L9"><span class="dc">This file models the *ring layer* of Algorithm 1: the content-oblivious broadcast mechanism</span></span>
+<span id="L10"><span class="dc">(token phase, Algorithm 1(a), and unary data phase, Algorithm 1(b)) on an oriented cycle</span></span>
+<span id="L11"><span class="dc">`ZMod n`. The simulated protocol `π` is abstracted away: the queue `Q_u` of each node receives</span></span>
+<span id="L12"><span class="dc">arbitrary positive payloads (`push`, an environment step that may happen at any time), and a node</span></span>
+<span id="L13"><span class="dc">"decodes" one payload per epoch into its `log`. The composition with an actual protocol `π`</span></span>
+<span id="L14"><span class="dc">is in `Cycle/Simulation.lean`.</span></span>
+<span id="L15"></span>
+<span id="L16"><span class="dc">## The network</span></span>
+<span id="L17"></span>
+<span id="L18"><span class="dc">Node `u` is joined to `u + 1` (its clockwise neighbour) and to `u - 1` (its counterclockwise</span></span>
+<span id="L19"><span class="dc">neighbour); for `n = 1` this is a self-loop and for `n = 2` a double link, the algorithm works</span></span>
+<span id="L20"><span class="dc">verbatim there too. Messages are pulses (fully-defective channels: the content of every message</span></span>
+<span id="L21"><span class="dc">may be corrupted, so content is ignored), hence a channel is a counter. We keep, for every node,</span></span>
+<span id="L22"><span class="dc">the number of clockwise (`cw`) and counterclockwise (`ccw`) pulses it has sent and received:</span></span>
+<span id="L23"><span class="dc">the clockwise pulses in transit to `u` are `cwS (u - 1) - cwR u`, the counterclockwise ones</span></span>
+<span id="L24"><span class="dc">`ccwS (u + 1) - ccwR u`. Channels are not FIFO, which is irrelevant for indistinguishable pulses.</span></span>
+<span id="L25"></span>
+<span id="L26"><span class="dc">## The algorithm (one state per program point)</span></span>
+<span id="L27"></span>
+<span id="L28"><span class="dc">* `idle` — line 1 (waiting for a non-empty queue or a clockwise `request` pulse);</span></span>
+<span id="L29"><span class="dc">* `waitReq` — line 3 (own `request` sent, waiting for one);</span></span>
+<span id="L30"><span class="dc">* `ready` — line 8 (waiting for a `token` (ccw) or the first `data` (cw) pulse);</span></span>
+<span id="L31"><span class="dc">* `fwd c` — line 25 (non-holder in the data phase, `c` data pulses received and forwarded);</span></span>
+<span id="L32"><span class="dc">* `send d r` — line 21 (token holder, sent its `d` data pulses, `r` of them came back);</span></span>
+<span id="L33"><span class="dc">* `waitEnd d` — line 23 (token holder, `end` pulse sent).</span></span>
+<span id="L34"></span>
+<span id="L35"><span class="dc">A node only reads a pulse from a direction it is waiting for (`cwReady`, `ccwReady`): pulses from</span></span>
+<span id="L36"><span class="dc">the other direction stay in the incoming buffer, as in the pseudo-code's `wait until` statements.</span></span>
+<span id="L37"></span>
+<span id="L38"><span class="dc">The meanings (`request`, `token`, `data`, `end`) are never stored in pulses: a node interprets a</span></span>
+<span id="L39"><span class="dc">pulse by its direction and its own state only.</span></span>
+<span id="L40"></span>
+<span id="L41"><span class="dc">## Ghost state</span></span>
+<span id="L42"></span>
+<span id="L43"><span class="dc">`Config.ds` (the payloads of the epochs started so far, in order) and `Config.hold` (the node that</span></span>
+<span id="L44"><span class="dc">captured the token last, initially `T₀`) are ghost variables for the analysis; transitions never</span></span>
+<span id="L45"><span class="dc">read them.</span></span>
+<span id="L46"><span class="dc">-/</span></span>
+<span id="L47"></span>
+<span id="L48"><span class="kw">namespace</span> Podc.FullyDefective.Cycle</span>
+<span id="L49"></span>
+<span id="L50"><span class="dc">/-- Program points of Algorithm 1 (see the module docstring). -/</span></span>
+<span id="L51"><span class="kw">inductive</span> <span class="const token" data-verso-hover="0">Phase</span> <span class="kw">where</span></span>
+<span id="L52">  <span class="dc">/-- Line 1. -/</span></span>
+<span id="L53">  | <span class="const token" data-verso-hover="55">idle</span></span>
+<span id="L54">  <span class="dc">/-- Line 3. -/</span></span>
+<span id="L55">  | <span class="const token" data-verso-hover="56">waitReq</span></span>
+<span id="L56">  <span class="dc">/-- Line 8. -/</span></span>
+<span id="L57">  | <span class="const token" data-verso-hover="57">ready</span></span>
+<span id="L58">  <span class="dc">/-- Line 25: non-holder in the data phase, `c` data pulses received. -/</span></span>
+<span id="L59">  | <span class="const token" data-verso-hover="58">fwd</span> (c : <span class="const token" data-verso-hover="42">ℕ</span>)</span>
+<span id="L60">  <span class="dc">/-- Line 21: holder, sent `d` data pulses, `r` came back. -/</span></span>
+<span id="L61">  | <span class="const token" data-verso-hover="59">send</span> (d r : <span class="const token" data-verso-hover="42">ℕ</span>)</span>
+<span id="L62">  <span class="dc">/-- Line 23: holder, waiting for its `end` pulse. -/</span></span>
+<span id="L63">  | <span class="const token" data-verso-hover="60">waitEnd</span> (d : <span class="const token" data-verso-hover="42">ℕ</span>)</span>
+<span id="L64">  <span class="kw">deriving</span> <span class="const token" data-verso-hover="265">DecidableEq</span></span>
+<span id="L65"></span>
+<span id="L66"><span class="dc">/-- Local state of a node: program point, `isTokenHolder`, queue `Q_u` of payloads (unary</span></span>
+<span id="L67"><span class="dc">lengths of encoded messages), and the decoded payloads (one per completed epoch). -/</span></span>
+<span id="L68"><span class="kw">structure</span> <span class="const token" data-verso-hover="165">Node</span> <span class="kw">where</span></span>
+<span id="L69">  <span class="dc">/-- Program point. -/</span></span>
+<span id="L70">  <span class="const token" data-verso-hover="72">ph</span> : <span class="const token" data-verso-hover="0">Phase</span></span>
+<span id="L71">  <span class="dc">/-- `isTokenHolder_u`. -/</span></span>
+<span id="L72">  <span class="const token" data-verso-hover="85">tok</span> : <span class="const token" data-verso-hover="451">Bool</span></span>
+<span id="L73">  <span class="dc">/-- The queue `Q_u`. -/</span></span>
+<span id="L74">  <span class="const token" data-verso-hover="83">q</span> : <span class="const token" data-verso-hover="50">List</span> <span class="const token" data-verso-hover="42">ℕ</span></span>
+<span id="L75">  <span class="dc">/-- The payloads decoded so far, one per completed epoch. -/</span></span>
+<span id="L76">  <span class="const token" data-verso-hover="47">log</span> : <span class="const token" data-verso-hover="50">List</span> <span class="const token" data-verso-hover="42">ℕ</span></span>
+<span id="L77"></span>
+<span id="L78"><span class="dc">/-- A global configuration of the ring layer. -/</span></span>
+<span id="L79"><span class="kw">structure</span> <span class="const token" data-verso-hover="44">Config</span> (n : <span class="const token" data-verso-hover="42">ℕ</span>) <span class="kw">where</span></span>
+<span id="L80">  <span class="dc">/-- Local states. -/</span></span>
+<span id="L81">  <span class="const token" data-verso-hover="46">node</span> : <span class="const token" data-verso-hover="45">ZMod</span> n → <span class="const token" data-verso-hover="165">Node</span></span>
+<span id="L82">  <span class="dc">/-- Clockwise pulses sent by `u` (to `u + 1`). -/</span></span>
+<span id="L83">  <span class="const token" data-verso-hover="71">cwS</span> : <span class="const token" data-verso-hover="45">ZMod</span> n → <span class="const token" data-verso-hover="42">ℕ</span></span>
+<span id="L84">  <span class="dc">/-- Clockwise pulses received by `u` (from `u - 1`). -/</span></span>
+<span id="L85">  <span class="const token" data-verso-hover="74">cwR</span> : <span class="const token" data-verso-hover="45">ZMod</span> n → <span class="const token" data-verso-hover="42">ℕ</span></span>
+<span id="L86">  <span class="dc">/-- Counterclockwise pulses sent by `u` (to `u - 1`). -/</span></span>
+<span id="L87">  <span class="const token" data-verso-hover="78">ccwS</span> : <span class="const token" data-verso-hover="45">ZMod</span> n → <span class="const token" data-verso-hover="42">ℕ</span></span>
+<span id="L88">  <span class="dc">/-- Counterclockwise pulses received by `u` (from `u + 1`). -/</span></span>
+<span id="L89">  <span class="const token" data-verso-hover="77">ccwR</span> : <span class="const token" data-verso-hover="45">ZMod</span> n → <span class="const token" data-verso-hover="42">ℕ</span></span>
+<span id="L90">  <span class="dc">/-- Ghost: payloads of the epochs started so far. -/</span></span>
+<span id="L91">  <span class="const token" data-verso-hover="68">ds</span> : <span class="const token" data-verso-hover="50">List</span> <span class="const token" data-verso-hover="42">ℕ</span></span>
+<span id="L92">  <span class="dc">/-- Ghost: the last node that set `isTokenHolder ← True` (initially `T₀`). -/</span></span>
+<span id="L93">  <span class="const token" data-verso-hover="87">hold</span> : <span class="const token" data-verso-hover="45">ZMod</span> n</span>
+<span id="L94"></span>
+<span id="L95"><span class="dc">/-- Whether a node at program point `p` reads clockwise pulses. -/</span></span>
+<span id="L96"><span class="kw">def</span> <span class="const token" data-verso-hover="169">Phase.cwReady</span> : <span class="const token" data-verso-hover="0">Phase</span> → <span class="const token" data-verso-hover="451">Bool</span></span>
+<span id="L97">  | <span class="const token" data-verso-hover="60">.</span>waitEnd _ =&gt; <span class="const token" data-verso-hover="108">false</span></span>
+<span id="L98">  | _ =&gt; <span class="const token" data-verso-hover="86">true</span></span>
+<span id="L99"></span>
+<span id="L100"><span class="dc">/-- Whether a node at program point `p` reads counterclockwise pulses. -/</span></span>
+<span id="L101"><span class="kw">def</span> <span class="const token" data-verso-hover="212">Phase.ccwReady</span> : <span class="const token" data-verso-hover="0">Phase</span> → <span class="const token" data-verso-hover="451">Bool</span></span>
+<span id="L102">  | <span class="const token" data-verso-hover="57">.</span>ready | <span class="const token" data-verso-hover="58">.</span>fwd _ | <span class="const token" data-verso-hover="60">.</span>waitEnd _ =&gt; <span class="const token" data-verso-hover="86">true</span></span>
+<span id="L103">  | _ =&gt; <span class="const token" data-verso-hover="108">false</span></span>
+<span id="L104"></span>
+<span id="L105"><span class="dc">/-- Reaction to reading a clockwise pulse: new local state, number of clockwise and of</span></span>
+<span id="L106"><span class="dc">counterclockwise pulses sent. -/</span></span>
+<span id="L107"><span class="kw">def</span> <span class="const token" data-verso-hover="1">onCW</span> (s : <span class="const token" data-verso-hover="165">Node</span>) : <span class="const token" data-verso-hover="165">Node</span> × <span class="const token" data-verso-hover="42">ℕ</span> × <span class="const token" data-verso-hover="42">ℕ</span> :=</span>
+<span id="L108">  <span class="kw">match</span> s.<span class="const token" data-verso-hover="72">ph</span> <span class="kw">with</span></span>
+<span id="L109">  <span class="cm">--</span><span class="cm"> lines 1–2 (a `request` arrived) and 4–6 (release the token if holding it)</span></span>
+<span id="L110">  | <span class="const token" data-verso-hover="55">.</span>idle =&gt; (⟨<span class="const token" data-verso-hover="57">.</span>ready, <span class="const token" data-verso-hover="108">false</span>, s.<span class="const token" data-verso-hover="83">q</span>, s.<span class="const token" data-verso-hover="47">log</span>⟩, <span class="nu">1</span>, <span class="kw">if</span> s.<span class="const token" data-verso-hover="85">tok</span> <span class="kw">then</span> <span class="nu">1</span> <span class="kw">else</span> <span class="nu">0</span>)</span>
+<span id="L111">  <span class="cm">--</span><span class="cm"> line 3 and lines 4–6</span></span>
+<span id="L112">  | <span class="const token" data-verso-hover="56">.</span>waitReq =&gt; (⟨<span class="const token" data-verso-hover="57">.</span>ready, <span class="const token" data-verso-hover="108">false</span>, s.<span class="const token" data-verso-hover="83">q</span>, s.<span class="const token" data-verso-hover="47">log</span>⟩, <span class="nu">0</span>, <span class="kw">if</span> s.<span class="const token" data-verso-hover="85">tok</span> <span class="kw">then</span> <span class="nu">1</span> <span class="kw">else</span> <span class="nu">0</span>)</span>
+<span id="L113">  <span class="cm">--</span><span class="cm"> line 8: the first `data` pulse, forwarded (line 25)</span></span>
+<span id="L114">  | <span class="const token" data-verso-hover="57">.</span>ready =&gt; (⟨<span class="const token" data-verso-hover="58">.</span>fwd <span class="nu">1</span>, s.<span class="const token" data-verso-hover="85">tok</span>, s.<span class="const token" data-verso-hover="83">q</span>, s.<span class="const token" data-verso-hover="47">log</span>⟩, <span class="nu">1</span>, <span class="nu">0</span>)</span>
+<span id="L115">  <span class="cm">--</span><span class="cm"> line 25</span></span>
+<span id="L116">  | <span class="const token" data-verso-hover="58">.</span>fwd c =&gt; (⟨<span class="const token" data-verso-hover="58">.</span>fwd (c + <span class="nu">1</span>), s.<span class="const token" data-verso-hover="85">tok</span>, s.<span class="const token" data-verso-hover="83">q</span>, s.<span class="const token" data-verso-hover="47">log</span>⟩, <span class="nu">1</span>, <span class="nu">0</span>)</span>
+<span id="L117">  <span class="cm">--</span><span class="cm"> lines 21–22</span></span>
+<span id="L118">  | <span class="const token" data-verso-hover="59">.</span>send d r =&gt;</span>
+<span id="L119">    <span class="kw">if</span> r + <span class="nu">1</span> &lt; d <span class="kw">then</span> (⟨<span class="const token" data-verso-hover="59">.</span>send d (r + <span class="nu">1</span>), s.<span class="const token" data-verso-hover="85">tok</span>, s.<span class="const token" data-verso-hover="83">q</span>, s.<span class="const token" data-verso-hover="47">log</span>⟩, <span class="nu">0</span>, <span class="nu">0</span>)</span>
+<span id="L120">    <span class="kw">else</span> (⟨<span class="const token" data-verso-hover="60">.</span>waitEnd d, s.<span class="const token" data-verso-hover="85">tok</span>, s.<span class="const token" data-verso-hover="83">q</span>, s.<span class="const token" data-verso-hover="47">log</span>⟩, <span class="nu">0</span>, <span class="nu">1</span>)</span>
+<span id="L121">  | <span class="const token" data-verso-hover="60">.</span>waitEnd _ =&gt; (s, <span class="nu">0</span>, <span class="nu">0</span>)</span>
+<span id="L122"></span>
+<span id="L123"><span class="dc">/-- Reaction to reading a counterclockwise pulse: new local state, number of clockwise and of</span></span>
+<span id="L124"><span class="dc">counterclockwise pulses sent. -/</span></span>
+<span id="L125"><span class="kw">def</span> <span class="const token" data-verso-hover="2">onCCW</span> (s : <span class="const token" data-verso-hover="165">Node</span>) : <span class="const token" data-verso-hover="165">Node</span> × <span class="const token" data-verso-hover="42">ℕ</span> × <span class="const token" data-verso-hover="42">ℕ</span> :=</span>
+<span id="L126">  <span class="kw">match</span> s.<span class="const token" data-verso-hover="72">ph</span> <span class="kw">with</span></span>
+<span id="L127">  <span class="cm">--</span><span class="cm"> lines 9–15: a `token` pulse</span></span>
+<span id="L128">  | <span class="const token" data-verso-hover="57">.</span>ready =&gt;</span>
+<span id="L129">    <span class="kw">match</span> s.<span class="const token" data-verso-hover="83">q</span> <span class="kw">with</span></span>
+<span id="L130">    <span class="cm">--</span><span class="cm"> lines 11, 18–20: take the token, dequeue, send `d` data pulses</span></span>
+<span id="L131">    | a :: q' =&gt; (⟨<span class="const token" data-verso-hover="59">.</span>send a <span class="nu">0</span>, <span class="const token" data-verso-hover="86">true</span>, q', s.<span class="const token" data-verso-hover="47">log</span>⟩, a, <span class="nu">0</span>)</span>
+<span id="L132">    <span class="cm">--</span><span class="cm"> line 13: forward the token</span></span>
+<span id="L133">    | [] =&gt; (s, <span class="nu">0</span>, <span class="nu">1</span>)</span>
+<span id="L134">  <span class="cm">--</span><span class="cm"> lines 25–29: the `end` pulse; decode, forward `end`</span></span>
+<span id="L135">  | <span class="const token" data-verso-hover="58">.</span>fwd c =&gt; (⟨<span class="const token" data-verso-hover="55">.</span>idle, s.<span class="const token" data-verso-hover="85">tok</span>, s.<span class="const token" data-verso-hover="83">q</span>, s.<span class="const token" data-verso-hover="47">log</span> ++ [c]⟩, <span class="nu">0</span>, <span class="nu">1</span>)</span>
+<span id="L136">  <span class="cm">--</span><span class="cm"> line 23: own `end` pulse is back</span></span>
+<span id="L137">  | <span class="const token" data-verso-hover="60">.</span>waitEnd d =&gt; (⟨<span class="const token" data-verso-hover="55">.</span>idle, s.<span class="const token" data-verso-hover="85">tok</span>, s.<span class="const token" data-verso-hover="83">q</span>, s.<span class="const token" data-verso-hover="47">log</span> ++ [d]⟩, <span class="nu">0</span>, <span class="nu">0</span>)</span>
+<span id="L138">  | _ =&gt; (s, <span class="nu">0</span>, <span class="nu">0</span>)</span>
+<span id="L139"></span>
+<span id="L140"><span class="dc">/-- The payload dequeued when the node reads a counterclockwise pulse: `some a` iff the node takes</span></span>
+<span id="L141"><span class="dc">the token (line 11) with `a` at the head of its queue. -/</span></span>
+<span id="L142"><span class="kw">def</span> <span class="const token" data-verso-hover="150">capture?</span> (s : <span class="const token" data-verso-hover="165">Node</span>) : <span class="const token" data-verso-hover="452">Option</span> <span class="const token" data-verso-hover="42">ℕ</span> :=</span>
+<span id="L143">  <span class="kw">match</span> s.<span class="const token" data-verso-hover="72">ph</span>, s.<span class="const token" data-verso-hover="83">q</span> <span class="kw">with</span></span>
+<span id="L144">  | <span class="const token" data-verso-hover="57">.</span>ready, a :: _ =&gt; <span class="const token" data-verso-hover="151">some</span> a</span>
+<span id="L145">  | _, _ =&gt; <span class="const token" data-verso-hover="152">none</span></span>
+<span id="L146"></span>
+<span id="L147"><span class="kw">variable</span> {n : <span class="const token" data-verso-hover="42">ℕ</span>}</span>
+<span id="L148"></span>
+<span id="L149"><span class="dc">/-- Clockwise pulses in transit to `u`. -/</span></span>
+<span id="L150"><span class="kw">def</span> <span class="const token" data-verso-hover="174">Config.cwIn</span> (c : <span class="const token" data-verso-hover="44">Config</span> n) (u : <span class="const token" data-verso-hover="45">ZMod</span> n) : <span class="kw">Prop</span> := c.<span class="const token" data-verso-hover="74">cwR</span> u &lt; c.<span class="const token" data-verso-hover="71">cwS</span> (u - <span class="nu">1</span>)</span>
+<span id="L151"></span>
+<span id="L152"><span class="dc">/-- A counterclockwise pulse is in transit to `u`. -/</span></span>
+<span id="L153"><span class="kw">def</span> <span class="const token" data-verso-hover="81">Config.ccwIn</span> (c : <span class="const token" data-verso-hover="44">Config</span> n) (u : <span class="const token" data-verso-hover="45">ZMod</span> n) : <span class="kw">Prop</span> := c.<span class="const token" data-verso-hover="77">ccwR</span> u &lt; c.<span class="const token" data-verso-hover="78">ccwS</span> (u + <span class="nu">1</span>)</span>
+<span id="L154"></span>
+<span id="L155"><span class="dc">/-- Steps of the ring layer. -/</span></span>
+<span id="L156"><span class="kw">inductive</span> <span class="const token" data-verso-hover="217">Label</span> (n : <span class="const token" data-verso-hover="42">ℕ</span>) <span class="kw">where</span></span>
+<span id="L157">  <span class="dc">/-- The environment (the simulated protocol) appends payload `a` to `Q_u`. -/</span></span>
+<span id="L158">  | <span class="const token" data-verso-hover="116">push</span> (u : <span class="const token" data-verso-hover="45">ZMod</span> n) (a : <span class="const token" data-verso-hover="42">ℕ</span>)</span>
+<span id="L159">  <span class="dc">/-- Line 1 → 2: `Q_u` is non-empty, `u` sends its `request` pulse. -/</span></span>
+<span id="L160">  | <span class="const token" data-verso-hover="126">start</span> (u : <span class="const token" data-verso-hover="45">ZMod</span> n)</span>
+<span id="L161">  <span class="dc">/-- `u` reads a clockwise pulse. -/</span></span>
+<span id="L162">  | <span class="const token" data-verso-hover="134">cw</span> (u : <span class="const token" data-verso-hover="45">ZMod</span> n)</span>
+<span id="L163">  <span class="dc">/-- `u` reads a counterclockwise pulse. -/</span></span>
+<span id="L164">  | <span class="const token" data-verso-hover="144">ccw</span> (u : <span class="const token" data-verso-hover="45">ZMod</span> n)</span>
+<span id="L165"></span>
+<span id="L166"><span class="dc">/-- The node that acts in a step. -/</span></span>
+<span id="L167"><span class="kw">def</span> <span class="const token" data-verso-hover="453">Label.node</span> : <span class="const token" data-verso-hover="217">Label</span> n → <span class="const token" data-verso-hover="45">ZMod</span> n</span>
+<span id="L168">  | <span class="const token" data-verso-hover="116">.</span>push u _ | <span class="const token" data-verso-hover="126">.</span>start u | <span class="const token" data-verso-hover="134">.</span>cw u | <span class="const token" data-verso-hover="144">.</span>ccw u =&gt; u</span>
+<span id="L169"></span>
+<span id="L170"><span class="dc">/-- Whether a step is enabled. Payloads are positive (unary encodings `1^d`, `d ≥ 1`). -/</span></span>
+<span id="L171"><span class="kw">def</span> <span class="const token" data-verso-hover="173">Enabled</span> (c : <span class="const token" data-verso-hover="44">Config</span> n) : <span class="const token" data-verso-hover="217">Label</span> n → <span class="kw">Prop</span></span>
+<span id="L172">  | <span class="const token" data-verso-hover="116">.</span>push _ a =&gt; <span class="nu">0</span> &lt; a</span>
+<span id="L173">  | <span class="const token" data-verso-hover="126">.</span>start u =&gt; (c.<span class="const token" data-verso-hover="46">node</span> u).<span class="const token" data-verso-hover="72">ph</span> = <span class="const token" data-verso-hover="55">.</span>idle ∧ (c.<span class="const token" data-verso-hover="46">node</span> u).<span class="const token" data-verso-hover="83">q</span> ≠ []</span>
+<span id="L174">  | <span class="const token" data-verso-hover="134">.</span>cw u =&gt; (c.<span class="const token" data-verso-hover="46">node</span> u).<span class="const token" data-verso-hover="72">ph</span>.<span class="const token" data-verso-hover="169">cwReady</span> = <span class="const token" data-verso-hover="86">true</span> ∧ c.<span class="const token" data-verso-hover="174">cwIn</span> u</span>
+<span id="L175">  | <span class="const token" data-verso-hover="144">.</span>ccw u =&gt; (c.<span class="const token" data-verso-hover="46">node</span> u).<span class="const token" data-verso-hover="72">ph</span>.<span class="const token" data-verso-hover="212">ccwReady</span> = <span class="const token" data-verso-hover="86">true</span> ∧ c.<span class="const token" data-verso-hover="81">ccwIn</span> u</span>
+<span id="L176"></span>
+<span id="L177"><span class="dc">/-- The configuration after a step. -/</span></span>
+<span id="L178"><span class="kw">def</span> <span class="const token" data-verso-hover="3">next</span> (c : <span class="const token" data-verso-hover="44">Config</span> n) : <span class="const token" data-verso-hover="217">Label</span> n → <span class="const token" data-verso-hover="44">Config</span> n</span>
+<span id="L179">  | <span class="const token" data-verso-hover="116">.</span>push u a =&gt;</span>
+<span id="L180">    { c <span class="kw">with</span> <span class="const token" data-verso-hover="46">node</span> := <span class="const token" data-verso-hover="308">Function.update</span> c.<span class="const token" data-verso-hover="46">node</span> u { c.<span class="const token" data-verso-hover="46">node</span> u <span class="kw">with</span> <span class="const token" data-verso-hover="83">q</span> := (c.<span class="const token" data-verso-hover="46">node</span> u).<span class="const token" data-verso-hover="83">q</span> ++ [a] } }</span>
+<span id="L181">  | <span class="const token" data-verso-hover="126">.</span>start u =&gt;</span>
+<span id="L182">    { c <span class="kw">with</span> <span class="const token" data-verso-hover="46">node</span> := <span class="const token" data-verso-hover="308">Function.update</span> c.<span class="const token" data-verso-hover="46">node</span> u { c.<span class="const token" data-verso-hover="46">node</span> u <span class="kw">with</span> <span class="const token" data-verso-hover="72">ph</span> := <span class="const token" data-verso-hover="56">.</span>waitReq }</span>
+<span id="L183">             <span class="const token" data-verso-hover="71">cwS</span> := <span class="const token" data-verso-hover="308">Function.update</span> c.<span class="const token" data-verso-hover="71">cwS</span> u (c.<span class="const token" data-verso-hover="71">cwS</span> u + <span class="nu">1</span>) }</span>
+<span id="L184">  | <span class="const token" data-verso-hover="134">.</span>cw u =&gt;</span>
+<span id="L185">    <span class="kw">let</span> r := <span class="const token" data-verso-hover="1">onCW</span> (c.<span class="const token" data-verso-hover="46">node</span> u)</span>
+<span id="L186">    { c <span class="kw">with</span> <span class="const token" data-verso-hover="46">node</span> := <span class="const token" data-verso-hover="308">Function.update</span> c.<span class="const token" data-verso-hover="46">node</span> u r.<span class="const token" data-verso-hover="135">1</span></span>
+<span id="L187">             <span class="const token" data-verso-hover="74">cwR</span> := <span class="const token" data-verso-hover="308">Function.update</span> c.<span class="const token" data-verso-hover="74">cwR</span> u (c.<span class="const token" data-verso-hover="74">cwR</span> u + <span class="nu">1</span>)</span>
+<span id="L188">             <span class="const token" data-verso-hover="71">cwS</span> := <span class="const token" data-verso-hover="308">Function.update</span> c.<span class="const token" data-verso-hover="71">cwS</span> u (c.<span class="const token" data-verso-hover="71">cwS</span> u + r.<span class="const token" data-verso-hover="137">2</span><span class="nu">.</span><span class="const token" data-verso-hover="135">1</span>)</span>
+<span id="L189">             <span class="const token" data-verso-hover="78">ccwS</span> := <span class="const token" data-verso-hover="308">Function.update</span> c.<span class="const token" data-verso-hover="78">ccwS</span> u (c.<span class="const token" data-verso-hover="78">ccwS</span> u + r.<span class="const token" data-verso-hover="137">2</span><span class="nu">.</span><span class="const token" data-verso-hover="137">2</span>) }</span>
+<span id="L190">  | <span class="const token" data-verso-hover="144">.</span>ccw u =&gt;</span>
+<span id="L191">    <span class="kw">let</span> r := <span class="const token" data-verso-hover="2">onCCW</span> (c.<span class="const token" data-verso-hover="46">node</span> u)</span>
+<span id="L192">    { c <span class="kw">with</span> <span class="const token" data-verso-hover="46">node</span> := <span class="const token" data-verso-hover="308">Function.update</span> c.<span class="const token" data-verso-hover="46">node</span> u r.<span class="const token" data-verso-hover="135">1</span></span>
+<span id="L193">             <span class="const token" data-verso-hover="77">ccwR</span> := <span class="const token" data-verso-hover="308">Function.update</span> c.<span class="const token" data-verso-hover="77">ccwR</span> u (c.<span class="const token" data-verso-hover="77">ccwR</span> u + <span class="nu">1</span>)</span>
+<span id="L194">             <span class="const token" data-verso-hover="71">cwS</span> := <span class="const token" data-verso-hover="308">Function.update</span> c.<span class="const token" data-verso-hover="71">cwS</span> u (c.<span class="const token" data-verso-hover="71">cwS</span> u + r.<span class="const token" data-verso-hover="137">2</span><span class="nu">.</span><span class="const token" data-verso-hover="135">1</span>)</span>
+<span id="L195">             <span class="const token" data-verso-hover="78">ccwS</span> := <span class="const token" data-verso-hover="308">Function.update</span> c.<span class="const token" data-verso-hover="78">ccwS</span> u (c.<span class="const token" data-verso-hover="78">ccwS</span> u + r.<span class="const token" data-verso-hover="137">2</span><span class="nu">.</span><span class="const token" data-verso-hover="137">2</span>)</span>
+<span id="L196">             <span class="cm">--</span><span class="cm"> ghost: record a captured token</span></span>
+<span id="L197">             <span class="const token" data-verso-hover="68">ds</span> := <span class="kw">match</span> <span class="const token" data-verso-hover="150">capture?</span> (c.<span class="const token" data-verso-hover="46">node</span> u) <span class="kw">with</span> | <span class="const token" data-verso-hover="151">some</span> a =&gt; c.<span class="const token" data-verso-hover="68">ds</span> ++ [a] | <span class="const token" data-verso-hover="152">none</span> =&gt; c.<span class="const token" data-verso-hover="68">ds</span></span>
+<span id="L198">             <span class="const token" data-verso-hover="87">hold</span> := <span class="kw">match</span> <span class="const token" data-verso-hover="150">capture?</span> (c.<span class="const token" data-verso-hover="46">node</span> u) <span class="kw">with</span> | <span class="const token" data-verso-hover="151">some</span> _ =&gt; u | <span class="const token" data-verso-hover="152">none</span> =&gt; c.<span class="const token" data-verso-hover="87">hold</span> }</span>
+<span id="L199"></span>
+<span id="L200"><span class="dc">/-- One step of the ring layer. -/</span></span>
+<span id="L201"><span class="kw">def</span> <span class="const token" data-verso-hover="454">Step</span> (c c' : <span class="const token" data-verso-hover="44">Config</span> n) : <span class="kw">Prop</span> := ∃ l, <span class="const token" data-verso-hover="173">Enabled</span> c l ∧ c' = <span class="const token" data-verso-hover="3">next</span> c l</span>
+<span id="L202"></span>
+<span id="L203"><span class="dc">/-- The initial configuration: all nodes at line 1, `T₀` holds the token, and the queues hold the</span></span>
+<span id="L204"><span class="dc">payloads `qs u` (the messages `π` sends at start-up). -/</span></span>
+<span id="L205"><span class="kw">def</span> <span class="const token" data-verso-hover="155">init</span> (T₀ : <span class="const token" data-verso-hover="45">ZMod</span> n) (qs : <span class="const token" data-verso-hover="45">ZMod</span> n → <span class="const token" data-verso-hover="50">List</span> <span class="const token" data-verso-hover="42">ℕ</span>) : <span class="const token" data-verso-hover="44">Config</span> n <span class="kw">where</span></span>
+<span id="L206">  <span class="const token" data-verso-hover="46">node</span> u := ⟨<span class="const token" data-verso-hover="55">.</span>idle, <span class="const token" data-verso-hover="455">decide</span> (u = T₀), qs u, []⟩</span>
+<span id="L207">  <span class="const token" data-verso-hover="71">cwS</span> _ := <span class="nu">0</span></span>
+<span id="L208">  <span class="const token" data-verso-hover="74">cwR</span> _ := <span class="nu">0</span></span>
+<span id="L209">  <span class="const token" data-verso-hover="78">ccwS</span> _ := <span class="nu">0</span></span>
+<span id="L210">  <span class="const token" data-verso-hover="77">ccwR</span> _ := <span class="nu">0</span></span>
+<span id="L211">  <span class="const token" data-verso-hover="68">ds</span> := []</span>
+<span id="L212">  <span class="const token" data-verso-hover="87">hold</span> := T₀</span>
+<span id="L213"></span>
+<span id="L214"><span class="dc">/-- Reachable configurations. -/</span></span>
+<span id="L215"><span class="kw">def</span> <span class="const token" data-verso-hover="218">Reach</span> (T₀ : <span class="const token" data-verso-hover="45">ZMod</span> n) (qs : <span class="const token" data-verso-hover="45">ZMod</span> n → <span class="const token" data-verso-hover="50">List</span> <span class="const token" data-verso-hover="42">ℕ</span>) (c : <span class="const token" data-verso-hover="44">Config</span> n) : <span class="kw">Prop</span> :=</span>
+<span id="L216">  <span class="const token" data-verso-hover="456">Relation.ReflTransGen</span> <span class="const token" data-verso-hover="454">Step</span> (<span class="const token" data-verso-hover="155">init</span> T₀ qs) c</span>
+<span id="L217"></span>
+<span id="L218"><span class="kw">end</span> Podc.FullyDefective.Cycle</span>
+<span id="L219"></span>
+</code></div>
+        <script>
+          window.versoHoversUrl = "PODC2022/FullyDefective/-hovers.json";</script>
+        <script src="static/lean/popper.js"></script>
+        <script src="static/lean/tippy.js"></script>
+        <script src="static/lean/marked.js"></script>
+        <script src="static/lean/highlighting.js"></script>
+        <script src="static/lean/lean.js"></script>
+        </article></main><footer class="site-footer"><div class="wrap">
+        Machine-checked formalizations of PODC papers in Lean 4. Generated with <a href="https://github.com/leanprover/verso">Verso</a> from the README files of <a href="https://github.com/vasnesterov/formal_podc">vasnesterov/formal_podc</a>.</div>
+      </footer></body>
+  </html>
+

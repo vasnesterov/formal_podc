@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="light dark">
+    <link rel="icon" href="data:,">
+    <title>DeterministicLoadBalancing: Model.lean · Formal PODC</title><base href="../../../.././"><link rel="stylesheet" href="static/lean/verso-vars.css">
+    <link rel="stylesheet" href="static/lean/highlighting.css">
+    <link rel="stylesheet" href="static/lean/tippy-border.css">
+    <link rel="stylesheet" href="static/style.css">
+    <script defer="defer" src="static/site.js"></script>
+    </head>
+  <body>
+    <header class="site-header">
+      <div class="wrap">
+        <a class="brand" href=".">Formal PODC</a><nav class="top">
+          <a href=".">Search</a><a href="about/">About</a><a href="https://github.com/vasnesterov/formal_podc">GitHub</a></nav>
+        </div>
+      </header>
+    <main class="wrap"><article><nav class="breadcrumbs" aria-label="Breadcrumb">
+          <a href=".">Search</a><span class="sep">›</span><a href="PODC2015/">PODC 2015</a><span class="sep">›</span><a href="PODC2015/DeterministicLoadBalancing/">DeterministicLoadBalancing</a><span class="sep">›</span><a href="PODC2015/DeterministicLoadBalancing/src/">Lean source</a><span class="sep">›</span><span aria-current="page">Model</span></nav>
+        <h1>
+          <code>Model.lean</code></h1>
+        <div class="paper-links">
+          <p>
+            Source of <a href="PODC2015/DeterministicLoadBalancing/">Deterministic Load Balancing — PODC 2015</a> · <a href="https://github.com/vasnesterov/formal_podc/blob/main/Papers/PODC2015/DeterministicLoadBalancing/Model.lean">GitHub</a> · hover over a name for its type and documentation</p>
+          </div>
+        <div class="lean-code lean-src">
+          <code class="hl lean block" data-lean-context="Model"><span id="L1"><span class="kw">import</span> Mathlib</span>
+<span id="L2"></span>
+<span id="L3"><span class="dc">/-!</span></span>
+<span id="L4"><span class="dc"># Discrete diffusive load balancing on graphs: the model</span></span>
+<span id="L5"></span>
+<span id="L6"><span class="dc">Berenbrink, Klasing, Kosowski, Mallmann-Trenn, Uznański, *Improved Analysis of Deterministic</span></span>
+<span id="L7"><span class="dc">Load-Balancing Schemes*, PODC 2015 (arXiv:1404.4344v4), Section 1.3.</span></span>
+<span id="L8"></span>
+<span id="L9"><span class="dc">* The network is a finite simple graph `G` (the paper's "original graph"); every node additionally</span></span>
+<span id="L10"><span class="dc">  has `dl` self-loops (the paper's `d◦`). A node `v` has `D v = deg v + dl` edges in the balancing</span></span>
+<span id="L11"><span class="dc">  graph `G⁺` (the paper's `d⁺`).</span></span>
+<span id="L12"><span class="dc">* Time is synchronous. In every step every node `v` with load `x` (number of indivisible tokens)</span></span>
+<span id="L13"><span class="dc">  sends `out v s x w` tokens to each neighbour `w` and keeps `keep v s x` tokens (the tokens sent over</span></span>
+<span id="L14"><span class="dc">  its self-loops; the self-loops of a node only matter through their total, the distribution over</span></span>
+<span id="L15"><span class="dc">  individual self-loops is expressed by an explicit split `g : Fin dl → ℕ` in the fairness</span></span>
+<span id="L16"><span class="dc">  predicates below). `s` is the node's local state (e.g. a rotor), updated by `next`.</span></span>
+<span id="L17"><span class="dc">* A `Balancer` is deterministic and local: node `v` decides from its own identity, state and load</span></span>
+<span id="L18"><span class="dc">  only. Stateless algorithms are those with `σ = Unit`.</span></span>
+<span id="L19"></span>
+<span id="L20"><span class="dc">The discrepancy of a load vector is `max − min` (`disc`).</span></span>
+<span id="L21"><span class="dc">-/</span></span>
+<span id="L22"></span>
+<span id="L23"><span class="kw">open</span> Finset</span>
+<span id="L24"></span>
+<span id="L25"><span class="kw">namespace</span> Podc.DeterministicLoadBalancing</span>
+<span id="L26"></span>
+<span id="L27"><span class="kw">variable</span> {V : <span class="kw">Type</span>*} [<span class="const token" data-verso-hover="27">Fintype</span> V] [<span class="const token" data-verso-hover="28">DecidableEq</span> V]</span>
+<span id="L28"></span>
+<span id="L29"><span class="kw">set_option</span> <span class="const token" data-verso-hover="29">linter.unusedSectionVars</span> false</span>
+<span id="L30"></span>
+<span id="L31"><span class="kw">section</span> General</span>
+<span id="L32"></span>
+<span id="L33"><span class="kw">variable</span> (G : <span class="const token" data-verso-hover="30">SimpleGraph</span> V) [<span class="const token" data-verso-hover="31">DecidableRel</span> G.<span class="const token" data-verso-hover="32">Adj</span>]</span>
+<span id="L34"></span>
+<span id="L35"><span class="dc">/-- A deterministic, local, synchronous discrete load-balancing algorithm on `G`</span></span>
+<span id="L36"><span class="dc">(paper, Section 1.3). Node `v` in local state `s` holding `x` tokens sends `out v s x w` tokens</span></span>
+<span id="L37"><span class="dc">to its neighbour `w`, keeps `keep v s x` tokens (on its self-loops / in its remainder) and moves to</span></span>
+<span id="L38"><span class="dc">state `next v s x`. No tokens are created or destroyed. -/</span></span>
+<span id="L39"><span class="kw">structure</span> <span class="const token" data-verso-hover="9">Balancer</span> <span class="kw">where</span></span>
+<span id="L40">  <span class="dc">/-- Local state of a node. -/</span></span>
+<span id="L41">  <span class="const token" data-verso-hover="33">σ</span> : <span class="kw">Type</span></span>
+<span id="L42">  <span class="dc">/-- Initial local states (e.g. initial rotor positions). -/</span></span>
+<span id="L43">  <span class="const token" data-verso-hover="34">init</span> : V → <span class="const token" data-verso-hover="33">σ</span></span>
+<span id="L44">  <span class="dc">/-- Tokens sent from `v` to its neighbour `w`. -/</span></span>
+<span id="L45">  <span class="const token" data-verso-hover="35">out</span> : V → <span class="const token" data-verso-hover="33">σ</span> → <span class="const token" data-verso-hover="36">ℕ</span> → V → <span class="const token" data-verso-hover="36">ℕ</span></span>
+<span id="L46">  <span class="dc">/-- Tokens kept by `v` (sent over its self-loops). -/</span></span>
+<span id="L47">  <span class="const token" data-verso-hover="37">keep</span> : V → <span class="const token" data-verso-hover="33">σ</span> → <span class="const token" data-verso-hover="36">ℕ</span> → <span class="const token" data-verso-hover="36">ℕ</span></span>
+<span id="L48">  <span class="dc">/-- Next local state. -/</span></span>
+<span id="L49">  <span class="const token" data-verso-hover="38">next</span> : V → <span class="const token" data-verso-hover="33">σ</span> → <span class="const token" data-verso-hover="36">ℕ</span> → <span class="const token" data-verso-hover="33">σ</span></span>
+<span id="L50">  <span class="dc">/-- Conservation: a node distributes exactly its load. -/</span></span>
+<span id="L51">  <span class="const token" data-verso-hover="39">conserve</span> : ∀ v s x, <span class="const token" data-verso-hover="37">keep</span> v s x + ∑ w ∈ G.<span class="const token" data-verso-hover="40">neighborFinset</span> v, <span class="const token" data-verso-hover="35">out</span> v s x w = x</span>
+<span id="L52"></span>
+<span id="L53"><span class="dc">/-- `∑_v ∑_{w ∼ v} f w v = ∑_w ∑_{v ∼ w} f w v` (double counting of darts). -/</span></span>
+<span id="L54"><span class="kw">lemma</span> <span class="const token" data-verso-hover="41">sum_sum_neighbor_swap</span> {M : <span class="kw">Type</span>*} [<span class="const token" data-verso-hover="42">AddCommMonoid</span> M] (f : V → V → M) :</span>
+<span id="L55">    ∑ v, ∑ w ∈ G.<span class="const token" data-verso-hover="40">neighborFinset</span> v, f w v = ∑ w, ∑ v ∈ G.<span class="const token" data-verso-hover="40">neighborFinset</span> w, f w v := <span class="kw">by</span></span>
+<span id="L56">  simp_rw [G.<span class="const token" data-verso-hover="43">neighborFinset_eq_filter</span>, <span class="const token" data-verso-hover="44">Finset.sum_filter</span>]</span>
+<span id="L57">  <span class="kw">rw</span> [<span class="const token" data-verso-hover="45">Finset.sum_comm</span>]</span>
+<span id="L58">  <span class="kw">refine</span> <span class="const token" data-verso-hover="46">Finset.sum_congr</span> <span class="const token" data-verso-hover="47">rfl</span> <span class="kw">fun</span> w _ =&gt; <span class="const token" data-verso-hover="46">Finset.sum_congr</span> <span class="const token" data-verso-hover="47">rfl</span> <span class="kw">fun</span> v _ =&gt; ?_</span>
+<span id="L59">  <span class="kw">simp</span> [G.<span class="const token" data-verso-hover="48">adj_comm</span>]</span>
+<span id="L60"></span>
+<span id="L61"><span class="kw">namespace</span> Balancer</span>
+<span id="L62"></span>
+<span id="L63"><span class="kw">variable</span> {G} (A : <span class="const token" data-verso-hover="9">Balancer</span> G)</span>
+<span id="L64"></span>
+<span id="L65"><span class="dc">/-- One synchronous step: every node distributes its load; node `v` receives what it keeps plus</span></span>
+<span id="L66"><span class="dc">what its neighbours send to it. -/</span></span>
+<span id="L67"><span class="kw">def</span> <span class="const token" data-verso-hover="49">step</span> (c : (V → <span class="const token" data-verso-hover="36">ℕ</span>) × (V → A.<span class="const token" data-verso-hover="33">σ</span>)) : (V → <span class="const token" data-verso-hover="36">ℕ</span>) × (V → A.<span class="const token" data-verso-hover="33">σ</span>) :=</span>
+<span id="L68">  (<span class="kw">fun</span> v =&gt; A.<span class="const token" data-verso-hover="37">keep</span> v (c.<span class="const token" data-verso-hover="50">2</span> v) (c.<span class="const token" data-verso-hover="51">1</span> v) + ∑ w ∈ G.<span class="const token" data-verso-hover="40">neighborFinset</span> v, A.<span class="const token" data-verso-hover="35">out</span> w (c.<span class="const token" data-verso-hover="50">2</span> w) (c.<span class="const token" data-verso-hover="51">1</span> w) v,</span>
+<span id="L69">   <span class="kw">fun</span> v =&gt; A.<span class="const token" data-verso-hover="38">next</span> v (c.<span class="const token" data-verso-hover="50">2</span> v) (c.<span class="const token" data-verso-hover="51">1</span> v))</span>
+<span id="L70"></span>
+<span id="L71"><span class="dc">/-- The configuration (loads, states) at time `t`, from initial loads `x₀`</span></span>
+<span id="L72"><span class="dc">(the paper's `x₁` is our time `0`). -/</span></span>
+<span id="L73"><span class="kw">def</span> <span class="const token" data-verso-hover="52">config</span> (x₀ : V → <span class="const token" data-verso-hover="36">ℕ</span>) : <span class="const token" data-verso-hover="36">ℕ</span> → (V → <span class="const token" data-verso-hover="36">ℕ</span>) × (V → A.<span class="const token" data-verso-hover="33">σ</span>)</span>
+<span id="L74">  | <span class="nu">0</span> =&gt; (x₀, A.<span class="const token" data-verso-hover="34">init</span>)</span>
+<span id="L75">  | t + <span class="nu">1</span> =&gt; A.<span class="const token" data-verso-hover="49">step</span> (<span class="const token" data-verso-hover="52">config</span> x₀ t)</span>
+<span id="L76"></span>
+<span id="L77"><span class="dc">/-- Load vector at time `t`. -/</span></span>
+<span id="L78"><span class="kw">def</span> <span class="const token" data-verso-hover="53">load</span> (x₀ : V → <span class="const token" data-verso-hover="36">ℕ</span>) (t : <span class="const token" data-verso-hover="36">ℕ</span>) : V → <span class="const token" data-verso-hover="36">ℕ</span> := (A.<span class="const token" data-verso-hover="52">config</span> x₀ t).<span class="const token" data-verso-hover="51">1</span></span>
+<span id="L79"></span>
+<span id="L80"><span class="dc">/-- Local states at time `t`. -/</span></span>
+<span id="L81"><span class="kw">def</span> <span class="const token" data-verso-hover="54">state</span> (x₀ : V → <span class="const token" data-verso-hover="36">ℕ</span>) (t : <span class="const token" data-verso-hover="36">ℕ</span>) : V → A.<span class="const token" data-verso-hover="33">σ</span> := (A.<span class="const token" data-verso-hover="52">config</span> x₀ t).<span class="const token" data-verso-hover="50">2</span></span>
+<span id="L82"></span>
+<span id="L83"><span class="dc">/-- `f_t(v, w)`: tokens sent from `v` to its neighbour `w` in step `t`. -/</span></span>
+<span id="L84"><span class="kw">def</span> <span class="const token" data-verso-hover="55">flow</span> (x₀ : V → <span class="const token" data-verso-hover="36">ℕ</span>) (t : <span class="const token" data-verso-hover="36">ℕ</span>) (v w : V) : <span class="const token" data-verso-hover="36">ℕ</span> := A.<span class="const token" data-verso-hover="35">out</span> v (A.<span class="const token" data-verso-hover="54">state</span> x₀ t v) (A.<span class="const token" data-verso-hover="53">load</span> x₀ t v) w</span>
+<span id="L85"></span>
+<span id="L86"><span class="dc">/-- Tokens kept by `v` (sent over its self-loops) in step `t`. -/</span></span>
+<span id="L87"><span class="kw">def</span> <span class="const token" data-verso-hover="56">kept</span> (x₀ : V → <span class="const token" data-verso-hover="36">ℕ</span>) (t : <span class="const token" data-verso-hover="36">ℕ</span>) (v : V) : <span class="const token" data-verso-hover="36">ℕ</span> := A.<span class="const token" data-verso-hover="37">keep</span> v (A.<span class="const token" data-verso-hover="54">state</span> x₀ t v) (A.<span class="const token" data-verso-hover="53">load</span> x₀ t v)</span>
+<span id="L88"></span>
+<span id="L89"><span class="dc">/-- `F_t(v, w)`: cumulative number of tokens sent from `v` to `w` in steps `0, …, t`. -/</span></span>
+<span id="L90"><span class="kw">def</span> <span class="const token" data-verso-hover="57">cumFlow</span> (x₀ : V → <span class="const token" data-verso-hover="36">ℕ</span>) (t : <span class="const token" data-verso-hover="36">ℕ</span>) (v w : V) : <span class="const token" data-verso-hover="36">ℕ</span> := ∑ τ ∈ <span class="const token" data-verso-hover="58">range</span> (t + <span class="nu">1</span>), A.<span class="const token" data-verso-hover="55">flow</span> x₀ τ v w</span>
+<span id="L91"></span>
+<span id="L92">@[<span class="kw">simp</span>] <span class="kw">lemma</span> <span class="const token" data-verso-hover="59">load_zero</span> (x₀ : V → <span class="const token" data-verso-hover="36">ℕ</span>) : A.<span class="const token" data-verso-hover="53">load</span> x₀ <span class="nu">0</span> = x₀ := <span class="const token" data-verso-hover="47">rfl</span></span>
+<span id="L93"></span>
+<span id="L94"><span class="kw">lemma</span> <span class="const token" data-verso-hover="60">load_succ</span> (x₀ : V → <span class="const token" data-verso-hover="36">ℕ</span>) (t : <span class="const token" data-verso-hover="36">ℕ</span>) (v : V) :</span>
+<span id="L95">    A.<span class="const token" data-verso-hover="53">load</span> x₀ (t + <span class="nu">1</span>) v = A.<span class="const token" data-verso-hover="56">kept</span> x₀ t v + ∑ w ∈ G.<span class="const token" data-verso-hover="40">neighborFinset</span> v, A.<span class="const token" data-verso-hover="55">flow</span> x₀ t w v := <span class="kw">by</span></span>
+<span id="L96">  <span class="kw">simp</span> only [<span class="const token" data-verso-hover="53">load</span>, <span class="const token" data-verso-hover="56">kept</span>, <span class="const token" data-verso-hover="55">flow</span>, <span class="const token" data-verso-hover="54">state</span>, <span class="const token" data-verso-hover="52">config</span>, <span class="const token" data-verso-hover="49">step</span>]</span>
+<span id="L97"></span>
+<span id="L98"><span class="kw">lemma</span> <span class="const token" data-verso-hover="61">state_succ</span> (x₀ : V → <span class="const token" data-verso-hover="36">ℕ</span>) (t : <span class="const token" data-verso-hover="36">ℕ</span>) (v : V) :</span>
+<span id="L99">    A.<span class="const token" data-verso-hover="54">state</span> x₀ (t + <span class="nu">1</span>) v = A.<span class="const token" data-verso-hover="38">next</span> v (A.<span class="const token" data-verso-hover="54">state</span> x₀ t v) (A.<span class="const token" data-verso-hover="53">load</span> x₀ t v) := <span class="kw">by</span></span>
+<span id="L100">  <span class="kw">simp</span> only [<span class="const token" data-verso-hover="53">load</span>, <span class="const token" data-verso-hover="54">state</span>, <span class="const token" data-verso-hover="52">config</span>, <span class="const token" data-verso-hover="49">step</span>]</span>
+<span id="L101"></span>
+<span id="L102"><span class="kw">lemma</span> <span class="const token" data-verso-hover="62">kept_add_sum_flow</span> (x₀ : V → <span class="const token" data-verso-hover="36">ℕ</span>) (t : <span class="const token" data-verso-hover="36">ℕ</span>) (v : V) :</span>
+<span id="L103">    A.<span class="const token" data-verso-hover="56">kept</span> x₀ t v + ∑ w ∈ G.<span class="const token" data-verso-hover="40">neighborFinset</span> v, A.<span class="const token" data-verso-hover="55">flow</span> x₀ t v w = A.<span class="const token" data-verso-hover="53">load</span> x₀ t v :=</span>
+<span id="L104">  A.<span class="const token" data-verso-hover="39">conserve</span> _ _ _</span>
+<span id="L105"></span>
+<span id="L106"><span class="dc">/-- The total load is invariant. -/</span></span>
+<span id="L107"><span class="kw">lemma</span> <span class="const token" data-verso-hover="63">sum_load_succ</span> (x₀ : V → <span class="const token" data-verso-hover="36">ℕ</span>) (t : <span class="const token" data-verso-hover="36">ℕ</span>) : ∑ v, A.<span class="const token" data-verso-hover="53">load</span> x₀ (t + <span class="nu">1</span>) v = ∑ v, A.<span class="const token" data-verso-hover="53">load</span> x₀ t v := <span class="kw">by</span></span>
+<span id="L108">  simp_rw [<span class="const token" data-verso-hover="60">load_succ</span>, <span class="const token" data-verso-hover="64">Finset.sum_add_distrib</span>]</span>
+<span id="L109">  <span class="kw">rw</span> [<span class="const token" data-verso-hover="41">sum_sum_neighbor_swap</span> G (<span class="kw">fun</span> w v =&gt; A.<span class="const token" data-verso-hover="55">flow</span> x₀ t w v), ← <span class="const token" data-verso-hover="64">Finset.sum_add_distrib</span>]</span>
+<span id="L110">  <span class="kw">exact</span> <span class="const token" data-verso-hover="46">Finset.sum_congr</span> <span class="const token" data-verso-hover="47">rfl</span> <span class="kw">fun</span> v _ =&gt; A.<span class="const token" data-verso-hover="62">kept_add_sum_flow</span> x₀ t v</span>
+<span id="L111"></span>
+<span id="L112"><span class="kw">lemma</span> <span class="const token" data-verso-hover="65">sum_load</span> (x₀ : V → <span class="const token" data-verso-hover="36">ℕ</span>) (t : <span class="const token" data-verso-hover="36">ℕ</span>) : ∑ v, A.<span class="const token" data-verso-hover="53">load</span> x₀ t v = ∑ v, x₀ v := <span class="kw">by</span></span>
+<span id="L113">  <span class="kw">induction</span> t <span class="kw">with</span></span>
+<span id="L114">  | <span class="const token" data-verso-hover="66">zero</span> =&gt; <span class="kw">rfl</span></span>
+<span id="L115">  | <span class="const token" data-verso-hover="67">succ</span> t ih =&gt; <span class="kw">rw</span> [<span class="const token" data-verso-hover="63">sum_load_succ</span>, ih]</span>
+<span id="L116"></span>
+<span id="L117"><span class="kw">end</span> Balancer</span>
+<span id="L118"></span>
+<span id="L119"><span class="dc">/-- A stateless balancer: node `v` with load `x` sends `out v x w` to `w` and keeps `keep v x`. -/</span></span>
+<span id="L120"><span class="kw">def</span> <span class="const token" data-verso-hover="68">Balancer.stateless</span> (out : V → <span class="const token" data-verso-hover="36">ℕ</span> → V → <span class="const token" data-verso-hover="36">ℕ</span>) (keep : V → <span class="const token" data-verso-hover="36">ℕ</span> → <span class="const token" data-verso-hover="36">ℕ</span>)</span>
+<span id="L121">    (h : ∀ v x, keep v x + ∑ w ∈ G.<span class="const token" data-verso-hover="40">neighborFinset</span> v, out v x w = x) : <span class="const token" data-verso-hover="9">Balancer</span> G <span class="kw">where</span></span>
+<span id="L122">  <span class="const token" data-verso-hover="33">σ</span> := <span class="const token" data-verso-hover="69">Unit</span></span>
+<span id="L123">  <span class="const token" data-verso-hover="34">init</span> _ := <span class="const token" data-verso-hover="70">(</span>)</span>
+<span id="L124">  <span class="const token" data-verso-hover="35">out</span> v _ x := out v x</span>
+<span id="L125">  <span class="const token" data-verso-hover="37">keep</span> v _ x := keep v x</span>
+<span id="L126">  <span class="const token" data-verso-hover="38">next</span> _ _ _ := <span class="const token" data-verso-hover="70">(</span>)</span>
+<span id="L127">  <span class="const token" data-verso-hover="39">conserve</span> v _ x := h v x</span>
+<span id="L128"></span>
+<span id="L129"><span class="kw">end</span> General</span>
+<span id="L130"></span>
+<span id="L131"><span class="dc">/-! ### Discrepancy -/</span></span>
+<span id="L132"></span>
+<span id="L133"><span class="dc">/-- Discrepancy of a load vector: `max_v x v − min_v x v`. -/</span></span>
+<span id="L134"><span class="kw">def</span> <span class="const token" data-verso-hover="71">disc</span> (x : V → <span class="const token" data-verso-hover="36">ℕ</span>) : <span class="const token" data-verso-hover="36">ℕ</span> := <span class="const token" data-verso-hover="72">univ</span>.<span class="const token" data-verso-hover="73">sup</span> <span class="kw">fun</span> p : V × V =&gt; x p.<span class="const token" data-verso-hover="51">1</span> - x p.<span class="const token" data-verso-hover="50">2</span></span>
+<span id="L135"></span>
+<span id="L136"><span class="kw">lemma</span> <span class="const token" data-verso-hover="74">sub_le_disc</span> (x : V → <span class="const token" data-verso-hover="36">ℕ</span>) (u w : V) : x u - x w ≤ <span class="const token" data-verso-hover="71">disc</span> x :=</span>
+<span id="L137">  <span class="const token" data-verso-hover="75">Finset.le_sup</span> (f := <span class="kw">fun</span> p : V × V =&gt; x p.<span class="const token" data-verso-hover="51">1</span> - x p.<span class="const token" data-verso-hover="50">2</span>) (<span class="const token" data-verso-hover="76">mem_univ</span> (u, w))</span>
+<span id="L138"></span>
+<span id="L139"><span class="kw">lemma</span> <span class="const token" data-verso-hover="77">disc_eq_zero_iff</span> (x : V → <span class="const token" data-verso-hover="36">ℕ</span>) : <span class="const token" data-verso-hover="71">disc</span> x = <span class="nu">0</span> ↔ ∀ u w, x u = x w := <span class="kw">by</span></span>
+<span id="L140">  <span class="kw">constructor</span></span>
+<span id="L141">  · <span class="kw">intro</span> h u w</span>
+<span id="L142">    <span class="kw">have</span> h1 := <span class="const token" data-verso-hover="74">sub_le_disc</span> x u w</span>
+<span id="L143">    <span class="kw">have</span> h2 := <span class="const token" data-verso-hover="74">sub_le_disc</span> x w u</span>
+<span id="L144">    <span class="kw">omega</span></span>
+<span id="L145">  · <span class="kw">intro</span> h</span>
+<span id="L146">    <span class="kw">refine</span> <span class="const token" data-verso-hover="78">Nat.eq_zero_of_le_zero</span> (<span class="const token" data-verso-hover="79">Finset.sup_le</span> <span class="kw">fun</span> p _ =&gt; ?_)</span>
+<span id="L147">    <span class="kw">simp</span> [h p.<span class="const token" data-verso-hover="51">1</span> p.<span class="const token" data-verso-hover="50">2</span>]</span>
+<span id="L148"></span>
+<span id="L149"><span class="dc">/-- If the total load is not divisible by the number of nodes, the discrepancy is at least `1`. -/</span></span>
+<span id="L150"><span class="kw">lemma</span> <span class="const token" data-verso-hover="80">one_le_disc_of_not_dvd</span> (x : V → <span class="const token" data-verso-hover="36">ℕ</span>) (h : ¬ <span class="const token" data-verso-hover="81">Fintype.card</span> V ∣ ∑ v, x v) : <span class="nu">1</span> ≤ <span class="const token" data-verso-hover="71">disc</span> x := <span class="kw">by</span></span>
+<span id="L151">  <span class="kw">by_contra</span> h0</span>
+<span id="L152">  <span class="kw">have</span> hc := (<span class="const token" data-verso-hover="77">disc_eq_zero_iff</span> x).<span class="const token" data-verso-hover="82">1</span> (<span class="kw">by</span> <span class="kw">omega</span>)</span>
+<span id="L153">  <span class="kw">apply</span> h</span>
+<span id="L154">  <span class="kw">rcases</span> <span class="const token" data-verso-hover="83">isEmpty_or_nonempty</span> V <span class="kw">with</span> hV | ⟨⟨v₀⟩⟩</span>
+<span id="L155">  · <span class="kw">simp</span></span>
+<span id="L156">  · <span class="kw">refine</span> ⟨x v₀, ?_⟩</span>
+<span id="L157">    <span class="kw">rw</span> [<span class="const token" data-verso-hover="46">Finset.sum_congr</span> <span class="const token" data-verso-hover="47">rfl</span> <span class="kw">fun</span> v _ =&gt; hc v v₀]</span>
+<span id="L158">    <span class="kw">simp</span> [<span class="const token" data-verso-hover="84">mul_comm</span>]</span>
+<span id="L159"></span>
+<span id="L160"><span class="dc">/-! ### Fairness notions -/</span></span>
+<span id="L161"></span>
+<span id="L162"><span class="dc">/-- `y` is a fair share of `x` tokens over `k` edges: `y = ⌊x/k⌋`, or `y = ⌊x/k⌋ + 1` when `k ∤ x`;</span></span>
+<span id="L163"><span class="dc">equivalently `⌊x/k⌋ ≤ y ≤ ⌈x/k⌉` (`fairShare_iff`). -/</span></span>
+<span id="L164"><span class="kw">def</span> <span class="const token" data-verso-hover="85">FairShare</span> (k x y : <span class="const token" data-verso-hover="36">ℕ</span>) : <span class="kw">Prop</span> := y = x / k ∨ (x % k ≠ <span class="nu">0</span> ∧ y = x / k + <span class="nu">1</span>)</span>
+<span id="L165"></span>
+<span id="L166"><span class="kw">lemma</span> <span class="const token" data-verso-hover="86">fairShare_iff</span> {k x y : <span class="const token" data-verso-hover="36">ℕ</span>} (hk : <span class="nu">0</span> &lt; k) : <span class="const token" data-verso-hover="85">FairShare</span> k x y ↔ x / k ≤ y ∧ y ≤ x ⌈/⌉ k := <span class="kw">by</span></span>
+<span id="L167">  <span class="kw">rw</span> [<span class="const token" data-verso-hover="87">Nat.ceilDiv_eq_add_pred_div</span>]</span>
+<span id="L168">  <span class="kw">have</span> h1 := <span class="const token" data-verso-hover="88">Nat.div_add_mod</span> x k</span>
+<span id="L169">  <span class="kw">have</span> h2 := <span class="const token" data-verso-hover="89">Nat.mod_lt</span> x hk</span>
+<span id="L170">  <span class="kw">have</span> h3 : (x + k - <span class="nu">1</span>) / k = x / k + <span class="kw">if</span> x % k = <span class="nu">0</span> <span class="kw">then</span> <span class="nu">0</span> <span class="kw">else</span> <span class="nu">1</span> := <span class="kw">by</span></span>
+<span id="L171">    <span class="kw">have</span> he : x + k - <span class="nu">1</span> = (x % k + k - <span class="nu">1</span>) + k * (x / k) := <span class="kw">by</span> <span class="kw">omega</span></span>
+<span id="L172">    <span class="kw">rw</span> [he, <span class="const token" data-verso-hover="90">Nat.add_mul_div_left</span> _ _ hk]</span>
+<span id="L173">    <span class="kw">split_ifs</span> <span class="kw">with</span> h</span>
+<span id="L174">    · <span class="kw">rw</span> [h, <span class="const token" data-verso-hover="91">Nat.div_eq_of_lt</span> (<span class="kw">by</span> <span class="kw">omega</span>)]; <span class="kw">simp</span></span>
+<span id="L175">    · <span class="kw">have</span> : (x % k + k - <span class="nu">1</span>) / k = <span class="nu">1</span> := <span class="const token" data-verso-hover="92">Nat.div_eq_of_lt_le</span> (<span class="kw">by</span> <span class="kw">omega</span>) (<span class="kw">by</span> <span class="kw">omega</span>)</span>
+<span id="L176">      <span class="kw">rw</span> [this]; <span class="kw">omega</span></span>
+<span id="L177">  <span class="kw">rw</span> [h3]</span>
+<span id="L178">  <span class="kw">unfold</span> <span class="const token" data-verso-hover="85">FairShare</span></span>
+<span id="L179">  <span class="kw">split_ifs</span> <span class="kw">with</span> h &lt;;&gt; <span class="kw">omega</span></span>
+<span id="L180"></span>
+<span id="L181"><span class="kw">section</span> Fairness</span>
+<span id="L182"></span>
+<span id="L183"><span class="kw">variable</span> {G : <span class="const token" data-verso-hover="30">SimpleGraph</span> V} [<span class="const token" data-verso-hover="31">DecidableRel</span> G.<span class="const token" data-verso-hover="32">Adj</span>]</span>
+<span id="L184"></span>
+<span id="L185"><span class="dc">/-- Round fairness with `dl` self-loops per node (the class of Rabani–Sinclair–Wanka [17]): a node</span></span>
+<span id="L186"><span class="dc">with load `x` sends a fair share `⌊x/d⁺⌋` or `⌈x/d⁺⌉` over each of its `d⁺ = deg + dl` edges,</span></span>
+<span id="L187"><span class="dc">including each self-loop (`g` is the split of the kept tokens over the self-loops). -/</span></span>
+<span id="L188"><span class="kw">def</span> <span class="const token" data-verso-hover="10">Balancer.RoundFair</span> (dl : <span class="const token" data-verso-hover="36">ℕ</span>) (A : <span class="const token" data-verso-hover="9">Balancer</span> G) : <span class="kw">Prop</span> :=</span>
+<span id="L189">  ∀ v s x, (∀ w ∈ G.<span class="const token" data-verso-hover="40">neighborFinset</span> v, <span class="const token" data-verso-hover="85">FairShare</span> (G.<span class="const token" data-verso-hover="93">degree</span> v + dl) x (A.<span class="const token" data-verso-hover="35">out</span> v s x w)) ∧</span>
+<span id="L190">    ∃ g : <span class="const token" data-verso-hover="94">Fin</span> dl → <span class="const token" data-verso-hover="36">ℕ</span>, ∑ i, g i = A.<span class="const token" data-verso-hover="37">keep</span> v s x ∧ ∀ i, <span class="const token" data-verso-hover="85">FairShare</span> (G.<span class="const token" data-verso-hover="93">degree</span> v + dl) x (g i)</span>
+<span id="L191"></span>
+<span id="L192"><span class="dc">/-- Definition 2.1: cumulative `δ`-fairness. In every execution and every step, every edge of `v`</span></span>
+<span id="L193"><span class="dc">(including self-loops) receives at least `⌊x/d⁺⌋` tokens, and the cumulative flows `F_t` over any</span></span>
+<span id="L194"><span class="dc">two original edges of a node differ by at most `δ`. -/</span></span>
+<span id="L195"><span class="kw">def</span> <span class="const token" data-verso-hover="11">Balancer.CumulativelyFair</span> (dl δ : <span class="const token" data-verso-hover="36">ℕ</span>) (A : <span class="const token" data-verso-hover="9">Balancer</span> G) : <span class="kw">Prop</span> :=</span>
+<span id="L196">  ∀ x₀ t v,</span>
+<span id="L197">    (∀ w ∈ G.<span class="const token" data-verso-hover="40">neighborFinset</span> v, A.<span class="const token" data-verso-hover="53">load</span> x₀ t v / (G.<span class="const token" data-verso-hover="93">degree</span> v + dl) ≤ A.<span class="const token" data-verso-hover="55">flow</span> x₀ t v w) ∧</span>
+<span id="L198">    (∃ g : <span class="const token" data-verso-hover="94">Fin</span> dl → <span class="const token" data-verso-hover="36">ℕ</span>, ∑ i, g i = A.<span class="const token" data-verso-hover="56">kept</span> x₀ t v ∧</span>
+<span id="L199">      ∀ i, A.<span class="const token" data-verso-hover="53">load</span> x₀ t v / (G.<span class="const token" data-verso-hover="93">degree</span> v + dl) ≤ g i) ∧</span>
+<span id="L200">    ∀ w₁ ∈ G.<span class="const token" data-verso-hover="40">neighborFinset</span> v, ∀ w₂ ∈ G.<span class="const token" data-verso-hover="40">neighborFinset</span> v,</span>
+<span id="L201">      A.<span class="const token" data-verso-hover="57">cumFlow</span> x₀ t v w₁ ≤ A.<span class="const token" data-verso-hover="57">cumFlow</span> x₀ t v w₂ + δ</span>
+<span id="L202"></span>
+<span id="L203"><span class="dc">/-- The one-step part of Definition 3.1: node `v` with load `x` sends a fair share over every edge</span></span>
+<span id="L204"><span class="dc">(round fairness, conditions "receive `⌊x/d⁺⌋`" and 3.) and at least `min{s, e}` self-loops receive</span></span>
+<span id="L205"><span class="dc">`⌈x/d⁺⌉ = ⌊x/d⁺⌋ + 1` tokens, where `e = x mod d⁺` (condition 2., `s`-self-preference). -/</span></span>
+<span id="L206"><span class="kw">def</span> <span class="const token" data-verso-hover="95">GoodStep</span> (dl s : <span class="const token" data-verso-hover="36">ℕ</span>) (k : <span class="const token" data-verso-hover="36">ℕ</span>) (x : <span class="const token" data-verso-hover="36">ℕ</span>) (out : V → <span class="const token" data-verso-hover="36">ℕ</span>) (nbrs : <span class="const token" data-verso-hover="96">Finset</span> V) (keep : <span class="const token" data-verso-hover="36">ℕ</span>) : <span class="kw">Prop</span> :=</span>
+<span id="L207">  (∀ w ∈ nbrs, <span class="const token" data-verso-hover="85">FairShare</span> k x (out w)) ∧</span>
+<span id="L208">    ∃ g : <span class="const token" data-verso-hover="94">Fin</span> dl → <span class="const token" data-verso-hover="36">ℕ</span>, ∑ i, g i = keep ∧ (∀ i, <span class="const token" data-verso-hover="85">FairShare</span> k x (g i)) ∧</span>
+<span id="L209">      <span class="const token" data-verso-hover="97">min</span> s (x % k) ≤ #{i | g i = x / k + <span class="nu">1</span>}</span>
+<span id="L210"></span>
+<span id="L211"><span class="dc">/-- Definition 3.1: a good `s`-balancer (`1 ≤ s ≤ d◦`): cumulatively `1`-fair, round-fair and</span></span>
+<span id="L212"><span class="dc">`s`-self-preferring. -/</span></span>
+<span id="L213"><span class="kw">def</span> <span class="const token" data-verso-hover="12">Balancer.IsGood</span> (dl s : <span class="const token" data-verso-hover="36">ℕ</span>) (A : <span class="const token" data-verso-hover="9">Balancer</span> G) : <span class="kw">Prop</span> :=</span>
+<span id="L214">  <span class="nu">1</span> ≤ s ∧ s ≤ dl ∧ A.<span class="const token" data-verso-hover="11">CumulativelyFair</span> dl <span class="nu">1</span> ∧</span>
+<span id="L215">    ∀ v σ x, <span class="const token" data-verso-hover="95">GoodStep</span> dl s (G.<span class="const token" data-verso-hover="93">degree</span> v + dl) x (A.<span class="const token" data-verso-hover="35">out</span> v σ x) (G.<span class="const token" data-verso-hover="40">neighborFinset</span> v) (A.<span class="const token" data-verso-hover="37">keep</span> v σ x)</span>
+<span id="L216"></span>
+<span id="L217"><span class="kw">end</span> Fairness</span>
+<span id="L218"></span>
+<span id="L219"><span class="kw">end</span> Podc.DeterministicLoadBalancing</span>
+<span id="L220"></span>
+</code></div>
+        <script>
+          window.versoHoversUrl = "PODC2015/DeterministicLoadBalancing/-hovers.json";</script>
+        <script src="static/lean/popper.js"></script>
+        <script src="static/lean/tippy.js"></script>
+        <script src="static/lean/marked.js"></script>
+        <script src="static/lean/highlighting.js"></script>
+        <script src="static/lean/lean.js"></script>
+        </article></main><footer class="site-footer"><div class="wrap">
+        Machine-checked formalizations of PODC papers in Lean 4. Generated with <a href="https://github.com/leanprover/verso">Verso</a> from the README files of <a href="https://github.com/vasnesterov/formal_podc">vasnesterov/formal_podc</a>.</div>
+      </footer></body>
+  </html>
+

@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="light dark">
+    <link rel="icon" href="data:,">
+    <title>ConcurrentSketches: Sketch.lean · Formal PODC</title><base href="../../../.././"><link rel="stylesheet" href="static/lean/verso-vars.css">
+    <link rel="stylesheet" href="static/lean/highlighting.css">
+    <link rel="stylesheet" href="static/lean/tippy-border.css">
+    <link rel="stylesheet" href="static/style.css">
+    <script defer="defer" src="static/site.js"></script>
+    </head>
+  <body>
+    <header class="site-header">
+      <div class="wrap">
+        <a class="brand" href=".">Formal PODC</a><nav class="top">
+          <a href=".">Search</a><a href="about/">About</a><a href="https://github.com/vasnesterov/formal_podc">GitHub</a></nav>
+        </div>
+      </header>
+    <main class="wrap"><article><nav class="breadcrumbs" aria-label="Breadcrumb">
+          <a href=".">Search</a><span class="sep">›</span><a href="PODC2019/">PODC 2019</a><span class="sep">›</span><a href="PODC2019/ConcurrentSketches/">ConcurrentSketches</a><span class="sep">›</span><a href="PODC2019/ConcurrentSketches/src/">Lean source</a><span class="sep">›</span><span aria-current="page">Sketch</span></nav>
+        <h1>
+          <code>Sketch.lean</code></h1>
+        <div class="paper-links">
+          <p>
+            Source of <a href="PODC2019/ConcurrentSketches/">Fast Concurrent Data Sketches — PODC 2019</a> · <a href="https://github.com/vasnesterov/formal_podc/blob/main/Papers/PODC2019/ConcurrentSketches/Sketch.lean">GitHub</a> · hover over a name for its type and documentation</p>
+          </div>
+        <div class="lean-code lean-src">
+          <code class="hl lean block" data-lean-context="Sketch"><span id="L1"><span class="kw">import</span> Papers.PODC2019.ConcurrentSketches.Relaxation</span>
+<span id="L2"><span class="kw">import</span> Podc.Computability.Distributed.SharedMemory.HistorySpecLin</span>
+<span id="L3"></span>
+<span id="L4"><span class="dc">/-!</span></span>
+<span id="L5"><span class="dc"># Fast Concurrent Data Sketches (PODC 2019): sequential and composable sketches</span></span>
+<span id="L6"></span>
+<span id="L7"><span class="dc">Sections 3–5.1 of the paper.</span></span>
+<span id="L8"></span>
+<span id="L9"><span class="dc">* `Sketch`: a *derandomised* sequential sketch (Section 4: the coin flips are fixed by an</span></span>
+<span id="L10"><span class="dc">  oracle, so the sketch is a deterministic object): a state, `init`, `update`, `query`.</span></span>
+<span id="L11"><span class="dc">  `Sketch.run A` is the state after ingesting the stream `A` from `init`; a state *summarises*</span></span>
+<span id="L12"><span class="dc">  `A` iff it is `run A` (the paper: "a state summarizes two different streams iff that state is</span></span>
+<span id="L13"><span class="dc">  reached after ingesting each of them to an empty sketch").</span></span>
+<span id="L14"><span class="dc">* `Composable` (Section 5.1): a sketch with `merge`, `snapshot` and the pre-filtering API</span></span>
+<span id="L15"><span class="dc">  `calcHint`/`shouldAdd`, with the paper's semantic requirements as fields:</span></span>
+<span id="L16"><span class="dc">  - `merge_run`: if `S` summarises `A` and `S'` summarises `A'`, then `merge S S'` summarises</span></span>
+<span id="L17"><span class="dc">    `A ‖ A'`;</span></span>
+<span id="L18"><span class="dc">  - `snapQuery_snapshot`: a snapshot answers every query like the sketch it was taken from;</span></span>
+<span id="L19"><span class="dc">  - `shouldAdd_spec`: if `S` summarises `A` and `shouldAdd(S.calcHint(), a)` is false, then for</span></span>
+<span id="L20"><span class="dc">    all streams `B₁, B₂`, `A ‖ B₁ ‖ a ‖ B₂` and `A ‖ B₁ ‖ B₂` are summarised by the same state.</span></span>
+<span id="L21"><span class="dc">  The paper's requirement `calcHint() ≠ 0` is built into the algorithms' encoding of `prop`</span></span>
+<span id="L22"><span class="dc">  (`Option Hint`, `none` = 0).</span></span>
+<span id="L23"><span class="dc">* `seqObj S`: the sketch as a CSLib `ObjSpec` (operations `update a`, `query arg`, and the</span></span>
+<span id="L24"><span class="dc">  never-returning `propagate` operation that starts the background propagator thread of the</span></span>
+<span id="L25"><span class="dc">  concurrent algorithms; it is a no-op in the sequential specification).</span></span>
+<span id="L26"><span class="dc">* `SeqSketch S`: the sequential histories of the derandomised sketch (legal histories of</span></span>
+<span id="L27"><span class="dc">  `seqObj S`, stated directly); `SeqSketchR r S` (Definition 2): histories that have an</span></span>
+<span id="L28"><span class="dc">  `r`-relaxation in</span></span>
+<span id="L29"><span class="dc">  `SeqSketch S`.</span></span>
+<span id="L30"><span class="dc">* `Safe h F`: the hint `h` is safe for the stream `F` (it was computed from a prefix of `F`), so</span></span>
+<span id="L31"><span class="dc">  filtering out `a` with `shouldAdd h a = false` does not change `run F`.</span></span>
+<span id="L32"><span class="dc">-/</span></span>
+<span id="L33"></span>
+<span id="L34"><span class="kw">namespace</span> Podc.ConcurrentSketches</span>
+<span id="L35"></span>
+<span id="L36"><span class="kw">open</span> Cslib.SharedMemory</span>
+<span id="L37"></span>
+<span id="L38"><span class="dc">/-- A derandomised sequential sketch (Section 3; the randomness is fixed by an oracle). -/</span></span>
+<span id="L39"><span class="kw">structure</span> <span class="const token" data-verso-hover="624">Sketch</span> <span class="kw">where</span></span>
+<span id="L40">  <span class="dc">/-- Sketch states. -/</span></span>
+<span id="L41">  <span class="const token" data-verso-hover="29">State</span> : <span class="kw">Type</span></span>
+<span id="L42">  <span class="dc">/-- Stream elements. -/</span></span>
+<span id="L43">  <span class="const token" data-verso-hover="31">Elem</span> : <span class="kw">Type</span></span>
+<span id="L44">  <span class="dc">/-- Query arguments. -/</span></span>
+<span id="L45">  <span class="const token" data-verso-hover="33">Arg</span> : <span class="kw">Type</span></span>
+<span id="L46">  <span class="dc">/-- Query results. -/</span></span>
+<span id="L47">  <span class="const token" data-verso-hover="34">Val</span> : <span class="kw">Type</span></span>
+<span id="L48">  <span class="dc">/-- The empty sketch (`S.init()`). -/</span></span>
+<span id="L49">  <span class="const token" data-verso-hover="35">init</span> : <span class="const token" data-verso-hover="29">State</span></span>
+<span id="L50">  <span class="dc">/-- `S.update(a)`. -/</span></span>
+<span id="L51">  <span class="const token" data-verso-hover="36">update</span> : <span class="const token" data-verso-hover="29">State</span> → <span class="const token" data-verso-hover="31">Elem</span> → <span class="const token" data-verso-hover="29">State</span></span>
+<span id="L52">  <span class="dc">/-- `S.query(arg)`. -/</span></span>
+<span id="L53">  <span class="const token" data-verso-hover="37">query</span> : <span class="const token" data-verso-hover="29">State</span> → <span class="const token" data-verso-hover="33">Arg</span> → <span class="const token" data-verso-hover="34">Val</span></span>
+<span id="L54"></span>
+<span id="L55"><span class="kw">namespace</span> Sketch</span>
+<span id="L56"></span>
+<span id="L57"><span class="kw">variable</span> (S : <span class="const token" data-verso-hover="624">Sketch</span>)</span>
+<span id="L58"></span>
+<span id="L59"><span class="dc">/-- The state after ingesting the stream `A` into the empty sketch: the unique state that</span></span>
+<span id="L60"><span class="dc">*summarises* `A`. -/</span></span>
+<span id="L61"><span class="kw">def</span> <span class="const token" data-verso-hover="102">run</span> (A : <span class="const token" data-verso-hover="46">List</span> S.<span class="const token" data-verso-hover="31">Elem</span>) : S.<span class="const token" data-verso-hover="29">State</span> := A.<span class="const token" data-verso-hover="47">foldl</span> S.<span class="const token" data-verso-hover="36">update</span> S.<span class="const token" data-verso-hover="35">init</span></span>
+<span id="L62"></span>
+<span id="L63">@[<span class="kw">simp</span>] <span class="kw">lemma</span> <span class="const token" data-verso-hover="625">run_nil</span> : S.<span class="const token" data-verso-hover="102">run</span> [] = S.<span class="const token" data-verso-hover="35">init</span> := <span class="const token" data-verso-hover="52">rfl</span></span>
+<span id="L64"></span>
+<span id="L65"><span class="kw">lemma</span> <span class="const token" data-verso-hover="460">run_concat</span> (A : <span class="const token" data-verso-hover="46">List</span> S.<span class="const token" data-verso-hover="31">Elem</span>) (a : S.<span class="const token" data-verso-hover="31">Elem</span>) : S.<span class="const token" data-verso-hover="102">run</span> (A ++ [a]) = S.<span class="const token" data-verso-hover="36">update</span> (S.<span class="const token" data-verso-hover="102">run</span> A) a := <span class="kw">by</span></span>
+<span id="L66">  <span class="kw">simp</span> [<span class="const token" data-verso-hover="102">run</span>]</span>
+<span id="L67"></span>
+<span id="L68"><span class="kw">end</span> Sketch</span>
+<span id="L69"></span>
+<span id="L70"><span class="dc">/-- A *composable* sketch (Section 5.1) with its semantic requirements. -/</span></span>
+<span id="L71"><span class="kw">structure</span> <span class="const token" data-verso-hover="12">Composable</span> <span class="kw">extends</span> <span class="const token" data-verso-hover="624">Sketch</span> <span class="kw">where</span></span>
+<span id="L72">  <span class="dc">/-- `S.merge(S')`. -/</span></span>
+<span id="L73">  <span class="const token" data-verso-hover="38">merge</span> : State → State → State</span>
+<span id="L74">  <span class="dc">/-- Results of `snapshot`. -/</span></span>
+<span id="L75">  <span class="const token" data-verso-hover="39">Snap</span> : <span class="kw">Type</span></span>
+<span id="L76">  <span class="dc">/-- `S.snapshot()`. -/</span></span>
+<span id="L77">  <span class="const token" data-verso-hover="40">snapshot</span> : State → <span class="const token" data-verso-hover="39">Snap</span></span>
+<span id="L78">  <span class="dc">/-- Querying a snapshot. -/</span></span>
+<span id="L79">  <span class="const token" data-verso-hover="42">snapQuery</span> : <span class="const token" data-verso-hover="39">Snap</span> → Arg → Val</span>
+<span id="L80">  <span class="dc">/-- Hints. -/</span></span>
+<span id="L81">  <span class="const token" data-verso-hover="43">Hint</span> : <span class="kw">Type</span></span>
+<span id="L82">  <span class="dc">/-- `S.calcHint()`. -/</span></span>
+<span id="L83">  <span class="const token" data-verso-hover="44">calcHint</span> : State → <span class="const token" data-verso-hover="43">Hint</span></span>
+<span id="L84">  <span class="dc">/-- `shouldAdd(h, a)` (a static function). -/</span></span>
+<span id="L85">  <span class="const token" data-verso-hover="24">shouldAdd</span> : <span class="const token" data-verso-hover="43">Hint</span> → Elem → <span class="const token" data-verso-hover="306">Bool</span></span>
+<span id="L86">  <span class="dc">/-- Merging a sketch summarising `A` with one summarising `B` summarises `A ‖ B`. -/</span></span>
+<span id="L87">  <span class="const token" data-verso-hover="45">merge_run</span> : ∀ A B : <span class="const token" data-verso-hover="46">List</span> Elem,</span>
+<span id="L88">    <span class="const token" data-verso-hover="38">merge</span> (A.<span class="const token" data-verso-hover="47">foldl</span> update init) (B.<span class="const token" data-verso-hover="47">foldl</span> update init) = (A ++ B).<span class="const token" data-verso-hover="47">foldl</span> update init</span>
+<span id="L89">  <span class="dc">/-- A snapshot answers every query like the sketch it was taken from. -/</span></span>
+<span id="L90">  <span class="const token" data-verso-hover="51">snapQuery_snapshot</span> : ∀ s q, <span class="const token" data-verso-hover="42">snapQuery</span> (<span class="const token" data-verso-hover="40">snapshot</span> s) q = query s q</span>
+<span id="L91">  <span class="dc">/-- Pre-filtering is safe: if `S` summarises `A` and `shouldAdd(S.calcHint(), a)` is false,</span></span>
+<span id="L92"><span class="dc">  then `A ‖ B₁ ‖ a ‖ B₂` and `A ‖ B₁ ‖ B₂` are summarised by the same state. -/</span></span>
+<span id="L93">  <span class="const token" data-verso-hover="53">shouldAdd_spec</span> : ∀ (A : <span class="const token" data-verso-hover="46">List</span> Elem) (a : Elem),</span>
+<span id="L94">    <span class="const token" data-verso-hover="24">shouldAdd</span> (<span class="const token" data-verso-hover="44">calcHint</span> (A.<span class="const token" data-verso-hover="47">foldl</span> update init)) a = <span class="const token" data-verso-hover="311">false</span> →</span>
+<span id="L95">      ∀ B₁ B₂ : <span class="const token" data-verso-hover="46">List</span> Elem,</span>
+<span id="L96">        (A ++ B₁ ++ a :: B₂).<span class="const token" data-verso-hover="47">foldl</span> update init = (A ++ B₁ ++ B₂).<span class="const token" data-verso-hover="47">foldl</span> update init</span>
+<span id="L97"></span>
+<span id="L98"><span class="kw">namespace</span> Composable</span>
+<span id="L99"></span>
+<span id="L100"><span class="kw">variable</span> (S : <span class="const token" data-verso-hover="12">Composable</span>)</span>
+<span id="L101"></span>
+<span id="L102"><span class="kw">lemma</span> <span class="const token" data-verso-hover="474">merge_run'</span> (A B : <span class="const token" data-verso-hover="46">List</span> S.<span class="const token" data-verso-hover="31">Elem</span>) :</span>
+<span id="L103">    S.<span class="const token" data-verso-hover="38">merge</span> (S.<span class="const token" data-verso-hover="102">run</span> A) (S.<span class="const token" data-verso-hover="102">run</span> B) = S.<span class="const token" data-verso-hover="102">run</span> (A ++ B) := S.<span class="const token" data-verso-hover="45">merge_run</span> A B</span>
+<span id="L104"></span>
+<span id="L105"><span class="dc">/-- The hint `h` is *safe* for the stream `F`: there is a prefix `A` of `F` such that filtering</span></span>
+<span id="L106"><span class="dc">by `h` is as harmless as filtering by the hint of a sketch summarising `A`. -/</span></span>
+<span id="L107"><span class="kw">def</span> <span class="const token" data-verso-hover="230">Safe</span> (h : S.<span class="const token" data-verso-hover="43">Hint</span>) (F : <span class="const token" data-verso-hover="46">List</span> S.<span class="const token" data-verso-hover="31">Elem</span>) : <span class="kw">Prop</span> :=</span>
+<span id="L108">  ∃ A, A &lt;+: F ∧ ∀ a, S.<span class="const token" data-verso-hover="24">shouldAdd</span> h a = <span class="const token" data-verso-hover="311">false</span> →</span>
+<span id="L109">    ∀ B₁ B₂ : <span class="const token" data-verso-hover="46">List</span> S.<span class="const token" data-verso-hover="31">Elem</span>, S.<span class="const token" data-verso-hover="102">run</span> (A ++ B₁ ++ a :: B₂) = S.<span class="const token" data-verso-hover="102">run</span> (A ++ B₁ ++ B₂)</span>
+<span id="L110"></span>
+<span id="L111"><span class="kw">variable</span> {S}</span>
+<span id="L112"></span>
+<span id="L113"><span class="kw">lemma</span> <span class="const token" data-verso-hover="626">Safe.append</span> {h : S.<span class="const token" data-verso-hover="43">Hint</span>} {F : <span class="const token" data-verso-hover="46">List</span> S.<span class="const token" data-verso-hover="31">Elem</span>} (hs : S.<span class="const token" data-verso-hover="230">Safe</span> h F) (G : <span class="const token" data-verso-hover="46">List</span> S.<span class="const token" data-verso-hover="31">Elem</span>) :</span>
+<span id="L114">    S.<span class="const token" data-verso-hover="230">Safe</span> h (F ++ G) := <span class="kw">by</span></span>
+<span id="L115">  <span class="kw">obtain</span> ⟨A, hA, h⟩ := hs</span>
+<span id="L116">  <span class="kw">exact</span> ⟨A, hA.<span class="const token" data-verso-hover="415">trans</span> (<span class="const token" data-verso-hover="416">List.prefix_append</span> F G), h⟩</span>
+<span id="L117"></span>
+<span id="L118"><span class="kw">lemma</span> <span class="const token" data-verso-hover="389">Safe.mono</span> {h : S.<span class="const token" data-verso-hover="43">Hint</span>} {F G : <span class="const token" data-verso-hover="46">List</span> S.<span class="const token" data-verso-hover="31">Elem</span>} (hs : S.<span class="const token" data-verso-hover="230">Safe</span> h F) (hFG : F &lt;+: G) :</span>
+<span id="L119">    S.<span class="const token" data-verso-hover="230">Safe</span> h G := <span class="kw">by</span></span>
+<span id="L120">  <span class="kw">obtain</span> ⟨T, <span class="kw">rfl</span>⟩ := hFG; <span class="kw">exact</span> hs.<span class="const token" data-verso-hover="626">append</span> T</span>
+<span id="L121"></span>
+<span id="L122"><span class="dc">/-- The hint computed from a sketch summarising `F` is safe for `F`. -/</span></span>
+<span id="L123"><span class="kw">lemma</span> <span class="const token" data-verso-hover="469">safe_calcHint</span> (F : <span class="const token" data-verso-hover="46">List</span> S.<span class="const token" data-verso-hover="31">Elem</span>) : S.<span class="const token" data-verso-hover="230">Safe</span> (S.<span class="const token" data-verso-hover="44">calcHint</span> (S.<span class="const token" data-verso-hover="102">run</span> F)) F :=</span>
+<span id="L124">  ⟨F, <span class="const token" data-verso-hover="468">List.prefix_refl</span> F, <span class="kw">fun</span> a ha B₁ B₂ =&gt; S.<span class="const token" data-verso-hover="53">shouldAdd_spec</span> F a ha B₁ B₂⟩</span>
+<span id="L125"></span>
+<span id="L126"><span class="dc">/-- Filtering out an element rejected by a safe hint does not change the summary. -/</span></span>
+<span id="L127"><span class="kw">lemma</span> <span class="const token" data-verso-hover="503">Safe.run_concat</span> {h : S.<span class="const token" data-verso-hover="43">Hint</span>} {F : <span class="const token" data-verso-hover="46">List</span> S.<span class="const token" data-verso-hover="31">Elem</span>} (hs : S.<span class="const token" data-verso-hover="230">Safe</span> h F) {a : S.<span class="const token" data-verso-hover="31">Elem</span>}</span>
+<span id="L128">    (ha : S.<span class="const token" data-verso-hover="24">shouldAdd</span> h a = <span class="const token" data-verso-hover="311">false</span>) : S.<span class="const token" data-verso-hover="102">run</span> (F ++ [a]) = S.<span class="const token" data-verso-hover="102">run</span> F := <span class="kw">by</span></span>
+<span id="L129">  <span class="kw">obtain</span> ⟨A, ⟨B, <span class="kw">rfl</span>⟩, h⟩ := hs</span>
+<span id="L130">  <span class="kw">simpa</span> <span class="kw">using</span> h a ha B []</span>
+<span id="L131"></span>
+<span id="L132"><span class="kw">end</span> Composable</span>
+<span id="L133"></span>
+<span id="L134"><span class="dc">/-! ## The sketch as a sequential object -/</span></span>
+<span id="L135"></span>
+<span id="L136"><span class="dc">/-- Operations of the sketch object. `propagate` is the (never-returning) operation that starts</span></span>
+<span id="L137"><span class="dc">the background propagator thread of the concurrent algorithms; it is a no-op sequentially. -/</span></span>
+<span id="L138"><span class="kw">inductive</span> <span class="const token" data-verso-hover="277">SkOp</span> (S : <span class="const token" data-verso-hover="624">Sketch</span>) <span class="kw">where</span></span>
+<span id="L139">  | <span class="const token" data-verso-hover="58">update</span> (a : S.<span class="const token" data-verso-hover="31">Elem</span>)</span>
+<span id="L140">  | <span class="const token" data-verso-hover="63">query</span> (q : S.<span class="const token" data-verso-hover="33">Arg</span>)</span>
+<span id="L141">  | <span class="const token" data-verso-hover="10">propagate</span></span>
+<span id="L142"></span>
+<span id="L143"><span class="dc">/-- Responses of the sketch object. -/</span></span>
+<span id="L144"><span class="kw">inductive</span> <span class="const token" data-verso-hover="489">SkResp</span> (S : <span class="const token" data-verso-hover="624">Sketch</span>) <span class="kw">where</span></span>
+<span id="L145">  | <span class="const token" data-verso-hover="61">ack</span></span>
+<span id="L146">  | <span class="const token" data-verso-hover="65">val</span> (v : S.<span class="const token" data-verso-hover="34">Val</span>)</span>
+<span id="L147"></span>
+<span id="L148"><span class="dc">/-- The derandomised sequential sketch as a deterministic sequential object. -/</span></span>
+<span id="L149"><span class="kw">abbrev</span> <span class="const token" data-verso-hover="334">seqObj</span> (S : <span class="const token" data-verso-hover="624">Sketch</span>) : <span class="const token" data-verso-hover="233">ObjSpec</span> <span class="kw">where</span></span>
+<span id="L150">  <span class="const token" data-verso-hover="299">State</span> := S.<span class="const token" data-verso-hover="29">State</span></span>
+<span id="L151">  <span class="const token" data-verso-hover="236">Op</span> := <span class="const token" data-verso-hover="277">SkOp</span> S</span>
+<span id="L152">  <span class="const token" data-verso-hover="237">Resp</span> := <span class="const token" data-verso-hover="489">SkResp</span> S</span>
+<span id="L153">  <span class="const token" data-verso-hover="300">init</span> := S.<span class="const token" data-verso-hover="35">init</span></span>
+<span id="L154">  <span class="const token" data-verso-hover="244">δ</span> s o := <span class="kw">match</span> o <span class="kw">with</span></span>
+<span id="L155">    | <span class="const token" data-verso-hover="58">.</span>update a =&gt; (S.<span class="const token" data-verso-hover="36">update</span> s a, <span class="const token" data-verso-hover="61">.</span>ack)</span>
+<span id="L156">    | <span class="const token" data-verso-hover="63">.</span>query q =&gt; (s, <span class="const token" data-verso-hover="65">.</span>val (S.<span class="const token" data-verso-hover="37">query</span> s q))</span>
+<span id="L157">    | <span class="const token" data-verso-hover="10">.</span>propagate =&gt; (s, <span class="const token" data-verso-hover="61">.</span>ack)</span>
+<span id="L158"></span>
+<span id="L159"><span class="dc">/-- The response of the sequential sketch in state `s` to operation `o`. -/</span></span>
+<span id="L160"><span class="kw">def</span> <span class="const token" data-verso-hover="97">seqResp</span> (S : <span class="const token" data-verso-hover="624">Sketch</span>) (s : S.<span class="const token" data-verso-hover="29">State</span>) : <span class="const token" data-verso-hover="277">SkOp</span> S → <span class="const token" data-verso-hover="489">SkResp</span> S</span>
+<span id="L161">  | <span class="const token" data-verso-hover="58">.</span>update _ =&gt; <span class="const token" data-verso-hover="61">.</span>ack</span>
+<span id="L162">  | <span class="const token" data-verso-hover="63">.</span>query q =&gt; <span class="const token" data-verso-hover="65">.</span>val (S.<span class="const token" data-verso-hover="37">query</span> s q)</span>
+<span id="L163">  | <span class="const token" data-verso-hover="10">.</span>propagate =&gt; <span class="const token" data-verso-hover="61">.</span>ack</span>
+<span id="L164"></span>
+<span id="L165"><span class="dc">/-- Entries of sequential histories: an operation instance with its operation and response. -/</span></span>
+<span id="L166"><span class="kw">abbrev</span> <span class="const token" data-verso-hover="85">Entry</span> (P : <span class="kw">Type</span>) (S : <span class="const token" data-verso-hover="624">Sketch</span>) := <span class="const token" data-verso-hover="259">OpId</span> P × <span class="const token" data-verso-hover="277">SkOp</span> S × <span class="const token" data-verso-hover="489">SkResp</span> S</span>
+<span id="L167"></span>
+<span id="L168"><span class="kw">variable</span> {P : <span class="kw">Type</span>} {S : <span class="const token" data-verso-hover="624">Sketch</span>}</span>
+<span id="L169"></span>
+<span id="L170"><span class="dc">/-- The stream of an entry list: the arguments of its updates, in order. -/</span></span>
+<span id="L171"><span class="kw">def</span> <span class="const token" data-verso-hover="100">upds</span> : <span class="const token" data-verso-hover="46">List</span> (<span class="const token" data-verso-hover="85">Entry</span> P S) → <span class="const token" data-verso-hover="46">List</span> S.<span class="const token" data-verso-hover="31">Elem</span> :=</span>
+<span id="L172">  <span class="const token" data-verso-hover="627">List.filterMap</span> <span class="kw">fun</span> e =&gt; <span class="kw">match</span> e.<span class="const token" data-verso-hover="88">2</span><span class="nu">.</span><span class="const token" data-verso-hover="89">1</span> <span class="kw">with</span></span>
+<span id="L173">    | <span class="const token" data-verso-hover="58">.</span>update a =&gt; <span class="const token" data-verso-hover="115">some</span> a</span>
+<span id="L174">    | _ =&gt; <span class="const token" data-verso-hover="11">none</span></span>
+<span id="L175"></span>
+<span id="L176">@[<span class="kw">simp</span>] <span class="kw">lemma</span> <span class="const token" data-verso-hover="628">upds_nil</span> : <span class="const token" data-verso-hover="100">upds</span> ([] : <span class="const token" data-verso-hover="46">List</span> (<span class="const token" data-verso-hover="85">Entry</span> P S)) = [] := <span class="const token" data-verso-hover="52">rfl</span></span>
+<span id="L177"></span>
+<span id="L178">@[<span class="kw">simp</span>] <span class="kw">lemma</span> <span class="const token" data-verso-hover="475">upds_append</span> (H H' : <span class="const token" data-verso-hover="46">List</span> (<span class="const token" data-verso-hover="85">Entry</span> P S)) : <span class="const token" data-verso-hover="100">upds</span> (H ++ H') = <span class="const token" data-verso-hover="100">upds</span> H ++ <span class="const token" data-verso-hover="100">upds</span> H' := <span class="kw">by</span></span>
+<span id="L179">  <span class="kw">simp</span> [<span class="const token" data-verso-hover="100">upds</span>]</span>
+<span id="L180"></span>
+<span id="L181">@[<span class="kw">simp</span>] <span class="kw">lemma</span> <span class="const token" data-verso-hover="502">upds_update</span> (x : <span class="const token" data-verso-hover="259">OpId</span> P) (a : S.<span class="const token" data-verso-hover="31">Elem</span>) (r : <span class="const token" data-verso-hover="489">SkResp</span> S) :</span>
+<span id="L182">    <span class="const token" data-verso-hover="100">upds</span> [((x, <span class="const token" data-verso-hover="58">.</span>update a, r) : <span class="const token" data-verso-hover="85">Entry</span> P S)] = [a] := <span class="const token" data-verso-hover="52">rfl</span></span>
+<span id="L183"></span>
+<span id="L184">@[<span class="kw">simp</span>] <span class="kw">lemma</span> <span class="const token" data-verso-hover="629">upds_query</span> (x : <span class="const token" data-verso-hover="259">OpId</span> P) (q : S.<span class="const token" data-verso-hover="33">Arg</span>) (r : <span class="const token" data-verso-hover="489">SkResp</span> S) :</span>
+<span id="L185">    <span class="const token" data-verso-hover="100">upds</span> [((x, <span class="const token" data-verso-hover="63">.</span>query q, r) : <span class="const token" data-verso-hover="85">Entry</span> P S)] = [] := <span class="const token" data-verso-hover="52">rfl</span></span>
+<span id="L186"></span>
+<span id="L187"><span class="dc">/-- `SeqSketch` (Section 4): the sequential histories of the derandomised sketch, i.e. those in</span></span>
+<span id="L188"><span class="dc">which every operation gets the response of the sequential sketch that has ingested the updates</span></span>
+<span id="L189"><span class="dc">preceding it (the legal histories of `seqObj S`). -/</span></span>
+<span id="L190"><span class="kw">def</span> <span class="const token" data-verso-hover="13">SeqSketch</span> (S : <span class="const token" data-verso-hover="624">Sketch</span>) (H : <span class="const token" data-verso-hover="46">List</span> (<span class="const token" data-verso-hover="85">Entry</span> P S)) : <span class="kw">Prop</span> :=</span>
+<span id="L191">  ∀ H₁ e H₂, H = H₁ ++ e :: H₂ → e.<span class="const token" data-verso-hover="88">2</span><span class="nu">.</span><span class="const token" data-verso-hover="88">2</span> = <span class="const token" data-verso-hover="97">seqResp</span> S (S.<span class="const token" data-verso-hover="102">run</span> (<span class="const token" data-verso-hover="100">upds</span> H₁)) e.<span class="const token" data-verso-hover="88">2</span><span class="nu">.</span><span class="const token" data-verso-hover="89">1</span></span>
+<span id="L192"></span>
+<span id="L193"><span class="dc">/-- `SeqSketch_r` (Definition 2): the histories that have an `r`-relaxation in `SeqSketch`. -/</span></span>
+<span id="L194"><span class="kw">def</span> <span class="const token" data-verso-hover="105">SeqSketchR</span> (r : <span class="const token" data-verso-hover="30">ℕ</span>) (S : <span class="const token" data-verso-hover="624">Sketch</span>) (H' : <span class="const token" data-verso-hover="46">List</span> (<span class="const token" data-verso-hover="85">Entry</span> P S)) : <span class="kw">Prop</span> :=</span>
+<span id="L195">  ∃ H, <span class="const token" data-verso-hover="13">SeqSketch</span> S H ∧ <span class="const token" data-verso-hover="596">IsRelaxation</span> r H H'</span>
+<span id="L196"></span>
+<span id="L197"><span class="kw">lemma</span> <span class="const token" data-verso-hover="447">seqSketch_nil</span> : <span class="const token" data-verso-hover="13">SeqSketch</span> S ([] : <span class="const token" data-verso-hover="46">List</span> (<span class="const token" data-verso-hover="85">Entry</span> P S)) := <span class="kw">by</span></span>
+<span id="L198">  <span class="kw">intro</span> H₁ e H₂ h; <span class="kw">simp</span> <span class="kw">at</span> h</span>
+<span id="L199"></span>
+<span id="L200"><span class="dc">/-- Appending one entry to a history of `SeqSketch`. -/</span></span>
+<span id="L201"><span class="kw">lemma</span> <span class="const token" data-verso-hover="483">seqSketch_concat</span> {H : <span class="const token" data-verso-hover="46">List</span> (<span class="const token" data-verso-hover="85">Entry</span> P S)} (hH : <span class="const token" data-verso-hover="13">SeqSketch</span> S H) (e : <span class="const token" data-verso-hover="85">Entry</span> P S)</span>
+<span id="L202">    (he : e.<span class="const token" data-verso-hover="88">2</span><span class="nu">.</span><span class="const token" data-verso-hover="88">2</span> = <span class="const token" data-verso-hover="97">seqResp</span> S (S.<span class="const token" data-verso-hover="102">run</span> (<span class="const token" data-verso-hover="100">upds</span> H)) e.<span class="const token" data-verso-hover="88">2</span><span class="nu">.</span><span class="const token" data-verso-hover="89">1</span>) : <span class="const token" data-verso-hover="13">SeqSketch</span> S (H ++ [e]) := <span class="kw">by</span></span>
+<span id="L203">  <span class="kw">intro</span> H₁ e' H₂ h</span>
+<span id="L204">  <span class="kw">rcases</span> H₂.<span class="const token" data-verso-hover="630">eq_nil_or_concat</span> <span class="kw">with</span> <span class="kw">rfl</span> | ⟨H₂', z, <span class="kw">rfl</span>⟩</span>
+<span id="L205">  · <span class="kw">rw</span> [← <span class="const token" data-verso-hover="631">List.concat_eq_append</span>, ← <span class="const token" data-verso-hover="631">List.concat_eq_append</span>] <span class="kw">at</span> h</span>
+<span id="L206">    <span class="kw">obtain</span> ⟨<span class="kw">rfl</span>, <span class="kw">rfl</span>⟩ := <span class="const token" data-verso-hover="632">List.concat_inj</span>.<span class="const token" data-verso-hover="80">1</span> h</span>
+<span id="L207">    <span class="kw">exact</span> he</span>
+<span id="L208">  · <span class="kw">have</span> h' : H ++ [e] = (H₁ ++ e' :: H₂') ++ [z] := <span class="kw">by</span> <span class="kw">rw</span> [h]; <span class="kw">simp</span></span>
+<span id="L209">    <span class="kw">obtain</span> ⟨<span class="kw">rfl</span>, -⟩ := <span class="const token" data-verso-hover="633">List.append_inj'</span> h' <span class="const token" data-verso-hover="52">rfl</span></span>
+<span id="L210">    <span class="kw">exact</span> hH _ _ _ <span class="const token" data-verso-hover="52">rfl</span></span>
+<span id="L211"></span>
+<span id="L212"><span class="kw">lemma</span> <span class="const token" data-verso-hover="476">seqSketch_append</span> {H : <span class="const token" data-verso-hover="46">List</span> (<span class="const token" data-verso-hover="85">Entry</span> P S)} (hH : <span class="const token" data-verso-hover="13">SeqSketch</span> S H) (G : <span class="const token" data-verso-hover="46">List</span> (<span class="const token" data-verso-hover="85">Entry</span> P S))</span>
+<span id="L213">    (hG : ∀ e ∈ G, e.<span class="const token" data-verso-hover="88">2</span><span class="nu">.</span><span class="const token" data-verso-hover="88">2</span> = <span class="const token" data-verso-hover="61">.</span>ack ∧ ∀ q, e.<span class="const token" data-verso-hover="88">2</span><span class="nu">.</span><span class="const token" data-verso-hover="89">1</span> ≠ <span class="const token" data-verso-hover="63">.</span>query q) : <span class="const token" data-verso-hover="13">SeqSketch</span> S (H ++ G) := <span class="kw">by</span></span>
+<span id="L214">  <span class="kw">induction</span> G <span class="kw">using</span> <span class="const token" data-verso-hover="78">List.reverseRecOn</span> <span class="kw">with</span></span>
+<span id="L215">  | <span class="const token" data-verso-hover="49">nil</span> =&gt; <span class="kw">simpa</span> <span class="kw">using</span> hH</span>
+<span id="L216">  | append_singleton G e ih =&gt;</span>
+<span id="L217">    <span class="kw">rw</span> [← <span class="const token" data-verso-hover="414">List.append_assoc</span>]</span>
+<span id="L218">    <span class="kw">refine</span> <span class="const token" data-verso-hover="483">seqSketch_concat</span> (ih <span class="kw">fun</span> e he =&gt; hG e (<span class="kw">by</span> <span class="kw">simp</span> [he])) e ?_</span>
+<span id="L219">    <span class="kw">obtain</span> ⟨x, o, r⟩ := e</span>
+<span id="L220">    <span class="kw">obtain</span> ⟨h1, h2⟩ := hG (x, o, r) (<span class="kw">by</span> <span class="kw">simp</span>)</span>
+<span id="L221">    <span class="kw">simp</span> only <span class="kw">at</span> h1 h2 ⊢; <span class="kw">subst</span> h1</span>
+<span id="L222">    <span class="kw">cases</span> o <span class="kw">with</span></span>
+<span id="L223">    | <span class="const token" data-verso-hover="58">update</span> a =&gt; <span class="kw">rfl</span></span>
+<span id="L224">    | <span class="const token" data-verso-hover="63">query</span> q =&gt; <span class="kw">exact</span> <span class="const token" data-verso-hover="81">absurd</span> <span class="const token" data-verso-hover="52">rfl</span> (h2 q)</span>
+<span id="L225">    | <span class="const token" data-verso-hover="10">propagate</span> =&gt; <span class="kw">rfl</span></span>
+<span id="L226"></span>
+<span id="L227"><span class="kw">end</span> Podc.ConcurrentSketches</span>
+<span id="L228"></span>
+</code></div>
+        <script>
+          window.versoHoversUrl = "PODC2019/ConcurrentSketches/-hovers.json";</script>
+        <script src="static/lean/popper.js"></script>
+        <script src="static/lean/tippy.js"></script>
+        <script src="static/lean/marked.js"></script>
+        <script src="static/lean/highlighting.js"></script>
+        <script src="static/lean/lean.js"></script>
+        </article></main><footer class="site-footer"><div class="wrap">
+        Machine-checked formalizations of PODC papers in Lean 4. Generated with <a href="https://github.com/leanprover/verso">Verso</a> from the README files of <a href="https://github.com/vasnesterov/formal_podc">vasnesterov/formal_podc</a>.</div>
+      </footer></body>
+  </html>
+

@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="light dark">
+    <link rel="icon" href="data:,">
+    <title>VFTSpannersOptimal: FTGreedy.lean · Formal PODC</title><base href="../../../.././"><link rel="stylesheet" href="static/lean/verso-vars.css">
+    <link rel="stylesheet" href="static/lean/highlighting.css">
+    <link rel="stylesheet" href="static/lean/tippy-border.css">
+    <link rel="stylesheet" href="static/style.css">
+    <script defer="defer" src="static/site.js"></script>
+    </head>
+  <body>
+    <header class="site-header">
+      <div class="wrap">
+        <a class="brand" href=".">Formal PODC</a><nav class="top">
+          <a href=".">Search</a><a href="about/">About</a><a href="https://github.com/vasnesterov/formal_podc">GitHub</a></nav>
+        </div>
+      </header>
+    <main class="wrap"><article><nav class="breadcrumbs" aria-label="Breadcrumb">
+          <a href=".">Search</a><span class="sep">›</span><a href="PODC2019/">PODC 2019</a><span class="sep">›</span><a href="PODC2019/VFTSpannersOptimal/">VFTSpannersOptimal</a><span class="sep">›</span><a href="PODC2019/VFTSpannersOptimal/src/">Lean source</a><span class="sep">›</span><span aria-current="page">FTGreedy</span></nav>
+        <h1>
+          <code>FTGreedy.lean</code></h1>
+        <div class="paper-links">
+          <p>
+            Source of <a href="PODC2019/VFTSpannersOptimal/">Vertex Fault Tolerant Spanners — PODC 2019</a> · <a href="https://github.com/vasnesterov/formal_podc/blob/main/Papers/PODC2019/VFTSpannersOptimal/FTGreedy.lean">GitHub</a> · hover over a name for its type and documentation</p>
+          </div>
+        <div class="lean-code lean-src">
+          <code class="hl lean block" data-lean-context="FTGreedy"><span id="L1"><span class="kw">import</span> Cslib.Foundations.Combinatorics.SimpleGraph.FaultTolerantGreedy</span>
+<span id="L2"><span class="kw">import</span> Cslib.Foundations.Combinatorics.SimpleGraph.GirthExtremal</span>
+<span id="L3"><span class="kw">import</span> Mathlib</span>
+<span id="L4"></span>
+<span id="L5"><span class="dc">/-!</span></span>
+<span id="L6"><span class="dc"># The FT greedy algorithm and its size (Bodwin–Patel, PODC'19)</span></span>
+<span id="L7"></span>
+<span id="L8"><span class="dc">**Algorithm 1** (VFT / EFT greedy): scan the edges in nondecreasing weight order and add `(u, v)` to</span></span>
+<span id="L9"><span class="dc">the current graph `H` iff there is a fault set `F` of at most `f` vertices (resp. edges) with</span></span>
+<span id="L10"><span class="dc">`d_{H \ F}(u, v) &gt; k · w(u, v)`. Fault sets are required to avoid the edge being tested (`u, v ∉ F`,</span></span>
+<span id="L11"><span class="dc">resp. `{u, v} ∉ F`); see `differencies.md` (without this the literal test is always true for</span></span>
+<span id="L12"><span class="dc">`f ≥ 1`, cf. `ftGreedyLiteral_eq`).</span></span>
+<span id="L13"></span>
+<span id="L14"><span class="dc">* `ftGreedy w k f L` / `ftGreedyEdge w k f L` — Algorithm 1 for vertex / edge faults, on top of the</span></span>
+<span id="L15"><span class="dc">  generic greedy scheme `SimpleGraph.greedyGraph` (edge list `L`, weights `w`, stretch `k`), shared</span></span>
+<span id="L16"><span class="dc">  with Dinitz–Robelle (PODC'20) in `Cslib/Foundations/Combinatorics/SimpleGraph/FaultTolerantGreedy.lean`.</span></span>
+<span id="L17"><span class="dc">* `ftGreedy_isWeightedVFTSpanner` / `ftGreedyEdge_isWeightedEFTSpanner` — correctness (for any order).</span></span>
+<span id="L18"><span class="dc">* **Lemma 3**: `ftGreedy_exists_blockingSet` / `ftGreedyEdge_exists_blockingSet` — a `(k+1)`-blocking set</span></span>
+<span id="L19"><span class="dc">  of size `≤ f |E(H)|` (the edge version produces a *vertex*–edge blocking set too), via the shared</span></span>
+<span id="L20"><span class="dc">  `SimpleGraph.exists_blockingSet_of_insertion` (for a short cycle, the edge inserted last is</span></span>
+<span id="L21"><span class="dc">  bypassed by the rest of the cycle, which must meet that edge's fault set).</span></span>
+<span id="L22"><span class="dc">* **Theorem 1**: `ftGreedy_card_edges_le` / `ftGreedyEdge_card_edges_le`:</span></span>
+<span id="L23"><span class="dc">  `|E(H)| ≤ 32 f² · max(b(⌊n / 2f⌋, k + 1), 1)`, with `b = SimpleGraph.girthExtremal`.</span></span>
+<span id="L24"><span class="dc">* **Corollary 2**: `ftGreedy_card_edges_le_rpow` / `ftGreedyEdge_card_edges_le_rpow`: for stretch</span></span>
+<span id="L25"><span class="dc">  `2k - 1`, `|E(H)| ≤ 16 f^{1-1/k} n^{1+1/k}`.</span></span>
+<span id="L26"><span class="dc">-/</span></span>
+<span id="L27"></span>
+<span id="L28"><span class="kw">open</span> Finset SimpleGraph</span>
+<span id="L29"><span class="kw">open</span> <span class="kw">scoped</span> ENNReal NNReal</span>
+<span id="L30"></span>
+<span id="L31"><span class="kw">namespace</span> VFTSpannersOptimal</span>
+<span id="L32"></span>
+<span id="L33"><span class="kw">variable</span> {V : <span class="kw">Type</span>*}</span>
+<span id="L34"></span>
+<span id="L35"><span class="dc">/-! ### Algorithm 1 -/</span></span>
+<span id="L36"></span>
+<span id="L37"><span class="kw">open</span> Classical <span class="kw">in</span></span>
+<span id="L38"><span class="dc">/-- The test of the VFT greedy algorithm: is there a set `F ∌ u, v` of at most `f` vertices with</span></span>
+<span id="L39"><span class="dc">`d_{H \ F}(u, v) &gt; k · w(u, v)`? -/</span></span>
+<span id="L40"><span class="kw">noncomputable</span> <span class="kw">def</span> <span class="const token" data-verso-hover="92">vftTest</span> (w : <span class="const token" data-verso-hover="34">Sym2</span> V → <span class="const token" data-verso-hover="35">ℝ</span>≥<span class="nu">0</span>) (k f : <span class="const token" data-verso-hover="23">ℕ</span>) (H : <span class="const token" data-verso-hover="33">SimpleGraph</span> V) (u v : V) : <span class="const token" data-verso-hover="40">Bool</span> :=</span>
+<span id="L41">  <span class="const token" data-verso-hover="41">decide</span> (∃ F : <span class="const token" data-verso-hover="42">Finset</span> V, <span class="kw">#F</span> ≤ f ∧ u ∉ F ∧ v ∉ F ∧</span>
+<span id="L42">    (k : <span class="const token" data-verso-hover="43">ℝ</span>≥0∞) * w s(u, v) &lt; (H.<span class="const token" data-verso-hover="44">deleteVerts</span> F).<span class="const token" data-verso-hover="45">wdist</span> w u v)</span>
+<span id="L43"></span>
+<span id="L44"><span class="kw">open</span> Classical <span class="kw">in</span></span>
+<span id="L45"><span class="dc">/-- The test of the EFT greedy algorithm: is there a set `F ∌ {u, v}` of at most `f` edges with</span></span>
+<span id="L46"><span class="dc">`d_{H \ F}(u, v) &gt; k · w(u, v)`? -/</span></span>
+<span id="L47"><span class="kw">noncomputable</span> <span class="kw">def</span> <span class="const token" data-verso-hover="93">eftTest</span> (w : <span class="const token" data-verso-hover="34">Sym2</span> V → <span class="const token" data-verso-hover="35">ℝ</span>≥<span class="nu">0</span>) (k f : <span class="const token" data-verso-hover="23">ℕ</span>) (H : <span class="const token" data-verso-hover="33">SimpleGraph</span> V) (u v : V) : <span class="const token" data-verso-hover="40">Bool</span> :=</span>
+<span id="L48">  <span class="const token" data-verso-hover="41">decide</span> (∃ F : <span class="const token" data-verso-hover="42">Finset</span> (<span class="const token" data-verso-hover="34">Sym2</span> V), <span class="kw">#F</span> ≤ f ∧ s(u, v) ∉ F ∧</span>
+<span id="L49">    (k : <span class="const token" data-verso-hover="43">ℝ</span>≥0∞) * w s(u, v) &lt; (H.<span class="const token" data-verso-hover="94">deleteEdges</span> F).<span class="const token" data-verso-hover="45">wdist</span> w u v)</span>
+<span id="L50"></span>
+<span id="L51"><span class="dc">/-- **Algorithm 1 (VFT greedy)** on the edge list `L` (to be sorted by weight). -/</span></span>
+<span id="L52"><span class="kw">noncomputable</span> <span class="kw">def</span> <span class="const token" data-verso-hover="2">ftGreedy</span> (w : <span class="const token" data-verso-hover="34">Sym2</span> V → <span class="const token" data-verso-hover="35">ℝ</span>≥<span class="nu">0</span>) (k f : <span class="const token" data-verso-hover="23">ℕ</span>) (L : <span class="const token" data-verso-hover="22">List</span> (V × V)) : <span class="const token" data-verso-hover="33">SimpleGraph</span> V :=</span>
+<span id="L53">  <span class="const token" data-verso-hover="16">greedyGraph</span> (<span class="const token" data-verso-hover="92">vftTest</span> w k f) L</span>
+<span id="L54"></span>
+<span id="L55"><span class="dc">/-- **Algorithm 1 (EFT greedy)** on the edge list `L` (to be sorted by weight). -/</span></span>
+<span id="L56"><span class="kw">noncomputable</span> <span class="kw">def</span> <span class="const token" data-verso-hover="3">ftGreedyEdge</span> (w : <span class="const token" data-verso-hover="34">Sym2</span> V → <span class="const token" data-verso-hover="35">ℝ</span>≥<span class="nu">0</span>) (k f : <span class="const token" data-verso-hover="23">ℕ</span>) (L : <span class="const token" data-verso-hover="22">List</span> (V × V)) : <span class="const token" data-verso-hover="33">SimpleGraph</span> V :=</span>
+<span id="L57">  <span class="const token" data-verso-hover="16">greedyGraph</span> (<span class="const token" data-verso-hover="93">eftTest</span> w k f) L</span>
+<span id="L58"></span>
+<span id="L59"><span class="kw">lemma</span> <span class="const token" data-verso-hover="95">vftTest_eq_true</span> {w : <span class="const token" data-verso-hover="34">Sym2</span> V → <span class="const token" data-verso-hover="35">ℝ</span>≥<span class="nu">0</span>} {k f : <span class="const token" data-verso-hover="23">ℕ</span>} {H : <span class="const token" data-verso-hover="33">SimpleGraph</span> V} {u v : V} :</span>
+<span id="L60">    <span class="const token" data-verso-hover="92">vftTest</span> w k f H u v = <span class="const token" data-verso-hover="57">true</span> ↔ ∃ F : <span class="const token" data-verso-hover="42">Finset</span> V, <span class="kw">#F</span> ≤ f ∧ u ∉ F ∧ v ∉ F ∧</span>
+<span id="L61">      (k : <span class="const token" data-verso-hover="43">ℝ</span>≥0∞) * w s(u, v) &lt; (H.<span class="const token" data-verso-hover="44">deleteVerts</span> F).<span class="const token" data-verso-hover="45">wdist</span> w u v := <span class="kw">by</span></span>
+<span id="L62">  <span class="kw">simp</span> [<span class="const token" data-verso-hover="92">vftTest</span>]</span>
+<span id="L63"></span>
+<span id="L64"><span class="kw">lemma</span> <span class="const token" data-verso-hover="96">eftTest_eq_true</span> {w : <span class="const token" data-verso-hover="34">Sym2</span> V → <span class="const token" data-verso-hover="35">ℝ</span>≥<span class="nu">0</span>} {k f : <span class="const token" data-verso-hover="23">ℕ</span>} {H : <span class="const token" data-verso-hover="33">SimpleGraph</span> V} {u v : V} :</span>
+<span id="L65">    <span class="const token" data-verso-hover="93">eftTest</span> w k f H u v = <span class="const token" data-verso-hover="57">true</span> ↔ ∃ F : <span class="const token" data-verso-hover="42">Finset</span> (<span class="const token" data-verso-hover="34">Sym2</span> V), <span class="kw">#F</span> ≤ f ∧ s(u, v) ∉ F ∧</span>
+<span id="L66">      (k : <span class="const token" data-verso-hover="43">ℝ</span>≥0∞) * w s(u, v) &lt; (H.<span class="const token" data-verso-hover="94">deleteEdges</span> F).<span class="const token" data-verso-hover="45">wdist</span> w u v := <span class="kw">by</span></span>
+<span id="L67">  <span class="kw">simp</span> [<span class="const token" data-verso-hover="93">eftTest</span>]</span>
+<span id="L68"></span>
+<span id="L69"><span class="dc">/-! ### Correctness -/</span></span>
+<span id="L70"></span>
+<span id="L71"><span class="dc">/-- **Correctness of the VFT greedy algorithm** (any edge order): the output is an `f`-VFT</span></span>
+<span id="L72"><span class="dc">`k`-spanner of `(G, w)`. -/</span></span>
+<span id="L73"><span class="kw">theorem</span> <span class="const token" data-verso-hover="5">ftGreedy_isWeightedVFTSpanner</span> {G : <span class="const token" data-verso-hover="33">SimpleGraph</span> V} {w : <span class="const token" data-verso-hover="34">Sym2</span> V → <span class="const token" data-verso-hover="35">ℝ</span>≥<span class="nu">0</span>}</span>
+<span id="L74">    {L : <span class="const token" data-verso-hover="22">List</span> (V × V)} {k f : <span class="const token" data-verso-hover="23">ℕ</span>} (hk : <span class="nu">1</span> ≤ k)</span>
+<span id="L75">    (hLG : ∀ p ∈ L, G.<span class="const token" data-verso-hover="97">Adj</span> p.<span class="const token" data-verso-hover="60">1</span> p.<span class="const token" data-verso-hover="61">2</span>) (hL : ∀ u v, G.<span class="const token" data-verso-hover="97">Adj</span> u v → (u, v) ∈ L ∨ (v, u) ∈ L) :</span>
+<span id="L76">    <span class="const token" data-verso-hover="36">IsWeightedVFTSpanner</span> G (<span class="const token" data-verso-hover="2">ftGreedy</span> w k f L) w f k := <span class="kw">by</span></span>
+<span id="L77">  <span class="kw">refine</span> <span class="const token" data-verso-hover="98">greedyGraph_isWeightedVFTSpanner</span> hk (<span class="kw">fun</span> i _ hrej F hF h1 h2 =&gt; ?_) hLG hL</span>
+<span id="L78">  <span class="kw">rw</span> [← <span class="const token" data-verso-hover="99">Bool.not_eq_true</span>, <span class="const token" data-verso-hover="95">vftTest_eq_true</span>] <span class="kw">at</span> hrej</span>
+<span id="L79">  push <span class="const token" data-verso-hover="100">Not</span> <span class="kw">at</span> hrej</span>
+<span id="L80">  <span class="kw">exact</span> hrej F hF h1 h2</span>
+<span id="L81"></span>
+<span id="L82"><span class="dc">/-- **Correctness of the EFT greedy algorithm** (any edge order). -/</span></span>
+<span id="L83"><span class="kw">theorem</span> <span class="const token" data-verso-hover="6">ftGreedyEdge_isWeightedEFTSpanner</span> {G : <span class="const token" data-verso-hover="33">SimpleGraph</span> V} {w : <span class="const token" data-verso-hover="34">Sym2</span> V → <span class="const token" data-verso-hover="35">ℝ</span>≥<span class="nu">0</span>}</span>
+<span id="L84">    {L : <span class="const token" data-verso-hover="22">List</span> (V × V)} {k f : <span class="const token" data-verso-hover="23">ℕ</span>} (hk : <span class="nu">1</span> ≤ k)</span>
+<span id="L85">    (hLG : ∀ p ∈ L, G.<span class="const token" data-verso-hover="97">Adj</span> p.<span class="const token" data-verso-hover="60">1</span> p.<span class="const token" data-verso-hover="61">2</span>) (hL : ∀ u v, G.<span class="const token" data-verso-hover="97">Adj</span> u v → (u, v) ∈ L ∨ (v, u) ∈ L) :</span>
+<span id="L86">    <span class="const token" data-verso-hover="101">IsWeightedEFTSpanner</span> G (<span class="const token" data-verso-hover="3">ftGreedyEdge</span> w k f L) w f k := <span class="kw">by</span></span>
+<span id="L87">  <span class="kw">refine</span> <span class="const token" data-verso-hover="102">greedyGraph_isWeightedEFTSpanner</span> hk (<span class="kw">fun</span> i _ hrej F hF hiF =&gt; ?_) hLG hL</span>
+<span id="L88">  <span class="kw">rw</span> [← <span class="const token" data-verso-hover="99">Bool.not_eq_true</span>, <span class="const token" data-verso-hover="96">eftTest_eq_true</span>] <span class="kw">at</span> hrej</span>
+<span id="L89">  push <span class="const token" data-verso-hover="100">Not</span> <span class="kw">at</span> hrej</span>
+<span id="L90">  <span class="kw">exact</span> hrej F hF hiF</span>
+<span id="L91"></span>
+<span id="L92"><span class="dc">/-! ### Lemma 3: blocking sets -/</span></span>
+<span id="L93"></span>
+<span id="L94"><span class="kw">variable</span> [<span class="const token" data-verso-hover="18">DecidableEq</span> V]</span>
+<span id="L95"></span>
+<span id="L96"><span class="kw">omit</span> [<span class="const token" data-verso-hover="18">DecidableEq</span> V] <span class="kw">in</span></span>
+<span id="L97"><span class="dc">/-- An earlier edge of a sorted insertion list is no heavier. -/</span></span>
+<span id="L98"><span class="kw">private</span> <span class="kw">lemma</span> <span class="const token" data-verso-hover="103">weight_le_of_lt</span> {w : <span class="const token" data-verso-hover="34">Sym2</span> V → <span class="const token" data-verso-hover="35">ℝ</span>≥<span class="nu">0</span>} {A : <span class="const token" data-verso-hover="22">List</span> (V × V)}</span>
+<span id="L99">    (hA : A.<span class="const token" data-verso-hover="104">Pairwise</span> <span class="kw">fun</span> a b =&gt; w s(a.<span class="const token" data-verso-hover="60">1</span>, a.<span class="const token" data-verso-hover="61">2</span>) ≤ w s(b.<span class="const token" data-verso-hover="60">1</span>, b.<span class="const token" data-verso-hover="61">2</span>)) {i j : <span class="const token" data-verso-hover="23">ℕ</span>} (hi : i &lt; A.<span class="const token" data-verso-hover="105">length</span>)</span>
+<span id="L100">    (hj : j &lt; A.<span class="const token" data-verso-hover="105">length</span>) (hji : j &lt; i) : w s(A[j].<span class="const token" data-verso-hover="60">1</span>, A[j].<span class="const token" data-verso-hover="61">2</span>) ≤ w s(A[i].<span class="const token" data-verso-hover="60">1</span>, A[i].<span class="const token" data-verso-hover="61">2</span>) :=</span>
+<span id="L101">  <span class="const token" data-verso-hover="106">List.pairwise_iff_getElem</span>.<span class="const token" data-verso-hover="107">mp</span> hA j i hj hi hji</span>
+<span id="L102"></span>
+<span id="L103"><span class="kw">omit</span> [<span class="const token" data-verso-hover="18">DecidableEq</span> V] <span class="kw">in</span></span>
+<span id="L104"><span class="dc">/-- A walk using only edges no heavier than `c` has weight at most `length · c`. -/</span></span>
+<span id="L105"><span class="kw">private</span> <span class="kw">lemma</span> <span class="const token" data-verso-hover="108">wlength_le_of_old</span> {w : <span class="const token" data-verso-hover="34">Sym2</span> V → <span class="const token" data-verso-hover="35">ℝ</span>≥<span class="nu">0</span>} {A : <span class="const token" data-verso-hover="22">List</span> (V × V)}</span>
+<span id="L106">    (hA : A.<span class="const token" data-verso-hover="104">Pairwise</span> <span class="kw">fun</span> a b =&gt; w s(a.<span class="const token" data-verso-hover="60">1</span>, a.<span class="const token" data-verso-hover="61">2</span>) ≤ w s(b.<span class="const token" data-verso-hover="60">1</span>, b.<span class="const token" data-verso-hover="61">2</span>)) {i : <span class="const token" data-verso-hover="23">ℕ</span>} (hi : i &lt; A.<span class="const token" data-verso-hover="105">length</span>)</span>
+<span id="L107">    {G : <span class="const token" data-verso-hover="33">SimpleGraph</span> V} {a b : V} (p : G.<span class="const token" data-verso-hover="49">Walk</span> a b)</span>
+<span id="L108">    (hold : ∀ e ∈ p.<span class="const token" data-verso-hover="109">edges</span>, ∃ j, ∃ hj : j &lt; A.<span class="const token" data-verso-hover="105">length</span>, j &lt; i ∧ e = s(A[j].<span class="const token" data-verso-hover="60">1</span>, A[j].<span class="const token" data-verso-hover="61">2</span>)) :</span>
+<span id="L109">    p.<span class="const token" data-verso-hover="110">wlength</span> w ≤ p.<span class="const token" data-verso-hover="111">length</span> * w s(A[i].<span class="const token" data-verso-hover="60">1</span>, A[i].<span class="const token" data-verso-hover="61">2</span>) := <span class="kw">by</span></span>
+<span id="L110">  <span class="kw">refine</span> p.<span class="const token" data-verso-hover="112">wlength_le_length_mul</span> w <span class="kw">fun</span> e he =&gt; ?_</span>
+<span id="L111">  <span class="kw">obtain</span> ⟨j, hj, hji, <span class="kw">rfl</span>⟩ := hold e he</span>
+<span id="L112">  <span class="kw">exact_mod_cast</span> <span class="const token" data-verso-hover="103">weight_le_of_lt</span> hA hi hj hji</span>
+<span id="L113"></span>
+<span id="L114"><span class="dc">/-- **Lemma 3 of Bodwin–Patel (VFT).** If the edges are scanned in nondecreasing weight order, the</span></span>
+<span id="L115"><span class="dc">output of the VFT greedy algorithm has a `(k+1)`-blocking set of size at most `f |E(H)|`. -/</span></span>
+<span id="L116"><span class="kw">theorem</span> <span class="const token" data-verso-hover="7">ftGreedy_exists_blockingSet</span> {w : <span class="const token" data-verso-hover="34">Sym2</span> V → <span class="const token" data-verso-hover="35">ℝ</span>≥<span class="nu">0</span>} {L : <span class="const token" data-verso-hover="22">List</span> (V × V)} {k f : <span class="const token" data-verso-hover="23">ℕ</span>}</span>
+<span id="L117">    (hk : <span class="nu">1</span> ≤ k) (hsort : L.<span class="const token" data-verso-hover="104">Pairwise</span> <span class="kw">fun</span> a b =&gt; w s(a.<span class="const token" data-verso-hover="60">1</span>, a.<span class="const token" data-verso-hover="61">2</span>) ≤ w s(b.<span class="const token" data-verso-hover="60">1</span>, b.<span class="const token" data-verso-hover="61">2</span>)) :</span>
+<span id="L118">    ∃ B : <span class="const token" data-verso-hover="42">Finset</span> (V × <span class="const token" data-verso-hover="34">Sym2</span> V), (<span class="const token" data-verso-hover="2">ftGreedy</span> w k f L).<span class="const token" data-verso-hover="113">IsBlockingSet</span> (k + <span class="nu">1</span>) B ∧</span>
+<span id="L119">      <span class="kw">#B</span> ≤ f * (<span class="const token" data-verso-hover="2">ftGreedy</span> w k f L).<span class="const token" data-verso-hover="25">edgeSet</span>.<span class="const token" data-verso-hover="26">ncard</span> := <span class="kw">by</span></span>
+<span id="L120">  <span class="kw">set</span> A := <span class="const token" data-verso-hover="63">greedyEdges</span> (<span class="const token" data-verso-hover="92">vftTest</span> w k f) L</span>
+<span id="L121">  <span class="kw">have</span> hA : A.<span class="const token" data-verso-hover="104">Pairwise</span> <span class="kw">fun</span> a b =&gt; w s(a.<span class="const token" data-verso-hover="60">1</span>, a.<span class="const token" data-verso-hover="61">2</span>) ≤ w s(b.<span class="const token" data-verso-hover="60">1</span>, b.<span class="const token" data-verso-hover="61">2</span>) :=</span>
+<span id="L122">    hsort.<span class="const token" data-verso-hover="114">sublist</span> (<span class="const token" data-verso-hover="115">greedyEdges_sublist</span> L)</span>
+<span id="L123">  <span class="kw">have</span> hgood := <span class="const token" data-verso-hover="116">dec_greedyEdges_take</span> (dec := <span class="const token" data-verso-hover="92">vftTest</span> w k f) L</span>
+<span id="L124">  <span class="kw">have</span> hcut : ∀ i (h : i &lt; A.<span class="const token" data-verso-hover="105">length</span>), ∃ F : <span class="const token" data-verso-hover="42">Finset</span> V, <span class="kw">#F</span> ≤ f ∧ A[i].<span class="const token" data-verso-hover="60">1</span> ∉ F ∧ A[i].<span class="const token" data-verso-hover="61">2</span> ∉ F ∧</span>
+<span id="L125">      (k : <span class="const token" data-verso-hover="43">ℝ</span>≥0∞) * w s(A[i].<span class="const token" data-verso-hover="60">1</span>, A[i].<span class="const token" data-verso-hover="61">2</span>) &lt;</span>
+<span id="L126">        ((<span class="const token" data-verso-hover="62">edgeGraph</span> (A.<span class="const token" data-verso-hover="117">take</span> i)).<span class="const token" data-verso-hover="44">deleteVerts</span> F).<span class="const token" data-verso-hover="45">wdist</span> w A[i].<span class="const token" data-verso-hover="60">1</span> A[i].<span class="const token" data-verso-hover="61">2</span> :=</span>
+<span id="L127">    <span class="kw">fun</span> i h =&gt; <span class="const token" data-verso-hover="95">vftTest_eq_true</span>.<span class="const token" data-verso-hover="107">mp</span> (hgood i h)</span>
+<span id="L128">  <span class="kw">choose</span> F hFc hu hv hlt <span class="kw">using</span> hcut</span>
+<span id="L129">  <span class="kw">refine</span> <span class="const token" data-verso-hover="17">exists_blockingSet_of_insertion</span> (<span class="kw">fun</span> i h heq =&gt; ?_) (<span class="kw">fun</span> i h hadj =&gt; ?_) F hFc</span>
+<span id="L130">    (<span class="kw">fun</span> i h x hx =&gt; ⟨<span class="kw">fun</span> h' =&gt; hu i h (h' ▸ hx), <span class="kw">fun</span> h' =&gt; hv i h (h' ▸ hx)⟩) ?_</span>
+<span id="L131">  · <span class="kw">have</span> := hlt i h</span>
+<span id="L132">    <span class="kw">rw</span> [heq, <span class="const token" data-verso-hover="118">wdist_self</span>] <span class="kw">at</span> this</span>
+<span id="L133">    <span class="kw">exact</span> <span class="const token" data-verso-hover="119">absurd</span> this (<span class="const token" data-verso-hover="120">not_lt</span>.<span class="const token" data-verso-hover="121">mpr</span> <span class="const token" data-verso-hover="122">zero_le</span>)</span>
+<span id="L134">  · <span class="kw">have</span> h1 := <span class="const token" data-verso-hover="123">wdist_le_of_adj</span> (w := w) (<span class="kw">show</span> ((<span class="const token" data-verso-hover="62">edgeGraph</span> (A.<span class="const token" data-verso-hover="117">take</span> i)).<span class="const token" data-verso-hover="44">deleteVerts</span> (F i h)).<span class="const token" data-verso-hover="97">Adj</span></span>
+<span id="L135">      A[i].<span class="const token" data-verso-hover="60">1</span> A[i].<span class="const token" data-verso-hover="61">2</span> <span class="kw">from</span> ⟨hadj, hu i h, hv i h⟩)</span>
+<span id="L136">    <span class="kw">have</span> h2 : (w s(A[i].<span class="const token" data-verso-hover="60">1</span>, A[i].<span class="const token" data-verso-hover="61">2</span>) : <span class="const token" data-verso-hover="43">ℝ</span>≥0∞) ≤ k * w s(A[i].<span class="const token" data-verso-hover="60">1</span>, A[i].<span class="const token" data-verso-hover="61">2</span>) :=</span>
+<span id="L137">      <span class="const token" data-verso-hover="124">le_mul_of_one_le_left</span> <span class="const token" data-verso-hover="122">zero_le</span> (<span class="kw">by</span> <span class="kw">exact_mod_cast</span> hk)</span>
+<span id="L138">    <span class="kw">exact</span> <span class="const token" data-verso-hover="119">absurd</span> (hlt i h) (<span class="const token" data-verso-hover="120">not_lt</span>.<span class="const token" data-verso-hover="121">mpr</span> (h1.<span class="const token" data-verso-hover="125">trans</span> h2))</span>
+<span id="L139">  · <span class="kw">intro</span> i h p hplen hold</span>
+<span id="L140">    <span class="kw">by_contra</span> hnone</span>
+<span id="L141">    push <span class="const token" data-verso-hover="100">Not</span> <span class="kw">at</span> hnone</span>
+<span id="L142">    <span class="kw">have</span> hsupp : ∀ x ∈ p.<span class="const token" data-verso-hover="126">support</span>, x ∉ (F i h : <span class="const token" data-verso-hover="127">Set</span> V) := <span class="kw">fun</span> x hx hxF =&gt; hnone x hx hxF</span>
+<span id="L143">    <span class="kw">have</span> := hlt i h</span>
+<span id="L144">    <span class="kw">refine</span> <span class="const token" data-verso-hover="119">absurd</span> this (<span class="const token" data-verso-hover="120">not_lt</span>.<span class="const token" data-verso-hover="121">mpr</span> ?_)</span>
+<span id="L145">    <span class="kw">calc</span> ((<span class="const token" data-verso-hover="62">edgeGraph</span> (A.<span class="const token" data-verso-hover="117">take</span> i)).<span class="const token" data-verso-hover="44">deleteVerts</span> (F i h)).<span class="const token" data-verso-hover="45">wdist</span> w A[i].<span class="const token" data-verso-hover="60">1</span> A[i].<span class="const token" data-verso-hover="61">2</span></span>
+<span id="L146">        ≤ (p.<span class="const token" data-verso-hover="128">toDeleteVerts</span> hsupp).<span class="const token" data-verso-hover="110">wlength</span> w := <span class="const token" data-verso-hover="129">wdist_le</span> _</span>
+<span id="L147">      _ = p.<span class="const token" data-verso-hover="110">wlength</span> w := <span class="kw">by</span> <span class="kw">simp</span> [<span class="const token" data-verso-hover="128">Walk.toDeleteVerts</span>]</span>
+<span id="L148">      _ ≤ p.<span class="const token" data-verso-hover="111">length</span> * w s(A[i].<span class="const token" data-verso-hover="60">1</span>, A[i].<span class="const token" data-verso-hover="61">2</span>) := <span class="const token" data-verso-hover="108">wlength_le_of_old</span> hA h p hold</span>
+<span id="L149">      _ ≤ k * w s(A[i].<span class="const token" data-verso-hover="60">1</span>, A[i].<span class="const token" data-verso-hover="61">2</span>) := <span class="kw">by</span> <span class="kw">gcongr</span>; <span class="kw">exact_mod_cast</span> (<span class="kw">by</span> <span class="kw">omega</span> : p.<span class="const token" data-verso-hover="111">length</span> ≤ k)</span>
+<span id="L150"></span>
+<span id="L151"><span class="dc">/-- **Lemma 3 of Bodwin–Patel (EFT).** The output of the EFT greedy algorithm also has a</span></span>
+<span id="L152"><span class="dc">(vertex–edge) `(k+1)`-blocking set of size at most `f |E(H)|`: from each fault edge on the cycle we</span></span>
+<span id="L153"><span class="dc">keep one of its endpoints outside the tested edge. -/</span></span>
+<span id="L154"><span class="kw">theorem</span> <span class="const token" data-verso-hover="8">ftGreedyEdge_exists_blockingSet</span> {w : <span class="const token" data-verso-hover="34">Sym2</span> V → <span class="const token" data-verso-hover="35">ℝ</span>≥<span class="nu">0</span>} {L : <span class="const token" data-verso-hover="22">List</span> (V × V)} {k f : <span class="const token" data-verso-hover="23">ℕ</span>}</span>
+<span id="L155">    (hk : <span class="nu">1</span> ≤ k) (hsort : L.<span class="const token" data-verso-hover="104">Pairwise</span> <span class="kw">fun</span> a b =&gt; w s(a.<span class="const token" data-verso-hover="60">1</span>, a.<span class="const token" data-verso-hover="61">2</span>) ≤ w s(b.<span class="const token" data-verso-hover="60">1</span>, b.<span class="const token" data-verso-hover="61">2</span>)) :</span>
+<span id="L156">    ∃ B : <span class="const token" data-verso-hover="42">Finset</span> (V × <span class="const token" data-verso-hover="34">Sym2</span> V), (<span class="const token" data-verso-hover="3">ftGreedyEdge</span> w k f L).<span class="const token" data-verso-hover="113">IsBlockingSet</span> (k + <span class="nu">1</span>) B ∧</span>
+<span id="L157">      <span class="kw">#B</span> ≤ f * (<span class="const token" data-verso-hover="3">ftGreedyEdge</span> w k f L).<span class="const token" data-verso-hover="25">edgeSet</span>.<span class="const token" data-verso-hover="26">ncard</span> := <span class="kw">by</span></span>
+<span id="L158">  <span class="kw">classical</span></span>
+<span id="L159">  <span class="kw">set</span> A := <span class="const token" data-verso-hover="63">greedyEdges</span> (<span class="const token" data-verso-hover="93">eftTest</span> w k f) L</span>
+<span id="L160">  <span class="kw">have</span> hA : A.<span class="const token" data-verso-hover="104">Pairwise</span> <span class="kw">fun</span> a b =&gt; w s(a.<span class="const token" data-verso-hover="60">1</span>, a.<span class="const token" data-verso-hover="61">2</span>) ≤ w s(b.<span class="const token" data-verso-hover="60">1</span>, b.<span class="const token" data-verso-hover="61">2</span>) :=</span>
+<span id="L161">    hsort.<span class="const token" data-verso-hover="114">sublist</span> (<span class="const token" data-verso-hover="115">greedyEdges_sublist</span> L)</span>
+<span id="L162">  <span class="kw">have</span> hgood := <span class="const token" data-verso-hover="116">dec_greedyEdges_take</span> (dec := <span class="const token" data-verso-hover="93">eftTest</span> w k f) L</span>
+<span id="L163">  <span class="kw">have</span> hcut : ∀ i (h : i &lt; A.<span class="const token" data-verso-hover="105">length</span>), ∃ F : <span class="const token" data-verso-hover="42">Finset</span> (<span class="const token" data-verso-hover="34">Sym2</span> V), <span class="kw">#F</span> ≤ f ∧ s(A[i].<span class="const token" data-verso-hover="60">1</span>, A[i].<span class="const token" data-verso-hover="61">2</span>) ∉ F ∧</span>
+<span id="L164">      (k : <span class="const token" data-verso-hover="43">ℝ</span>≥0∞) * w s(A[i].<span class="const token" data-verso-hover="60">1</span>, A[i].<span class="const token" data-verso-hover="61">2</span>) &lt;</span>
+<span id="L165">        ((<span class="const token" data-verso-hover="62">edgeGraph</span> (A.<span class="const token" data-verso-hover="117">take</span> i)).<span class="const token" data-verso-hover="94">deleteEdges</span> F).<span class="const token" data-verso-hover="45">wdist</span> w A[i].<span class="const token" data-verso-hover="60">1</span> A[i].<span class="const token" data-verso-hover="61">2</span> :=</span>
+<span id="L166">    <span class="kw">fun</span> i h =&gt; <span class="const token" data-verso-hover="96">eftTest_eq_true</span>.<span class="const token" data-verso-hover="107">mp</span> (hgood i h)</span>
+<span id="L167">  <span class="kw">choose</span> F hFc hFe hlt <span class="kw">using</span> hcut</span>
+<span id="L168">  <span class="cm">--</span><span class="cm"> an endpoint of a fault edge outside the tested edge</span></span>
+<span id="L169">  <span class="kw">let</span> P : ∀ i, i &lt; A.<span class="const token" data-verso-hover="105">length</span> → <span class="const token" data-verso-hover="34">Sym2</span> V → <span class="kw">Prop</span> := <span class="kw">fun</span> i _ e' =&gt; ∃ x ∈ e', x ≠ A[i].<span class="const token" data-verso-hover="60">1</span> ∧ x ≠ A[i].<span class="const token" data-verso-hover="61">2</span></span>
+<span id="L170">  <span class="kw">let</span> pick : ∀ i (h : i &lt; A.<span class="const token" data-verso-hover="105">length</span>), <span class="const token" data-verso-hover="34">Sym2</span> V → V := <span class="kw">fun</span> i h e' =&gt;</span>
+<span id="L171">    <span class="kw">if</span> hx : P i h e' <span class="kw">then</span> hx.<span class="const token" data-verso-hover="130">choose</span> <span class="kw">else</span> A[i].<span class="const token" data-verso-hover="60">1</span></span>
+<span id="L172">  <span class="kw">let</span> X : ∀ i, i &lt; A.<span class="const token" data-verso-hover="105">length</span> → <span class="const token" data-verso-hover="42">Finset</span> V := <span class="kw">fun</span> i h =&gt;</span>
+<span id="L173">    ((F i h).<span class="const token" data-verso-hover="68">filter</span> (P i h)).<span class="const token" data-verso-hover="131">image</span> (pick i h)</span>
+<span id="L174">  <span class="kw">have</span> hpick : ∀ i h e', P i h e' → pick i h e' ∈ e' ∧ pick i h e' ≠ A[i].<span class="const token" data-verso-hover="60">1</span> ∧</span>
+<span id="L175">      pick i h e' ≠ A[i].<span class="const token" data-verso-hover="61">2</span> := <span class="kw">by</span></span>
+<span id="L176">    <span class="kw">intro</span> i h e' he'</span>
+<span id="L177">    <span class="kw">have</span> hp : pick i h e' = he'.<span class="const token" data-verso-hover="130">choose</span> := <span class="const token" data-verso-hover="132">dite_eq_left_of_eq_true</span> (<span class="const token" data-verso-hover="133">eq_true</span> he')</span>
+<span id="L178">    <span class="kw">rw</span> [hp]</span>
+<span id="L179">    <span class="kw">exact</span> he'.<span class="const token" data-verso-hover="134">choose_spec</span></span>
+<span id="L180">  <span class="kw">refine</span> <span class="const token" data-verso-hover="17">exists_blockingSet_of_insertion</span> (D := f) (<span class="kw">fun</span> i h heq =&gt; ?_) (<span class="kw">fun</span> i h hadj =&gt; ?_) X</span>
+<span id="L181">    (<span class="kw">fun</span> i h =&gt; <span class="const token" data-verso-hover="135">card_image_le</span>.<span class="const token" data-verso-hover="125">trans</span> ((<span class="const token" data-verso-hover="136">card_filter_le</span> _ _).<span class="const token" data-verso-hover="125">trans</span> (hFc i h))) ?_ ?_</span>
+<span id="L182">  · <span class="kw">have</span> := hlt i h</span>
+<span id="L183">    <span class="kw">rw</span> [heq, <span class="const token" data-verso-hover="118">wdist_self</span>] <span class="kw">at</span> this</span>
+<span id="L184">    <span class="kw">exact</span> <span class="const token" data-verso-hover="119">absurd</span> this (<span class="const token" data-verso-hover="120">not_lt</span>.<span class="const token" data-verso-hover="121">mpr</span> <span class="const token" data-verso-hover="122">zero_le</span>)</span>
+<span id="L185">  · <span class="kw">have</span> hadj' : ((<span class="const token" data-verso-hover="62">edgeGraph</span> (A.<span class="const token" data-verso-hover="117">take</span> i)).<span class="const token" data-verso-hover="94">deleteEdges</span> (F i h)).<span class="const token" data-verso-hover="97">Adj</span> A[i].<span class="const token" data-verso-hover="60">1</span> A[i].<span class="const token" data-verso-hover="61">2</span> := <span class="kw">by</span></span>
+<span id="L186">      <span class="kw">rw</span> [<span class="const token" data-verso-hover="137">deleteEdges_adj</span>]; <span class="kw">exact</span> ⟨hadj, <span class="kw">by</span> <span class="kw">simpa</span> <span class="kw">using</span> hFe i h⟩</span>
+<span id="L187">    <span class="kw">have</span> h1 := <span class="const token" data-verso-hover="123">wdist_le_of_adj</span> (w := w) hadj'</span>
+<span id="L188">    <span class="kw">have</span> h2 : (w s(A[i].<span class="const token" data-verso-hover="60">1</span>, A[i].<span class="const token" data-verso-hover="61">2</span>) : <span class="const token" data-verso-hover="43">ℝ</span>≥0∞) ≤ k * w s(A[i].<span class="const token" data-verso-hover="60">1</span>, A[i].<span class="const token" data-verso-hover="61">2</span>) :=</span>
+<span id="L189">      <span class="const token" data-verso-hover="124">le_mul_of_one_le_left</span> <span class="const token" data-verso-hover="122">zero_le</span> (<span class="kw">by</span> <span class="kw">exact_mod_cast</span> hk)</span>
+<span id="L190">    <span class="kw">exact</span> <span class="const token" data-verso-hover="119">absurd</span> (hlt i h) (<span class="const token" data-verso-hover="120">not_lt</span>.<span class="const token" data-verso-hover="121">mpr</span> (h1.<span class="const token" data-verso-hover="125">trans</span> h2))</span>
+<span id="L191">  · <span class="kw">intro</span> i h x hx</span>
+<span id="L192">    <span class="kw">simp</span> only [X, <span class="const token" data-verso-hover="138">mem_image</span>, <span class="const token" data-verso-hover="73">mem_filter</span>] <span class="kw">at</span> hx</span>
+<span id="L193">    <span class="kw">obtain</span> ⟨e', ⟨-, he'⟩, <span class="kw">rfl</span>⟩ := hx</span>
+<span id="L194">    <span class="kw">exact</span> ⟨(hpick i h e' he').<span class="const token" data-verso-hover="53">2</span><span class="nu">.</span><span class="const token" data-verso-hover="54">1</span>, (hpick i h e' he').<span class="const token" data-verso-hover="53">2</span><span class="nu">.</span><span class="const token" data-verso-hover="53">2</span>⟩</span>
+<span id="L195">  · <span class="kw">intro</span> i h p hplen hold</span>
+<span id="L196">    <span class="cm">--</span><span class="cm"> some edge of `p` is a fault edge</span></span>
+<span id="L197">    <span class="kw">have</span> hne_uv : A[i].<span class="const token" data-verso-hover="60">1</span> ≠ A[i].<span class="const token" data-verso-hover="61">2</span> := <span class="kw">by</span></span>
+<span id="L198">      <span class="kw">intro</span> heq</span>
+<span id="L199">      <span class="kw">have</span> := hlt i h</span>
+<span id="L200">      <span class="kw">rw</span> [heq, <span class="const token" data-verso-hover="118">wdist_self</span>] <span class="kw">at</span> this</span>
+<span id="L201">      <span class="kw">exact</span> <span class="const token" data-verso-hover="119">absurd</span> this (<span class="const token" data-verso-hover="120">not_lt</span>.<span class="const token" data-verso-hover="121">mpr</span> <span class="const token" data-verso-hover="122">zero_le</span>)</span>
+<span id="L202">    <span class="kw">have</span> : ∃ e' ∈ p.<span class="const token" data-verso-hover="109">edges</span>, e' ∈ F i h := <span class="kw">by</span></span>
+<span id="L203">      <span class="kw">by_contra</span> hnone</span>
+<span id="L204">      push <span class="const token" data-verso-hover="100">Not</span> <span class="kw">at</span> hnone</span>
+<span id="L205">      <span class="kw">have</span> := hlt i h</span>
+<span id="L206">      <span class="kw">refine</span> <span class="const token" data-verso-hover="119">absurd</span> this (<span class="const token" data-verso-hover="120">not_lt</span>.<span class="const token" data-verso-hover="121">mpr</span> ?_)</span>
+<span id="L207">      <span class="kw">calc</span> ((<span class="const token" data-verso-hover="62">edgeGraph</span> (A.<span class="const token" data-verso-hover="117">take</span> i)).<span class="const token" data-verso-hover="94">deleteEdges</span> (F i h)).<span class="const token" data-verso-hover="45">wdist</span> w A[i].<span class="const token" data-verso-hover="60">1</span> A[i].<span class="const token" data-verso-hover="61">2</span></span>
+<span id="L208">          ≤ (p.<span class="const token" data-verso-hover="139">toDeleteEdges</span> (F i h) <span class="kw">fun</span> e he heF =&gt; hnone e he heF).<span class="const token" data-verso-hover="110">wlength</span> w := <span class="const token" data-verso-hover="129">wdist_le</span> _</span>
+<span id="L209">        _ = p.<span class="const token" data-verso-hover="110">wlength</span> w := <span class="kw">by</span> <span class="kw">simp</span> [<span class="const token" data-verso-hover="139">Walk.toDeleteEdges</span>]</span>
+<span id="L210">        _ ≤ p.<span class="const token" data-verso-hover="111">length</span> * w s(A[i].<span class="const token" data-verso-hover="60">1</span>, A[i].<span class="const token" data-verso-hover="61">2</span>) := <span class="const token" data-verso-hover="108">wlength_le_of_old</span> hA h p hold</span>
+<span id="L211">        _ ≤ k * w s(A[i].<span class="const token" data-verso-hover="60">1</span>, A[i].<span class="const token" data-verso-hover="61">2</span>) := <span class="kw">by</span> <span class="kw">gcongr</span>; <span class="kw">exact_mod_cast</span> (<span class="kw">by</span> <span class="kw">omega</span> : p.<span class="const token" data-verso-hover="111">length</span> ≤ k)</span>
+<span id="L212">    <span class="kw">obtain</span> ⟨e', he'p, he'F⟩ := this</span>
+<span id="L213">    <span class="cm">--</span><span class="cm"> `e'` is not the tested edge, so it has an endpoint outside it</span></span>
+<span id="L214">    <span class="kw">have</span> hP : P i h e' := <span class="kw">by</span></span>
+<span id="L215">      <span class="kw">induction</span> e' <span class="kw">using</span> <span class="const token" data-verso-hover="140">Sym2.ind</span> <span class="kw">with</span></span>
+<span id="L216">      | _ a b =&gt;</span>
+<span id="L217">        <span class="kw">have</span> hab : a ≠ b := (p.<span class="const token" data-verso-hover="141">adj_of_mem_edges</span> he'p).<span class="const token" data-verso-hover="142">ne</span></span>
+<span id="L218">        <span class="kw">by_contra</span> hno</span>
+<span id="L219">        <span class="kw">simp</span> only [P, <span class="const token" data-verso-hover="143">Sym2.mem_iff</span>, <span class="const token" data-verso-hover="144">not_exists</span>, <span class="const token" data-verso-hover="145">not_and</span>] <span class="kw">at</span> hno</span>
+<span id="L220">        <span class="kw">have</span> ha := hno a (<span class="const token" data-verso-hover="38">Or.inl</span> <span class="const token" data-verso-hover="51">rfl</span>)</span>
+<span id="L221">        <span class="kw">have</span> hb := hno b (<span class="const token" data-verso-hover="146">Or.inr</span> <span class="const token" data-verso-hover="51">rfl</span>)</span>
+<span id="L222">        <span class="kw">apply</span> hFe i h</span>
+<span id="L223">        <span class="kw">have</span> heq : s(A[i].<span class="const token" data-verso-hover="60">1</span>, A[i].<span class="const token" data-verso-hover="61">2</span>) = s(a, b) := <span class="kw">by</span></span>
+<span id="L224">          <span class="kw">by_cases</span> ha1 : a = A[i].<span class="const token" data-verso-hover="60">1</span></span>
+<span id="L225">          · <span class="kw">have</span> hb2 : b = A[i].<span class="const token" data-verso-hover="61">2</span> := <span class="kw">by</span></span>
+<span id="L226">              <span class="kw">by_contra</span> hb2</span>
+<span id="L227">              <span class="kw">exact</span> hb (<span class="kw">fun</span> hb1 =&gt; hab (ha1.<span class="const token" data-verso-hover="147">trans</span> hb1.<span class="const token" data-verso-hover="148">symm</span>)) hb2</span>
+<span id="L228">            <span class="kw">rw</span> [ha1, hb2]</span>
+<span id="L229">          · <span class="kw">have</span> ha2 : a = A[i].<span class="const token" data-verso-hover="61">2</span> := <span class="const token" data-verso-hover="149">by_contra</span> <span class="kw">fun</span> h' =&gt; ha ha1 h'</span>
+<span id="L230">            <span class="kw">have</span> hb1 : b = A[i].<span class="const token" data-verso-hover="60">1</span> := <span class="kw">by</span></span>
+<span id="L231">              <span class="kw">by_contra</span> hb1</span>
+<span id="L232">              <span class="kw">exact</span> hb hb1 (<span class="kw">fun</span> hb2 =&gt; hab (ha2.<span class="const token" data-verso-hover="147">trans</span> hb2.<span class="const token" data-verso-hover="148">symm</span>))</span>
+<span id="L233">            <span class="kw">rw</span> [ha2, hb1, <span class="const token" data-verso-hover="150">Sym2.eq_swap</span>]</span>
+<span id="L234">        <span class="kw">rw</span> [heq]; <span class="kw">exact</span> he'F</span>
+<span id="L235">    <span class="kw">refine</span> ⟨pick i h e', ?_, ?_⟩</span>
+<span id="L236">    · <span class="kw">have</span> hmem := (hpick i h e' hP).<span class="const token" data-verso-hover="54">1</span></span>
+<span id="L237">      <span class="kw">induction</span> e' <span class="kw">using</span> <span class="const token" data-verso-hover="140">Sym2.ind</span> <span class="kw">with</span></span>
+<span id="L238">      | _ a b =&gt;</span>
+<span id="L239">        <span class="kw">rcases</span> <span class="const token" data-verso-hover="143">Sym2.mem_iff</span>.<span class="const token" data-verso-hover="107">mp</span> hmem <span class="kw">with</span> h' | h'</span>
+<span id="L240">        · <span class="kw">rw</span> [h']; <span class="kw">exact</span> p.<span class="const token" data-verso-hover="151">fst_mem_support_of_mem_edges</span> he'p</span>
+<span id="L241">        · <span class="kw">rw</span> [h']; <span class="kw">exact</span> p.<span class="const token" data-verso-hover="152">snd_mem_support_of_mem_edges</span> he'p</span>
+<span id="L242">    · <span class="kw">simp</span> only [X, <span class="const token" data-verso-hover="138">mem_image</span>, <span class="const token" data-verso-hover="73">mem_filter</span>]</span>
+<span id="L243">      <span class="kw">exact</span> ⟨e', ⟨he'F, hP⟩, <span class="const token" data-verso-hover="51">rfl</span>⟩</span>
+<span id="L244"></span>
+<span id="L245"><span class="dc">/-! ### Theorem 1 and Corollary 2 -/</span></span>
+<span id="L246"></span>
+<span id="L247"><span class="kw">variable</span> [<span class="const token" data-verso-hover="19">Fintype</span> V]</span>
+<span id="L248"></span>
+<span id="L249"><span class="dc">/-- **Theorem 1 of Bodwin–Patel (VFT), explicit form.** For edges scanned in nondecreasing weight</span></span>
+<span id="L250"><span class="dc">order, the VFT greedy spanner with parameters `f ≥ 1`, `k ≥ 1` satisfies</span></span>
+<span id="L251"><span class="dc">`|E(H)| ≤ 32 f² · max(b(⌊n / 2f⌋, k + 1), 1)`. -/</span></span>
+<span id="L252"><span class="kw">theorem</span> <span class="const token" data-verso-hover="1">ftGreedy_card_edges_le</span> {w : <span class="const token" data-verso-hover="34">Sym2</span> V → <span class="const token" data-verso-hover="35">ℝ</span>≥<span class="nu">0</span>} {L : <span class="const token" data-verso-hover="22">List</span> (V × V)} {k f : <span class="const token" data-verso-hover="23">ℕ</span>}</span>
+<span id="L253">    (hk : <span class="nu">1</span> ≤ k) (hf : <span class="nu">1</span> ≤ f) (hsort : L.<span class="const token" data-verso-hover="104">Pairwise</span> <span class="kw">fun</span> a b =&gt; w s(a.<span class="const token" data-verso-hover="60">1</span>, a.<span class="const token" data-verso-hover="61">2</span>) ≤ w s(b.<span class="const token" data-verso-hover="60">1</span>, b.<span class="const token" data-verso-hover="61">2</span>)) :</span>
+<span id="L254">    (<span class="const token" data-verso-hover="2">ftGreedy</span> w k f L).<span class="const token" data-verso-hover="25">edgeSet</span>.<span class="const token" data-verso-hover="26">ncard</span> ≤</span>
+<span id="L255">      <span class="nu">32</span> * f ^ <span class="nu">2</span> * <span class="const token" data-verso-hover="27">max</span> (<span class="const token" data-verso-hover="4">girthExtremal</span> (<span class="const token" data-verso-hover="28">Fintype.card</span> V / (<span class="nu">2</span> * f)) (k + <span class="nu">1</span>)) <span class="nu">1</span> := <span class="kw">by</span></span>
+<span id="L256">  <span class="kw">obtain</span> ⟨B, hB, hBc⟩ := <span class="const token" data-verso-hover="7">ftGreedy_exists_blockingSet</span> (f := f) hk hsort</span>
+<span id="L257">  <span class="kw">exact</span> hB.<span class="const token" data-verso-hover="30">ncard_le_girthExtremal</span> hBc hf</span>
+<span id="L258"></span>
+<span id="L259"><span class="dc">/-- **Theorem 1 of Bodwin–Patel (EFT), explicit form.** -/</span></span>
+<span id="L260"><span class="kw">theorem</span> <span class="const token" data-verso-hover="9">ftGreedyEdge_card_edges_le</span> {w : <span class="const token" data-verso-hover="34">Sym2</span> V → <span class="const token" data-verso-hover="35">ℝ</span>≥<span class="nu">0</span>} {L : <span class="const token" data-verso-hover="22">List</span> (V × V)} {k f : <span class="const token" data-verso-hover="23">ℕ</span>}</span>
+<span id="L261">    (hk : <span class="nu">1</span> ≤ k) (hf : <span class="nu">1</span> ≤ f) (hsort : L.<span class="const token" data-verso-hover="104">Pairwise</span> <span class="kw">fun</span> a b =&gt; w s(a.<span class="const token" data-verso-hover="60">1</span>, a.<span class="const token" data-verso-hover="61">2</span>) ≤ w s(b.<span class="const token" data-verso-hover="60">1</span>, b.<span class="const token" data-verso-hover="61">2</span>)) :</span>
+<span id="L262">    (<span class="const token" data-verso-hover="3">ftGreedyEdge</span> w k f L).<span class="const token" data-verso-hover="25">edgeSet</span>.<span class="const token" data-verso-hover="26">ncard</span> ≤</span>
+<span id="L263">      <span class="nu">32</span> * f ^ <span class="nu">2</span> * <span class="const token" data-verso-hover="27">max</span> (<span class="const token" data-verso-hover="4">girthExtremal</span> (<span class="const token" data-verso-hover="28">Fintype.card</span> V / (<span class="nu">2</span> * f)) (k + <span class="nu">1</span>)) <span class="nu">1</span> := <span class="kw">by</span></span>
+<span id="L264">  <span class="kw">obtain</span> ⟨B, hB, hBc⟩ := <span class="const token" data-verso-hover="8">ftGreedyEdge_exists_blockingSet</span> (f := f) hk hsort</span>
+<span id="L265">  <span class="kw">exact</span> hB.<span class="const token" data-verso-hover="30">ncard_le_girthExtremal</span> hBc hf</span>
+<span id="L266"></span>
+<span id="L267"><span class="kw">omit</span> [<span class="const token" data-verso-hover="18">DecidableEq</span> V] <span class="kw">in</span></span>
+<span id="L268"><span class="dc">/-- The size bound for any graph with a `2k`-blocking set of size `≤ f |E|`, via the Moore bound. -/</span></span>
+<span id="L269"><span class="kw">lemma</span> <span class="const token" data-verso-hover="153">card_le_rpow_of_blockingSet</span> {H : <span class="const token" data-verso-hover="33">SimpleGraph</span> V} {k f : <span class="const token" data-verso-hover="23">ℕ</span>} {B : <span class="const token" data-verso-hover="42">Finset</span> (V × <span class="const token" data-verso-hover="34">Sym2</span> V)}</span>
+<span id="L270">    (hk : <span class="nu">1</span> ≤ k) (hf : <span class="nu">1</span> ≤ f) (hB : H.<span class="const token" data-verso-hover="113">IsBlockingSet</span> (<span class="nu">2</span> * k) B)</span>
+<span id="L271">    (hBc : <span class="kw">#B</span> ≤ f * H.<span class="const token" data-verso-hover="25">edgeSet</span>.<span class="const token" data-verso-hover="26">ncard</span>) :</span>
+<span id="L272">    (H.<span class="const token" data-verso-hover="25">edgeSet</span>.<span class="const token" data-verso-hover="26">ncard</span> : <span class="const token" data-verso-hover="32">ℝ</span>) ≤ <span class="nu">16</span> * (f : <span class="const token" data-verso-hover="32">ℝ</span>) ^ (<span class="nu">1</span> - <span class="nu">1</span> / (k : <span class="const token" data-verso-hover="32">ℝ</span>)) *</span>
+<span id="L273">      (<span class="const token" data-verso-hover="28">Fintype.card</span> V : <span class="const token" data-verso-hover="32">ℝ</span>) ^ (<span class="nu">1</span> + <span class="nu">1</span> / (k : <span class="const token" data-verso-hover="32">ℝ</span>)) := <span class="kw">by</span></span>
+<span id="L274">  <span class="kw">simpa</span> <span class="kw">using</span> hB.<span class="const token" data-verso-hover="154">ncard_edgeSet_le_mul_rpow</span> hk hf hBc (<span class="const token" data-verso-hover="90">Nat.cast_nonneg</span> f) <span class="const token" data-verso-hover="77">le_rfl</span> (<span class="kw">by</span> <span class="kw">simp</span>)</span>
+<span id="L275"></span>
+<span id="L276"><span class="dc">/-- **Corollary 2 of Bodwin–Patel (VFT).** With stretch `2k - 1`, the VFT greedy spanner has at most</span></span>
+<span id="L277"><span class="dc">`16 f^{1-1/k} n^{1+1/k}` edges. -/</span></span>
+<span id="L278"><span class="kw">theorem</span> <span class="const token" data-verso-hover="10">ftGreedy_card_edges_le_rpow</span> {w : <span class="const token" data-verso-hover="34">Sym2</span> V → <span class="const token" data-verso-hover="35">ℝ</span>≥<span class="nu">0</span>} {L : <span class="const token" data-verso-hover="22">List</span> (V × V)} {k f : <span class="const token" data-verso-hover="23">ℕ</span>}</span>
+<span id="L279">    (hk : <span class="nu">1</span> ≤ k) (hf : <span class="nu">1</span> ≤ f) (hsort : L.<span class="const token" data-verso-hover="104">Pairwise</span> <span class="kw">fun</span> a b =&gt; w s(a.<span class="const token" data-verso-hover="60">1</span>, a.<span class="const token" data-verso-hover="61">2</span>) ≤ w s(b.<span class="const token" data-verso-hover="60">1</span>, b.<span class="const token" data-verso-hover="61">2</span>)) :</span>
+<span id="L280">    ((<span class="const token" data-verso-hover="2">ftGreedy</span> w (<span class="nu">2</span> * k - <span class="nu">1</span>) f L).<span class="const token" data-verso-hover="25">edgeSet</span>.<span class="const token" data-verso-hover="26">ncard</span> : <span class="const token" data-verso-hover="32">ℝ</span>) ≤</span>
+<span id="L281">      <span class="nu">16</span> * (f : <span class="const token" data-verso-hover="32">ℝ</span>) ^ (<span class="nu">1</span> - <span class="nu">1</span> / (k : <span class="const token" data-verso-hover="32">ℝ</span>)) * (<span class="const token" data-verso-hover="28">Fintype.card</span> V : <span class="const token" data-verso-hover="32">ℝ</span>) ^ (<span class="nu">1</span> + <span class="nu">1</span> / (k : <span class="const token" data-verso-hover="32">ℝ</span>)) := <span class="kw">by</span></span>
+<span id="L282">  <span class="kw">obtain</span> ⟨B, hB, hBc⟩ := <span class="const token" data-verso-hover="7">ftGreedy_exists_blockingSet</span> (f := f) (<span class="kw">by</span> <span class="kw">omega</span> : <span class="nu">1</span> ≤ <span class="nu">2</span> * k - <span class="nu">1</span>) hsort</span>
+<span id="L283">  <span class="kw">rw</span> [<span class="kw">show</span> <span class="nu">2</span> * k - <span class="nu">1</span> + <span class="nu">1</span> = <span class="nu">2</span> * k <span class="kw">by</span> <span class="kw">omega</span>] <span class="kw">at</span> hB</span>
+<span id="L284">  <span class="kw">exact</span> <span class="const token" data-verso-hover="153">card_le_rpow_of_blockingSet</span> hk hf hB hBc</span>
+<span id="L285"></span>
+<span id="L286"><span class="dc">/-- **Corollary 2 of Bodwin–Patel (EFT).** -/</span></span>
+<span id="L287"><span class="kw">theorem</span> <span class="const token" data-verso-hover="11">ftGreedyEdge_card_edges_le_rpow</span> {w : <span class="const token" data-verso-hover="34">Sym2</span> V → <span class="const token" data-verso-hover="35">ℝ</span>≥<span class="nu">0</span>} {L : <span class="const token" data-verso-hover="22">List</span> (V × V)} {k f : <span class="const token" data-verso-hover="23">ℕ</span>}</span>
+<span id="L288">    (hk : <span class="nu">1</span> ≤ k) (hf : <span class="nu">1</span> ≤ f) (hsort : L.<span class="const token" data-verso-hover="104">Pairwise</span> <span class="kw">fun</span> a b =&gt; w s(a.<span class="const token" data-verso-hover="60">1</span>, a.<span class="const token" data-verso-hover="61">2</span>) ≤ w s(b.<span class="const token" data-verso-hover="60">1</span>, b.<span class="const token" data-verso-hover="61">2</span>)) :</span>
+<span id="L289">    ((<span class="const token" data-verso-hover="3">ftGreedyEdge</span> w (<span class="nu">2</span> * k - <span class="nu">1</span>) f L).<span class="const token" data-verso-hover="25">edgeSet</span>.<span class="const token" data-verso-hover="26">ncard</span> : <span class="const token" data-verso-hover="32">ℝ</span>) ≤</span>
+<span id="L290">      <span class="nu">16</span> * (f : <span class="const token" data-verso-hover="32">ℝ</span>) ^ (<span class="nu">1</span> - <span class="nu">1</span> / (k : <span class="const token" data-verso-hover="32">ℝ</span>)) * (<span class="const token" data-verso-hover="28">Fintype.card</span> V : <span class="const token" data-verso-hover="32">ℝ</span>) ^ (<span class="nu">1</span> + <span class="nu">1</span> / (k : <span class="const token" data-verso-hover="32">ℝ</span>)) := <span class="kw">by</span></span>
+<span id="L291">  <span class="kw">obtain</span> ⟨B, hB, hBc⟩ :=</span>
+<span id="L292">    <span class="const token" data-verso-hover="8">ftGreedyEdge_exists_blockingSet</span> (f := f) (<span class="kw">by</span> <span class="kw">omega</span> : <span class="nu">1</span> ≤ <span class="nu">2</span> * k - <span class="nu">1</span>) hsort</span>
+<span id="L293">  <span class="kw">rw</span> [<span class="kw">show</span> <span class="nu">2</span> * k - <span class="nu">1</span> + <span class="nu">1</span> = <span class="nu">2</span> * k <span class="kw">by</span> <span class="kw">omega</span>] <span class="kw">at</span> hB</span>
+<span id="L294">  <span class="kw">exact</span> <span class="const token" data-verso-hover="153">card_le_rpow_of_blockingSet</span> hk hf hB hBc</span>
+<span id="L295"></span>
+<span id="L296"><span class="kw">end</span> VFTSpannersOptimal</span>
+<span id="L297"></span>
+</code></div>
+        <script>
+          window.versoHoversUrl = "PODC2019/VFTSpannersOptimal/-hovers.json";</script>
+        <script src="static/lean/popper.js"></script>
+        <script src="static/lean/tippy.js"></script>
+        <script src="static/lean/marked.js"></script>
+        <script src="static/lean/highlighting.js"></script>
+        <script src="static/lean/lean.js"></script>
+        </article></main><footer class="site-footer"><div class="wrap">
+        Machine-checked formalizations of PODC papers in Lean 4. Generated with <a href="https://github.com/leanprover/verso">Verso</a> from the README files of <a href="https://github.com/vasnesterov/formal_podc">vasnesterov/formal_podc</a>.</div>
+      </footer></body>
+  </html>
+

@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="light dark">
+    <link rel="icon" href="data:,">
+    <title>PaxosRaftRefinement: RaftStar.lean · Formal PODC</title><base href="../../../.././"><link rel="stylesheet" href="static/lean/verso-vars.css">
+    <link rel="stylesheet" href="static/lean/highlighting.css">
+    <link rel="stylesheet" href="static/lean/tippy-border.css">
+    <link rel="stylesheet" href="static/style.css">
+    <script defer="defer" src="static/site.js"></script>
+    </head>
+  <body>
+    <header class="site-header">
+      <div class="wrap">
+        <a class="brand" href=".">Formal PODC</a><nav class="top">
+          <a href=".">Search</a><a href="about/">About</a><a href="https://github.com/vasnesterov/formal_podc">GitHub</a></nav>
+        </div>
+      </header>
+    <main class="wrap"><article><nav class="breadcrumbs" aria-label="Breadcrumb">
+          <a href=".">Search</a><span class="sep">›</span><a href="PODC2019/">PODC 2019</a><span class="sep">›</span><a href="PODC2019/PaxosRaftRefinement/">PaxosRaftRefinement</a><span class="sep">›</span><a href="PODC2019/PaxosRaftRefinement/src/">Lean source</a><span class="sep">›</span><span aria-current="page">RaftStar</span></nav>
+        <h1>
+          <code>RaftStar.lean</code></h1>
+        <div class="paper-links">
+          <p>
+            Source of <a href="PODC2019/PaxosRaftRefinement/">Paxos vs. Raft, and porting optimizations — PODC 2019</a> · <a href="https://github.com/vasnesterov/formal_podc/blob/main/Papers/PODC2019/PaxosRaftRefinement/RaftStar.lean">GitHub</a> · hover over a name for its type and documentation</p>
+          </div>
+        <div class="lean-code lean-src">
+          <code class="hl lean block" data-lean-context="RaftStar"><span id="L1"><span class="kw">import</span> Papers.PODC2019.PaxosRaftRefinement.Paxos</span>
+<span id="L2"></span>
+<span id="L3"><span class="dc">/-!</span></span>
+<span id="L4"><span class="dc"># Raft* (Figure 2 of [paper]), as an interleaving transition system</span></span>
+<span id="L5"></span>
+<span id="L6"><span class="dc">Same network and failure model as `Paxos.lean`: asynchronous message passing, every message ever</span></span>
+<span id="L7"><span class="dc">sent stays in a set (loss, duplication, reordering), crash-stop servers (a crashed server takes no</span></span>
+<span id="L8"><span class="dc">further steps), any intersecting quorum system.</span></span>
+<span id="L9"></span>
+<span id="L10"><span class="dc">A log is a list of entries `(term, value)`; index `i` of the paper is position `i` of the list</span></span>
+<span id="L11"><span class="dc">(`lastIndex = length - 1`, `commitIndex = commit - 1`: we store the *number* of committed</span></span>
+<span id="L12"><span class="dc">entries). The `bal` field of Figure 2 is not modelled: the refinement mapping of Appendix C uses</span></span>
+<span id="L13"><span class="dc">the term of the last log entry as the accepted ballot of every entry (see `Refinement.lean`).</span></span>
+<span id="L14"></span>
+<span id="L15"><span class="dc">The model is parametrised by `Rules`:</span></span>
+<span id="L16"></span>
+<span id="L17"><span class="dc">* `voteOK L n t` — when a server with log `L` grants a `requestVote` of a candidate whose log has</span></span>
+<span id="L18"><span class="dc">  length `n` and last term `t` (Figure 2, lines 9–11). `Rules.fig2` is the rule as printed, which</span></span>
+<span id="L19"><span class="dc">  compares the voter's entry *at the candidate's last index* with the candidate's last term;</span></span>
+<span id="L20"><span class="dc">  `Rules.lastTerm` compares the voter's *last* term (as the TLA+ spec B.2 and Raft do);</span></span>
+<span id="L21"><span class="dc">* `heartbeat` — whether `AppendEntries` may carry no new value (Figure 2 does not exclude</span></span>
+<span id="L22"><span class="dc">  `vals = []`; the TLA+ spec always appends exactly one value).</span></span>
+<span id="L23"></span>
+<span id="L24"><span class="dc">Repairs of Figure 2 that are built in (see `differencies.md`): `RequestVote` resets `isLeader` and</span></span>
+<span id="L25"><span class="dc">casts the candidate's own (implicit) vote, which carries its whole log; `BecomeLeader` needs that</span></span>
+<span id="L26"><span class="dc">own vote among a quorum of votes and is guarded by `¬ isLeader` (as in the TLA+ spec); votes carry</span></span>
+<span id="L27"><span class="dc">the voter's whole log (Appendix C, step 2.2/3.5: "we can still assume Raft* includes the full</span></span>
+<span id="L28"><span class="dc">log"); an `append` message carries the leader's whole log `full` together with `prevLen` and the</span></span>
+<span id="L29"><span class="dc">receiver only uses `prevLen`, the term at `prevLen - 1` (`pTerm`) and the entries after `prevLen`</span></span>
+<span id="L30"><span class="dc">(`ents`), as in Figure 2.</span></span>
+<span id="L31"></span>
+<span id="L32"><span class="dc">Two ghost (history) variables, `props` and `acks`, record the Paxos `accept`/`acceptOK` messages</span></span>
+<span id="L33"><span class="dc">implied by Raft* steps (as `proposedValues` and `votes` in the TLA+ spec B.2); they do not influence</span></span>
+<span id="L34"><span class="dc">the behaviour.</span></span>
+<span id="L35"><span class="dc">-/</span></span>
+<span id="L36"></span>
+<span id="L37"><span class="kw">namespace</span> Podc.PaxosRaftRefinement</span>
+<span id="L38"></span>
+<span id="L39"><span class="kw">namespace</span> Raft</span>
+<span id="L40"></span>
+<span id="L41"><span class="kw">variable</span> {N V : <span class="kw">Type</span>*}</span>
+<span id="L42"></span>
+<span id="L43"><span class="dc">/-- The term of the last entry of a log, `0` for the empty log (terms of entries are `≥ 1`). -/</span></span>
+<span id="L44"><span class="kw">def</span> <span class="const token" data-verso-hover="73">lastTerm</span> (L : <span class="const token" data-verso-hover="39">List</span> (<span class="const token" data-verso-hover="37">ℕ</span> × V)) : <span class="const token" data-verso-hover="37">ℕ</span> := (L.<span class="const token" data-verso-hover="348">getLast?</span>.<span class="const token" data-verso-hover="74">map</span> <span class="const token" data-verso-hover="234">Prod.fst</span>).<span class="const token" data-verso-hover="349">getD</span> <span class="nu">0</span></span>
+<span id="L45"></span>
+<span id="L46"><span class="dc">/-- The term of the entry at position `n - 1` (`s.log[n-1].term`), `0` if `n = 0` or there is no</span></span>
+<span id="L47"><span class="dc">such entry (the paper's empty entry). -/</span></span>
+<span id="L48"><span class="kw">def</span> <span class="const token" data-verso-hover="350">termAt</span> (L : <span class="const token" data-verso-hover="39">List</span> (<span class="const token" data-verso-hover="37">ℕ</span> × V)) (n : <span class="const token" data-verso-hover="37">ℕ</span>) : <span class="const token" data-verso-hover="37">ℕ</span> :=</span>
+<span id="L49">  <span class="kw">if</span> n = <span class="nu">0</span> <span class="kw">then</span> <span class="nu">0</span> <span class="kw">else</span> ((L[n - <span class="nu">1</span>]?).<span class="const token" data-verso-hover="74">map</span> <span class="const token" data-verso-hover="234">Prod.fst</span>).<span class="const token" data-verso-hover="349">getD</span> <span class="nu">0</span></span>
+<span id="L50"></span>
+<span id="L51"><span class="dc">/-- `requestVote(cand, term, lastIndex + 1, lastTerm)`. -/</span></span>
+<span id="L52">@[<span class="kw">ext</span>]</span>
+<span id="L53"><span class="kw">structure</span> <span class="const token" data-verso-hover="313">RVMsg</span> (N : <span class="kw">Type</span>*) <span class="kw">where</span></span>
+<span id="L54">  <span class="dc">/-- The candidate. -/</span></span>
+<span id="L55">  <span class="const token" data-verso-hover="271">cand</span> : N</span>
+<span id="L56">  <span class="dc">/-- Its new term. -/</span></span>
+<span id="L57">  <span class="const token" data-verso-hover="272">term</span> : <span class="const token" data-verso-hover="37">ℕ</span></span>
+<span id="L58">  <span class="dc">/-- Length of its log (`lastIndex + 1`). -/</span></span>
+<span id="L59">  <span class="const token" data-verso-hover="273">len</span> : <span class="const token" data-verso-hover="37">ℕ</span></span>
+<span id="L60">  <span class="dc">/-- Term of its last entry. -/</span></span>
+<span id="L61">  <span class="const token" data-verso-hover="274">lterm</span> : <span class="const token" data-verso-hover="37">ℕ</span></span>
+<span id="L62"></span>
+<span id="L63"><span class="dc">/-- `requestVoteOK`: `src` votes for `dst` in term `term`, sending its log. -/</span></span>
+<span id="L64">@[<span class="kw">ext</span>]</span>
+<span id="L65"><span class="kw">structure</span> <span class="const token" data-verso-hover="252">RVOKMsg</span> (N V : <span class="kw">Type</span>*) <span class="kw">where</span></span>
+<span id="L66">  <span class="dc">/-- The voter. -/</span></span>
+<span id="L67">  <span class="const token" data-verso-hover="255">src</span> : N</span>
+<span id="L68">  <span class="dc">/-- The candidate. -/</span></span>
+<span id="L69">  <span class="const token" data-verso-hover="253">dst</span> : N</span>
+<span id="L70">  <span class="dc">/-- The term. -/</span></span>
+<span id="L71">  <span class="const token" data-verso-hover="254">term</span> : <span class="const token" data-verso-hover="37">ℕ</span></span>
+<span id="L72">  <span class="dc">/-- The voter's log. -/</span></span>
+<span id="L73">  <span class="const token" data-verso-hover="248">log</span> : <span class="const token" data-verso-hover="39">List</span> (<span class="const token" data-verso-hover="37">ℕ</span> × V)</span>
+<span id="L74"></span>
+<span id="L75"><span class="dc">/-- `append(term, prev, pTerm, ents, commit)` sent by `src`, presented as the leader's whole log</span></span>
+<span id="L76"><span class="dc">`full` and `prevLen = prev + 1`: `ents = full.drop prevLen`, `pTerm = termAt full prevLen`. -/</span></span>
+<span id="L77">@[<span class="kw">ext</span>]</span>
+<span id="L78"><span class="kw">structure</span> <span class="const token" data-verso-hover="326">AEMsg</span> (N V : <span class="kw">Type</span>*) <span class="kw">where</span></span>
+<span id="L79">  <span class="dc">/-- The leader. -/</span></span>
+<span id="L80">  <span class="const token" data-verso-hover="278">src</span> : N</span>
+<span id="L81">  <span class="dc">/-- Its term. -/</span></span>
+<span id="L82">  <span class="const token" data-verso-hover="279">term</span> : <span class="const token" data-verso-hover="37">ℕ</span></span>
+<span id="L83">  <span class="dc">/-- `prev + 1`. -/</span></span>
+<span id="L84">  <span class="const token" data-verso-hover="280">prevLen</span> : <span class="const token" data-verso-hover="37">ℕ</span></span>
+<span id="L85">  <span class="dc">/-- The leader's log when sending. -/</span></span>
+<span id="L86">  <span class="const token" data-verso-hover="250">full</span> : <span class="const token" data-verso-hover="39">List</span> (<span class="const token" data-verso-hover="37">ℕ</span> × V)</span>
+<span id="L87">  <span class="dc">/-- `commitIndex + 1` of the leader. -/</span></span>
+<span id="L88">  <span class="const token" data-verso-hover="281">commit</span> : <span class="const token" data-verso-hover="37">ℕ</span></span>
+<span id="L89"></span>
+<span id="L90"><span class="dc">/-- `appendOK(term, lastIndex)` from `src` to `dst`, with `len = lastIndex + 1`. -/</span></span>
+<span id="L91">@[<span class="kw">ext</span>]</span>
+<span id="L92"><span class="kw">structure</span> <span class="const token" data-verso-hover="342">AEOKMsg</span> (N : <span class="kw">Type</span>*) <span class="kw">where</span></span>
+<span id="L93">  <span class="dc">/-- The follower. -/</span></span>
+<span id="L94">  <span class="const token" data-verso-hover="289">src</span> : N</span>
+<span id="L95">  <span class="dc">/-- The leader. -/</span></span>
+<span id="L96">  <span class="const token" data-verso-hover="343">dst</span> : N</span>
+<span id="L97">  <span class="dc">/-- The term. -/</span></span>
+<span id="L98">  <span class="const token" data-verso-hover="290">term</span> : <span class="const token" data-verso-hover="37">ℕ</span></span>
+<span id="L99">  <span class="dc">/-- The follower's log length. -/</span></span>
+<span id="L100">  <span class="const token" data-verso-hover="288">len</span> : <span class="const token" data-verso-hover="37">ℕ</span></span>
+<span id="L101"></span>
+<span id="L102"><span class="dc">/-- Global state of Raft*. -/</span></span>
+<span id="L103">@[<span class="kw">ext</span>]</span>
+<span id="L104"><span class="kw">structure</span> <span class="const token" data-verso-hover="36">State</span> (N V : <span class="kw">Type</span>*) <span class="kw">where</span></span>
+<span id="L105">  <span class="dc">/-- `currentTerm`. -/</span></span>
+<span id="L106">  <span class="const token" data-verso-hover="40">term</span> : N → <span class="const token" data-verso-hover="37">ℕ</span></span>
+<span id="L107">  <span class="dc">/-- `isLeader`. -/</span></span>
+<span id="L108">  <span class="const token" data-verso-hover="41">leader</span> : N → <span class="const token" data-verso-hover="38">Bool</span></span>
+<span id="L109">  <span class="dc">/-- The log, entries `(term, value)`. -/</span></span>
+<span id="L110">  <span class="const token" data-verso-hover="42">log</span> : N → <span class="const token" data-verso-hover="39">List</span> (<span class="const token" data-verso-hover="37">ℕ</span> × V)</span>
+<span id="L111">  <span class="dc">/-- `commitIndex + 1`. -/</span></span>
+<span id="L112">  <span class="const token" data-verso-hover="43">commit</span> : N → <span class="const token" data-verso-hover="37">ℕ</span></span>
+<span id="L113">  <span class="dc">/-- `requestVote` messages. -/</span></span>
+<span id="L114">  <span class="const token" data-verso-hover="270">rv</span> : <span class="const token" data-verso-hover="108">Set</span> (<span class="const token" data-verso-hover="313">RVMsg</span> N)</span>
+<span id="L115">  <span class="dc">/-- `requestVoteOK` messages. -/</span></span>
+<span id="L116">  <span class="const token" data-verso-hover="70">rvok</span> : <span class="const token" data-verso-hover="108">Set</span> (<span class="const token" data-verso-hover="252">RVOKMsg</span> N V)</span>
+<span id="L117">  <span class="dc">/-- `append` messages. -/</span></span>
+<span id="L118">  <span class="const token" data-verso-hover="249">ae</span> : <span class="const token" data-verso-hover="108">Set</span> (<span class="const token" data-verso-hover="326">AEMsg</span> N V)</span>
+<span id="L119">  <span class="dc">/-- `appendOK` messages. -/</span></span>
+<span id="L120">  <span class="const token" data-verso-hover="287">aeok</span> : <span class="const token" data-verso-hover="108">Set</span> (<span class="const token" data-verso-hover="342">AEOKMsg</span> N)</span>
+<span id="L121">  <span class="dc">/-- Ghost: Paxos proposals `(index, ballot, value)` implied so far. -/</span></span>
+<span id="L122">  <span class="const token" data-verso-hover="259">props</span> : <span class="const token" data-verso-hover="108">Set</span> (<span class="const token" data-verso-hover="37">ℕ</span> × <span class="const token" data-verso-hover="37">ℕ</span> × V)</span>
+<span id="L123">  <span class="dc">/-- Ghost: Paxos acceptances `(server, index, ballot, value)` implied so far. -/</span></span>
+<span id="L124">  <span class="const token" data-verso-hover="257">acks</span> : <span class="const token" data-verso-hover="108">Set</span> (N × <span class="const token" data-verso-hover="37">ℕ</span> × <span class="const token" data-verso-hover="37">ℕ</span> × V)</span>
+<span id="L125"></span>
+<span id="L126"><span class="dc">/-- The initial state. -/</span></span>
+<span id="L127"><span class="kw">def</span> <span class="const token" data-verso-hover="58">init</span> : <span class="const token" data-verso-hover="36">State</span> N V <span class="kw">where</span></span>
+<span id="L128">  <span class="const token" data-verso-hover="40">term</span> _ := <span class="nu">0</span></span>
+<span id="L129">  <span class="const token" data-verso-hover="41">leader</span> _ := <span class="const token" data-verso-hover="57">false</span></span>
+<span id="L130">  <span class="const token" data-verso-hover="42">log</span> _ := []</span>
+<span id="L131">  <span class="const token" data-verso-hover="43">commit</span> _ := <span class="nu">0</span></span>
+<span id="L132">  <span class="const token" data-verso-hover="270">rv</span> := ∅</span>
+<span id="L133">  <span class="const token" data-verso-hover="70">rvok</span> := ∅</span>
+<span id="L134">  <span class="const token" data-verso-hover="249">ae</span> := ∅</span>
+<span id="L135">  <span class="const token" data-verso-hover="287">aeok</span> := ∅</span>
+<span id="L136">  <span class="const token" data-verso-hover="259">props</span> := ∅</span>
+<span id="L137">  <span class="const token" data-verso-hover="257">acks</span> := ∅</span>
+<span id="L138"></span>
+<span id="L139"><span class="dc">/-- Variants of the rules of Figure 2. -/</span></span>
+<span id="L140"><span class="kw">structure</span> <span class="const token" data-verso-hover="45">Rules</span> (V : <span class="kw">Type</span>*) <span class="kw">where</span></span>
+<span id="L141">  <span class="dc">/-- A server with log `L` may vote for a candidate with log length `n` and last term `t`. -/</span></span>
+<span id="L142">  <span class="const token" data-verso-hover="261">voteOK</span> : <span class="const token" data-verso-hover="39">List</span> (<span class="const token" data-verso-hover="37">ℕ</span> × V) → <span class="const token" data-verso-hover="37">ℕ</span> → <span class="const token" data-verso-hover="37">ℕ</span> → <span class="kw">Prop</span></span>
+<span id="L143">  <span class="dc">/-- `AppendEntries` may send no new value. -/</span></span>
+<span id="L144">  <span class="const token" data-verso-hover="345">heartbeat</span> : <span class="kw">Prop</span></span>
+<span id="L145"></span>
+<span id="L146"><span class="dc">/-- Figure 2, lines 9–11, as printed:</span></span>
+<span id="L147"><span class="dc">`s.log[lIndex].term &lt; lTerm || (s.log[lIndex].term = lTerm &amp;&amp; s.lastIndex ≥ lIndex)`. -/</span></span>
+<span id="L148"><span class="kw">def</span> <span class="const token" data-verso-hover="351">fig2VoteOK</span> (L : <span class="const token" data-verso-hover="39">List</span> (<span class="const token" data-verso-hover="37">ℕ</span> × V)) (n t : <span class="const token" data-verso-hover="37">ℕ</span>) : <span class="kw">Prop</span> :=</span>
+<span id="L149">  <span class="const token" data-verso-hover="350">termAt</span> L n &lt; t ∨ (<span class="const token" data-verso-hover="350">termAt</span> L n = t ∧ n ≤ L.<span class="const token" data-verso-hover="131">length</span>)</span>
+<span id="L150"></span>
+<span id="L151"><span class="dc">/-- Raft's (and the TLA+ spec B.2's) up-to-date check: the voter's last term is smaller, or equal</span></span>
+<span id="L152"><span class="dc">with a log that is not longer. -/</span></span>
+<span id="L153"><span class="kw">def</span> <span class="const token" data-verso-hover="46">raftVoteOK</span> (L : <span class="const token" data-verso-hover="39">List</span> (<span class="const token" data-verso-hover="37">ℕ</span> × V)) (n t : <span class="const token" data-verso-hover="37">ℕ</span>) : <span class="kw">Prop</span> :=</span>
+<span id="L154">  <span class="const token" data-verso-hover="73">lastTerm</span> L &lt; t ∨ (<span class="const token" data-verso-hover="73">lastTerm</span> L = t ∧ L.<span class="const token" data-verso-hover="131">length</span> ≤ n)</span>
+<span id="L155"></span>
+<span id="L156"><span class="dc">/-- Figure 2 with the voter's last entry instead of its entry at `lIndex`. -/</span></span>
+<span id="L157"><span class="kw">def</span> <span class="const token" data-verso-hover="352">fig2FixedVoteOK</span> (L : <span class="const token" data-verso-hover="39">List</span> (<span class="const token" data-verso-hover="37">ℕ</span> × V)) (n t : <span class="const token" data-verso-hover="37">ℕ</span>) : <span class="kw">Prop</span> :=</span>
+<span id="L158">  <span class="const token" data-verso-hover="73">lastTerm</span> L &lt; t ∨ (<span class="const token" data-verso-hover="73">lastTerm</span> L = t ∧ n ≤ L.<span class="const token" data-verso-hover="131">length</span>)</span>
+<span id="L159"></span>
+<span id="L160"><span class="dc">/-- Figure 2 literally: the printed vote rule, and `AppendEntries` with any (possibly empty) `vals`. -/</span></span>
+<span id="L161"><span class="kw">def</span> <span class="const token" data-verso-hover="55">Rules.fig2</span> : <span class="const token" data-verso-hover="45">Rules</span> V := ⟨<span class="const token" data-verso-hover="351">fig2VoteOK</span>, <span class="const token" data-verso-hover="47">True</span>⟩</span>
+<span id="L162"></span>
+<span id="L163"><span class="dc">/-- Repaired Raft*: the voter's last term must not exceed the candidate's (any log lengths), and</span></span>
+<span id="L164"><span class="dc">every `AppendEntries` appends at least one value. -/</span></span>
+<span id="L165"><span class="kw">def</span> <span class="const token" data-verso-hover="80">Rules.repaired</span> : <span class="const token" data-verso-hover="45">Rules</span> V := ⟨<span class="kw">fun</span> L _ t =&gt; <span class="const token" data-verso-hover="73">lastTerm</span> L ≤ t, <span class="const token" data-verso-hover="353">False</span>⟩</span>
+<span id="L166"></span>
+<span id="L167"><span class="dc">/-- `ext` extends a log of length `n` by safe entries of the votes `S` (Figure 2, lines 22–27):</span></span>
+<span id="L168"><span class="dc">the new length is the largest reported length, and the value at each new position is taken from a</span></span>
+<span id="L169"><span class="dc">vote whose log has the largest last term among the votes reaching that position. -/</span></span>
+<span id="L170"><span class="kw">def</span> <span class="const token" data-verso-hover="354">ExtOK</span> (S : <span class="const token" data-verso-hover="83">Finset</span> (<span class="const token" data-verso-hover="252">RVOKMsg</span> N V)) (n : <span class="const token" data-verso-hover="37">ℕ</span>) (<span class="kw">ext</span> : <span class="const token" data-verso-hover="39">List</span> V) : <span class="kw">Prop</span> :=</span>
+<span id="L171">  (∀ m ∈ S, m.<span class="const token" data-verso-hover="248">log</span>.<span class="const token" data-verso-hover="131">length</span> ≤ n + ext.<span class="const token" data-verso-hover="131">length</span>) ∧</span>
+<span id="L172">  ∀ j (hj : j &lt; ext.<span class="const token" data-verso-hover="131">length</span>), ∃ m ∈ S, ∃ c, m.<span class="const token" data-verso-hover="248">log</span>[n + j]? = <span class="const token" data-verso-hover="116">some</span> (c, <span class="kw">ext</span>[j]) ∧</span>
+<span id="L173">    ∀ m' ∈ S, n + j &lt; m'.<span class="const token" data-verso-hover="248">log</span>.<span class="const token" data-verso-hover="131">length</span> → <span class="const token" data-verso-hover="73">lastTerm</span> m'.<span class="const token" data-verso-hover="248">log</span> ≤ <span class="const token" data-verso-hover="73">lastTerm</span> m.<span class="const token" data-verso-hover="248">log</span></span>
+<span id="L174"></span>
+<span id="L175"><span class="dc">/-- Ghost proposals of all entries of `L` in ballot `t`. -/</span></span>
+<span id="L176"><span class="kw">def</span> <span class="const token" data-verso-hover="317">propsOf</span> (L : <span class="const token" data-verso-hover="39">List</span> (<span class="const token" data-verso-hover="37">ℕ</span> × V)) (t : <span class="const token" data-verso-hover="37">ℕ</span>) : <span class="const token" data-verso-hover="108">Set</span> (<span class="const token" data-verso-hover="37">ℕ</span> × <span class="const token" data-verso-hover="37">ℕ</span> × V) :=</span>
+<span id="L177">  {x | ∃ i, ∃ h : i &lt; L.<span class="const token" data-verso-hover="131">length</span>, x = (i, t, L[i].<span class="const token" data-verso-hover="75">2</span>)}</span>
+<span id="L178"></span>
+<span id="L179"><span class="dc">/-- Ghost acceptances by `s` of all entries of `L` in ballot `t`. -/</span></span>
+<span id="L180"><span class="kw">def</span> <span class="const token" data-verso-hover="318">acksOf</span> (s : N) (L : <span class="const token" data-verso-hover="39">List</span> (<span class="const token" data-verso-hover="37">ℕ</span> × V)) (t : <span class="const token" data-verso-hover="37">ℕ</span>) : <span class="const token" data-verso-hover="108">Set</span> (N × <span class="const token" data-verso-hover="37">ℕ</span> × <span class="const token" data-verso-hover="37">ℕ</span> × V) :=</span>
+<span id="L181">  {x | ∃ i, ∃ h : i &lt; L.<span class="const token" data-verso-hover="131">length</span>, x = (s, i, t, L[i].<span class="const token" data-verso-hover="75">2</span>)}</span>
+<span id="L182"></span>
+<span id="L183"><span class="dc">/-- The follower's log matches the `append` message at `prevLen - 1` (Figure 2:</span></span>
+<span id="L184"><span class="dc">`s.log[prev].term == pTerm`). -/</span></span>
+<span id="L185"><span class="kw">def</span> <span class="const token" data-verso-hover="327">PrevMatch</span> (L : <span class="const token" data-verso-hover="39">List</span> (<span class="const token" data-verso-hover="37">ℕ</span> × V)) (m : <span class="const token" data-verso-hover="326">AEMsg</span> N V) : <span class="kw">Prop</span> :=</span>
+<span id="L186">  m.<span class="const token" data-verso-hover="280">prevLen</span> = <span class="nu">0</span> ∨ ∃ e ∈ L[m.<span class="const token" data-verso-hover="280">prevLen</span> - <span class="nu">1</span>]?, ∃ e' ∈ m.<span class="const token" data-verso-hover="250">full</span>[m.<span class="const token" data-verso-hover="280">prevLen</span> - <span class="nu">1</span>]?, e.<span class="const token" data-verso-hover="234">1</span> = e'.<span class="const token" data-verso-hover="234">1</span></span>
+<span id="L187"></span>
+<span id="L188"><span class="kw">variable</span> [<span class="const token" data-verso-hover="86">DecidableEq</span> N]</span>
+<span id="L189"></span>
+<span id="L190"><span class="dc">/-- One step of Raft* (Figure 2) under the rules `R`. -/</span></span>
+<span id="L191"><span class="kw">inductive</span> <span class="const token" data-verso-hover="346">Step</span> (Q : <span class="const token" data-verso-hover="33">QuorumSystem</span> N) (R : <span class="const token" data-verso-hover="45">Rules</span> V) : <span class="const token" data-verso-hover="36">State</span> N V → <span class="const token" data-verso-hover="36">State</span> N V → <span class="kw">Prop</span></span>
+<span id="L192">  <span class="dc">/-- `RequestVote(s)` (with the candidate's own vote). -/</span></span>
+<span id="L193">  | <span class="const token" data-verso-hover="61">requestVote</span> (r : <span class="const token" data-verso-hover="36">State</span> N V) (s : N) :</span>
+<span id="L194">      <span class="const token" data-verso-hover="346">Step</span> Q R r { r <span class="kw">with</span></span>
+<span id="L195">        <span class="const token" data-verso-hover="40">term</span> := <span class="const token" data-verso-hover="119">Function.update</span> r.<span class="const token" data-verso-hover="40">term</span> s (r.<span class="const token" data-verso-hover="40">term</span> s + <span class="nu">1</span>)</span>
+<span id="L196">        <span class="const token" data-verso-hover="41">leader</span> := <span class="const token" data-verso-hover="119">Function.update</span> r.<span class="const token" data-verso-hover="41">leader</span> s <span class="const token" data-verso-hover="57">false</span></span>
+<span id="L197">        <span class="const token" data-verso-hover="270">rv</span> := <span class="const token" data-verso-hover="120">insert</span> ⟨s, r.<span class="const token" data-verso-hover="40">term</span> s + <span class="nu">1</span>, (r.<span class="const token" data-verso-hover="42">log</span> s).<span class="const token" data-verso-hover="131">length</span>, <span class="const token" data-verso-hover="73">lastTerm</span> (r.<span class="const token" data-verso-hover="42">log</span> s)⟩ r.<span class="const token" data-verso-hover="270">rv</span></span>
+<span id="L198">        <span class="const token" data-verso-hover="70">rvok</span> := <span class="const token" data-verso-hover="120">insert</span> ⟨s, s, r.<span class="const token" data-verso-hover="40">term</span> s + <span class="nu">1</span>, r.<span class="const token" data-verso-hover="42">log</span> s⟩ r.<span class="const token" data-verso-hover="70">rvok</span> }</span>
+<span id="L199">  <span class="dc">/-- `ReceiveVote(s)`. -/</span></span>
+<span id="L200">  | <span class="const token" data-verso-hover="62">receiveVote</span> (r : <span class="const token" data-verso-hover="36">State</span> N V) (s : N) (m : <span class="const token" data-verso-hover="313">RVMsg</span> N) (hm : m ∈ r.<span class="const token" data-verso-hover="270">rv</span>) (ht : r.<span class="const token" data-verso-hover="40">term</span> s &lt; m.<span class="const token" data-verso-hover="272">term</span>)</span>
+<span id="L201">      (hv : R.<span class="const token" data-verso-hover="261">voteOK</span> (r.<span class="const token" data-verso-hover="42">log</span> s) m.<span class="const token" data-verso-hover="273">len</span> m.<span class="const token" data-verso-hover="274">lterm</span>) :</span>
+<span id="L202">      <span class="const token" data-verso-hover="346">Step</span> Q R r { r <span class="kw">with</span></span>
+<span id="L203">        <span class="const token" data-verso-hover="40">term</span> := <span class="const token" data-verso-hover="119">Function.update</span> r.<span class="const token" data-verso-hover="40">term</span> s m.<span class="const token" data-verso-hover="272">term</span></span>
+<span id="L204">        <span class="const token" data-verso-hover="41">leader</span> := <span class="const token" data-verso-hover="119">Function.update</span> r.<span class="const token" data-verso-hover="41">leader</span> s <span class="const token" data-verso-hover="57">false</span></span>
+<span id="L205">        <span class="const token" data-verso-hover="70">rvok</span> := <span class="const token" data-verso-hover="120">insert</span> ⟨s, m.<span class="const token" data-verso-hover="271">cand</span>, m.<span class="const token" data-verso-hover="272">term</span>, r.<span class="const token" data-verso-hover="42">log</span> s⟩ r.<span class="const token" data-verso-hover="70">rvok</span> }</span>
+<span id="L206">  <span class="dc">/-- `BecomeLeader(s)`: keep the own log and extend it by the safe entries of the votes. -/</span></span>
+<span id="L207">  | <span class="const token" data-verso-hover="63">becomeLeader</span> (r : <span class="const token" data-verso-hover="36">State</span> N V) (s : N) (S : <span class="const token" data-verso-hover="83">Finset</span> (<span class="const token" data-verso-hover="252">RVOKMsg</span> N V)) (<span class="kw">ext</span> : <span class="const token" data-verso-hover="39">List</span> V)</span>
+<span id="L208">      (hl : r.<span class="const token" data-verso-hover="41">leader</span> s = <span class="const token" data-verso-hover="57">false</span>)</span>
+<span id="L209">      (hS : ∀ m ∈ S, m ∈ r.<span class="const token" data-verso-hover="70">rvok</span> ∧ m.<span class="const token" data-verso-hover="253">dst</span> = s ∧ m.<span class="const token" data-verso-hover="254">term</span> = r.<span class="const token" data-verso-hover="40">term</span> s)</span>
+<span id="L210">      (hself : ∃ m ∈ S, m.<span class="const token" data-verso-hover="255">src</span> = s)</span>
+<span id="L211">      (hQ : Q.<span class="const token" data-verso-hover="82">IsQuorum</span> (S.<span class="const token" data-verso-hover="123">image</span> <span class="const token" data-verso-hover="255">RVOKMsg.src</span>))</span>
+<span id="L212">      (hext : <span class="const token" data-verso-hover="354">ExtOK</span> S (r.<span class="const token" data-verso-hover="42">log</span> s).<span class="const token" data-verso-hover="131">length</span> <span class="kw">ext</span>) :</span>
+<span id="L213">      <span class="const token" data-verso-hover="346">Step</span> Q R r { r <span class="kw">with</span></span>
+<span id="L214">        <span class="const token" data-verso-hover="41">leader</span> := <span class="const token" data-verso-hover="119">Function.update</span> r.<span class="const token" data-verso-hover="41">leader</span> s <span class="const token" data-verso-hover="56">true</span></span>
+<span id="L215">        <span class="const token" data-verso-hover="42">log</span> := <span class="const token" data-verso-hover="119">Function.update</span> r.<span class="const token" data-verso-hover="42">log</span> s (r.<span class="const token" data-verso-hover="42">log</span> s ++ ext.<span class="const token" data-verso-hover="296">map</span> (<span class="kw">fun</span> v =&gt; (r.<span class="const token" data-verso-hover="40">term</span> s, v)))</span>
+<span id="L216">        <span class="const token" data-verso-hover="259">props</span> := <span class="kw">if</span> <span class="kw">ext</span> = [] <span class="kw">then</span> r.<span class="const token" data-verso-hover="259">props</span> <span class="kw">else</span></span>
+<span id="L217">          r.<span class="const token" data-verso-hover="259">props</span> ∪ <span class="const token" data-verso-hover="317">propsOf</span> (r.<span class="const token" data-verso-hover="42">log</span> s ++ ext.<span class="const token" data-verso-hover="296">map</span> (<span class="kw">fun</span> v =&gt; (r.<span class="const token" data-verso-hover="40">term</span> s, v))) (r.<span class="const token" data-verso-hover="40">term</span> s)</span>
+<span id="L218">        <span class="const token" data-verso-hover="257">acks</span> := <span class="kw">if</span> <span class="kw">ext</span> = [] <span class="kw">then</span> r.<span class="const token" data-verso-hover="257">acks</span> <span class="kw">else</span></span>
+<span id="L219">          r.<span class="const token" data-verso-hover="257">acks</span> ∪ <span class="const token" data-verso-hover="318">acksOf</span> s (r.<span class="const token" data-verso-hover="42">log</span> s ++ ext.<span class="const token" data-verso-hover="296">map</span> (<span class="kw">fun</span> v =&gt; (r.<span class="const token" data-verso-hover="40">term</span> s, v))) (r.<span class="const token" data-verso-hover="40">term</span> s) }</span>
+<span id="L220">  <span class="dc">/-- `AppendEntries(s, vals, prev)`: append `vals` and send the entries after `prevLen`. -/</span></span>
+<span id="L221">  | <span class="const token" data-verso-hover="64">appendEntries</span> (r : <span class="const token" data-verso-hover="36">State</span> N V) (s : N) (vals : <span class="const token" data-verso-hover="39">List</span> V) (prevLen : <span class="const token" data-verso-hover="37">ℕ</span>)</span>
+<span id="L222">      (hl : r.<span class="const token" data-verso-hover="41">leader</span> s = <span class="const token" data-verso-hover="56">true</span>) (hvals : vals ≠ [] ∨ R.<span class="const token" data-verso-hover="345">heartbeat</span>)</span>
+<span id="L223">      (hprev : prevLen ≤ (r.<span class="const token" data-verso-hover="42">log</span> s).<span class="const token" data-verso-hover="131">length</span>) :</span>
+<span id="L224">      <span class="const token" data-verso-hover="346">Step</span> Q R r { r <span class="kw">with</span></span>
+<span id="L225">        <span class="const token" data-verso-hover="42">log</span> := <span class="const token" data-verso-hover="119">Function.update</span> r.<span class="const token" data-verso-hover="42">log</span> s (r.<span class="const token" data-verso-hover="42">log</span> s ++ vals.<span class="const token" data-verso-hover="296">map</span> (<span class="kw">fun</span> v =&gt; (r.<span class="const token" data-verso-hover="40">term</span> s, v)))</span>
+<span id="L226">        <span class="const token" data-verso-hover="249">ae</span> := <span class="const token" data-verso-hover="120">insert</span> ⟨s, r.<span class="const token" data-verso-hover="40">term</span> s, prevLen, r.<span class="const token" data-verso-hover="42">log</span> s ++ vals.<span class="const token" data-verso-hover="296">map</span> (<span class="kw">fun</span> v =&gt; (r.<span class="const token" data-verso-hover="40">term</span> s, v)),</span>
+<span id="L227">          r.<span class="const token" data-verso-hover="43">commit</span> s⟩ r.<span class="const token" data-verso-hover="249">ae</span></span>
+<span id="L228">        <span class="const token" data-verso-hover="259">props</span> := r.<span class="const token" data-verso-hover="259">props</span> ∪ <span class="const token" data-verso-hover="317">propsOf</span> (r.<span class="const token" data-verso-hover="42">log</span> s ++ vals.<span class="const token" data-verso-hover="296">map</span> (<span class="kw">fun</span> v =&gt; (r.<span class="const token" data-verso-hover="40">term</span> s, v))) (r.<span class="const token" data-verso-hover="40">term</span> s)</span>
+<span id="L229">        <span class="const token" data-verso-hover="257">acks</span> := r.<span class="const token" data-verso-hover="257">acks</span> ∪ <span class="const token" data-verso-hover="318">acksOf</span> s (r.<span class="const token" data-verso-hover="42">log</span> s ++ vals.<span class="const token" data-verso-hover="296">map</span> (<span class="kw">fun</span> v =&gt; (r.<span class="const token" data-verso-hover="40">term</span> s, v))) (r.<span class="const token" data-verso-hover="40">term</span> s) }</span>
+<span id="L230">  <span class="dc">/-- `ReceiveAppend(s)`: Raft* rejects an `append` that would erase entries. -/</span></span>
+<span id="L231">  | <span class="const token" data-verso-hover="67">receiveAppend</span> (r : <span class="const token" data-verso-hover="36">State</span> N V) (s : N) (m : <span class="const token" data-verso-hover="326">AEMsg</span> N V) (hm : m ∈ r.<span class="const token" data-verso-hover="249">ae</span>)</span>
+<span id="L232">      (ht : r.<span class="const token" data-verso-hover="40">term</span> s ≤ m.<span class="const token" data-verso-hover="279">term</span>) (hprev : m.<span class="const token" data-verso-hover="280">prevLen</span> ≤ (r.<span class="const token" data-verso-hover="42">log</span> s).<span class="const token" data-verso-hover="131">length</span>)</span>
+<span id="L233">      (hmatch : <span class="const token" data-verso-hover="327">PrevMatch</span> (r.<span class="const token" data-verso-hover="42">log</span> s) m) (hlen : (r.<span class="const token" data-verso-hover="42">log</span> s).<span class="const token" data-verso-hover="131">length</span> ≤ m.<span class="const token" data-verso-hover="250">full</span>.<span class="const token" data-verso-hover="131">length</span>) :</span>
+<span id="L234">      <span class="const token" data-verso-hover="346">Step</span> Q R r { r <span class="kw">with</span></span>
+<span id="L235">        <span class="const token" data-verso-hover="40">term</span> := <span class="const token" data-verso-hover="119">Function.update</span> r.<span class="const token" data-verso-hover="40">term</span> s m.<span class="const token" data-verso-hover="279">term</span></span>
+<span id="L236">        <span class="const token" data-verso-hover="41">leader</span> := <span class="const token" data-verso-hover="119">Function.update</span> r.<span class="const token" data-verso-hover="41">leader</span> s (<span class="kw">if</span> r.<span class="const token" data-verso-hover="40">term</span> s &lt; m.<span class="const token" data-verso-hover="279">term</span> <span class="kw">then</span> <span class="const token" data-verso-hover="57">false</span> <span class="kw">else</span> r.<span class="const token" data-verso-hover="41">leader</span> s)</span>
+<span id="L237">        <span class="const token" data-verso-hover="42">log</span> := <span class="const token" data-verso-hover="119">Function.update</span> r.<span class="const token" data-verso-hover="42">log</span> s ((r.<span class="const token" data-verso-hover="42">log</span> s).<span class="const token" data-verso-hover="293">take</span> m.<span class="const token" data-verso-hover="280">prevLen</span> ++ m.<span class="const token" data-verso-hover="250">full</span>.<span class="const token" data-verso-hover="328">drop</span> m.<span class="const token" data-verso-hover="280">prevLen</span>)</span>
+<span id="L238">        <span class="const token" data-verso-hover="43">commit</span> := <span class="const token" data-verso-hover="119">Function.update</span> r.<span class="const token" data-verso-hover="43">commit</span> s (<span class="const token" data-verso-hover="336">max</span> m.<span class="const token" data-verso-hover="281">commit</span> (r.<span class="const token" data-verso-hover="43">commit</span> s))</span>
+<span id="L239">        <span class="const token" data-verso-hover="287">aeok</span> := <span class="const token" data-verso-hover="120">insert</span> ⟨s, m.<span class="const token" data-verso-hover="278">src</span>, m.<span class="const token" data-verso-hover="279">term</span>, m.<span class="const token" data-verso-hover="250">full</span>.<span class="const token" data-verso-hover="131">length</span>⟩ r.<span class="const token" data-verso-hover="287">aeok</span></span>
+<span id="L240">        <span class="const token" data-verso-hover="257">acks</span> := r.<span class="const token" data-verso-hover="257">acks</span> ∪</span>
+<span id="L241">          <span class="const token" data-verso-hover="318">acksOf</span> s ((r.<span class="const token" data-verso-hover="42">log</span> s).<span class="const token" data-verso-hover="293">take</span> m.<span class="const token" data-verso-hover="280">prevLen</span> ++ m.<span class="const token" data-verso-hover="250">full</span>.<span class="const token" data-verso-hover="328">drop</span> m.<span class="const token" data-verso-hover="280">prevLen</span>) m.<span class="const token" data-verso-hover="279">term</span> }</span>
+<span id="L242">  <span class="dc">/-- `LeaderLearn(s)`: commit up to an index acknowledged by the followers in `S`. -/</span></span>
+<span id="L243">  | <span class="const token" data-verso-hover="68">leaderLearn</span> (r : <span class="const token" data-verso-hover="36">State</span> N V) (s : N) (S : <span class="const token" data-verso-hover="83">Finset</span> (<span class="const token" data-verso-hover="342">AEOKMsg</span> N)) (k : <span class="const token" data-verso-hover="37">ℕ</span>)</span>
+<span id="L244">      (hl : r.<span class="const token" data-verso-hover="41">leader</span> s = <span class="const token" data-verso-hover="56">true</span>)</span>
+<span id="L245">      (hS : ∀ m ∈ S, m ∈ r.<span class="const token" data-verso-hover="287">aeok</span> ∧ m.<span class="const token" data-verso-hover="343">dst</span> = s ∧ m.<span class="const token" data-verso-hover="290">term</span> = r.<span class="const token" data-verso-hover="40">term</span> s)</span>
+<span id="L246">      (hQ : Q.<span class="const token" data-verso-hover="82">IsQuorum</span> (<span class="const token" data-verso-hover="120">insert</span> s (S.<span class="const token" data-verso-hover="123">image</span> <span class="const token" data-verso-hover="289">AEOKMsg.src</span>)))</span>
+<span id="L247">      (hk : ∀ m ∈ S, k ≤ m.<span class="const token" data-verso-hover="288">len</span>) (hkl : k ≤ (r.<span class="const token" data-verso-hover="42">log</span> s).<span class="const token" data-verso-hover="131">length</span>) :</span>
+<span id="L248">      <span class="const token" data-verso-hover="346">Step</span> Q R r { r <span class="kw">with</span> <span class="const token" data-verso-hover="43">commit</span> := <span class="const token" data-verso-hover="119">Function.update</span> r.<span class="const token" data-verso-hover="43">commit</span> s (<span class="const token" data-verso-hover="336">max</span> (r.<span class="const token" data-verso-hover="43">commit</span> s) k) }</span>
+<span id="L249"></span>
+<span id="L250"><span class="dc">/-- Reachable states of Raft* under the rules `R`. -/</span></span>
+<span id="L251"><span class="kw">def</span> <span class="const token" data-verso-hover="54">Reachable</span> (Q : <span class="const token" data-verso-hover="33">QuorumSystem</span> N) (R : <span class="const token" data-verso-hover="45">Rules</span> V) (r : <span class="const token" data-verso-hover="36">State</span> N V) : <span class="kw">Prop</span> :=</span>
+<span id="L252">  <span class="const token" data-verso-hover="128">Relation.ReflTransGen</span> (<span class="const token" data-verso-hover="346">Step</span> Q R) <span class="const token" data-verso-hover="58">init</span> r</span>
+<span id="L253"></span>
+<span id="L254"><span class="dc">/-- The committed prefix agrees: **state machine safety** of Raft. -/</span></span>
+<span id="L255"><span class="kw">def</span> <span class="const token" data-verso-hover="72">CommitSafe</span> (r : <span class="const token" data-verso-hover="36">State</span> N V) : <span class="kw">Prop</span> :=</span>
+<span id="L256">  ∀ s s' i (h : i &lt; (r.<span class="const token" data-verso-hover="42">log</span> s).<span class="const token" data-verso-hover="131">length</span>) (h' : i &lt; (r.<span class="const token" data-verso-hover="42">log</span> s').<span class="const token" data-verso-hover="131">length</span>),</span>
+<span id="L257">    i &lt; r.<span class="const token" data-verso-hover="43">commit</span> s → i &lt; r.<span class="const token" data-verso-hover="43">commit</span> s' → (r.<span class="const token" data-verso-hover="42">log</span> s)[i].<span class="const token" data-verso-hover="75">2</span> = (r.<span class="const token" data-verso-hover="42">log</span> s')[i].<span class="const token" data-verso-hover="75">2</span></span>
+<span id="L258"></span>
+<span id="L259"><span class="kw">end</span> Raft</span>
+<span id="L260"></span>
+<span id="L261"><span class="kw">end</span> Podc.PaxosRaftRefinement</span>
+<span id="L262"></span>
+</code></div>
+        <script>
+          window.versoHoversUrl = "PODC2019/PaxosRaftRefinement/-hovers.json";</script>
+        <script src="static/lean/popper.js"></script>
+        <script src="static/lean/tippy.js"></script>
+        <script src="static/lean/marked.js"></script>
+        <script src="static/lean/highlighting.js"></script>
+        <script src="static/lean/lean.js"></script>
+        </article></main><footer class="site-footer"><div class="wrap">
+        Machine-checked formalizations of PODC papers in Lean 4. Generated with <a href="https://github.com/leanprover/verso">Verso</a> from the README files of <a href="https://github.com/vasnesterov/formal_podc">vasnesterov/formal_podc</a>.</div>
+      </footer></body>
+  </html>
+

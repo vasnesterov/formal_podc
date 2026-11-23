@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="light dark">
+    <link rel="icon" href="data:,">
+    <title>HotStuff: Basic/Impl.lean · Formal PODC</title><base href="../../../.././"><link rel="stylesheet" href="static/lean/verso-vars.css">
+    <link rel="stylesheet" href="static/lean/highlighting.css">
+    <link rel="stylesheet" href="static/lean/tippy-border.css">
+    <link rel="stylesheet" href="static/style.css">
+    <script defer="defer" src="static/site.js"></script>
+    </head>
+  <body>
+    <header class="site-header">
+      <div class="wrap">
+        <a class="brand" href=".">Formal PODC</a><nav class="top">
+          <a href=".">Search</a><a href="about/">About</a><a href="https://github.com/vasnesterov/formal_podc">GitHub</a></nav>
+        </div>
+      </header>
+    <main class="wrap"><article><nav class="breadcrumbs" aria-label="Breadcrumb">
+          <a href=".">Search</a><span class="sep">›</span><a href="PODC2019/">PODC 2019</a><span class="sep">›</span><a href="PODC2019/HotStuff/">HotStuff</a><span class="sep">›</span><a href="PODC2019/HotStuff/src/">Lean source</a><span class="sep">›</span><span aria-current="page">Basic.Impl</span></nav>
+        <h1>
+          <code>Basic/Impl.lean</code></h1>
+        <div class="paper-links">
+          <p>
+            Source of <a href="PODC2019/HotStuff/">HotStuff — PODC 2019</a> · <a href="https://github.com/vasnesterov/formal_podc/blob/main/Papers/PODC2019/HotStuff/Basic/Impl.lean">GitHub</a> · hover over a name for its type and documentation</p>
+          </div>
+        <div class="lean-code lean-src">
+          <code class="hl lean block" data-lean-context="Basic.Impl"><span id="L1"><span class="kw">import</span> Papers.PODC2019.HotStuff.Basic.Safety</span>
+<span id="L2"><span class="kw">import</span> Cslib.Computability.Distributed.Byzantine.PartialSync.Auth</span>
+<span id="L3"></span>
+<span id="L4"><span class="dc">/-!</span></span>
+<span id="L5"><span class="dc"># Basic HotStuff (Algorithm 2) in the partially synchronous model</span></span>
+<span id="L6"></span>
+<span id="L7"><span class="dc">An implementation of Algorithm 2 as a CSLib `Cslib.Byzantine.PartialSync.Algorithm`: discrete</span></span>
+<span id="L8"><span class="dc">time, every correct replica takes one step per time unit, Byzantine replicas send arbitrary</span></span>
+<span id="L9"><span class="dc">messages, messages between correct replicas sent at `τ` are delivered by `max τ gst + δ`.</span></span>
+<span id="L10"><span class="dc">Signatures are abstract tokens (`Auth`): a partial signature of replica `i` on a tuple `q` is the</span></span>
+<span id="L11"><span class="dc">token `(i, q)`; a QC carries the tuples' signer set and hence the tokens of all its signers</span></span>
+<span id="L12"><span class="dc">(an ideal `(n − f, n)`-threshold signature). Byzantine replicas can only use tokens of Byzantine</span></span>
+<span id="L13"><span class="dc">signers or tokens already emitted by correct replicas (`Run.AuthValid`).</span></span>
+<span id="L14"></span>
+<span id="L15"><span class="dc">* **Replica role.** Each replica keeps a buffer of all received messages (paired with the</span></span>
+<span id="L16"><span class="dc">  authenticated sender) and in every step runs, in order, the leader handlers `L1`–`L4` (if it is</span></span>
+<span id="L17"><span class="dc">  the leader of its current view) and the replica handlers `R1`–`R4`; a handler fires when the</span></span>
+<span id="L18"><span class="dc">  message it "waits for" is in the buffer. `R4` (decide) and the `nextView` interrupt move to the</span></span>
+<span id="L19"><span class="dc">  next view and send `Msg(new-view, ⊥, prepareQC)` to the next leader (Lines 35-36).</span></span>
+<span id="L20"><span class="dc">* **Pacemaker.** `nextView` is an *input* of each replica: `(inp p).1 τ = true` means that the</span></span>
+<span id="L21"><span class="dc">  pacemaker interrupts replica `p` at time `τ`. Theorem 4 is a statement about runs in which the</span></span>
+<span id="L22"><span class="dc">  pacemaker does not interrupt during the relevant interval; safety holds for all inputs.</span></span>
+<span id="L23"><span class="dc">* **Client commands.** `(inp p).2 v` is the command the replica proposes when leading view `v`.</span></span>
+<span id="L24"><span class="dc">* Messages produced in a step are sent at the next time unit (`out`), once.</span></span>
+<span id="L25"><span class="dc">-/</span></span>
+<span id="L26"></span>
+<span id="L27"><span class="kw">namespace</span> HotStuff.Basic</span>
+<span id="L28"></span>
+<span id="L29"><span class="kw">open</span> Classical Cslib.Byzantine.PartialSync</span>
+<span id="L30"></span>
+<span id="L31"><span class="kw">variable</span> {P C : <span class="kw">Type</span>*} [<span class="const token" data-verso-hover="40">Fintype</span> P] [<span class="const token" data-verso-hover="30">DecidableEq</span> P]</span>
+<span id="L32"></span>
+<span id="L33"><span class="dc">/-- A QC as carried in messages: the signed tuple and the set of signers whose partial</span></span>
+<span id="L34"><span class="dc">signatures it combines. -/</span></span>
+<span id="L35"><span class="kw">structure</span> <span class="const token" data-verso-hover="197">QCm</span> (P C : <span class="kw">Type</span>*) <span class="kw">where</span></span>
+<span id="L36">  <span class="const token" data-verso-hover="206">qc</span> : <span class="const token" data-verso-hover="33">QC</span> C</span>
+<span id="L37">  <span class="const token" data-verso-hover="293">sigs</span> : <span class="const token" data-verso-hover="42">Finset</span> P</span>
+<span id="L38"></span>
+<span id="L39"><span class="dc">/-- The genesis QC `⊥` (no signatures). -/</span></span>
+<span id="L40"><span class="kw">def</span> <span class="const token" data-verso-hover="239">QCm.gen</span> : <span class="const token" data-verso-hover="197">QCm</span> P C := ⟨<span class="const token" data-verso-hover="37">QC.genesis</span>, ∅⟩</span>
+<span id="L41"></span>
+<span id="L42"><span class="dc">/-- Local validity check (`tverify`): genesis, or at least `n − f` signers. -/</span></span>
+<span id="L43"><span class="kw">def</span> <span class="const token" data-verso-hover="205">QCm.ok</span> (f : <span class="const token" data-verso-hover="32">ℕ</span>) (j : <span class="const token" data-verso-hover="197">QCm</span> P C) : <span class="kw">Prop</span> := j.<span class="const token" data-verso-hover="206">qc</span>.<span class="const token" data-verso-hover="38">IsGen</span> ∨ <span class="const token" data-verso-hover="45">Fintype.card</span> P - f ≤ j.<span class="const token" data-verso-hover="293">sigs</span>.<span class="const token" data-verso-hover="46">card</span></span>
+<span id="L44"></span>
+<span id="L45"><span class="dc">/-- Messages of Algorithm 2. The message type tags `pre-commit`, `commit`, `decide` are</span></span>
+<span id="L46"><span class="dc">represented by the type of the carried QC (the replica only checks `matchingQC`). -/</span></span>
+<span id="L47"><span class="kw">inductive</span> <span class="const token" data-verso-hover="186">Msg</span> (P C : <span class="kw">Type</span>*)</span>
+<span id="L48">  <span class="dc">/-- `Msg(new-view, ⊥, prepareQC)`, stamped with the sender's view `v` (which it leaves). -/</span></span>
+<span id="L49">  | <span class="const token" data-verso-hover="182">newView</span> (v : <span class="const token" data-verso-hover="32">ℕ</span>) (j : <span class="const token" data-verso-hover="197">QCm</span> P C)</span>
+<span id="L50">  <span class="dc">/-- `Msg(prepare, curProposal, highQC)`. -/</span></span>
+<span id="L51">  | <span class="const token" data-verso-hover="198">prepare</span> (v : <span class="const token" data-verso-hover="32">ℕ</span>) (x : <span class="const token" data-verso-hover="23">Node</span> C) (j : <span class="const token" data-verso-hover="197">QCm</span> P C)</span>
+<span id="L52">  <span class="dc">/-- `Msg(pre-commit/commit/decide, ⊥, qc)`. -/</span></span>
+<span id="L53">  | <span class="const token" data-verso-hover="199">cert</span> (j : <span class="const token" data-verso-hover="197">QCm</span> P C)</span>
+<span id="L54">  <span class="dc">/-- `voteMsg`: the partial signature of `i` on `q`. -/</span></span>
+<span id="L55">  | <span class="const token" data-verso-hover="200">vote</span> (i : P) (q : <span class="const token" data-verso-hover="33">QC</span> C)</span>
+<span id="L56"></span>
+<span id="L57"><span class="dc">/-- Signature tokens: `(i, q)` is `i`'s partial signature on the tuple `q`. -/</span></span>
+<span id="L58"><span class="kw">abbrev</span> <span class="const token" data-verso-hover="208">Tok</span> (P C : <span class="kw">Type</span>*) := P × <span class="const token" data-verso-hover="33">QC</span> C</span>
+<span id="L59"></span>
+<span id="L60"><span class="dc">/-- The tokens of a QC. -/</span></span>
+<span id="L61"><span class="kw">def</span> <span class="const token" data-verso-hover="202">QCm.toks</span> (j : <span class="const token" data-verso-hover="197">QCm</span> P C) : <span class="const token" data-verso-hover="43">Set</span> (<span class="const token" data-verso-hover="208">Tok</span> P C) := {k | k.<span class="const token" data-verso-hover="212">1</span> ∈ j.<span class="const token" data-verso-hover="293">sigs</span> ∧ k.<span class="const token" data-verso-hover="209">2</span> = j.<span class="const token" data-verso-hover="206">qc</span>}</span>
+<span id="L62"></span>
+<span id="L63"><span class="dc">/-- Tokens carried by a message. -/</span></span>
+<span id="L64"><span class="kw">def</span> <span class="const token" data-verso-hover="203">Msg.toks</span> : <span class="const token" data-verso-hover="186">Msg</span> P C → <span class="const token" data-verso-hover="43">Set</span> (<span class="const token" data-verso-hover="208">Tok</span> P C)</span>
+<span id="L65">  | <span class="const token" data-verso-hover="182">.</span>newView _ j =&gt; j.<span class="const token" data-verso-hover="202">toks</span></span>
+<span id="L66">  | <span class="const token" data-verso-hover="198">.</span>prepare _ _ j =&gt; j.<span class="const token" data-verso-hover="202">toks</span></span>
+<span id="L67">  | <span class="const token" data-verso-hover="199">.</span>cert j =&gt; j.<span class="const token" data-verso-hover="202">toks</span></span>
+<span id="L68">  | <span class="const token" data-verso-hover="200">.</span>vote i q =&gt; {(i, q)}</span>
+<span id="L69"></span>
+<span id="L70"><span class="dc">/-- The signature structure. -/</span></span>
+<span id="L71"><span class="kw">def</span> <span class="const token" data-verso-hover="294">auth</span> : <span class="const token" data-verso-hover="295">Auth</span> P (<span class="const token" data-verso-hover="186">Msg</span> P C) (<span class="const token" data-verso-hover="208">Tok</span> P C) := ⟨<span class="const token" data-verso-hover="212">Prod.fst</span>, <span class="const token" data-verso-hover="203">Msg.toks</span>⟩</span>
+<span id="L72"></span>
+<span id="L73"><span class="dc">/-- Inputs of a replica: the pacemaker's interrupts and the client commands to propose. -/</span></span>
+<span id="L74"><span class="kw">abbrev</span> <span class="const token" data-verso-hover="296">Inp</span> (C : <span class="kw">Type</span>*) := (<span class="const token" data-verso-hover="32">ℕ</span> → <span class="const token" data-verso-hover="297">Bool</span>) × (<span class="const token" data-verso-hover="32">ℕ</span> → C)</span>
+<span id="L75"></span>
+<span id="L76"><span class="dc">/-- Local state of a replica. -/</span></span>
+<span id="L77"><span class="kw">structure</span> <span class="const token" data-verso-hover="75">RState</span> (P C : <span class="kw">Type</span>*) <span class="kw">where</span></span>
+<span id="L78">  <span class="dc">/-- The replica's input (pacemaker interrupts and client commands). -/</span></span>
+<span id="L79">  <span class="const token" data-verso-hover="92">inp</span> : <span class="const token" data-verso-hover="296">Inp</span> C</span>
+<span id="L80">  <span class="dc">/-- Number of steps taken (= global time for correct replicas). -/</span></span>
+<span id="L81">  <span class="const token" data-verso-hover="96">clock</span> : <span class="const token" data-verso-hover="32">ℕ</span></span>
+<span id="L82">  <span class="const token" data-verso-hover="78">view</span> : <span class="const token" data-verso-hover="32">ℕ</span></span>
+<span id="L83">  <span class="dc">/-- Replica-role progress in the view (`0`–`4`, as in `Loc`). -/</span></span>
+<span id="L84">  <span class="const token" data-verso-hover="80">phase</span> : <span class="const token" data-verso-hover="32">ℕ</span></span>
+<span id="L85">  <span class="const token" data-verso-hover="82">lock</span> : <span class="const token" data-verso-hover="197">QCm</span> P C</span>
+<span id="L86">  <span class="const token" data-verso-hover="84">prepQC</span> : <span class="const token" data-verso-hover="197">QCm</span> P C</span>
+<span id="L87">  <span class="const token" data-verso-hover="86">committed</span> : <span class="const token" data-verso-hover="43">Set</span> (<span class="const token" data-verso-hover="23">Node</span> C)</span>
+<span id="L88">  <span class="dc">/-- All votes cast so far (ghost: the votes are also sent). -/</span></span>
+<span id="L89">  <span class="const token" data-verso-hover="88">votes</span> : <span class="const token" data-verso-hover="43">Set</span> (<span class="const token" data-verso-hover="33">QC</span> C)</span>
+<span id="L90">  <span class="dc">/-- All messages received so far, with their (authenticated) sender. -/</span></span>
+<span id="L91">  <span class="const token" data-verso-hover="90">buf</span> : <span class="const token" data-verso-hover="24">List</span> (P × <span class="const token" data-verso-hover="186">Msg</span> P C)</span>
+<span id="L92">  <span class="dc">/-- Leader-role progress in the view: `0` collecting new-views, `1` proposed, `2`/`3`/`4`</span></span>
+<span id="L93"><span class="dc">  formed the prepare/pre-commit/commit QC. -/</span></span>
+<span id="L94">  <span class="const token" data-verso-hover="115">lphase</span> : <span class="const token" data-verso-hover="32">ℕ</span></span>
+<span id="L95">  <span class="dc">/-- The leader's proposal `curProposal` and its justification `highQC`. -/</span></span>
+<span id="L96">  <span class="const token" data-verso-hover="117">prop</span> : <span class="const token" data-verso-hover="23">Node</span> C</span>
+<span id="L97">  <span class="const token" data-verso-hover="119">high</span> : <span class="const token" data-verso-hover="197">QCm</span> P C</span>
+<span id="L98">  <span class="dc">/-- Messages to send at the next time unit. -/</span></span>
+<span id="L99">  <span class="const token" data-verso-hover="180">out</span> : P → <span class="const token" data-verso-hover="24">List</span> (<span class="const token" data-verso-hover="186">Msg</span> P C)</span>
+<span id="L100">  <span class="dc">/-- Ghost: all proposals `(view, node, highQC)` made as a leader. -/</span></span>
+<span id="L101">  <span class="const token" data-verso-hover="111">props</span> : <span class="const token" data-verso-hover="43">Set</span> (<span class="const token" data-verso-hover="32">ℕ</span> × <span class="const token" data-verso-hover="23">Node</span> C × <span class="const token" data-verso-hover="197">QCm</span> P C)</span>
+<span id="L102">  <span class="dc">/-- Ghost: all QCs formed as a leader. -/</span></span>
+<span id="L103">  <span class="const token" data-verso-hover="98">made</span> : <span class="const token" data-verso-hover="43">Set</span> (<span class="const token" data-verso-hover="197">QCm</span> P C)</span>
+<span id="L104">  <span class="dc">/-- Ghost: the views in which the replica decided, with the decided node. -/</span></span>
+<span id="L105">  <span class="const token" data-verso-hover="94">decs</span> : <span class="const token" data-verso-hover="43">Set</span> (<span class="const token" data-verso-hover="32">ℕ</span> × <span class="const token" data-verso-hover="23">Node</span> C)</span>
+<span id="L106">  <span class="dc">/-- Ghost: all messages ever sent, with their destination. -/</span></span>
+<span id="L107">  <span class="const token" data-verso-hover="298">sent</span> : <span class="const token" data-verso-hover="43">Set</span> (P × <span class="const token" data-verso-hover="186">Msg</span> P C)</span>
+<span id="L108">  <span class="dc">/-- Ghost: every evaluation of the voting rule of Line 9: view, proposal, justification and the</span></span>
+<span id="L109"><span class="dc">  lock at that moment. -/</span></span>
+<span id="L110">  <span class="const token" data-verso-hover="299">r1</span> : <span class="const token" data-verso-hover="43">Set</span> (<span class="const token" data-verso-hover="32">ℕ</span> × <span class="const token" data-verso-hover="23">Node</span> C × <span class="const token" data-verso-hover="197">QCm</span> P C × <span class="const token" data-verso-hover="33">QC</span> C)</span>
+<span id="L111"></span>
+<span id="L112"><span class="dc">/-- Projection to the abstract local state. -/</span></span>
+<span id="L113"><span class="kw">def</span> <span class="const token" data-verso-hover="222">RState.toLoc</span> (s : <span class="const token" data-verso-hover="75">RState</span> P C) : <span class="const token" data-verso-hover="47">Loc</span> C := ⟨s.<span class="const token" data-verso-hover="78">view</span>, s.<span class="const token" data-verso-hover="80">phase</span>, s.<span class="const token" data-verso-hover="82">lock</span>.<span class="const token" data-verso-hover="206">qc</span>, s.<span class="const token" data-verso-hover="84">prepQC</span>.<span class="const token" data-verso-hover="206">qc</span>, s.<span class="const token" data-verso-hover="86">committed</span>⟩</span>
+<span id="L114"></span>
+<span id="L115"><span class="kw">section</span> Handlers</span>
+<span id="L116"></span>
+<span id="L117"><span class="kw">variable</span> (f : <span class="const token" data-verso-hover="32">ℕ</span>) (leader : <span class="const token" data-verso-hover="32">ℕ</span> → P) (p : P)</span>
+<span id="L118"></span>
+<span id="L119"><span class="dc">/-- Add messages to the outbox. -/</span></span>
+<span id="L120"><span class="kw">def</span> <span class="const token" data-verso-hover="187">RState.send</span> (s : <span class="const token" data-verso-hover="75">RState</span> P C) (g : P → <span class="const token" data-verso-hover="24">List</span> (<span class="const token" data-verso-hover="186">Msg</span> P C)) : <span class="const token" data-verso-hover="75">RState</span> P C :=</span>
+<span id="L121">  { s <span class="kw">with</span> <span class="const token" data-verso-hover="180">out</span> := <span class="kw">fun</span> q =&gt; s.<span class="const token" data-verso-hover="180">out</span> q ++ g q, <span class="const token" data-verso-hover="298">sent</span> := s.<span class="const token" data-verso-hover="298">sent</span> ∪ {qm | qm.<span class="const token" data-verso-hover="209">2</span> ∈ g qm.<span class="const token" data-verso-hover="212">1</span>} }</span>
+<span id="L122"></span>
+<span id="L123"><span class="dc">/-- Send `m` to `q` only. -/</span></span>
+<span id="L124"><span class="kw">def</span> <span class="const token" data-verso-hover="181">to1</span> (q : P) (m : <span class="const token" data-verso-hover="186">Msg</span> P C) : P → <span class="const token" data-verso-hover="24">List</span> (<span class="const token" data-verso-hover="186">Msg</span> P C) := <span class="kw">fun</span> q' =&gt; <span class="kw">if</span> q' = q <span class="kw">then</span> [m] <span class="kw">else</span> []</span>
+<span id="L125"></span>
+<span id="L126"><span class="dc">/-- Send `m` to everybody (including oneself). -/</span></span>
+<span id="L127"><span class="kw">def</span> <span class="const token" data-verso-hover="261">bcast</span> (m : <span class="const token" data-verso-hover="186">Msg</span> P C) : P → <span class="const token" data-verso-hover="24">List</span> (<span class="const token" data-verso-hover="186">Msg</span> P C) := <span class="kw">fun</span> _ =&gt; [m]</span>
+<span id="L128"></span>
+<span id="L129"><span class="dc">/-- Move to the next view (Lines 35-36): send `Msg(new-view, ⊥, prepareQC)` to the next leader</span></span>
+<span id="L130"><span class="dc">and reset the per-view variables. -/</span></span>
+<span id="L131"><span class="kw">def</span> <span class="const token" data-verso-hover="165">enterView</span> (s : <span class="const token" data-verso-hover="75">RState</span> P C) : <span class="const token" data-verso-hover="75">RState</span> P C :=</span>
+<span id="L132">  { (s.<span class="const token" data-verso-hover="187">send</span> (<span class="const token" data-verso-hover="181">to1</span> (leader (s.<span class="const token" data-verso-hover="78">view</span> + <span class="nu">1</span>)) (<span class="const token" data-verso-hover="182">.</span>newView s.<span class="const token" data-verso-hover="78">view</span> s.<span class="const token" data-verso-hover="84">prepQC</span>))) <span class="kw">with</span></span>
+<span id="L133">    <span class="const token" data-verso-hover="78">view</span> := s.<span class="const token" data-verso-hover="78">view</span> + <span class="nu">1</span>, <span class="const token" data-verso-hover="80">phase</span> := <span class="nu">0</span>, <span class="const token" data-verso-hover="115">lphase</span> := <span class="nu">0</span>, <span class="const token" data-verso-hover="117">prop</span> := [], <span class="const token" data-verso-hover="119">high</span> := <span class="const token" data-verso-hover="239">QCm.gen</span> }</span>
+<span id="L134"></span>
+<span id="L135"><span class="dc">/-- The justification of a new-view message for view `w`, if it is one and it is valid. -/</span></span>
+<span id="L136"><span class="kw">noncomputable</span> <span class="kw">def</span> <span class="const token" data-verso-hover="251">nvJ</span> (w : <span class="const token" data-verso-hover="32">ℕ</span>) : <span class="const token" data-verso-hover="186">Msg</span> P C → <span class="const token" data-verso-hover="55">Option</span> (<span class="const token" data-verso-hover="197">QCm</span> P C)</span>
+<span id="L137">  | <span class="const token" data-verso-hover="182">.</span>newView w' j =&gt; <span class="kw">if</span> w' = w ∧ j.<span class="const token" data-verso-hover="205">ok</span> f <span class="kw">then</span> <span class="const token" data-verso-hover="57">some</span> j <span class="kw">else</span> <span class="const token" data-verso-hover="59">none</span></span>
+<span id="L138">  | _ =&gt; <span class="const token" data-verso-hover="59">none</span></span>
+<span id="L139"></span>
+<span id="L140"><span class="dc">/-- Senders of valid new-view messages for view `s.view − 1`. -/</span></span>
+<span id="L141"><span class="kw">noncomputable</span> <span class="kw">def</span> <span class="const token" data-verso-hover="300">nvSenders</span> (s : <span class="const token" data-verso-hover="75">RState</span> P C) : <span class="const token" data-verso-hover="42">Finset</span> P :=</span>
+<span id="L142">  <span class="const token" data-verso-hover="301">Finset.univ</span>.<span class="const token" data-verso-hover="302">filter</span> <span class="kw">fun</span> q =&gt; ∃ j, (q, <span class="const token" data-verso-hover="182">Msg.newView</span> (s.<span class="const token" data-verso-hover="78">view</span> - <span class="nu">1</span>) j) ∈ s.<span class="const token" data-verso-hover="90">buf</span> ∧ j.<span class="const token" data-verso-hover="205">ok</span> f</span>
+<span id="L143"></span>
+<span id="L144"><span class="dc">/-- The QC with the highest view in a list (genesis if empty). -/</span></span>
+<span id="L145"><span class="kw">def</span> <span class="const token" data-verso-hover="238">bestQC</span> : <span class="const token" data-verso-hover="24">List</span> (<span class="const token" data-verso-hover="197">QCm</span> P C) → <span class="const token" data-verso-hover="197">QCm</span> P C</span>
+<span id="L146">  | [] =&gt; <span class="const token" data-verso-hover="239">QCm.gen</span></span>
+<span id="L147">  | j :: js =&gt; <span class="kw">if</span> (<span class="const token" data-verso-hover="238">bestQC</span> js).<span class="const token" data-verso-hover="206">qc</span>.<span class="const token" data-verso-hover="35">view</span> &lt; j.<span class="const token" data-verso-hover="206">qc</span>.<span class="const token" data-verso-hover="35">view</span> <span class="kw">then</span> j <span class="kw">else</span> <span class="const token" data-verso-hover="238">bestQC</span> js</span>
+<span id="L148"></span>
+<span id="L149"><span class="dc">/-- Signers of votes on `q` in the buffer. -/</span></span>
+<span id="L150"><span class="kw">noncomputable</span> <span class="kw">def</span> <span class="const token" data-verso-hover="265">voters</span> (s : <span class="const token" data-verso-hover="75">RState</span> P C) (q : <span class="const token" data-verso-hover="33">QC</span> C) : <span class="const token" data-verso-hover="42">Finset</span> P :=</span>
+<span id="L151">  <span class="const token" data-verso-hover="301">Finset.univ</span>.<span class="const token" data-verso-hover="302">filter</span> <span class="kw">fun</span> i =&gt; ∃ q', (q', <span class="const token" data-verso-hover="200">Msg.vote</span> i q) ∈ s.<span class="const token" data-verso-hover="90">buf</span></span>
+<span id="L152"></span>
+<span id="L153"><span class="dc">/-- `L1` (Lines 2-6): after `n − f` new-view messages, propose `cmd :: highQC.node`. -/</span></span>
+<span id="L154"><span class="kw">noncomputable</span> <span class="kw">def</span> <span class="const token" data-verso-hover="77">L1</span> (s : <span class="const token" data-verso-hover="75">RState</span> P C) : <span class="const token" data-verso-hover="75">RState</span> P C :=</span>
+<span id="L155">  <span class="kw">if</span> s.<span class="const token" data-verso-hover="115">lphase</span> = <span class="nu">0</span> ∧ p = leader s.<span class="const token" data-verso-hover="78">view</span> ∧ <span class="const token" data-verso-hover="45">Fintype.card</span> P - f ≤ (<span class="const token" data-verso-hover="300">nvSenders</span> f s).<span class="const token" data-verso-hover="46">card</span> <span class="kw">then</span></span>
+<span id="L156">    <span class="kw">let</span> h := <span class="const token" data-verso-hover="238">bestQC</span> (s.<span class="const token" data-verso-hover="90">buf</span>.<span class="const token" data-verso-hover="255">filterMap</span> <span class="kw">fun</span> m =&gt; <span class="const token" data-verso-hover="251">nvJ</span> f (s.<span class="const token" data-verso-hover="78">view</span> - <span class="nu">1</span>) m.<span class="const token" data-verso-hover="209">2</span>)</span>
+<span id="L157">    { (s.<span class="const token" data-verso-hover="187">send</span> (<span class="const token" data-verso-hover="261">bcast</span> (<span class="const token" data-verso-hover="198">.</span>prepare s.<span class="const token" data-verso-hover="78">view</span> (s.<span class="const token" data-verso-hover="92">inp</span>.<span class="const token" data-verso-hover="209">2</span> s.<span class="const token" data-verso-hover="78">view</span> :: h.<span class="const token" data-verso-hover="206">qc</span>.<span class="const token" data-verso-hover="36">node</span>) h))) <span class="kw">with</span></span>
+<span id="L158">      <span class="const token" data-verso-hover="115">lphase</span> := <span class="nu">1</span>, <span class="const token" data-verso-hover="117">prop</span> := s.<span class="const token" data-verso-hover="92">inp</span>.<span class="const token" data-verso-hover="209">2</span> s.<span class="const token" data-verso-hover="78">view</span> :: h.<span class="const token" data-verso-hover="206">qc</span>.<span class="const token" data-verso-hover="36">node</span>, <span class="const token" data-verso-hover="119">high</span> := h,</span>
+<span id="L159">      <span class="const token" data-verso-hover="111">props</span> := <span class="const token" data-verso-hover="63">insert</span> (s.<span class="const token" data-verso-hover="78">view</span>, s.<span class="const token" data-verso-hover="92">inp</span>.<span class="const token" data-verso-hover="209">2</span> s.<span class="const token" data-verso-hover="78">view</span> :: h.<span class="const token" data-verso-hover="206">qc</span>.<span class="const token" data-verso-hover="36">node</span>, h) s.<span class="const token" data-verso-hover="111">props</span> }</span>
+<span id="L160">  <span class="kw">else</span> s</span>
+<span id="L161"></span>
+<span id="L162"><span class="dc">/-- The QC type formed in leader phase `k` (`1`, `2`, `3`). -/</span></span>
+<span id="L163"><span class="kw">def</span> <span class="const token" data-verso-hover="264">lty</span> : <span class="const token" data-verso-hover="32">ℕ</span> → <span class="const token" data-verso-hover="26">Phase</span></span>
+<span id="L164">  | <span class="nu">1</span> =&gt; <span class="const token" data-verso-hover="27">.</span>prepare</span>
+<span id="L165">  | <span class="nu">2</span> =&gt; <span class="const token" data-verso-hover="28">.</span>precommit</span>
+<span id="L166">  | _ =&gt; <span class="const token" data-verso-hover="29">.</span>commit</span>
+<span id="L167"></span>
+<span id="L168"><span class="dc">/-- `L2`–`L4` (Lines 11-14, 19-22, 27-30): after `n − f` votes, combine them into a QC and</span></span>
+<span id="L169"><span class="dc">broadcast it. -/</span></span>
+<span id="L170"><span class="kw">noncomputable</span> <span class="kw">def</span> <span class="const token" data-verso-hover="100">LQ</span> (k : <span class="const token" data-verso-hover="32">ℕ</span>) (s : <span class="const token" data-verso-hover="75">RState</span> P C) : <span class="const token" data-verso-hover="75">RState</span> P C :=</span>
+<span id="L171">  <span class="kw">if</span> s.<span class="const token" data-verso-hover="115">lphase</span> = k ∧ p = leader s.<span class="const token" data-verso-hover="78">view</span> ∧</span>
+<span id="L172">      <span class="const token" data-verso-hover="45">Fintype.card</span> P - f ≤ (<span class="const token" data-verso-hover="265">voters</span> s ⟨<span class="const token" data-verso-hover="264">lty</span> k, s.<span class="const token" data-verso-hover="78">view</span>, s.<span class="const token" data-verso-hover="117">prop</span>⟩).<span class="const token" data-verso-hover="46">card</span> <span class="kw">then</span></span>
+<span id="L173">    { (s.<span class="const token" data-verso-hover="187">send</span> (<span class="const token" data-verso-hover="261">bcast</span> (<span class="const token" data-verso-hover="199">.</span>cert ⟨⟨<span class="const token" data-verso-hover="264">lty</span> k, s.<span class="const token" data-verso-hover="78">view</span>, s.<span class="const token" data-verso-hover="117">prop</span>⟩, <span class="const token" data-verso-hover="265">voters</span> s ⟨<span class="const token" data-verso-hover="264">lty</span> k, s.<span class="const token" data-verso-hover="78">view</span>, s.<span class="const token" data-verso-hover="117">prop</span>⟩⟩))) <span class="kw">with</span></span>
+<span id="L174">      <span class="const token" data-verso-hover="115">lphase</span> := k + <span class="nu">1</span>,</span>
+<span id="L175">      <span class="const token" data-verso-hover="98">made</span> := <span class="const token" data-verso-hover="63">insert</span> ⟨⟨<span class="const token" data-verso-hover="264">lty</span> k, s.<span class="const token" data-verso-hover="78">view</span>, s.<span class="const token" data-verso-hover="117">prop</span>⟩, <span class="const token" data-verso-hover="265">voters</span> s ⟨<span class="const token" data-verso-hover="264">lty</span> k, s.<span class="const token" data-verso-hover="78">view</span>, s.<span class="const token" data-verso-hover="117">prop</span>⟩⟩ s.<span class="const token" data-verso-hover="98">made</span> }</span>
+<span id="L176">  <span class="kw">else</span> s</span>
+<span id="L177"></span>
+<span id="L178"><span class="dc">/-- `R1` (Lines 7-10). -/</span></span>
+<span id="L179"><span class="kw">noncomputable</span> <span class="kw">def</span> <span class="const token" data-verso-hover="113">R1</span> (s : <span class="const token" data-verso-hover="75">RState</span> P C) : <span class="const token" data-verso-hover="75">RState</span> P C :=</span>
+<span id="L180">  <span class="kw">if</span> h : s.<span class="const token" data-verso-hover="80">phase</span> = <span class="nu">0</span> ∧ ∃ xj : <span class="const token" data-verso-hover="23">Node</span> C × <span class="const token" data-verso-hover="197">QCm</span> P C,</span>
+<span id="L181">      (leader s.<span class="const token" data-verso-hover="78">view</span>, <span class="const token" data-verso-hover="198">Msg.prepare</span> s.<span class="const token" data-verso-hover="78">view</span> xj.<span class="const token" data-verso-hover="212">1</span> xj.<span class="const token" data-verso-hover="209">2</span>) ∈ s.<span class="const token" data-verso-hover="90">buf</span> <span class="kw">then</span></span>
+<span id="L182">    <span class="kw">let</span> xj := <span class="const token" data-verso-hover="273">Classical.choose</span> h.<span class="const token" data-verso-hover="253">2</span></span>
+<span id="L183">    <span class="kw">if</span> xj.<span class="const token" data-verso-hover="209">2</span>.<span class="const token" data-verso-hover="205">ok</span> f ∧ xj.<span class="const token" data-verso-hover="209">2</span>.<span class="const token" data-verso-hover="206">qc</span>.<span class="const token" data-verso-hover="36">node</span> &lt;:+ xj.<span class="const token" data-verso-hover="212">1</span> ∧ <span class="const token" data-verso-hover="39">SafeNode</span> s.<span class="const token" data-verso-hover="82">lock</span>.<span class="const token" data-verso-hover="206">qc</span> xj.<span class="const token" data-verso-hover="212">1</span> xj.<span class="const token" data-verso-hover="209">2</span>.<span class="const token" data-verso-hover="206">qc</span> <span class="kw">then</span></span>
+<span id="L184">      { (s.<span class="const token" data-verso-hover="187">send</span> (<span class="const token" data-verso-hover="181">to1</span> (leader s.<span class="const token" data-verso-hover="78">view</span>) (<span class="const token" data-verso-hover="200">.</span>vote p ⟨<span class="const token" data-verso-hover="27">.</span>prepare, s.<span class="const token" data-verso-hover="78">view</span>, xj.<span class="const token" data-verso-hover="212">1</span>⟩))) <span class="kw">with</span></span>
+<span id="L185">        <span class="const token" data-verso-hover="80">phase</span> := <span class="nu">1</span>, <span class="const token" data-verso-hover="88">votes</span> := <span class="const token" data-verso-hover="63">insert</span> ⟨<span class="const token" data-verso-hover="27">.</span>prepare, s.<span class="const token" data-verso-hover="78">view</span>, xj.<span class="const token" data-verso-hover="212">1</span>⟩ s.<span class="const token" data-verso-hover="88">votes</span>,</span>
+<span id="L186">        <span class="const token" data-verso-hover="299">r1</span> := <span class="const token" data-verso-hover="63">insert</span> (s.<span class="const token" data-verso-hover="78">view</span>, xj.<span class="const token" data-verso-hover="212">1</span>, xj.<span class="const token" data-verso-hover="209">2</span>, s.<span class="const token" data-verso-hover="82">lock</span>.<span class="const token" data-verso-hover="206">qc</span>) s.<span class="const token" data-verso-hover="299">r1</span> }</span>
+<span id="L187">    <span class="kw">else</span> { s <span class="kw">with</span> <span class="const token" data-verso-hover="80">phase</span> := <span class="nu">1</span>, <span class="const token" data-verso-hover="299">r1</span> := <span class="const token" data-verso-hover="63">insert</span> (s.<span class="const token" data-verso-hover="78">view</span>, xj.<span class="const token" data-verso-hover="212">1</span>, xj.<span class="const token" data-verso-hover="209">2</span>, s.<span class="const token" data-verso-hover="82">lock</span>.<span class="const token" data-verso-hover="206">qc</span>) s.<span class="const token" data-verso-hover="299">r1</span> }</span>
+<span id="L188">  <span class="kw">else</span> s</span>
+<span id="L189"></span>
+<span id="L190"><span class="dc">/-- The certificate of type `ty` for the current view from the current leader, if any. -/</span></span>
+<span id="L191"><span class="kw">def</span> <span class="const token" data-verso-hover="282">HasCert</span> (ty : <span class="const token" data-verso-hover="26">Phase</span>) (s : <span class="const token" data-verso-hover="75">RState</span> P C) (j : <span class="const token" data-verso-hover="197">QCm</span> P C) : <span class="kw">Prop</span> :=</span>
+<span id="L192">  (leader s.<span class="const token" data-verso-hover="78">view</span>, <span class="const token" data-verso-hover="199">Msg.cert</span> j) ∈ s.<span class="const token" data-verso-hover="90">buf</span> ∧ j.<span class="const token" data-verso-hover="206">qc</span>.<span class="const token" data-verso-hover="34">ty</span> = ty ∧ j.<span class="const token" data-verso-hover="206">qc</span>.<span class="const token" data-verso-hover="35">view</span> = s.<span class="const token" data-verso-hover="78">view</span> ∧ j.<span class="const token" data-verso-hover="205">ok</span> f</span>
+<span id="L193"></span>
+<span id="L194"><span class="dc">/-- `R2` (Lines 15-18). -/</span></span>
+<span id="L195"><span class="kw">noncomputable</span> <span class="kw">def</span> <span class="const token" data-verso-hover="130">R2</span> (s : <span class="const token" data-verso-hover="75">RState</span> P C) : <span class="const token" data-verso-hover="75">RState</span> P C :=</span>
+<span id="L196">  <span class="kw">if</span> h : s.<span class="const token" data-verso-hover="80">phase</span> = <span class="nu">1</span> ∧ ∃ j, <span class="const token" data-verso-hover="282">HasCert</span> f leader <span class="const token" data-verso-hover="27">.</span>prepare s j <span class="kw">then</span></span>
+<span id="L197">    <span class="kw">let</span> j := <span class="const token" data-verso-hover="273">Classical.choose</span> h.<span class="const token" data-verso-hover="253">2</span></span>
+<span id="L198">    { (s.<span class="const token" data-verso-hover="187">send</span> (<span class="const token" data-verso-hover="181">to1</span> (leader s.<span class="const token" data-verso-hover="78">view</span>) (<span class="const token" data-verso-hover="200">.</span>vote p ⟨<span class="const token" data-verso-hover="28">.</span>precommit, s.<span class="const token" data-verso-hover="78">view</span>, j.<span class="const token" data-verso-hover="206">qc</span>.<span class="const token" data-verso-hover="36">node</span>⟩))) <span class="kw">with</span></span>
+<span id="L199">      <span class="const token" data-verso-hover="80">phase</span> := <span class="nu">2</span>, <span class="const token" data-verso-hover="84">prepQC</span> := j, <span class="const token" data-verso-hover="88">votes</span> := <span class="const token" data-verso-hover="63">insert</span> ⟨<span class="const token" data-verso-hover="28">.</span>precommit, s.<span class="const token" data-verso-hover="78">view</span>, j.<span class="const token" data-verso-hover="206">qc</span>.<span class="const token" data-verso-hover="36">node</span>⟩ s.<span class="const token" data-verso-hover="88">votes</span> }</span>
+<span id="L200">  <span class="kw">else</span> s</span>
+<span id="L201"></span>
+<span id="L202"><span class="dc">/-- `R3` (Lines 23-26): lock and vote. -/</span></span>
+<span id="L203"><span class="kw">noncomputable</span> <span class="kw">def</span> <span class="const token" data-verso-hover="143">R3</span> (s : <span class="const token" data-verso-hover="75">RState</span> P C) : <span class="const token" data-verso-hover="75">RState</span> P C :=</span>
+<span id="L204">  <span class="kw">if</span> h : s.<span class="const token" data-verso-hover="80">phase</span> = <span class="nu">2</span> ∧ ∃ j, <span class="const token" data-verso-hover="282">HasCert</span> f leader <span class="const token" data-verso-hover="28">.</span>precommit s j <span class="kw">then</span></span>
+<span id="L205">    <span class="kw">let</span> j := <span class="const token" data-verso-hover="273">Classical.choose</span> h.<span class="const token" data-verso-hover="253">2</span></span>
+<span id="L206">    { (s.<span class="const token" data-verso-hover="187">send</span> (<span class="const token" data-verso-hover="181">to1</span> (leader s.<span class="const token" data-verso-hover="78">view</span>) (<span class="const token" data-verso-hover="200">.</span>vote p ⟨<span class="const token" data-verso-hover="29">.</span>commit, s.<span class="const token" data-verso-hover="78">view</span>, j.<span class="const token" data-verso-hover="206">qc</span>.<span class="const token" data-verso-hover="36">node</span>⟩))) <span class="kw">with</span></span>
+<span id="L207">      <span class="const token" data-verso-hover="80">phase</span> := <span class="nu">3</span>, <span class="const token" data-verso-hover="82">lock</span> := j, <span class="const token" data-verso-hover="88">votes</span> := <span class="const token" data-verso-hover="63">insert</span> ⟨<span class="const token" data-verso-hover="29">.</span>commit, s.<span class="const token" data-verso-hover="78">view</span>, j.<span class="const token" data-verso-hover="206">qc</span>.<span class="const token" data-verso-hover="36">node</span>⟩ s.<span class="const token" data-verso-hover="88">votes</span> }</span>
+<span id="L208">  <span class="kw">else</span> s</span>
+<span id="L209"></span>
+<span id="L210"><span class="dc">/-- Execute the branch led by `x`. -/</span></span>
+<span id="L211"><span class="kw">def</span> <span class="const token" data-verso-hover="195">RState.commitNode</span> (s : <span class="const token" data-verso-hover="75">RState</span> P C) (x : <span class="const token" data-verso-hover="23">Node</span> C) : <span class="const token" data-verso-hover="75">RState</span> P C :=</span>
+<span id="L212">  { s <span class="kw">with</span> <span class="const token" data-verso-hover="80">phase</span> := <span class="nu">4</span>, <span class="const token" data-verso-hover="86">committed</span> := <span class="const token" data-verso-hover="63">insert</span> x s.<span class="const token" data-verso-hover="86">committed</span>, <span class="const token" data-verso-hover="94">decs</span> := <span class="const token" data-verso-hover="63">insert</span> (s.<span class="const token" data-verso-hover="78">view</span>, x) s.<span class="const token" data-verso-hover="94">decs</span> }</span>
+<span id="L213"></span>
+<span id="L214"><span class="dc">/-- `R4` (Lines 31-34, then 35-36): execute the committed branch and start the next view. -/</span></span>
+<span id="L215"><span class="kw">noncomputable</span> <span class="kw">def</span> <span class="const token" data-verso-hover="156">R4</span> (s : <span class="const token" data-verso-hover="75">RState</span> P C) : <span class="const token" data-verso-hover="75">RState</span> P C :=</span>
+<span id="L216">  <span class="kw">if</span> h : s.<span class="const token" data-verso-hover="80">phase</span> = <span class="nu">3</span> ∧ ∃ j, <span class="const token" data-verso-hover="282">HasCert</span> f leader <span class="const token" data-verso-hover="29">.</span>commit s j <span class="kw">then</span></span>
+<span id="L217">    <span class="kw">let</span> j := <span class="const token" data-verso-hover="273">Classical.choose</span> h.<span class="const token" data-verso-hover="253">2</span></span>
+<span id="L218">    <span class="const token" data-verso-hover="165">enterView</span> leader (s.<span class="const token" data-verso-hover="195">commitNode</span> j.<span class="const token" data-verso-hover="206">qc</span>.<span class="const token" data-verso-hover="36">node</span>)</span>
+<span id="L219">  <span class="kw">else</span> s</span>
+<span id="L220"></span>
+<span id="L221"><span class="dc">/-- The received messages, paired with their senders. -/</span></span>
+<span id="L222"><span class="kw">noncomputable</span> <span class="kw">def</span> <span class="const token" data-verso-hover="286">received</span> (inbox : P → <span class="const token" data-verso-hover="24">List</span> (<span class="const token" data-verso-hover="186">Msg</span> P C)) : <span class="const token" data-verso-hover="24">List</span> (P × <span class="const token" data-verso-hover="186">Msg</span> P C) :=</span>
+<span id="L223">  <span class="const token" data-verso-hover="301">Finset.univ</span>.<span class="const token" data-verso-hover="303">toList</span>.<span class="const token" data-verso-hover="304">flatMap</span> <span class="kw">fun</span> q =&gt; (inbox q).<span class="const token" data-verso-hover="305">map</span> <span class="kw">fun</span> m =&gt; (q, m)</span>
+<span id="L224"></span>
+<span id="L225"><span class="dc">/-- Receive the inbox: append it to the buffer, clear the outbox, advance the clock. -/</span></span>
+<span id="L226"><span class="kw">noncomputable</span> <span class="kw">def</span> <span class="const token" data-verso-hover="289">recv</span> (s : <span class="const token" data-verso-hover="75">RState</span> P C) (inbox : P → <span class="const token" data-verso-hover="24">List</span> (<span class="const token" data-verso-hover="186">Msg</span> P C)) : <span class="const token" data-verso-hover="75">RState</span> P C :=</span>
+<span id="L227">  { s <span class="kw">with</span> <span class="const token" data-verso-hover="96">clock</span> := s.<span class="const token" data-verso-hover="96">clock</span> + <span class="nu">1</span>, <span class="const token" data-verso-hover="180">out</span> := <span class="kw">fun</span> _ =&gt; [], <span class="const token" data-verso-hover="90">buf</span> := s.<span class="const token" data-verso-hover="90">buf</span> ++ <span class="const token" data-verso-hover="286">received</span> inbox }</span>
+<span id="L228"></span>
+<span id="L229"><span class="dc">/-- One step: receive, run the leader handlers, the replica handlers, and the `nextView`</span></span>
+<span id="L230"><span class="dc">interrupt. -/</span></span>
+<span id="L231"><span class="kw">noncomputable</span> <span class="kw">def</span> <span class="const token" data-verso-hover="292">stepR</span> (s : <span class="const token" data-verso-hover="75">RState</span> P C) (inbox : P → <span class="const token" data-verso-hover="24">List</span> (<span class="const token" data-verso-hover="186">Msg</span> P C)) : <span class="const token" data-verso-hover="75">RState</span> P C :=</span>
+<span id="L232">  <span class="kw">let</span> s₀ := <span class="const token" data-verso-hover="289">recv</span> s inbox</span>
+<span id="L233">  <span class="kw">let</span> s₁ := <span class="const token" data-verso-hover="100">LQ</span> f leader p <span class="nu">3</span> (<span class="const token" data-verso-hover="100">LQ</span> f leader p <span class="nu">2</span> (<span class="const token" data-verso-hover="100">LQ</span> f leader p <span class="nu">1</span> (<span class="const token" data-verso-hover="77">L1</span> f leader p s₀)))</span>
+<span id="L234">  <span class="kw">let</span> s₂ := <span class="const token" data-verso-hover="156">R4</span> f leader (<span class="const token" data-verso-hover="143">R3</span> f leader p (<span class="const token" data-verso-hover="130">R2</span> f leader p (<span class="const token" data-verso-hover="113">R1</span> f leader p s₁)))</span>
+<span id="L235">  <span class="kw">if</span> s.<span class="const token" data-verso-hover="92">inp</span>.<span class="const token" data-verso-hover="212">1</span> s.<span class="const token" data-verso-hover="96">clock</span> <span class="kw">then</span> <span class="const token" data-verso-hover="165">enterView</span> leader s₂ <span class="kw">else</span> s₂</span>
+<span id="L236"></span>
+<span id="L237"><span class="kw">end</span> Handlers</span>
+<span id="L238"></span>
+<span id="L239"><span class="dc">/-- Initial state: view `1`, the "special new-view message from view `0`" to `leader 1`. -/</span></span>
+<span id="L240"><span class="kw">def</span> <span class="const token" data-verso-hover="306">RState.init</span> (leader : <span class="const token" data-verso-hover="32">ℕ</span> → P) (i : <span class="const token" data-verso-hover="296">Inp</span> C) : <span class="const token" data-verso-hover="75">RState</span> P C <span class="kw">where</span></span>
+<span id="L241">  <span class="const token" data-verso-hover="92">inp</span> := i</span>
+<span id="L242">  <span class="const token" data-verso-hover="96">clock</span> := <span class="nu">0</span></span>
+<span id="L243">  <span class="const token" data-verso-hover="78">view</span> := <span class="nu">1</span></span>
+<span id="L244">  <span class="const token" data-verso-hover="80">phase</span> := <span class="nu">0</span></span>
+<span id="L245">  <span class="const token" data-verso-hover="82">lock</span> := <span class="const token" data-verso-hover="239">QCm.gen</span></span>
+<span id="L246">  <span class="const token" data-verso-hover="84">prepQC</span> := <span class="const token" data-verso-hover="239">QCm.gen</span></span>
+<span id="L247">  <span class="const token" data-verso-hover="86">committed</span> := ∅</span>
+<span id="L248">  <span class="const token" data-verso-hover="88">votes</span> := ∅</span>
+<span id="L249">  <span class="const token" data-verso-hover="90">buf</span> := []</span>
+<span id="L250">  <span class="const token" data-verso-hover="115">lphase</span> := <span class="nu">0</span></span>
+<span id="L251">  <span class="const token" data-verso-hover="117">prop</span> := []</span>
+<span id="L252">  <span class="const token" data-verso-hover="119">high</span> := <span class="const token" data-verso-hover="239">QCm.gen</span></span>
+<span id="L253">  <span class="const token" data-verso-hover="180">out</span> := <span class="const token" data-verso-hover="181">to1</span> (leader <span class="nu">1</span>) (<span class="const token" data-verso-hover="182">.</span>newView <span class="nu">0</span> <span class="const token" data-verso-hover="239">QCm.gen</span>)</span>
+<span id="L254">  <span class="const token" data-verso-hover="111">props</span> := ∅</span>
+<span id="L255">  <span class="const token" data-verso-hover="98">made</span> := ∅</span>
+<span id="L256">  <span class="const token" data-verso-hover="94">decs</span> := ∅</span>
+<span id="L257">  <span class="const token" data-verso-hover="298">sent</span> := {(leader <span class="nu">1</span>, <span class="const token" data-verso-hover="182">.</span>newView <span class="nu">0</span> <span class="const token" data-verso-hover="239">QCm.gen</span>)}</span>
+<span id="L258">  <span class="const token" data-verso-hover="299">r1</span> := ∅</span>
+<span id="L259"></span>
+<span id="L260"><span class="dc">/-- **Basic HotStuff** as a partially synchronous algorithm, with fault parameter `f` and leader</span></span>
+<span id="L261"><span class="dc">schedule `leader`. -/</span></span>
+<span id="L262"><span class="kw">noncomputable</span> <span class="kw">def</span> <span class="const token" data-verso-hover="307">hotstuff</span> (f : <span class="const token" data-verso-hover="32">ℕ</span>) (leader : <span class="const token" data-verso-hover="32">ℕ</span> → P) :</span>
+<span id="L263">    <span class="const token" data-verso-hover="308">Algorithm</span> P (<span class="const token" data-verso-hover="186">Msg</span> P C) (<span class="const token" data-verso-hover="75">RState</span> P C) (<span class="const token" data-verso-hover="296">Inp</span> C) <span class="const token" data-verso-hover="309">Unit</span> <span class="kw">where</span></span>
+<span id="L264">  <span class="const token" data-verso-hover="310">init</span> _ i := <span class="const token" data-verso-hover="306">RState.init</span> leader i</span>
+<span id="L265">  <span class="const token" data-verso-hover="311">step</span> p s inbox := <span class="const token" data-verso-hover="292">stepR</span> f leader p s inbox</span>
+<span id="L266">  <span class="const token" data-verso-hover="312">send</span> _ s q := s.<span class="const token" data-verso-hover="180">out</span> q</span>
+<span id="L267">  <span class="const token" data-verso-hover="313">decide</span> _ _ := <span class="const token" data-verso-hover="59">none</span></span>
+<span id="L268"></span>
+<span id="L269"><span class="kw">end</span> HotStuff.Basic</span>
+<span id="L270"></span>
+</code></div>
+        <script>
+          window.versoHoversUrl = "PODC2019/HotStuff/-hovers.json";</script>
+        <script src="static/lean/popper.js"></script>
+        <script src="static/lean/tippy.js"></script>
+        <script src="static/lean/marked.js"></script>
+        <script src="static/lean/highlighting.js"></script>
+        <script src="static/lean/lean.js"></script>
+        </article></main><footer class="site-footer"><div class="wrap">
+        Machine-checked formalizations of PODC papers in Lean 4. Generated with <a href="https://github.com/leanprover/verso">Verso</a> from the README files of <a href="https://github.com/vasnesterov/formal_podc">vasnesterov/formal_podc</a>.</div>
+      </footer></body>
+  </html>
+

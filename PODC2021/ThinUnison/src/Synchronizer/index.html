@@ -1,0 +1,586 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="light dark">
+    <link rel="icon" href="data:,">
+    <title>ThinUnison: Synchronizer.lean · Formal PODC</title><base href="../../../.././"><link rel="stylesheet" href="static/lean/verso-vars.css">
+    <link rel="stylesheet" href="static/lean/highlighting.css">
+    <link rel="stylesheet" href="static/lean/tippy-border.css">
+    <link rel="stylesheet" href="static/style.css">
+    <script defer="defer" src="static/site.js"></script>
+    </head>
+  <body>
+    <header class="site-header">
+      <div class="wrap">
+        <a class="brand" href=".">Formal PODC</a><nav class="top">
+          <a href=".">Search</a><a href="about/">About</a><a href="https://github.com/vasnesterov/formal_podc">GitHub</a></nav>
+        </div>
+      </header>
+    <main class="wrap"><article><nav class="breadcrumbs" aria-label="Breadcrumb">
+          <a href=".">Search</a><span class="sep">›</span><a href="PODC2021/">PODC 2021</a><span class="sep">›</span><a href="PODC2021/ThinUnison/">ThinUnison</a><span class="sep">›</span><a href="PODC2021/ThinUnison/src/">Lean source</a><span class="sep">›</span><span aria-current="page">Synchronizer</span></nav>
+        <h1>
+          <code>Synchronizer.lean</code></h1>
+        <div class="paper-links">
+          <p>
+            Source of <a href="PODC2021/ThinUnison/">A Thin Self-Stabilizing Asynchronous Unison Algorithm — PODC 2021</a> · <a href="https://github.com/vasnesterov/formal_podc/blob/main/Papers/PODC2021/ThinUnison/Synchronizer.lean">GitHub</a> · hover over a name for its type and documentation</p>
+          </div>
+        <div class="lean-code lean-src">
+          <code class="hl lean block" data-lean-context="Synchronizer"><span id="L1"><span class="kw">import</span> Papers.PODC2021.ThinUnison.Main</span>
+<span id="L2"><span class="kw">import</span> Cslib.Computability.Distributed.SelfStabilization.Daemon</span>
+<span id="L3"></span>
+<span id="L4"><span class="dc">/-!</span></span>
+<span id="L5"><span class="dc"># Corollary 1.2 of [EK21]: a self-stabilizing synchronizer (Section 4)</span></span>
+<span id="L6"></span>
+<span id="L7"><span class="dc">Emek, Keren. *A Thin Self-Stabilizing Asynchronous Unison Algorithm with Applications to Fault</span></span>
+<span id="L8"><span class="dc">Tolerant Biological Networks*, PODC 2021 ([EK21]), Section 4.</span></span>
+<span id="L9"></span>
+<span id="L10"><span class="dc">Given a (deterministic) synchronous SA algorithm `Π` with state set `Q`, the synchronizer `Π*`</span></span>
+<span id="L11"><span class="dc">has state set `Q × Q × Turn k`: a state `(q, q', ν)` consists of the current simulated `Π`-state</span></span>
+<span id="L12"><span class="dc">`q`, the previous simulated `Π`-state `q'` and an AlgAU turn `ν`. Every node runs AlgAU on the</span></span>
+<span id="L13"><span class="dc">third coordinate; when AlgAU performs an AA transition (the only transitions that advance the</span></span>
+<span id="L14"><span class="dc">clock, from the able turn `ν` to the able turn `ν' = φ(ν)‾`), the node moves from `(q, q', ν)` to</span></span>
+<span id="L15"><span class="dc">`(p, q, ν')`, where `p = δ_Π(q, S)` and `S` is the *simulated signal*: the set of `r` such that the</span></span>
+<span id="L16"><span class="dc">node senses some `Π*`-state `(r, ·, ν)` or `(·, r, ν')`. Otherwise the first two coordinates are</span></span>
+<span id="L17"><span class="dc">kept. The output of `(q, q', ν)` is `ω(q)` if `ν` is able (and `q` is an output state of `Π`).</span></span>
+<span id="L18"><span class="dc">The state space has `|Q|² (4k - 2) = O(D |Q|²)` states.</span></span>
+<span id="L19"></span>
+<span id="L20"><span class="dc">## Main results</span></span>
+<span id="L21"></span>
+<span id="L22"><span class="dc">* `synchronizer`, `synchOutput`: the construction.</span></span>
+<span id="L23"><span class="dc">* `synchronizer_isRun_auPart`: the third coordinate of an execution of `Π*` is an execution of</span></span>
+<span id="L24"><span class="dc">  AlgAU.</span></span>
+<span id="L25"><span class="dc">* `allGood_stab`: the configuration of AlgAU is good from time `R(N(D))` on (extracted from the</span></span>
+<span id="L26"><span class="dc">  proof of Theorem 1.1).</span></span>
+<span id="L27"><span class="dc">* `corollary_1_2_general`, `corollary_1_2`: **Corollary 1.2 of [EK21]** for deterministic `Π` and</span></span>
+<span id="L28"><span class="dc">  *static* tasks (outputs eventually constant): if `Π` synchronously stabilizes within `f` rounds,</span></span>
+<span id="L29"><span class="dc">  then `Π*` stabilizes under every fair schedule within `N(D) + D + f` rounds, to an output vector</span></span>
+<span id="L30"><span class="dc">  that `Π` would also produce.</span></span>
+<span id="L31"></span>
+<span id="L32"><span class="dc">## Proof</span></span>
+<span id="L33"></span>
+<span id="L34"><span class="dc">After `T = R(N(D))` the AlgAU component is good forever. We lift the clocks to integers</span></span>
+<span id="L35"><span class="dc">(`uclk`, see `Good.lean`): `U_v(t)` changes exactly at the AA steps of `v`, neighbours differ by at</span></span>
+<span id="L36"><span class="dc">most one, and `pos(λ_v(t)) ≡ B + U_v(t) (mod 2k)`. Let `j₀ = max_v U_v(T)`. For `j ≥ j₀` let</span></span>
+<span id="L37"><span class="dc">`X(v, j)` be the first coordinate of `v` while `U_v = j` (`simState`). When `v` advances from `j`</span></span>
+<span id="L38"><span class="dc">to `j + 1`, every node of `N⁺(v)` has `U ∈ {j, j + 1}`; a node with `U = j` has turn `ν` and first</span></span>
+<span id="L39"><span class="dc">coordinate `X(u, j)`, a node with `U = j + 1` has turn `φ(ν)‾` and second coordinate `X(u, j)`.</span></span>
+<span id="L40"><span class="dc">Hence the simulated signal is exactly the `Π`-signal of `v` under `X(·, j)`, and</span></span>
+<span id="L41"><span class="dc">`X(·, j + 1)` is one synchronous step of `Π` from `X(·, j)` (`simState_succ`).</span></span>
+<span id="L42"><span class="dc">-/</span></span>
+<span id="L43"></span>
+<span id="L44"><span class="kw">namespace</span> ThinUnison</span>
+<span id="L45"></span>
+<span id="L46"><span class="kw">open</span> Cslib.StoneAge</span>
+<span id="L47"></span>
+<span id="L48"><span class="kw">variable</span> {V Q : <span class="kw">Type</span>*}</span>
+<span id="L49"></span>
+<span id="L50"><span class="dc">/-! ## The construction -/</span></span>
+<span id="L51"></span>
+<span id="L52"><span class="dc">/-- The simulated `Π`-signal of a node in turn `ν` sensing the set `S` of `Π*`-states (Section 4</span></span>
+<span id="L53"><span class="dc">of [EK21]): all `r` such that some state `(r, ·, ν)` or `(·, r, φ(ν)‾)` is sensed. -/</span></span>
+<span id="L54"><span class="kw">def</span> <span class="const token" data-verso-hover="449">simSignal</span> {k : <span class="const token" data-verso-hover="45">ℕ</span>} (ν : <span class="const token" data-verso-hover="79">Turn</span> k) (S : <span class="const token" data-verso-hover="54">Set</span> (Q × Q × <span class="const token" data-verso-hover="79">Turn</span> k)) : <span class="const token" data-verso-hover="54">Set</span> Q :=</span>
+<span id="L55">  {r | ∃ x ∈ S, (x.<span class="const token" data-verso-hover="407">1</span> = r ∧ x.<span class="const token" data-verso-hover="408">2</span><span class="nu">.</span><span class="const token" data-verso-hover="408">2</span> = ν) ∨ (x.<span class="const token" data-verso-hover="408">2</span><span class="nu">.</span><span class="const token" data-verso-hover="407">1</span> = r ∧ x.<span class="const token" data-verso-hover="408">2</span><span class="nu">.</span><span class="const token" data-verso-hover="408">2</span> = ν.<span class="const token" data-verso-hover="85">aa</span>)}</span>
+<span id="L56"></span>
+<span id="L57"><span class="kw">open</span> Classical <span class="kw">in</span></span>
+<span id="L58"><span class="dc">/-- The synchronizer `Π*` of Section 4 of [EK21] applied to a deterministic SA algorithm `Π`,</span></span>
+<span id="L59"><span class="dc">with AlgAU parameter `k`. A state `(q, q', ν)`: current simulated state, previous simulated</span></span>
+<span id="L60"><span class="dc">state, AlgAU turn. If AlgAU performs an AA transition (`ν` able and the AA condition holds for the</span></span>
+<span id="L61"><span class="dc">sensed turns), the node moves to `(δ_Π(q, S), q, φ(ν)‾)` with `S` the simulated signal; otherwise</span></span>
+<span id="L62"><span class="dc">it keeps `q, q'` and applies AlgAU's transition function to `ν`. -/</span></span>
+<span id="L63"><span class="kw">noncomputable</span> <span class="kw">def</span> <span class="const token" data-verso-hover="450">synchronizer</span> (P : <span class="const token" data-verso-hover="41">Algorithm</span> Q) (k : <span class="const token" data-verso-hover="45">ℕ</span>) : <span class="const token" data-verso-hover="41">Algorithm</span> (Q × Q × <span class="const token" data-verso-hover="79">Turn</span> k) <span class="kw">where</span></span>
+<span id="L64">  <span class="const token" data-verso-hover="451">δ</span> s S :=</span>
+<span id="L65">    <span class="kw">if</span> s.<span class="const token" data-verso-hover="408">2</span><span class="nu">.</span><span class="const token" data-verso-hover="408">2</span>.<span class="const token" data-verso-hover="81">faulty</span> = <span class="const token" data-verso-hover="86">false</span> ∧ <span class="const token" data-verso-hover="89">AACond</span> s.<span class="const token" data-verso-hover="408">2</span><span class="nu">.</span><span class="const token" data-verso-hover="408">2</span> ((<span class="kw">fun</span> x =&gt; x.<span class="const token" data-verso-hover="408">2</span><span class="nu">.</span><span class="const token" data-verso-hover="408">2</span>) '' S) <span class="kw">then</span></span>
+<span id="L66">      (P.<span class="const token" data-verso-hover="451">δ</span> s.<span class="const token" data-verso-hover="407">1</span> (<span class="const token" data-verso-hover="449">simSignal</span> s.<span class="const token" data-verso-hover="408">2</span><span class="nu">.</span><span class="const token" data-verso-hover="408">2</span> S), s.<span class="const token" data-verso-hover="407">1</span>, s.<span class="const token" data-verso-hover="408">2</span><span class="nu">.</span><span class="const token" data-verso-hover="408">2</span>.<span class="const token" data-verso-hover="85">aa</span>)</span>
+<span id="L67">    <span class="kw">else</span> (s.<span class="const token" data-verso-hover="407">1</span>, s.<span class="const token" data-verso-hover="408">2</span><span class="nu">.</span><span class="const token" data-verso-hover="407">1</span>, <span class="const token" data-verso-hover="92">δ</span> k s.<span class="const token" data-verso-hover="408">2</span><span class="nu">.</span><span class="const token" data-verso-hover="408">2</span> ((<span class="kw">fun</span> x =&gt; x.<span class="const token" data-verso-hover="408">2</span><span class="nu">.</span><span class="const token" data-verso-hover="408">2</span>) '' S))</span>
+<span id="L68"></span>
+<span id="L69"><span class="dc">/-- The output of the synchronizer: `ω(q)` for a state `(q, q', ν)` with `ν` able (`none` encodes</span></span>
+<span id="L70"><span class="dc">non-output states). -/</span></span>
+<span id="L71"><span class="kw">def</span> <span class="const token" data-verso-hover="452">synchOutput</span> {O : <span class="kw">Type</span>*} {k : <span class="const token" data-verso-hover="45">ℕ</span>} (ω : Q → <span class="const token" data-verso-hover="100">Option</span> O) (s : Q × Q × <span class="const token" data-verso-hover="79">Turn</span> k) : <span class="const token" data-verso-hover="100">Option</span> O :=</span>
+<span id="L72">  <span class="kw">if</span> s.<span class="const token" data-verso-hover="408">2</span><span class="nu">.</span><span class="const token" data-verso-hover="408">2</span>.<span class="const token" data-verso-hover="81">faulty</span> <span class="kw">then</span> <span class="const token" data-verso-hover="101">none</span> <span class="kw">else</span> ω s.<span class="const token" data-verso-hover="407">1</span></span>
+<span id="L73"></span>
+<span id="L74"><span class="dc">/-- The AlgAU component of a `Π*`-execution. -/</span></span>
+<span id="L75"><span class="kw">def</span> <span class="const token" data-verso-hover="453">auPart</span> {k : <span class="const token" data-verso-hover="45">ℕ</span>} (C : <span class="const token" data-verso-hover="45">ℕ</span> → V → Q × Q × <span class="const token" data-verso-hover="79">Turn</span> k) : <span class="const token" data-verso-hover="45">ℕ</span> → V → <span class="const token" data-verso-hover="79">Turn</span> k := <span class="kw">fun</span> t v =&gt; (C t v).<span class="const token" data-verso-hover="408">2</span><span class="nu">.</span><span class="const token" data-verso-hover="408">2</span></span>
+<span id="L76"></span>
+<span id="L77"><span class="dc">/-- The third coordinate of `Π*` follows AlgAU. -/</span></span>
+<span id="L78"><span class="kw">theorem</span> <span class="const token" data-verso-hover="454">synchronizer_δ_snd_snd</span> (P : <span class="const token" data-verso-hover="41">Algorithm</span> Q) (k : <span class="const token" data-verso-hover="45">ℕ</span>) (s : Q × Q × <span class="const token" data-verso-hover="79">Turn</span> k)</span>
+<span id="L79">    (S : <span class="const token" data-verso-hover="54">Set</span> (Q × Q × <span class="const token" data-verso-hover="79">Turn</span> k)) :</span>
+<span id="L80">    ((<span class="const token" data-verso-hover="450">synchronizer</span> P k).<span class="const token" data-verso-hover="451">δ</span> s S).<span class="const token" data-verso-hover="408">2</span><span class="nu">.</span><span class="const token" data-verso-hover="408">2</span> = <span class="const token" data-verso-hover="92">δ</span> k s.<span class="const token" data-verso-hover="408">2</span><span class="nu">.</span><span class="const token" data-verso-hover="408">2</span> ((<span class="kw">fun</span> x =&gt; x.<span class="const token" data-verso-hover="408">2</span><span class="nu">.</span><span class="const token" data-verso-hover="408">2</span>) '' S) := <span class="kw">by</span></span>
+<span id="L81">  <span class="kw">unfold</span> <span class="const token" data-verso-hover="450">synchronizer</span></span>
+<span id="L82">  <span class="kw">dsimp</span> only</span>
+<span id="L83">  <span class="kw">split_ifs</span> <span class="kw">with</span> h</span>
+<span id="L84">  · <span class="kw">unfold</span> <span class="const token" data-verso-hover="92">δ</span>; <span class="kw">simp</span> [h.<span class="const token" data-verso-hover="93">1</span>, h.<span class="const token" data-verso-hover="95">2</span>]</span>
+<span id="L85">  · <span class="kw">rfl</span></span>
+<span id="L86"></span>
+<span id="L87"><span class="kw">theorem</span> <span class="const token" data-verso-hover="455">signal_map</span> (G : <span class="const token" data-verso-hover="31">SimpleGraph</span> V) {R : <span class="kw">Type</span>*} (f : Q → R) (C : V → Q) (v : V) :</span>
+<span id="L88">    <span class="const token" data-verso-hover="30">signal</span> G (<span class="kw">fun</span> w =&gt; f (C w)) v = f '' <span class="const token" data-verso-hover="30">signal</span> G C v := <span class="kw">by</span></span>
+<span id="L89">  <span class="kw">ext</span> r</span>
+<span id="L90">  <span class="kw">constructor</span></span>
+<span id="L91">  · <span class="kw">rintro</span> ⟨u, hu, <span class="kw">rfl</span>⟩; <span class="kw">exact</span> ⟨C u, ⟨u, hu, <span class="const token" data-verso-hover="36">rfl</span>⟩, <span class="const token" data-verso-hover="36">rfl</span>⟩</span>
+<span id="L92">  · <span class="kw">rintro</span> ⟨x, ⟨u, hu, <span class="kw">rfl</span>⟩, <span class="kw">rfl</span>⟩; <span class="kw">exact</span> ⟨u, hu, <span class="const token" data-verso-hover="36">rfl</span>⟩</span>
+<span id="L93"></span>
+<span id="L94"><span class="kw">theorem</span> <span class="const token" data-verso-hover="456">fwd_ne</span> {k : <span class="const token" data-verso-hover="45">ℕ</span>} {ℓ : <span class="const token" data-verso-hover="66">ℤ</span>} (h : <span class="const token" data-verso-hover="65">IsLevel</span> k ℓ) : <span class="const token" data-verso-hover="67">fwd</span> k ℓ ≠ ℓ := <span class="kw">by</span> lvl_omega</span>
+<span id="L95"></span>
+<span id="L96"><span class="kw">section</span> Run</span>
+<span id="L97"></span>
+<span id="L98"><span class="kw">variable</span> {G : <span class="const token" data-verso-hover="31">SimpleGraph</span> V} {P : <span class="const token" data-verso-hover="41">Algorithm</span> Q} {k : <span class="const token" data-verso-hover="45">ℕ</span>} {A : <span class="const token" data-verso-hover="45">ℕ</span> → <span class="const token" data-verso-hover="54">Set</span> V}</span>
+<span id="L99">  {C : <span class="const token" data-verso-hover="45">ℕ</span> → V → Q × Q × <span class="const token" data-verso-hover="79">Turn</span> k}</span>
+<span id="L100"></span>
+<span id="L101"><span class="dc">/-- The AlgAU component of an execution of `Π*` is an execution of AlgAU. -/</span></span>
+<span id="L102"><span class="kw">theorem</span> <span class="const token" data-verso-hover="457">synchronizer_isRun_auPart</span> (hC : <span class="const token" data-verso-hover="439">IsRun</span> G (<span class="const token" data-verso-hover="450">synchronizer</span> P k) A C) :</span>
+<span id="L103">    <span class="const token" data-verso-hover="132">AURun</span> G A (<span class="const token" data-verso-hover="453">auPart</span> C) := <span class="kw">by</span></span>
+<span id="L104">  <span class="kw">refine</span> ⟨<span class="kw">fun</span> t =&gt; <span class="const token" data-verso-hover="458">funext</span> <span class="kw">fun</span> v =&gt; ?_⟩</span>
+<span id="L105">  <span class="kw">classical</span></span>
+<span id="L106">  <span class="kw">by_cases</span> hv : v ∈ A t</span>
+<span id="L107">  · <span class="kw">simp</span> only [<span class="const token" data-verso-hover="459">step</span>, hv, <span class="const token" data-verso-hover="445">ite_true</span>]</span>
+<span id="L108">    <span class="kw">show</span> (C (t + <span class="nu">1</span>) v).<span class="const token" data-verso-hover="408">2</span><span class="nu">.</span><span class="const token" data-verso-hover="408">2</span> = _</span>
+<span id="L109">    <span class="kw">rw</span> [hC.<span class="const token" data-verso-hover="49">succ_of_mem</span> hv, <span class="const token" data-verso-hover="454">synchronizer_δ_snd_snd</span>,</span>
+<span id="L110">      ← <span class="const token" data-verso-hover="455">signal_map</span> G (<span class="kw">fun</span> x : Q × Q × <span class="const token" data-verso-hover="79">Turn</span> k =&gt; x.<span class="const token" data-verso-hover="408">2</span><span class="nu">.</span><span class="const token" data-verso-hover="408">2</span>) (C t) v]</span>
+<span id="L111">    <span class="kw">rfl</span></span>
+<span id="L112">  · <span class="kw">simp</span> only [<span class="const token" data-verso-hover="459">step</span>, hv, <span class="const token" data-verso-hover="167">ite_false</span>]</span>
+<span id="L113">    <span class="kw">show</span> (C (t + <span class="nu">1</span>) v).<span class="const token" data-verso-hover="408">2</span><span class="nu">.</span><span class="const token" data-verso-hover="408">2</span> = _</span>
+<span id="L114">    <span class="kw">rw</span> [hC.<span class="const token" data-verso-hover="56">succ_of_not_mem</span> hv]; <span class="kw">rfl</span></span>
+<span id="L115"></span>
+<span id="L116"><span class="dc">/-- If the AlgAU component does not change, the whole `Π*`-state does not change. -/</span></span>
+<span id="L117"><span class="kw">theorem</span> <span class="const token" data-verso-hover="460">eq_of_auPart_eq</span> (hC : <span class="const token" data-verso-hover="439">IsRun</span> G (<span class="const token" data-verso-hover="450">synchronizer</span> P k) A C) {t : <span class="const token" data-verso-hover="45">ℕ</span>} {v : V}</span>
+<span id="L118">    (h : <span class="const token" data-verso-hover="453">auPart</span> C (t + <span class="nu">1</span>) v = <span class="const token" data-verso-hover="453">auPart</span> C t v) : C (t + <span class="nu">1</span>) v = C t v := <span class="kw">by</span></span>
+<span id="L119">  <span class="kw">by_cases</span> hv : v ∈ A t</span>
+<span id="L120">  · <span class="kw">simp</span> only [<span class="const token" data-verso-hover="453">auPart</span>] <span class="kw">at</span> h</span>
+<span id="L121">    <span class="kw">rw</span> [hC.<span class="const token" data-verso-hover="49">succ_of_mem</span> hv] <span class="kw">at</span> h ⊢</span>
+<span id="L122">    <span class="kw">unfold</span> <span class="const token" data-verso-hover="450">synchronizer</span> <span class="kw">at</span> h ⊢</span>
+<span id="L123">    <span class="kw">dsimp</span> only <span class="kw">at</span> h ⊢</span>
+<span id="L124">    <span class="kw">split_ifs</span> <span class="kw">at</span> h ⊢ <span class="kw">with</span> h'</span>
+<span id="L125">    · <span class="kw">exact</span> <span class="const token" data-verso-hover="173">absurd</span> (<span class="const token" data-verso-hover="461">congrArg</span> <span class="const token" data-verso-hover="80">Turn.lvl</span> h) (<span class="const token" data-verso-hover="456">fwd_ne</span> (C t v).<span class="const token" data-verso-hover="408">2</span><span class="nu">.</span><span class="const token" data-verso-hover="408">2</span>.<span class="const token" data-verso-hover="82">isLevel</span>)</span>
+<span id="L126">    · <span class="kw">exact</span> <span class="const token" data-verso-hover="462">Prod.ext</span> <span class="const token" data-verso-hover="36">rfl</span> (<span class="const token" data-verso-hover="462">Prod.ext</span> <span class="const token" data-verso-hover="36">rfl</span> h)</span>
+<span id="L127">  · <span class="kw">exact</span> hC.<span class="const token" data-verso-hover="56">succ_of_not_mem</span> hv</span>
+<span id="L128"></span>
+<span id="L129"><span class="dc">/-- An AA transition of AlgAU performs one simulated step of `Π`. -/</span></span>
+<span id="L130"><span class="kw">theorem</span> <span class="const token" data-verso-hover="463">succ_of_aa</span> (hC : <span class="const token" data-verso-hover="439">IsRun</span> G (<span class="const token" data-verso-hover="450">synchronizer</span> P k) A C) {t : <span class="const token" data-verso-hover="45">ℕ</span>} {v : V} (hv : v ∈ A t)</span>
+<span id="L131">    (hf : (C t v).<span class="const token" data-verso-hover="408">2</span><span class="nu">.</span><span class="const token" data-verso-hover="408">2</span>.<span class="const token" data-verso-hover="81">faulty</span> = <span class="const token" data-verso-hover="86">false</span>) (h : <span class="const token" data-verso-hover="134">AAN</span> G (<span class="const token" data-verso-hover="453">auPart</span> C) t v) :</span>
+<span id="L132">    C (t + <span class="nu">1</span>) v = (P.<span class="const token" data-verso-hover="451">δ</span> (C t v).<span class="const token" data-verso-hover="407">1</span> (<span class="const token" data-verso-hover="449">simSignal</span> (C t v).<span class="const token" data-verso-hover="408">2</span><span class="nu">.</span><span class="const token" data-verso-hover="408">2</span> (<span class="const token" data-verso-hover="30">signal</span> G (C t) v)), (C t v).<span class="const token" data-verso-hover="407">1</span>,</span>
+<span id="L133">      (C t v).<span class="const token" data-verso-hover="408">2</span><span class="nu">.</span><span class="const token" data-verso-hover="408">2</span>.<span class="const token" data-verso-hover="85">aa</span>) := <span class="kw">by</span></span>
+<span id="L134">  <span class="kw">have</span> h' : <span class="const token" data-verso-hover="89">AACond</span> (C t v).<span class="const token" data-verso-hover="408">2</span><span class="nu">.</span><span class="const token" data-verso-hover="408">2</span> ((<span class="kw">fun</span> x =&gt; x.<span class="const token" data-verso-hover="408">2</span><span class="nu">.</span><span class="const token" data-verso-hover="408">2</span>) '' <span class="const token" data-verso-hover="30">signal</span> G (C t) v) := <span class="kw">by</span></span>
+<span id="L135">    <span class="kw">rw</span> [← <span class="const token" data-verso-hover="455">signal_map</span> G (<span class="kw">fun</span> x : Q × Q × <span class="const token" data-verso-hover="79">Turn</span> k =&gt; x.<span class="const token" data-verso-hover="408">2</span><span class="nu">.</span><span class="const token" data-verso-hover="408">2</span>) (C t) v]</span>
+<span id="L136">    <span class="kw">exact</span> <span class="const token" data-verso-hover="431">aaCond_signal_iff</span>.<span class="const token" data-verso-hover="124">2</span> ⟨hf, h⟩</span>
+<span id="L137">  <span class="kw">rw</span> [hC.<span class="const token" data-verso-hover="49">succ_of_mem</span> hv]</span>
+<span id="L138">  <span class="kw">unfold</span> <span class="const token" data-verso-hover="450">synchronizer</span></span>
+<span id="L139">  <span class="kw">dsimp</span> only</span>
+<span id="L140">  <span class="kw">simp</span> only [hf, h', <span class="const token" data-verso-hover="464">and_self</span>, <span class="const token" data-verso-hover="445">ite_true</span>]</span>
+<span id="L141"></span>
+<span id="L142"><span class="kw">end</span> Run</span>
+<span id="L143"></span>
+<span id="L144"><span class="dc">/-! ## Auxiliary facts -/</span></span>
+<span id="L145"></span>
+<span id="L146"><span class="kw">theorem</span> <span class="const token" data-verso-hover="465">uclk_succ_cases</span> {k : <span class="const token" data-verso-hover="45">ℕ</span>} {C : <span class="const token" data-verso-hover="45">ℕ</span> → V → <span class="const token" data-verso-hover="79">Turn</span> k} (o : V → <span class="const token" data-verso-hover="66">ℤ</span>) {T s : <span class="const token" data-verso-hover="45">ℕ</span>} (v : V)</span>
+<span id="L147">    (hs : T ≤ s) :</span>
+<span id="L148">    <span class="const token" data-verso-hover="146">uclk</span> C o T (s + <span class="nu">1</span>) v = <span class="const token" data-verso-hover="146">uclk</span> C o T s v ∨ <span class="const token" data-verso-hover="146">uclk</span> C o T (s + <span class="nu">1</span>) v = <span class="const token" data-verso-hover="146">uclk</span> C o T s v + <span class="nu">1</span> := <span class="kw">by</span></span>
+<span id="L149">  <span class="kw">rw</span> [<span class="const token" data-verso-hover="153">uclk_succ</span> o v hs]; <span class="kw">split_ifs</span> &lt;;&gt; <span class="kw">simp</span></span>
+<span id="L150"></span>
+<span id="L151"><span class="dc">/-- The good configuration of AlgAU after `N(D)` rounds (extracted from the proof of</span></span>
+<span id="L152"><span class="dc">Theorem 1.1 of [EK21]): for any execution of AlgAU with `k ≥ 3D + 2` on a graph of diameter at</span></span>
+<span id="L153"><span class="dc">most `D` under a fair schedule, the graph is good at time `R(N(D))` (and hence forever after, by</span></span>
+<span id="L154"><span class="dc">Lemma 2.10). -/</span></span>
+<span id="L155"><span class="kw">theorem</span> <span class="const token" data-verso-hover="466">allGood_stab</span> {G : <span class="const token" data-verso-hover="31">SimpleGraph</span> V} [<span class="const token" data-verso-hover="184">Finite</span> V] {D k : <span class="const token" data-verso-hover="45">ℕ</span>} (hDk : <span class="nu">3</span> * D + <span class="nu">2</span> ≤ k)</span>
+<span id="L156">    (hD : G.<span class="const token" data-verso-hover="194">ediam</span> ≤ D) {A : <span class="const token" data-verso-hover="45">ℕ</span> → <span class="const token" data-verso-hover="54">Set</span> V} (hA : <span class="const token" data-verso-hover="57">Fair</span> A) {C : <span class="const token" data-verso-hover="45">ℕ</span> → V → <span class="const token" data-verso-hover="79">Turn</span> k} (hC : <span class="const token" data-verso-hover="132">AURun</span> G A C) :</span>
+<span id="L157">    <span class="const token" data-verso-hover="111">AllGood</span> G C (<span class="const token" data-verso-hover="264">R</span> A (<span class="const token" data-verso-hover="252">stabRoundsK</span> k D)) := <span class="kw">by</span></span>
+<span id="L158">  <span class="kw">have</span> hk1 : <span class="nu">1</span> ≤ k := <span class="kw">by</span> <span class="kw">omega</span></span>
+<span id="L159">  <span class="kw">set</span> T0 := <span class="const token" data-verso-hover="264">R</span> A (<span class="const token" data-verso-hover="253">outRounds</span> k <span class="nu">1</span>) <span class="kw">with</span> hT0</span>
+<span id="L160">  <span class="kw">have</span> hop : ∀ t, T0 ≤ t → <span class="const token" data-verso-hover="109">AllOutProt</span> G C t := <span class="kw">fun</span> t ht =&gt; hC.<span class="const token" data-verso-hover="21">corollary_2_15</span> hA hk1 ht</span>
+<span id="L161">  <span class="kw">set</span> T1 := (<span class="const token" data-verso-hover="185">rho</span> A)^[<span class="nu">2</span> * k - <span class="nu">3</span>] T0 <span class="kw">with</span> hT1</span>
+<span id="L162">  <span class="kw">have</span> hjust : ∀ t, T1 ≤ t → <span class="const token" data-verso-hover="113">Justified</span> G C t := <span class="kw">fun</span> t ht =&gt; hC.<span class="const token" data-verso-hover="23">corollary_2_17</span> hA hop ht</span>
+<span id="L163">  <span class="kw">have</span> hT01 : T0 ≤ T1 := <span class="const token" data-verso-hover="219">le_rho_iter</span> hA _ _</span>
+<span id="L164">  <span class="kw">have</span> hpersist : ∀ s, T1 ≤ s → <span class="const token" data-verso-hover="110">AllProt</span> G C s → <span class="const token" data-verso-hover="110">AllProt</span> G C (s + <span class="nu">1</span>) := <span class="kw">fun</span> s hs h =&gt;</span>
+<span id="L165">    <span class="kw">fun</span> v =&gt; (hC.<span class="const token" data-verso-hover="137">allGood_succ</span> (<span class="const token" data-verso-hover="24">AURun.lemma_2_18</span> (hjust s hs) h) v).<span class="const token" data-verso-hover="93">1</span></span>
+<span id="L166">  <span class="kw">have</span> hprot := hC.<span class="const token" data-verso-hover="8">lemma_2_22</span> hA hDk hD (hop T1 hT01) hpersist</span>
+<span id="L167">  <span class="kw">set</span> T2 := (<span class="const token" data-verso-hover="185">rho</span> A)^[(D + <span class="nu">1</span>) * (<span class="nu">2</span> * ((k - <span class="nu">1</span>) * (<span class="nu">2</span> * k - <span class="nu">2</span>)))] T1 <span class="kw">with</span> hT2</span>
+<span id="L168">  <span class="kw">have</span> hT12 : T1 ≤ T2 := <span class="const token" data-verso-hover="219">le_rho_iter</span> hA _ _</span>
+<span id="L169">  <span class="kw">have</span> hgood : <span class="const token" data-verso-hover="111">AllGood</span> G C T2 := <span class="const token" data-verso-hover="24">AURun.lemma_2_18</span> (hjust T2 hT12) hprot</span>
+<span id="L170">  <span class="kw">have</span> hR : <span class="const token" data-verso-hover="264">R</span> A (<span class="const token" data-verso-hover="252">stabRoundsK</span> k D) = T2 := <span class="kw">by</span></span>
+<span id="L171">    <span class="kw">rw</span> [hT2, hT1, hT0, <span class="const token" data-verso-hover="264">R</span>, <span class="const token" data-verso-hover="264">R</span>, <span class="const token" data-verso-hover="266">rho_iter_add</span>, <span class="const token" data-verso-hover="266">rho_iter_add</span>]; <span class="kw">rfl</span></span>
+<span id="L172">  <span class="kw">rw</span> [hR]; <span class="kw">exact</span> hgood</span>
+<span id="L173"></span>
+<span id="L174"><span class="kw">open</span> Classical <span class="kw">in</span></span>
+<span id="L175"><span class="dc">/-- The simulated configuration of round `j` (relative to the unwrapped clocks `uclk` with start</span></span>
+<span id="L176"><span class="dc">time `T` and offsets `o`): the first coordinate of `w` at some time `τ ≥ T` with `U_w(τ) = j`. -/</span></span>
+<span id="L177"><span class="kw">noncomputable</span> <span class="kw">def</span> <span class="const token" data-verso-hover="467">simState</span> {k : <span class="const token" data-verso-hover="45">ℕ</span>} (C : <span class="const token" data-verso-hover="45">ℕ</span> → V → Q × Q × <span class="const token" data-verso-hover="79">Turn</span> k) (o : V → <span class="const token" data-verso-hover="66">ℤ</span>) (T : <span class="const token" data-verso-hover="45">ℕ</span>) (j : <span class="const token" data-verso-hover="66">ℤ</span>)</span>
+<span id="L178">    (w : V) : Q :=</span>
+<span id="L179">  <span class="kw">if</span> h : ∃ τ, T ≤ τ ∧ <span class="const token" data-verso-hover="146">uclk</span> (<span class="const token" data-verso-hover="453">auPart</span> C) o T τ w = j <span class="kw">then</span> (C h.<span class="const token" data-verso-hover="468">choose</span> w).<span class="const token" data-verso-hover="407">1</span> <span class="kw">else</span> (C T w).<span class="const token" data-verso-hover="407">1</span></span>
+<span id="L180"></span>
+<span id="L181"><span class="dc">/-! ## The simulation -/</span></span>
+<span id="L182"></span>
+<span id="L183"><span class="kw">section</span> Sim</span>
+<span id="L184"></span>
+<span id="L185"><span class="kw">variable</span> {G : <span class="const token" data-verso-hover="31">SimpleGraph</span> V} {P : <span class="const token" data-verso-hover="41">Algorithm</span> Q} {k : <span class="const token" data-verso-hover="45">ℕ</span>} {A : <span class="const token" data-verso-hover="45">ℕ</span> → <span class="const token" data-verso-hover="54">Set</span> V}</span>
+<span id="L186">  {C : <span class="const token" data-verso-hover="45">ℕ</span> → V → Q × Q × <span class="const token" data-verso-hover="79">Turn</span> k} (hC : <span class="const token" data-verso-hover="439">IsRun</span> G (<span class="const token" data-verso-hover="450">synchronizer</span> P k) A C) {T : <span class="const token" data-verso-hover="45">ℕ</span>}</span>
+<span id="L187">  (hg : <span class="const token" data-verso-hover="111">AllGood</span> G (<span class="const token" data-verso-hover="453">auPart</span> C) T) {o : V → <span class="const token" data-verso-hover="66">ℤ</span>}</span>
+<span id="L188"></span>
+<span id="L189"><span class="kw">include</span> hC hg</span>
+<span id="L190"></span>
+<span id="L191"><span class="dc">/-- While the unwrapped clock does not change, the `Π*`-state does not change. -/</span></span>
+<span id="L192"><span class="kw">theorem</span> <span class="const token" data-verso-hover="469">eq_of_uclk_eq</span> {t t' : <span class="const token" data-verso-hover="45">ℕ</span>} {w : V} (ht : T ≤ t) (htt' : t ≤ t')</span>
+<span id="L193">    (h : <span class="const token" data-verso-hover="146">uclk</span> (<span class="const token" data-verso-hover="453">auPart</span> C) o T t' w = <span class="const token" data-verso-hover="146">uclk</span> (<span class="const token" data-verso-hover="453">auPart</span> C) o T t w) : C t' w = C t w := <span class="kw">by</span></span>
+<span id="L194">  <span class="kw">revert</span> h</span>
+<span id="L195">  <span class="kw">induction</span> t', htt' <span class="kw">using</span> <span class="const token" data-verso-hover="140">Nat.le_induction</span> <span class="kw">with</span></span>
+<span id="L196">  | base =&gt; <span class="kw">intro</span>; <span class="kw">rfl</span></span>
+<span id="L197">  | <span class="const token" data-verso-hover="141">succ</span> n hn ih =&gt;</span>
+<span id="L198">    <span class="kw">intro</span> h</span>
+<span id="L199">    <span class="kw">have</span> m1 := <span class="const token" data-verso-hover="158">uclk_mono</span> (C := <span class="const token" data-verso-hover="453">auPart</span> C) o w (t := T) hn</span>
+<span id="L200">    <span class="kw">have</span> m2 := <span class="const token" data-verso-hover="158">uclk_mono</span> (C := <span class="const token" data-verso-hover="453">auPart</span> C) o w (t := T) (<span class="kw">show</span> n ≤ n + <span class="nu">1</span> <span class="kw">by</span> <span class="kw">omega</span>)</span>
+<span id="L201">    <span class="kw">have</span> hn' : <span class="const token" data-verso-hover="146">uclk</span> (<span class="const token" data-verso-hover="453">auPart</span> C) o T n w = <span class="const token" data-verso-hover="146">uclk</span> (<span class="const token" data-verso-hover="453">auPart</span> C) o T t w := <span class="kw">by</span> <span class="kw">omega</span></span>
+<span id="L202">    <span class="kw">rw</span> [← ih hn']</span>
+<span id="L203">    <span class="kw">apply</span> <span class="const token" data-verso-hover="460">eq_of_auPart_eq</span> hC</span>
+<span id="L204">    <span class="kw">have</span> hgn := (<span class="const token" data-verso-hover="457">synchronizer_isRun_auPart</span> hC).<span class="const token" data-verso-hover="139">allGood_le</span> hg (ht.<span class="const token" data-verso-hover="180">trans</span> hn)</span>
+<span id="L205">    <span class="kw">apply</span> (<span class="const token" data-verso-hover="457">synchronizer_isRun_auPart</span> hC).<span class="const token" data-verso-hover="172">eq_of_not_chg</span> hgn</span>
+<span id="L206">    <span class="kw">intro</span> hc</span>
+<span id="L207">    <span class="kw">have</span> := <span class="const token" data-verso-hover="153">uclk_succ</span> (C := <span class="const token" data-verso-hover="453">auPart</span> C) o w (ht.<span class="const token" data-verso-hover="180">trans</span> hn)</span>
+<span id="L208">    <span class="kw">rw</span> [<span class="const token" data-verso-hover="177">ite_eq_left</span> hc] <span class="kw">at</span> this</span>
+<span id="L209">    <span class="kw">omega</span></span>
+<span id="L210"></span>
+<span id="L211"><span class="dc">/-- A `+1` step of the unwrapped clock is an AA transition. -/</span></span>
+<span id="L212"><span class="kw">theorem</span> <span class="const token" data-verso-hover="470">aa_of_uclk_succ</span> {t : <span class="const token" data-verso-hover="45">ℕ</span>} {w : V} (ht : T ≤ t)</span>
+<span id="L213">    (h : <span class="const token" data-verso-hover="146">uclk</span> (<span class="const token" data-verso-hover="453">auPart</span> C) o T (t + <span class="nu">1</span>) w = <span class="const token" data-verso-hover="146">uclk</span> (<span class="const token" data-verso-hover="453">auPart</span> C) o T t w + <span class="nu">1</span>) :</span>
+<span id="L214">    w ∈ A t ∧ <span class="const token" data-verso-hover="134">AAN</span> G (<span class="const token" data-verso-hover="453">auPart</span> C) t w := <span class="kw">by</span></span>
+<span id="L215">  <span class="kw">have</span> hgt := (<span class="const token" data-verso-hover="457">synchronizer_isRun_auPart</span> hC).<span class="const token" data-verso-hover="139">allGood_le</span> hg ht</span>
+<span id="L216">  <span class="kw">have</span> hc : <span class="const token" data-verso-hover="99">output</span> (<span class="const token" data-verso-hover="453">auPart</span> C (t + <span class="nu">1</span>) w) ≠ <span class="const token" data-verso-hover="99">output</span> (<span class="const token" data-verso-hover="453">auPart</span> C t w) := <span class="kw">by</span></span>
+<span id="L217">    <span class="kw">intro</span> hc</span>
+<span id="L218">    <span class="kw">have</span> := <span class="const token" data-verso-hover="153">uclk_succ</span> (C := <span class="const token" data-verso-hover="453">auPart</span> C) o w ht</span>
+<span id="L219">    <span class="kw">rw</span> [<span class="const token" data-verso-hover="178">ite_eq_right</span> (<span class="const token" data-verso-hover="380">not_not</span>.<span class="const token" data-verso-hover="124">2</span> hc)] <span class="kw">at</span> this; <span class="kw">omega</span></span>
+<span id="L220">  <span class="kw">obtain</span> ⟨h1, h2, -⟩ := (<span class="const token" data-verso-hover="457">synchronizer_isRun_auPart</span> hC).<span class="const token" data-verso-hover="174">aa_of_chg</span> hgt hc</span>
+<span id="L221">  <span class="kw">exact</span> ⟨h1, h2⟩</span>
+<span id="L222"></span>
+<span id="L223"><span class="dc">/-- A `+1` step of the unwrapped clock performs one simulated step of `Π`. -/</span></span>
+<span id="L224"><span class="kw">theorem</span> <span class="const token" data-verso-hover="471">succ_of_uclk_succ</span> {t : <span class="const token" data-verso-hover="45">ℕ</span>} {w : V} (ht : T ≤ t)</span>
+<span id="L225">    (h : <span class="const token" data-verso-hover="146">uclk</span> (<span class="const token" data-verso-hover="453">auPart</span> C) o T (t + <span class="nu">1</span>) w = <span class="const token" data-verso-hover="146">uclk</span> (<span class="const token" data-verso-hover="453">auPart</span> C) o T t w + <span class="nu">1</span>) :</span>
+<span id="L226">    C (t + <span class="nu">1</span>) w = (P.<span class="const token" data-verso-hover="451">δ</span> (C t w).<span class="const token" data-verso-hover="407">1</span> (<span class="const token" data-verso-hover="449">simSignal</span> (C t w).<span class="const token" data-verso-hover="408">2</span><span class="nu">.</span><span class="const token" data-verso-hover="408">2</span> (<span class="const token" data-verso-hover="30">signal</span> G (C t) w)), (C t w).<span class="const token" data-verso-hover="407">1</span>,</span>
+<span id="L227">      (C t w).<span class="const token" data-verso-hover="408">2</span><span class="nu">.</span><span class="const token" data-verso-hover="408">2</span>.<span class="const token" data-verso-hover="85">aa</span>) := <span class="kw">by</span></span>
+<span id="L228">  <span class="kw">obtain</span> ⟨hw, haan⟩ := <span class="const token" data-verso-hover="470">aa_of_uclk_succ</span> hC hg ht h</span>
+<span id="L229">  <span class="kw">exact</span> <span class="const token" data-verso-hover="463">succ_of_aa</span> hC hw (((<span class="const token" data-verso-hover="457">synchronizer_isRun_auPart</span> hC).<span class="const token" data-verso-hover="139">allGood_le</span> hg ht w).<span class="const token" data-verso-hover="95">2</span><span class="nu">.</span><span class="const token" data-verso-hover="93">1</span>) haan</span>
+<span id="L230"></span>
+<span id="L231"><span class="dc">/-- The first coordinate of `w` at time `t ≥ T` is the simulated state of round `U_w(t)`. -/</span></span>
+<span id="L232"><span class="kw">theorem</span> <span class="const token" data-verso-hover="472">fst_eq_simState</span> {t : <span class="const token" data-verso-hover="45">ℕ</span>} {w : V} (ht : T ≤ t) :</span>
+<span id="L233">    (C t w).<span class="const token" data-verso-hover="407">1</span> = <span class="const token" data-verso-hover="467">simState</span> C o T (<span class="const token" data-verso-hover="146">uclk</span> (<span class="const token" data-verso-hover="453">auPart</span> C) o T t w) w := <span class="kw">by</span></span>
+<span id="L234">  <span class="kw">have</span> h : ∃ τ, T ≤ τ ∧ <span class="const token" data-verso-hover="146">uclk</span> (<span class="const token" data-verso-hover="453">auPart</span> C) o T τ w = <span class="const token" data-verso-hover="146">uclk</span> (<span class="const token" data-verso-hover="453">auPart</span> C) o T t w := ⟨t, ht, <span class="const token" data-verso-hover="36">rfl</span>⟩</span>
+<span id="L235">  <span class="kw">rw</span> [<span class="const token" data-verso-hover="467">simState</span>, <span class="const token" data-verso-hover="473">dite_eq_left</span> h]</span>
+<span id="L236">  <span class="kw">obtain</span> ⟨h3, h4⟩ := h.<span class="const token" data-verso-hover="474">choose_spec</span></span>
+<span id="L237">  <span class="kw">rcases</span> <span class="const token" data-verso-hover="475">le_total</span> t h.<span class="const token" data-verso-hover="468">choose</span> <span class="kw">with</span> h5 | h5</span>
+<span id="L238">  · <span class="kw">rw</span> [<span class="const token" data-verso-hover="469">eq_of_uclk_eq</span> hC hg ht h5 h4]</span>
+<span id="L239">  · <span class="kw">rw</span> [<span class="const token" data-verso-hover="469">eq_of_uclk_eq</span> hC hg h3 h5 h4.<span class="const token" data-verso-hover="39">symm</span>]</span>
+<span id="L240"></span>
+<span id="L241"><span class="dc">/-- The second coordinate of `w` at time `t ≥ T` with `U_w(t) = j + 1 &gt; o_w` is the simulated</span></span>
+<span id="L242"><span class="dc">state of round `j`. -/</span></span>
+<span id="L243"><span class="kw">theorem</span> <span class="const token" data-verso-hover="476">snd_eq_simState</span> {t : <span class="const token" data-verso-hover="45">ℕ</span>} {w : V} {j : <span class="const token" data-verso-hover="66">ℤ</span>} (ht : T ≤ t) (hj : o w ≤ j)</span>
+<span id="L244">    (hU : <span class="const token" data-verso-hover="146">uclk</span> (<span class="const token" data-verso-hover="453">auPart</span> C) o T t w = j + <span class="nu">1</span>) : (C t w).<span class="const token" data-verso-hover="408">2</span><span class="nu">.</span><span class="const token" data-verso-hover="407">1</span> = <span class="const token" data-verso-hover="467">simState</span> C o T j w := <span class="kw">by</span></span>
+<span id="L245">  <span class="kw">have</span> hT : <span class="const token" data-verso-hover="146">uclk</span> (<span class="const token" data-verso-hover="453">auPart</span> C) o T T w = o w := <span class="const token" data-verso-hover="148">uclk_self</span> o T w</span>
+<span id="L246">  <span class="kw">obtain</span> ⟨s, hs1, hs2, hs3, hs4⟩ := <span class="const token" data-verso-hover="477">Int.exists_eq_and_succ_eq_of_le_add_one</span></span>
+<span id="L247">    (f := <span class="kw">fun</span> s =&gt; <span class="const token" data-verso-hover="146">uclk</span> (<span class="const token" data-verso-hover="453">auPart</span> C) o T s w) (a := T) (b := t) (j := j) (hab := ht)</span>
+<span id="L248">    (<span class="kw">fun</span> s hs _ =&gt; <span class="kw">by</span></span>
+<span id="L249">      <span class="kw">rcases</span> <span class="const token" data-verso-hover="465">uclk_succ_cases</span> (C := <span class="const token" data-verso-hover="453">auPart</span> C) o w hs <span class="kw">with</span> h | h &lt;;&gt; <span class="kw">simp</span> only [h] &lt;;&gt; <span class="kw">omega</span>)</span>
+<span id="L250">    (<span class="kw">by</span> <span class="kw">simp</span> only [hT]; <span class="kw">omega</span>) (<span class="kw">by</span> <span class="kw">simp</span> only [hU]; <span class="kw">omega</span>)</span>
+<span id="L251">  <span class="kw">have</span> e1 := <span class="const token" data-verso-hover="471">succ_of_uclk_succ</span> hC hg hs1 (<span class="kw">by</span> <span class="kw">rw</span> [hs3, hs4])</span>
+<span id="L252">  <span class="kw">have</span> e2 := <span class="const token" data-verso-hover="469">eq_of_uclk_eq</span> hC hg (hs1.<span class="const token" data-verso-hover="180">trans</span> (<span class="const token" data-verso-hover="478">Nat.le_succ</span> s)) hs2 (<span class="kw">by</span> <span class="kw">rw</span> [hs4, hU])</span>
+<span id="L253">  <span class="kw">rw</span> [e2, e1]</span>
+<span id="L254">  <span class="kw">dsimp</span> only</span>
+<span id="L255">  <span class="kw">rw</span> [<span class="const token" data-verso-hover="472">fst_eq_simState</span> hC hg hs1, hs3]</span>
+<span id="L256"></span>
+<span id="L257"><span class="kw">variable</span> (hk : <span class="nu">2</span> ≤ k) {B : <span class="const token" data-verso-hover="98">ZMod</span> (<span class="nu">2</span> * k)}</span>
+<span id="L258">  (h1 : ∀ v, (<span class="const token" data-verso-hover="96">pos</span> k (<span class="const token" data-verso-hover="453">auPart</span> C T v).<span class="const token" data-verso-hover="80">lvl</span> : <span class="const token" data-verso-hover="98">ZMod</span> (<span class="nu">2</span> * k)) = B + (o v : <span class="const token" data-verso-hover="98">ZMod</span> (<span class="nu">2</span> * k)))</span>
+<span id="L259">  (h2 : ∀ u v, G.<span class="const token" data-verso-hover="105">Adj</span> u v → o u ≤ o v + <span class="nu">1</span>)</span>
+<span id="L260"></span>
+<span id="L261"><span class="kw">include</span> hk h1 h2</span>
+<span id="L262"></span>
+<span id="L263"><span class="dc">/-- Nearby nodes have the same turn iff they have the same unwrapped clock. -/</span></span>
+<span id="L264"><span class="kw">theorem</span> <span class="const token" data-verso-hover="479">auPart_eq_iff</span> {s : <span class="const token" data-verso-hover="45">ℕ</span>} {v w : V} (hs : T ≤ s)</span>
+<span id="L265">    (hw1 : <span class="const token" data-verso-hover="146">uclk</span> (<span class="const token" data-verso-hover="453">auPart</span> C) o T s w ≤ <span class="const token" data-verso-hover="146">uclk</span> (<span class="const token" data-verso-hover="453">auPart</span> C) o T s v + <span class="nu">1</span>)</span>
+<span id="L266">    (hw2 : <span class="const token" data-verso-hover="146">uclk</span> (<span class="const token" data-verso-hover="453">auPart</span> C) o T s v ≤ <span class="const token" data-verso-hover="146">uclk</span> (<span class="const token" data-verso-hover="453">auPart</span> C) o T s w + <span class="nu">1</span>) :</span>
+<span id="L267">    <span class="const token" data-verso-hover="453">auPart</span> C s w = <span class="const token" data-verso-hover="453">auPart</span> C s v ↔ <span class="const token" data-verso-hover="146">uclk</span> (<span class="const token" data-verso-hover="453">auPart</span> C) o T s w = <span class="const token" data-verso-hover="146">uclk</span> (<span class="const token" data-verso-hover="453">auPart</span> C) o T s v := <span class="kw">by</span></span>
+<span id="L268">  <span class="kw">have</span> hgs := (<span class="const token" data-verso-hover="457">synchronizer_isRun_auPart</span> hC).<span class="const token" data-verso-hover="139">allGood_le</span> hg hs</span>
+<span id="L269">  <span class="kw">obtain</span> ⟨i1, -⟩ := (<span class="const token" data-verso-hover="457">synchronizer_isRun_auPart</span> hC).<span class="const token" data-verso-hover="176">uclk_inv</span> hk hg o B h1 h2 hs</span>
+<span id="L270">  <span class="kw">constructor</span></span>
+<span id="L271">  · <span class="kw">intro</span> h</span>
+<span id="L272">    <span class="kw">have</span> e := i1 w</span>
+<span id="L273">    <span class="kw">rw</span> [h, i1 v] <span class="kw">at</span> e</span>
+<span id="L274">    <span class="kw">exact</span> <span class="const token" data-verso-hover="120">eq_of_intCast_eq</span> (n := <span class="nu">2</span> * k) (<span class="const token" data-verso-hover="480">add_left_cancel</span> e).<span class="const token" data-verso-hover="39">symm</span> (<span class="kw">by</span> <span class="kw">push_cast</span>; <span class="kw">omega</span>)</span>
+<span id="L275">      (<span class="kw">by</span> <span class="kw">push_cast</span>; <span class="kw">omega</span>)</span>
+<span id="L276">  · <span class="kw">intro</span> h</span>
+<span id="L277">    <span class="kw">apply</span> <span class="const token" data-verso-hover="481">Turn.ext</span></span>
+<span id="L278">    · <span class="kw">exact</span> <span class="const token" data-verso-hover="127">eq_of_pos_cast</span> (<span class="const token" data-verso-hover="453">auPart</span> C s w).<span class="const token" data-verso-hover="82">isLevel</span> (<span class="const token" data-verso-hover="453">auPart</span> C s v).<span class="const token" data-verso-hover="82">isLevel</span> (<span class="kw">by</span> <span class="kw">rw</span> [i1, i1, h])</span>
+<span id="L279">    · <span class="kw">rw</span> [(hgs w).<span class="const token" data-verso-hover="95">2</span><span class="nu">.</span><span class="const token" data-verso-hover="93">1</span>, (hgs v).<span class="const token" data-verso-hover="95">2</span><span class="nu">.</span><span class="const token" data-verso-hover="93">1</span>]</span>
+<span id="L280"></span>
+<span id="L281"><span class="dc">/-- A nearby node is in turn `φ(ν)‾` (`ν` the turn of `v`) iff its unwrapped clock is one more. -/</span></span>
+<span id="L282"><span class="kw">theorem</span> <span class="const token" data-verso-hover="482">auPart_eq_aa_iff</span> {s : <span class="const token" data-verso-hover="45">ℕ</span>} {v w : V} (hs : T ≤ s)</span>
+<span id="L283">    (hw1 : <span class="const token" data-verso-hover="146">uclk</span> (<span class="const token" data-verso-hover="453">auPart</span> C) o T s w ≤ <span class="const token" data-verso-hover="146">uclk</span> (<span class="const token" data-verso-hover="453">auPart</span> C) o T s v + <span class="nu">1</span>)</span>
+<span id="L284">    (hw2 : <span class="const token" data-verso-hover="146">uclk</span> (<span class="const token" data-verso-hover="453">auPart</span> C) o T s v ≤ <span class="const token" data-verso-hover="146">uclk</span> (<span class="const token" data-verso-hover="453">auPart</span> C) o T s w + <span class="nu">1</span>) :</span>
+<span id="L285">    <span class="const token" data-verso-hover="453">auPart</span> C s w = (<span class="const token" data-verso-hover="453">auPart</span> C s v).<span class="const token" data-verso-hover="85">aa</span> ↔</span>
+<span id="L286">      <span class="const token" data-verso-hover="146">uclk</span> (<span class="const token" data-verso-hover="453">auPart</span> C) o T s w = <span class="const token" data-verso-hover="146">uclk</span> (<span class="const token" data-verso-hover="453">auPart</span> C) o T s v + <span class="nu">1</span> := <span class="kw">by</span></span>
+<span id="L287">  <span class="kw">have</span> hgs := (<span class="const token" data-verso-hover="457">synchronizer_isRun_auPart</span> hC).<span class="const token" data-verso-hover="139">allGood_le</span> hg hs</span>
+<span id="L288">  <span class="kw">obtain</span> ⟨i1, -⟩ := (<span class="const token" data-verso-hover="457">synchronizer_isRun_auPart</span> hC).<span class="const token" data-verso-hover="176">uclk_inv</span> hk hg o B h1 h2 hs</span>
+<span id="L289">  <span class="kw">have</span> ea : (<span class="const token" data-verso-hover="96">pos</span> k (<span class="const token" data-verso-hover="453">auPart</span> C s v).<span class="const token" data-verso-hover="85">aa</span>.<span class="const token" data-verso-hover="80">lvl</span> : <span class="const token" data-verso-hover="98">ZMod</span> (<span class="nu">2</span> * k)) =</span>
+<span id="L290">      B + ((<span class="const token" data-verso-hover="146">uclk</span> (<span class="const token" data-verso-hover="453">auPart</span> C) o T s v + <span class="nu">1</span> : <span class="const token" data-verso-hover="66">ℤ</span>) : <span class="const token" data-verso-hover="98">ZMod</span> (<span class="nu">2</span> * k)) := <span class="kw">by</span></span>
+<span id="L291">    <span class="kw">rw</span> [<span class="kw">show</span> (<span class="const token" data-verso-hover="453">auPart</span> C s v).<span class="const token" data-verso-hover="85">aa</span>.<span class="const token" data-verso-hover="80">lvl</span> = <span class="const token" data-verso-hover="67">fwd</span> k (<span class="const token" data-verso-hover="453">auPart</span> C s v).<span class="const token" data-verso-hover="80">lvl</span> <span class="kw">from</span> <span class="const token" data-verso-hover="36">rfl</span>,</span>
+<span id="L292">      <span class="const token" data-verso-hover="125">pos_fwd_cast</span> (<span class="const token" data-verso-hover="453">auPart</span> C s v).<span class="const token" data-verso-hover="82">isLevel</span>, i1 v]</span>
+<span id="L293">    <span class="kw">push_cast</span>; <span class="kw">ring</span></span>
+<span id="L294">  <span class="kw">constructor</span></span>
+<span id="L295">  · <span class="kw">intro</span> h</span>
+<span id="L296">    <span class="kw">have</span> e := i1 w</span>
+<span id="L297">    <span class="kw">rw</span> [h, ea] <span class="kw">at</span> e</span>
+<span id="L298">    <span class="kw">exact</span> <span class="const token" data-verso-hover="120">eq_of_intCast_eq</span> (n := <span class="nu">2</span> * k) (<span class="const token" data-verso-hover="480">add_left_cancel</span> e).<span class="const token" data-verso-hover="39">symm</span> (<span class="kw">by</span> <span class="kw">push_cast</span>; <span class="kw">omega</span>)</span>
+<span id="L299">      (<span class="kw">by</span> <span class="kw">push_cast</span>; <span class="kw">omega</span>)</span>
+<span id="L300">  · <span class="kw">intro</span> h</span>
+<span id="L301">    <span class="kw">apply</span> <span class="const token" data-verso-hover="481">Turn.ext</span></span>
+<span id="L302">    · <span class="kw">exact</span> <span class="const token" data-verso-hover="127">eq_of_pos_cast</span> (<span class="const token" data-verso-hover="453">auPart</span> C s w).<span class="const token" data-verso-hover="82">isLevel</span> (<span class="const token" data-verso-hover="453">auPart</span> C s v).<span class="const token" data-verso-hover="85">aa</span>.<span class="const token" data-verso-hover="82">isLevel</span></span>
+<span id="L303">        (<span class="kw">by</span> <span class="kw">rw</span> [i1, ea, h])</span>
+<span id="L304">    · <span class="kw">rw</span> [(hgs w).<span class="const token" data-verso-hover="95">2</span><span class="nu">.</span><span class="const token" data-verso-hover="93">1</span>]; <span class="kw">rfl</span></span>
+<span id="L305"></span>
+<span id="L306"><span class="dc">/-- At an AA step of `v`, all neighbours have unwrapped clock `U_v` or `U_v + 1`. -/</span></span>
+<span id="L307"><span class="kw">theorem</span> <span class="const token" data-verso-hover="483">uclk_of_aan</span> {s : <span class="const token" data-verso-hover="45">ℕ</span>} {v u : V} (hs : T ≤ s) (haan : <span class="const token" data-verso-hover="134">AAN</span> G (<span class="const token" data-verso-hover="453">auPart</span> C) s v)</span>
+<span id="L308">    (hu : G.<span class="const token" data-verso-hover="105">Adj</span> v u) :</span>
+<span id="L309">    <span class="const token" data-verso-hover="146">uclk</span> (<span class="const token" data-verso-hover="453">auPart</span> C) o T s u = <span class="const token" data-verso-hover="146">uclk</span> (<span class="const token" data-verso-hover="453">auPart</span> C) o T s v ∨</span>
+<span id="L310">      <span class="const token" data-verso-hover="146">uclk</span> (<span class="const token" data-verso-hover="453">auPart</span> C) o T s u = <span class="const token" data-verso-hover="146">uclk</span> (<span class="const token" data-verso-hover="453">auPart</span> C) o T s v + <span class="nu">1</span> := <span class="kw">by</span></span>
+<span id="L311">  <span class="kw">have</span> hgs := (<span class="const token" data-verso-hover="457">synchronizer_isRun_auPart</span> hC).<span class="const token" data-verso-hover="139">allGood_le</span> hg hs</span>
+<span id="L312">  <span class="kw">obtain</span> ⟨-, i2⟩ := (<span class="const token" data-verso-hover="457">synchronizer_isRun_auPart</span> hC).<span class="const token" data-verso-hover="176">uclk_inv</span> hk hg o B h1 h2 hs</span>
+<span id="L313">  <span class="kw">have</span> b1 := i2 u v hu.<span class="const token" data-verso-hover="138">symm</span></span>
+<span id="L314">  <span class="kw">have</span> b2 := i2 v u hu</span>
+<span id="L315">  <span class="kw">rcases</span> (haan u hu).<span class="const token" data-verso-hover="95">2</span> <span class="kw">with</span> hl | hl</span>
+<span id="L316">  · <span class="kw">left</span></span>
+<span id="L317">    <span class="kw">exact</span> (<span class="const token" data-verso-hover="479">auPart_eq_iff</span> hC hg hk h1 h2 hs b1 b2).<span class="const token" data-verso-hover="199">1</span></span>
+<span id="L318">      (<span class="const token" data-verso-hover="481">Turn.ext</span> hl (<span class="kw">by</span> <span class="kw">rw</span> [(haan u hu).<span class="const token" data-verso-hover="93">1</span>, (hgs v).<span class="const token" data-verso-hover="95">2</span><span class="nu">.</span><span class="const token" data-verso-hover="93">1</span>]))</span>
+<span id="L319">  · <span class="kw">right</span></span>
+<span id="L320">    <span class="kw">exact</span> (<span class="const token" data-verso-hover="482">auPart_eq_aa_iff</span> hC hg hk h1 h2 hs b1 b2).<span class="const token" data-verso-hover="199">1</span> (<span class="const token" data-verso-hover="481">Turn.ext</span> hl (<span class="kw">by</span> <span class="kw">rw</span> [(haan u hu).<span class="const token" data-verso-hover="93">1</span>]; <span class="kw">rfl</span>))</span>
+<span id="L321"></span>
+<span id="L322"><span class="dc">/-- The key step: at an AA step of `v` at time `s ≥ T` with `U_v(s) = j ≥ max_w o_w`, the</span></span>
+<span id="L323"><span class="dc">simulated signal is the `Π`-signal of `v` under the simulated configuration of round `j`. -/</span></span>
+<span id="L324"><span class="kw">theorem</span> <span class="const token" data-verso-hover="484">simSignal_eq</span> {s : <span class="const token" data-verso-hover="45">ℕ</span>} {v : V} (hs : T ≤ s) (haan : <span class="const token" data-verso-hover="134">AAN</span> G (<span class="const token" data-verso-hover="453">auPart</span> C) s v)</span>
+<span id="L325">    (hj : ∀ w, o w ≤ <span class="const token" data-verso-hover="146">uclk</span> (<span class="const token" data-verso-hover="453">auPart</span> C) o T s v) :</span>
+<span id="L326">    <span class="const token" data-verso-hover="449">simSignal</span> (C s v).<span class="const token" data-verso-hover="408">2</span><span class="nu">.</span><span class="const token" data-verso-hover="408">2</span> (<span class="const token" data-verso-hover="30">signal</span> G (C s) v) =</span>
+<span id="L327">      <span class="const token" data-verso-hover="30">signal</span> G (<span class="const token" data-verso-hover="467">simState</span> C o T (<span class="const token" data-verso-hover="146">uclk</span> (<span class="const token" data-verso-hover="453">auPart</span> C) o T s v)) v := <span class="kw">by</span></span>
+<span id="L328">  <span class="kw">obtain</span> ⟨-, i2⟩ := (<span class="const token" data-verso-hover="457">synchronizer_isRun_auPart</span> hC).<span class="const token" data-verso-hover="176">uclk_inv</span> hk hg o B h1 h2 hs</span>
+<span id="L329">  <span class="kw">have</span> hr : ∀ w, (w = v ∨ G.<span class="const token" data-verso-hover="105">Adj</span> v w) →</span>
+<span id="L330">      <span class="const token" data-verso-hover="146">uclk</span> (<span class="const token" data-verso-hover="453">auPart</span> C) o T s w = <span class="const token" data-verso-hover="146">uclk</span> (<span class="const token" data-verso-hover="453">auPart</span> C) o T s v ∨</span>
+<span id="L331">        <span class="const token" data-verso-hover="146">uclk</span> (<span class="const token" data-verso-hover="453">auPart</span> C) o T s w = <span class="const token" data-verso-hover="146">uclk</span> (<span class="const token" data-verso-hover="453">auPart</span> C) o T s v + <span class="nu">1</span> := <span class="kw">by</span></span>
+<span id="L332">    <span class="kw">rintro</span> w (<span class="kw">rfl</span> | hw)</span>
+<span id="L333">    · <span class="kw">left</span>; <span class="kw">rfl</span></span>
+<span id="L334">    · <span class="kw">exact</span> <span class="const token" data-verso-hover="483">uclk_of_aan</span> hC hg hk h1 h2 hs haan hw</span>
+<span id="L335">  <span class="kw">ext</span> r</span>
+<span id="L336">  <span class="kw">constructor</span></span>
+<span id="L337">  · <span class="kw">rintro</span> ⟨x, ⟨w, hw, <span class="kw">rfl</span>⟩, hx | hx⟩</span>
+<span id="L338">    · <span class="kw">refine</span> ⟨w, hw, ?_⟩</span>
+<span id="L339">      <span class="kw">have</span> hU := (<span class="const token" data-verso-hover="479">auPart_eq_iff</span> hC hg hk h1 h2 hs (<span class="kw">by</span> <span class="kw">have</span> := hr w hw; <span class="kw">omega</span>)</span>
+<span id="L340">        (<span class="kw">by</span> <span class="kw">have</span> := hr w hw; <span class="kw">omega</span>)).<span class="const token" data-verso-hover="199">1</span> hx.<span class="const token" data-verso-hover="95">2</span></span>
+<span id="L341">      <span class="kw">rw</span> [← hx.<span class="const token" data-verso-hover="93">1</span>, <span class="const token" data-verso-hover="472">fst_eq_simState</span> hC hg hs, hU]</span>
+<span id="L342">    · <span class="kw">refine</span> ⟨w, hw, ?_⟩</span>
+<span id="L343">      <span class="kw">have</span> hU := (<span class="const token" data-verso-hover="482">auPart_eq_aa_iff</span> hC hg hk h1 h2 hs (<span class="kw">by</span> <span class="kw">have</span> := hr w hw; <span class="kw">omega</span>)</span>
+<span id="L344">        (<span class="kw">by</span> <span class="kw">have</span> := hr w hw; <span class="kw">omega</span>)).<span class="const token" data-verso-hover="199">1</span> hx.<span class="const token" data-verso-hover="95">2</span></span>
+<span id="L345">      <span class="kw">rw</span> [← hx.<span class="const token" data-verso-hover="93">1</span>, <span class="const token" data-verso-hover="476">snd_eq_simState</span> hC hg hs (hj w) hU]</span>
+<span id="L346">  · <span class="kw">rintro</span> ⟨w, hw, <span class="kw">rfl</span>⟩</span>
+<span id="L347">    <span class="kw">refine</span> ⟨C s w, ⟨w, hw, <span class="const token" data-verso-hover="36">rfl</span>⟩, ?_⟩</span>
+<span id="L348">    <span class="kw">have</span> b1 : <span class="const token" data-verso-hover="146">uclk</span> (<span class="const token" data-verso-hover="453">auPart</span> C) o T s w ≤ <span class="const token" data-verso-hover="146">uclk</span> (<span class="const token" data-verso-hover="453">auPart</span> C) o T s v + <span class="nu">1</span> := <span class="kw">by</span></span>
+<span id="L349">      <span class="kw">have</span> := hr w hw; <span class="kw">omega</span></span>
+<span id="L350">    <span class="kw">have</span> b2 : <span class="const token" data-verso-hover="146">uclk</span> (<span class="const token" data-verso-hover="453">auPart</span> C) o T s v ≤ <span class="const token" data-verso-hover="146">uclk</span> (<span class="const token" data-verso-hover="453">auPart</span> C) o T s w + <span class="nu">1</span> := <span class="kw">by</span></span>
+<span id="L351">      <span class="kw">have</span> := hr w hw; <span class="kw">omega</span></span>
+<span id="L352">    <span class="kw">rcases</span> hr w hw <span class="kw">with</span> hU | hU</span>
+<span id="L353">    · <span class="kw">left</span></span>
+<span id="L354">      <span class="kw">exact</span> ⟨<span class="kw">by</span> <span class="kw">rw</span> [<span class="const token" data-verso-hover="472">fst_eq_simState</span> hC hg hs, hU], (<span class="const token" data-verso-hover="479">auPart_eq_iff</span> hC hg hk h1 h2 hs b1 b2).<span class="const token" data-verso-hover="124">2</span> hU⟩</span>
+<span id="L355">    · <span class="kw">right</span></span>
+<span id="L356">      <span class="kw">exact</span> ⟨<span class="const token" data-verso-hover="476">snd_eq_simState</span> hC hg hs (hj w) hU,</span>
+<span id="L357">        (<span class="const token" data-verso-hover="482">auPart_eq_aa_iff</span> hC hg hk h1 h2 hs b1 b2).<span class="const token" data-verso-hover="124">2</span> hU⟩</span>
+<span id="L358"></span>
+<span id="L359"><span class="dc">/-- The simulated configuration of round `j + 1` is one synchronous step of `Π` from the</span></span>
+<span id="L360"><span class="dc">simulated configuration of round `j` (for `j ≥ max_w o_w`). -/</span></span>
+<span id="L361"><span class="kw">theorem</span> <span class="const token" data-verso-hover="485">simState_succ</span> {j : <span class="const token" data-verso-hover="66">ℤ</span>} (hj : ∀ w, o w ≤ j)</span>
+<span id="L362">    (hunb : ∀ w, ∃ τ, T ≤ τ ∧ j + <span class="nu">1</span> ≤ <span class="const token" data-verso-hover="146">uclk</span> (<span class="const token" data-verso-hover="453">auPart</span> C) o T τ w) (v : V) :</span>
+<span id="L363">    <span class="const token" data-verso-hover="467">simState</span> C o T (j + <span class="nu">1</span>) v = P.<span class="const token" data-verso-hover="451">δ</span> (<span class="const token" data-verso-hover="467">simState</span> C o T j v) (<span class="const token" data-verso-hover="30">signal</span> G (<span class="const token" data-verso-hover="467">simState</span> C o T j) v) := <span class="kw">by</span></span>
+<span id="L364">  <span class="kw">have</span> hT : <span class="const token" data-verso-hover="146">uclk</span> (<span class="const token" data-verso-hover="453">auPart</span> C) o T T v = o v := <span class="const token" data-verso-hover="148">uclk_self</span> o T v</span>
+<span id="L365">  <span class="kw">obtain</span> ⟨τ, hτ1, hτ2⟩ := hunb v</span>
+<span id="L366">  <span class="kw">obtain</span> ⟨s, hs1, -, hs3, hs4⟩ := <span class="const token" data-verso-hover="477">Int.exists_eq_and_succ_eq_of_le_add_one</span></span>
+<span id="L367">    (f := <span class="kw">fun</span> s =&gt; <span class="const token" data-verso-hover="146">uclk</span> (<span class="const token" data-verso-hover="453">auPart</span> C) o T s v) (a := T) (b := τ) (j := j) (hab := hτ1)</span>
+<span id="L368">    (<span class="kw">fun</span> s hs _ =&gt; <span class="kw">by</span></span>
+<span id="L369">      <span class="kw">rcases</span> <span class="const token" data-verso-hover="465">uclk_succ_cases</span> (C := <span class="const token" data-verso-hover="453">auPart</span> C) o v hs <span class="kw">with</span> h | h &lt;;&gt; <span class="kw">simp</span> only [h] &lt;;&gt; <span class="kw">omega</span>)</span>
+<span id="L370">    (<span class="kw">by</span> <span class="kw">simp</span> only [hT]; <span class="kw">exact</span> hj v) (<span class="kw">by</span> <span class="kw">omega</span>)</span>
+<span id="L371">  <span class="kw">obtain</span> ⟨hv, haan⟩ := <span class="const token" data-verso-hover="470">aa_of_uclk_succ</span> hC hg hs1 (<span class="kw">by</span> <span class="kw">rw</span> [hs3, hs4])</span>
+<span id="L372">  <span class="kw">have</span> e1 := <span class="const token" data-verso-hover="463">succ_of_aa</span> hC hv (((<span class="const token" data-verso-hover="457">synchronizer_isRun_auPart</span> hC).<span class="const token" data-verso-hover="139">allGood_le</span> hg hs1 v).<span class="const token" data-verso-hover="95">2</span><span class="nu">.</span><span class="const token" data-verso-hover="93">1</span>) haan</span>
+<span id="L373">  <span class="kw">rw</span> [← hs4, ← <span class="const token" data-verso-hover="472">fst_eq_simState</span> hC hg (hs1.<span class="const token" data-verso-hover="180">trans</span> (<span class="const token" data-verso-hover="478">Nat.le_succ</span> s)), e1]</span>
+<span id="L374">  <span class="kw">dsimp</span> only</span>
+<span id="L375">  <span class="kw">rw</span> [<span class="const token" data-verso-hover="484">simSignal_eq</span> hC hg hk h1 h2 hs1 haan (<span class="kw">by</span> <span class="kw">rw</span> [hs3]; <span class="kw">exact</span> hj), <span class="const token" data-verso-hover="472">fst_eq_simState</span> hC hg hs1, hs3]</span>
+<span id="L376"></span>
+<span id="L377"><span class="dc">/-- The simulated configurations form a synchronous execution of `Π`. -/</span></span>
+<span id="L378"><span class="kw">theorem</span> <span class="const token" data-verso-hover="486">simState_run</span> {j0 : <span class="const token" data-verso-hover="66">ℤ</span>} (hj0 : ∀ w, o w ≤ j0)</span>
+<span id="L379">    (hunb : ∀ (n : <span class="const token" data-verso-hover="66">ℤ</span>) w, ∃ τ, T ≤ τ ∧ n ≤ <span class="const token" data-verso-hover="146">uclk</span> (<span class="const token" data-verso-hover="453">auPart</span> C) o T τ w) (i : <span class="const token" data-verso-hover="45">ℕ</span>) :</span>
+<span id="L380">    <span class="const token" data-verso-hover="467">simState</span> C o T (j0 + i) = <span class="const token" data-verso-hover="46">run</span> G P (<span class="const token" data-verso-hover="467">simState</span> C o T j0) <span class="const token" data-verso-hover="47">sync</span> i := <span class="kw">by</span></span>
+<span id="L381">  <span class="kw">induction</span> i <span class="kw">with</span></span>
+<span id="L382">  | <span class="const token" data-verso-hover="191">zero</span> =&gt; <span class="kw">simp</span> [<span class="const token" data-verso-hover="46">run</span>]</span>
+<span id="L383">  | <span class="const token" data-verso-hover="141">succ</span> i ih =&gt;</span>
+<span id="L384">    <span class="kw">funext</span> v</span>
+<span id="L385">    <span class="kw">show</span> _ = <span class="const token" data-verso-hover="459">step</span> G P (<span class="const token" data-verso-hover="47">sync</span> i) (<span class="const token" data-verso-hover="46">run</span> G P (<span class="const token" data-verso-hover="467">simState</span> C o T j0) <span class="const token" data-verso-hover="47">sync</span> i) v</span>
+<span id="L386">    <span class="kw">rw</span> [← ih]</span>
+<span id="L387">    <span class="kw">simp</span> only [<span class="const token" data-verso-hover="459">step</span>, <span class="const token" data-verso-hover="47">sync</span>, <span class="const token" data-verso-hover="50">Set.mem_univ</span>, <span class="const token" data-verso-hover="445">ite_true</span>]</span>
+<span id="L388">    <span class="kw">push_cast</span></span>
+<span id="L389">    <span class="kw">rw</span> [← <span class="const token" data-verso-hover="487">add_assoc</span>]</span>
+<span id="L390">    <span class="kw">exact</span> <span class="const token" data-verso-hover="485">simState_succ</span> hC hg hk h1 h2 (<span class="kw">fun</span> w =&gt; (hj0 w).<span class="const token" data-verso-hover="180">trans</span> (<span class="kw">by</span> <span class="kw">omega</span>)) (<span class="kw">fun</span> w =&gt; hunb _ w) v</span>
+<span id="L391"></span>
+<span id="L392"><span class="kw">end</span> Sim</span>
+<span id="L393"></span>
+<span id="L394"><span class="dc">/-! ## Main results -/</span></span>
+<span id="L395"></span>
+<span id="L396"><span class="kw">variable</span> {G : <span class="const token" data-verso-hover="31">SimpleGraph</span> V}</span>
+<span id="L397"></span>
+<span id="L398"><span class="dc">/-- **Simulation theorem** for the synchronizer of Section 4 of [EK21] (`k ≥ 3D + 2`). For every</span></span>
+<span id="L399"><span class="dc">initial configuration `C0` of `Π*` and every fair schedule there are an initial configuration</span></span>
+<span id="L400"><span class="dc">`D0` of `Π` and simulated round numbers `r t v` such that, from time `R(N(D) + D)` on, the first</span></span>
+<span id="L401"><span class="dc">coordinate of every node `v` at time `t` is the state of `v` in the synchronous execution of `Π`</span></span>
+<span id="L402"><span class="dc">from `D0` after `r t v` rounds (and the AlgAU turn is able). The round numbers are non-decreasing</span></span>
+<span id="L403"><span class="dc">in `t`, differ by at most one across edges (from time `R(N(D))` on), and are at least `i` from time</span></span>
+<span id="L404"><span class="dc">`R(N(D) + D + i)` on. -/</span></span>
+<span id="L405"><span class="kw">theorem</span> <span class="const token" data-verso-hover="26">synchronizer_simulation</span> [<span class="const token" data-verso-hover="184">Finite</span> V] {D k : <span class="const token" data-verso-hover="45">ℕ</span>} (hDk : <span class="nu">3</span> * D + <span class="nu">2</span> ≤ k) (hD : G.<span class="const token" data-verso-hover="194">ediam</span> ≤ D)</span>
+<span id="L406">    (P : <span class="const token" data-verso-hover="41">Algorithm</span> Q) (C0 : V → Q × Q × <span class="const token" data-verso-hover="79">Turn</span> k) {A : <span class="const token" data-verso-hover="45">ℕ</span> → <span class="const token" data-verso-hover="54">Set</span> V} (hA : <span class="const token" data-verso-hover="57">Fair</span> A) :</span>
+<span id="L407">    ∃ (D0 : V → Q) (r : <span class="const token" data-verso-hover="45">ℕ</span> → V → <span class="const token" data-verso-hover="45">ℕ</span>),</span>
+<span id="L408">      (∀ i t, <span class="const token" data-verso-hover="264">R</span> A (<span class="const token" data-verso-hover="252">stabRoundsK</span> k D + D + i) ≤ t → ∀ v, i ≤ r t v) ∧</span>
+<span id="L409">      (∀ t, <span class="const token" data-verso-hover="264">R</span> A (<span class="const token" data-verso-hover="252">stabRoundsK</span> k D + D) ≤ t → ∀ v,</span>
+<span id="L410">        (<span class="const token" data-verso-hover="46">run</span> G (<span class="const token" data-verso-hover="450">synchronizer</span> P k) C0 A t v).<span class="const token" data-verso-hover="407">1</span> = <span class="const token" data-verso-hover="46">run</span> G P D0 <span class="const token" data-verso-hover="47">sync</span> (r t v) v ∧</span>
+<span id="L411">        (<span class="const token" data-verso-hover="46">run</span> G (<span class="const token" data-verso-hover="450">synchronizer</span> P k) C0 A t v).<span class="const token" data-verso-hover="408">2</span><span class="nu">.</span><span class="const token" data-verso-hover="408">2</span>.<span class="const token" data-verso-hover="81">faulty</span> = <span class="const token" data-verso-hover="86">false</span>) ∧</span>
+<span id="L412">      (∀ t v, r t v ≤ r (t + <span class="nu">1</span>) v) ∧</span>
+<span id="L413">      (∀ t, <span class="const token" data-verso-hover="264">R</span> A (<span class="const token" data-verso-hover="252">stabRoundsK</span> k D) ≤ t → ∀ u v, G.<span class="const token" data-verso-hover="105">Adj</span> u v → r t u ≤ r t v + <span class="nu">1</span>) := <span class="kw">by</span></span>
+<span id="L414">  <span class="kw">classical</span></span>
+<span id="L415">  <span class="kw">set</span> C := <span class="const token" data-verso-hover="46">run</span> G (<span class="const token" data-verso-hover="450">synchronizer</span> P k) C0 A <span class="kw">with</span> hCdef</span>
+<span id="L416">  <span class="kw">have</span> hC : <span class="const token" data-verso-hover="439">IsRun</span> G (<span class="const token" data-verso-hover="450">synchronizer</span> P k) A C := <span class="const token" data-verso-hover="48">isRun_run</span> _ _ _ _</span>
+<span id="L417">  <span class="kw">have</span> hC' := <span class="const token" data-verso-hover="457">synchronizer_isRun_auPart</span> hC</span>
+<span id="L418">  <span class="kw">set</span> T := <span class="const token" data-verso-hover="264">R</span> A (<span class="const token" data-verso-hover="252">stabRoundsK</span> k D) <span class="kw">with</span> hTdef</span>
+<span id="L419">  <span class="kw">have</span> hg : <span class="const token" data-verso-hover="111">AllGood</span> G (<span class="const token" data-verso-hover="453">auPart</span> C) T := <span class="const token" data-verso-hover="466">allGood_stab</span> hDk hD hA hC'</span>
+<span id="L420">  <span class="kw">rcases</span> <span class="const token" data-verso-hover="488">isEmpty_or_nonempty</span> V <span class="kw">with</span> hV | hV</span>
+<span id="L421">  · <span class="kw">exact</span> ⟨<span class="kw">fun</span> v =&gt; <span class="const token" data-verso-hover="489">isEmptyElim</span> v, <span class="kw">fun</span> _ v =&gt; <span class="const token" data-verso-hover="489">isEmptyElim</span> v, <span class="kw">fun</span> _ _ _ v =&gt; <span class="const token" data-verso-hover="489">isEmptyElim</span> v,</span>
+<span id="L422">      <span class="kw">fun</span> _ _ v =&gt; <span class="const token" data-verso-hover="489">isEmptyElim</span> v, <span class="kw">fun</span> _ v =&gt; <span class="const token" data-verso-hover="489">isEmptyElim</span> v, <span class="kw">fun</span> _ _ u =&gt; <span class="const token" data-verso-hover="489">isEmptyElim</span> u⟩</span>
+<span id="L423">  <span class="kw">have</span> hk : <span class="nu">2</span> ≤ k := <span class="kw">by</span> <span class="kw">omega</span></span>
+<span id="L424">  <span class="kw">obtain</span> ⟨o, B, h1, h2⟩ := <span class="const token" data-verso-hover="9">AURun.exists_offsets</span> hD (<span class="kw">by</span> <span class="kw">omega</span> : D + <span class="nu">2</span> ≤ k) hg (<span class="const token" data-verso-hover="490">Classical.arbitrary</span> V)</span>
+<span id="L425">  <span class="kw">have</span> : <span class="const token" data-verso-hover="417">Fintype</span> V := <span class="const token" data-verso-hover="491">Fintype.ofFinite</span> V</span>
+<span id="L426">  <span class="kw">obtain</span> ⟨vm, -, hvm⟩ := <span class="const token" data-verso-hover="492">Finset.exists_max_image</span> <span class="const token" data-verso-hover="493">Finset.univ</span> o <span class="const token" data-verso-hover="494">Finset.univ_nonempty</span></span>
+<span id="L427">  <span class="kw">obtain</span> ⟨j0, hj0e⟩ : ∃ j0, o vm = j0 := ⟨_, <span class="const token" data-verso-hover="36">rfl</span>⟩</span>
+<span id="L428">  <span class="kw">have</span> hj0 : ∀ w, o w ≤ j0 := <span class="kw">fun</span> w =&gt; hj0e ▸ hvm w (<span class="const token" data-verso-hover="495">Finset.mem_univ</span> w)</span>
+<span id="L429">  <span class="kw">have</span> hM : ∀ w, j0 - D ≤ <span class="const token" data-verso-hover="146">uclk</span> (<span class="const token" data-verso-hover="453">auPart</span> C) o T T w := <span class="kw">by</span></span>
+<span id="L430">    <span class="kw">intro</span> w</span>
+<span id="L431">    <span class="kw">obtain</span> ⟨p, hp⟩ := <span class="const token" data-verso-hover="198">SimpleGraph.ediam_le_coe_iff</span>.<span class="const token" data-verso-hover="199">1</span> hD vm w</span>
+<span id="L432">    <span class="kw">have</span> := <span class="const token" data-verso-hover="159">le_add_length_of_walk</span> h2 p</span>
+<span id="L433">    <span class="kw">rw</span> [<span class="const token" data-verso-hover="148">uclk_self</span>]; <span class="kw">omega</span></span>
+<span id="L434">  <span class="kw">have</span> hiter : ∀ (n : <span class="const token" data-verso-hover="45">ℕ</span>) w, j0 - D + n ≤ <span class="const token" data-verso-hover="146">uclk</span> (<span class="const token" data-verso-hover="453">auPart</span> C) o T ((<span class="const token" data-verso-hover="185">rho</span> A)^[n] T) w := <span class="kw">fun</span> n w =&gt;</span>
+<span id="L435">    hC'.<span class="const token" data-verso-hover="190">uclk_rho_iter</span> hA hk hg o B h1 h2 n <span class="const token" data-verso-hover="55">le_rfl</span> hM w</span>
+<span id="L436">  <span class="kw">have</span> hunb : ∀ (n : <span class="const token" data-verso-hover="66">ℤ</span>) w, ∃ τ, T ≤ τ ∧ n ≤ <span class="const token" data-verso-hover="146">uclk</span> (<span class="const token" data-verso-hover="453">auPart</span> C) o T τ w := <span class="kw">fun</span> n w =&gt;</span>
+<span id="L437">    ⟨(<span class="const token" data-verso-hover="185">rho</span> A)^[(n - (j0 - D)).<span class="const token" data-verso-hover="496">toNat</span>] T, <span class="const token" data-verso-hover="219">le_rho_iter</span> hA _ _, <span class="kw">by</span></span>
+<span id="L438">      <span class="kw">have</span> := hiter (n - (j0 - D)).<span class="const token" data-verso-hover="496">toNat</span> w; <span class="kw">omega</span>⟩</span>
+<span id="L439">  <span class="kw">have</span> hR : ∀ i, <span class="const token" data-verso-hover="264">R</span> A (<span class="const token" data-verso-hover="252">stabRoundsK</span> k D + D + i) = (<span class="const token" data-verso-hover="185">rho</span> A)^[D + i] T := <span class="kw">by</span></span>
+<span id="L440">    <span class="kw">intro</span> i</span>
+<span id="L441">    <span class="kw">rw</span> [hTdef, <span class="const token" data-verso-hover="264">R</span>, <span class="const token" data-verso-hover="264">R</span>, <span class="const token" data-verso-hover="266">rho_iter_add</span>, <span class="kw">show</span> <span class="const token" data-verso-hover="252">stabRoundsK</span> k D + D + i = D + i + <span class="const token" data-verso-hover="252">stabRoundsK</span> k D <span class="kw">by</span> <span class="kw">ring</span>]</span>
+<span id="L442">  <span class="kw">have</span> hge : ∀ i t, <span class="const token" data-verso-hover="264">R</span> A (<span class="const token" data-verso-hover="252">stabRoundsK</span> k D + D + i) ≤ t → ∀ v,</span>
+<span id="L443">      j0 + i ≤ <span class="const token" data-verso-hover="146">uclk</span> (<span class="const token" data-verso-hover="453">auPart</span> C) o T t v := <span class="kw">by</span></span>
+<span id="L444">    <span class="kw">intro</span> i t ht v</span>
+<span id="L445">    <span class="kw">rw</span> [hR] <span class="kw">at</span> ht</span>
+<span id="L446">    <span class="kw">have</span> := hiter (D + i) v</span>
+<span id="L447">    <span class="kw">have</span> := <span class="const token" data-verso-hover="158">uclk_mono</span> (C := <span class="const token" data-verso-hover="453">auPart</span> C) o v (t := T) ht</span>
+<span id="L448">    <span class="kw">push_cast</span> <span class="kw">at</span> *; <span class="kw">omega</span></span>
+<span id="L449">  <span class="kw">have</span> hTle : ∀ i t, <span class="const token" data-verso-hover="264">R</span> A (<span class="const token" data-verso-hover="252">stabRoundsK</span> k D + D + i) ≤ t → T ≤ t := <span class="kw">by</span></span>
+<span id="L450">    <span class="kw">intro</span> i t ht</span>
+<span id="L451">    <span class="kw">rw</span> [hR] <span class="kw">at</span> ht</span>
+<span id="L452">    <span class="kw">exact</span> (<span class="const token" data-verso-hover="219">le_rho_iter</span> hA _ _).<span class="const token" data-verso-hover="180">trans</span> ht</span>
+<span id="L453">  <span class="kw">refine</span> ⟨<span class="const token" data-verso-hover="467">simState</span> C o T j0, <span class="kw">fun</span> t v =&gt; (<span class="const token" data-verso-hover="146">uclk</span> (<span class="const token" data-verso-hover="453">auPart</span> C) o T t v - j0).<span class="const token" data-verso-hover="496">toNat</span>, ?_, ?_, ?_, ?_⟩</span>
+<span id="L454">  · <span class="kw">intro</span> i t ht v; <span class="kw">have</span> := hge i t ht v; <span class="kw">dsimp</span> only; <span class="kw">omega</span></span>
+<span id="L455">  · <span class="kw">intro</span> t ht v</span>
+<span id="L456">    <span class="kw">have</span> ht0 : <span class="const token" data-verso-hover="264">R</span> A (<span class="const token" data-verso-hover="252">stabRoundsK</span> k D + D + <span class="nu">0</span>) ≤ t := <span class="kw">by</span> <span class="kw">simpa</span> <span class="kw">using</span> ht</span>
+<span id="L457">    <span class="kw">have</span> hTt := hTle <span class="nu">0</span> t ht0</span>
+<span id="L458">    <span class="kw">have</span> hU := hge <span class="nu">0</span> t ht0 v</span>
+<span id="L459">    <span class="kw">refine</span> ⟨?_, (hC'.<span class="const token" data-verso-hover="139">allGood_le</span> hg hTt v).<span class="const token" data-verso-hover="95">2</span><span class="nu">.</span><span class="const token" data-verso-hover="93">1</span>⟩</span>
+<span id="L460">    <span class="kw">rw</span> [<span class="const token" data-verso-hover="472">fst_eq_simState</span> hC hg hTt, ← <span class="const token" data-verso-hover="486">simState_run</span> hC hg hk h1 h2 hj0 hunb]</span>
+<span id="L461">    <span class="kw">dsimp</span> only; <span class="kw">congr</span> <span class="nu">1</span>; <span class="kw">push_cast</span> <span class="kw">at</span> hU; <span class="kw">omega</span></span>
+<span id="L462">  · <span class="kw">intro</span> t v</span>
+<span id="L463">    <span class="kw">have</span> := <span class="const token" data-verso-hover="158">uclk_mono</span> (C := <span class="const token" data-verso-hover="453">auPart</span> C) o v (t := T) (<span class="kw">show</span> t ≤ t + <span class="nu">1</span> <span class="kw">by</span> <span class="kw">omega</span>)</span>
+<span id="L464">    <span class="kw">dsimp</span> only; <span class="kw">omega</span></span>
+<span id="L465">  · <span class="kw">intro</span> t ht u v huv</span>
+<span id="L466">    <span class="kw">have</span> := (hC'.<span class="const token" data-verso-hover="176">uclk_inv</span> hk hg o B h1 h2 ht).<span class="const token" data-verso-hover="95">2</span> u v huv</span>
+<span id="L467">    <span class="kw">dsimp</span> only; <span class="kw">omega</span></span>
+<span id="L468"></span>
+<span id="L469"><span class="dc">/-- `Π` synchronously self-stabilizes on `G` within `f` rounds for the *static* task `Legal`</span></span>
+<span id="L470"><span class="dc">(output vectors that, once reached, must be kept forever, e.g. leader election or MIS): from</span></span>
+<span id="L471"><span class="dc">every initial configuration, the synchronous execution has, from round `f` on, a fixed legal</span></span>
+<span id="L472"><span class="dc">output vector (`ω q = none` encodes that `q` is not an output state). -/</span></span>
+<span id="L473"><span class="kw">def</span> <span class="const token" data-verso-hover="27">SyncStabilizes</span> (G : <span class="const token" data-verso-hover="31">SimpleGraph</span> V) {O : <span class="kw">Type</span>*} (P : <span class="const token" data-verso-hover="41">Algorithm</span> Q) (ω : Q → <span class="const token" data-verso-hover="100">Option</span> O)</span>
+<span id="L474">    (Legal : (V → O) → <span class="kw">Prop</span>) (f : <span class="const token" data-verso-hover="45">ℕ</span>) : <span class="kw">Prop</span> :=</span>
+<span id="L475">  ∀ D0 : V → Q, ∃ out : V → O, Legal out ∧</span>
+<span id="L476">    ∀ j, f ≤ j → ∀ v, ω (<span class="const token" data-verso-hover="46">run</span> G P D0 <span class="const token" data-verso-hover="47">sync</span> j v) = <span class="const token" data-verso-hover="102">some</span> (out v)</span>
+<span id="L477"></span>
+<span id="L478"><span class="kw">open</span> Cslib.SelfStabilization <span class="kw">in</span></span>
+<span id="L479"><span class="dc">/-- `SyncStabilizes` is pseudo-stabilization within `f` rounds, for the class of synchronous</span></span>
+<span id="L480"><span class="dc">executions of `Π`, of the static specification "a fixed legal output vector forever". -/</span></span>
+<span id="L481"><span class="kw">theorem</span> <span class="const token" data-verso-hover="28">syncStabilizes_iff</span> {O : <span class="kw">Type</span>*} {P : <span class="const token" data-verso-hover="41">Algorithm</span> Q} {ω : Q → <span class="const token" data-verso-hover="100">Option</span> O}</span>
+<span id="L482">    {Legal : (V → O) → <span class="kw">Prop</span>} {f : <span class="const token" data-verso-hover="45">ℕ</span>} : <span class="const token" data-verso-hover="27">SyncStabilizes</span> G P ω Legal f ↔</span>
+<span id="L483">    <span class="const token" data-verso-hover="497">PseudoStabilizingWithin</span> (<span class="const token" data-verso-hover="498">IsSyncExec</span> <span class="kw">fun</span> C v =&gt; P.<span class="const token" data-verso-hover="451">δ</span> (C v) (<span class="const token" data-verso-hover="30">signal</span> G C v))</span>
+<span id="L484">      (<span class="kw">fun</span> e =&gt; ∃ out : V → O, Legal out ∧ ∀ j v, ω (e j v) = <span class="const token" data-verso-hover="102">some</span> (out v)) f := <span class="kw">by</span></span>
+<span id="L485">  <span class="kw">have</span> hrun := <span class="kw">fun</span> D0 =&gt; <span class="const token" data-verso-hover="499">Cslib.StoneAge.run_sync_mem_isSyncExec</span> (G := G) P D0</span>
+<span id="L486">  <span class="kw">constructor</span></span>
+<span id="L487">  · <span class="kw">intro</span> h e he</span>
+<span id="L488">    <span class="kw">obtain</span> ⟨out, hout, h⟩ := h (e <span class="nu">0</span>)</span>
+<span id="L489">    <span class="kw">refine</span> ⟨out, hout, <span class="kw">fun</span> j v =&gt; ?_⟩</span>
+<span id="L490">    <span class="kw">have</span> he' : <span class="const token" data-verso-hover="498">IsSyncExec</span> (<span class="kw">fun</span> C v =&gt; P.<span class="const token" data-verso-hover="451">δ</span> (C v) (<span class="const token" data-verso-hover="30">signal</span> G C v)) e := he</span>
+<span id="L491">    <span class="kw">show</span> ω (e (f + j) v) = <span class="const token" data-verso-hover="102">some</span> (out v)</span>
+<span id="L492">    <span class="kw">have</span> h2 := (hrun (e <span class="nu">0</span>)).<span class="const token" data-verso-hover="500">eq_iterate</span> (f + j)</span>
+<span id="L493">    <span class="kw">rw</span> [<span class="const token" data-verso-hover="501">run_zero</span>] <span class="kw">at</span> h2</span>
+<span id="L494">    <span class="kw">rw</span> [he'.<span class="const token" data-verso-hover="500">eq_iterate</span>, ← h2]</span>
+<span id="L495">    <span class="kw">exact</span> h _ (<span class="const token" data-verso-hover="502">Nat.le_add_right</span> f j) v</span>
+<span id="L496">  · <span class="kw">intro</span> h D0</span>
+<span id="L497">    <span class="kw">obtain</span> ⟨out, hout, h⟩ := h _ (hrun D0)</span>
+<span id="L498">    <span class="kw">refine</span> ⟨out, hout, <span class="kw">fun</span> j hj v =&gt; ?_⟩</span>
+<span id="L499">    <span class="kw">obtain</span> ⟨i, <span class="kw">rfl</span>⟩ := <span class="const token" data-verso-hover="503">Nat.exists_eq_add_of_le</span> hj</span>
+<span id="L500">    <span class="kw">exact</span> h i v</span>
+<span id="L501"></span>
+<span id="L502"><span class="dc">/-- **Corollary 1.2 of [EK21]** (deterministic `Π`, static tasks, any `k ≥ 3D + 2`): if `Π`</span></span>
+<span id="L503"><span class="dc">synchronously self-stabilizes within `f` rounds on `G` (of diameter at most `D`), then for every</span></span>
+<span id="L504"><span class="dc">initial configuration of the synchronizer `Π*` and every fair schedule, from time</span></span>
+<span id="L505"><span class="dc">`R(N(D) + D + f)` on all nodes of `Π*` output a fixed legal output vector. -/</span></span>
+<span id="L506"><span class="kw">theorem</span> <span class="const token" data-verso-hover="504">corollary_1_2_general</span> [<span class="const token" data-verso-hover="184">Finite</span> V] {D k : <span class="const token" data-verso-hover="45">ℕ</span>} (hDk : <span class="nu">3</span> * D + <span class="nu">2</span> ≤ k) (hD : G.<span class="const token" data-verso-hover="194">ediam</span> ≤ D)</span>
+<span id="L507">    {O : <span class="kw">Type</span>*} {P : <span class="const token" data-verso-hover="41">Algorithm</span> Q} {ω : Q → <span class="const token" data-verso-hover="100">Option</span> O} {Legal : (V → O) → <span class="kw">Prop</span>} {f : <span class="const token" data-verso-hover="45">ℕ</span>}</span>
+<span id="L508">    (hP : <span class="const token" data-verso-hover="27">SyncStabilizes</span> G P ω Legal f) (C0 : V → Q × Q × <span class="const token" data-verso-hover="79">Turn</span> k) {A : <span class="const token" data-verso-hover="45">ℕ</span> → <span class="const token" data-verso-hover="54">Set</span> V}</span>
+<span id="L509">    (hA : <span class="const token" data-verso-hover="57">Fair</span> A) :</span>
+<span id="L510">    ∃ out : V → O, Legal out ∧ ∀ t, <span class="const token" data-verso-hover="264">R</span> A (<span class="const token" data-verso-hover="252">stabRoundsK</span> k D + D + f) ≤ t → ∀ v,</span>
+<span id="L511">      <span class="const token" data-verso-hover="452">synchOutput</span> ω (<span class="const token" data-verso-hover="46">run</span> G (<span class="const token" data-verso-hover="450">synchronizer</span> P k) C0 A t v) = <span class="const token" data-verso-hover="102">some</span> (out v) := <span class="kw">by</span></span>
+<span id="L512">  <span class="kw">obtain</span> ⟨D0, r, hr1, hr2, -, -⟩ := <span class="const token" data-verso-hover="26">synchronizer_simulation</span> hDk hD P C0 hA</span>
+<span id="L513">  <span class="kw">obtain</span> ⟨out, hout1, hout2⟩ := hP D0</span>
+<span id="L514">  <span class="kw">refine</span> ⟨out, hout1, <span class="kw">fun</span> t ht v =&gt; ?_⟩</span>
+<span id="L515">  <span class="kw">have</span> ht' : <span class="const token" data-verso-hover="264">R</span> A (<span class="const token" data-verso-hover="252">stabRoundsK</span> k D + D) ≤ t :=</span>
+<span id="L516">    (<span class="const token" data-verso-hover="224">rho_iter_le_iter</span> hA (<span class="kw">by</span> <span class="kw">omega</span> : <span class="const token" data-verso-hover="252">stabRoundsK</span> k D + D ≤ <span class="const token" data-verso-hover="252">stabRoundsK</span> k D + D + f) <span class="nu">0</span>).<span class="const token" data-verso-hover="180">trans</span> ht</span>
+<span id="L517">  <span class="kw">obtain</span> ⟨e1, e2⟩ := hr2 t ht' v</span>
+<span id="L518">  <span class="kw">simp</span> only [<span class="const token" data-verso-hover="452">synchOutput</span>, e2, <span class="const token" data-verso-hover="166">Bool.false_eq_true</span>, <span class="const token" data-verso-hover="167">ite_false</span>, e1]</span>
+<span id="L519">  <span class="kw">exact</span> hout2 _ (hr1 f t ht v) v</span>
+<span id="L520"></span>
+<span id="L521"><span class="dc">/-- **Corollary 1.2 of [EK21]** (deterministic `Π`, static tasks), with the paper's parameter</span></span>
+<span id="L522"><span class="dc">`k = 3D + 2` of AlgAU: the synchronizer `Π*` (state space `|Q|² (12D + 4)`) stabilizes within</span></span>
+<span id="L523"><span class="dc">`N(D) + D + f = f + O(D³)` rounds under every fair schedule. -/</span></span>
+<span id="L524"><span class="kw">theorem</span> <span class="const token" data-verso-hover="2">corollary_1_2</span> [<span class="const token" data-verso-hover="184">Finite</span> V] {D : <span class="const token" data-verso-hover="45">ℕ</span>} (hD : G.<span class="const token" data-verso-hover="194">ediam</span> ≤ D) {O : <span class="kw">Type</span>*} {P : <span class="const token" data-verso-hover="41">Algorithm</span> Q}</span>
+<span id="L525">    {ω : Q → <span class="const token" data-verso-hover="100">Option</span> O} {Legal : (V → O) → <span class="kw">Prop</span>} {f : <span class="const token" data-verso-hover="45">ℕ</span>} (hP : <span class="const token" data-verso-hover="27">SyncStabilizes</span> G P ω Legal f)</span>
+<span id="L526">    (C0 : V → Q × Q × <span class="const token" data-verso-hover="79">Turn</span> (<span class="nu">3</span> * D + <span class="nu">2</span>)) {A : <span class="const token" data-verso-hover="45">ℕ</span> → <span class="const token" data-verso-hover="54">Set</span> V} (hA : <span class="const token" data-verso-hover="57">Fair</span> A) :</span>
+<span id="L527">    ∃ out : V → O, Legal out ∧ ∀ t, <span class="const token" data-verso-hover="264">R</span> A (<span class="const token" data-verso-hover="254">stabRounds</span> D + D + f) ≤ t → ∀ v,</span>
+<span id="L528">      <span class="const token" data-verso-hover="452">synchOutput</span> ω (<span class="const token" data-verso-hover="46">run</span> G (<span class="const token" data-verso-hover="450">synchronizer</span> P (<span class="nu">3</span> * D + <span class="nu">2</span>)) C0 A t v) = <span class="const token" data-verso-hover="102">some</span> (out v) :=</span>
+<span id="L529">  <span class="const token" data-verso-hover="504">corollary_1_2_general</span> <span class="const token" data-verso-hover="55">le_rfl</span> hD hP C0 hA</span>
+<span id="L530"></span>
+<span id="L531"><span class="dc">/-- Corollary 1.2 of [EK21] with an explicit `f + O(D³)` bound: stabilization within</span></span>
+<span id="L532"><span class="dc">`f + 71 (D + 1)³` rounds. -/</span></span>
+<span id="L533"><span class="kw">theorem</span> <span class="const token" data-verso-hover="505">corollary_1_2_exists</span> [<span class="const token" data-verso-hover="184">Finite</span> V] {D : <span class="const token" data-verso-hover="45">ℕ</span>} (hD : G.<span class="const token" data-verso-hover="194">ediam</span> ≤ D) {O : <span class="kw">Type</span>*} {P : <span class="const token" data-verso-hover="41">Algorithm</span> Q}</span>
+<span id="L534">    {ω : Q → <span class="const token" data-verso-hover="100">Option</span> O} {Legal : (V → O) → <span class="kw">Prop</span>} {f : <span class="const token" data-verso-hover="45">ℕ</span>} (hP : <span class="const token" data-verso-hover="27">SyncStabilizes</span> G P ω Legal f)</span>
+<span id="L535">    (C0 : V → Q × Q × <span class="const token" data-verso-hover="79">Turn</span> (<span class="nu">3</span> * D + <span class="nu">2</span>)) {A : <span class="const token" data-verso-hover="45">ℕ</span> → <span class="const token" data-verso-hover="54">Set</span> V} (hA : <span class="const token" data-verso-hover="57">Fair</span> A) :</span>
+<span id="L536">    ∃ i ≤ f + <span class="nu">71</span> * (D + <span class="nu">1</span>) ^ <span class="nu">3</span>, ∃ out : V → O, Legal out ∧ ∀ t, <span class="const token" data-verso-hover="264">R</span> A i ≤ t → ∀ v,</span>
+<span id="L537">      <span class="const token" data-verso-hover="452">synchOutput</span> ω (<span class="const token" data-verso-hover="46">run</span> G (<span class="const token" data-verso-hover="450">synchronizer</span> P (<span class="nu">3</span> * D + <span class="nu">2</span>)) C0 A t v) = <span class="const token" data-verso-hover="102">some</span> (out v) := <span class="kw">by</span></span>
+<span id="L538">  <span class="kw">refine</span> ⟨<span class="const token" data-verso-hover="254">stabRounds</span> D + D + f, ?_, <span class="const token" data-verso-hover="2">corollary_1_2</span> hD hP C0 hA⟩</span>
+<span id="L539">  <span class="kw">have</span> h1 := <span class="const token" data-verso-hover="16">stabRounds_le</span> D</span>
+<span id="L540">  <span class="kw">have</span> h2 : D ≤ (D + <span class="nu">1</span>) ^ <span class="nu">3</span> := (<span class="const token" data-verso-hover="478">Nat.le_succ</span> D).<span class="const token" data-verso-hover="180">trans</span> (<span class="const token" data-verso-hover="506">Nat.le_self_pow</span> (<span class="kw">by</span> <span class="kw">norm_num</span>) _)</span>
+<span id="L541">  <span class="kw">omega</span></span>
+<span id="L542"></span>
+<span id="L543"><span class="kw">end</span> ThinUnison</span>
+<span id="L544"></span>
+</code></div>
+        <script>
+          window.versoHoversUrl = "PODC2021/ThinUnison/-hovers.json";</script>
+        <script src="static/lean/popper.js"></script>
+        <script src="static/lean/tippy.js"></script>
+        <script src="static/lean/marked.js"></script>
+        <script src="static/lean/highlighting.js"></script>
+        <script src="static/lean/lean.js"></script>
+        </article></main><footer class="site-footer"><div class="wrap">
+        Machine-checked formalizations of PODC papers in Lean 4. Generated with <a href="https://github.com/leanprover/verso">Verso</a> from the README files of <a href="https://github.com/vasnesterov/formal_podc">vasnesterov/formal_podc</a>.</div>
+      </footer></body>
+  </html>
+

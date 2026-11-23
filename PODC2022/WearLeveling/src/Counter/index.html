@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="light dark">
+    <link rel="icon" href="data:,">
+    <title>WearLeveling: Counter.lean · Formal PODC</title><base href="../../../.././"><link rel="stylesheet" href="static/lean/verso-vars.css">
+    <link rel="stylesheet" href="static/lean/highlighting.css">
+    <link rel="stylesheet" href="static/lean/tippy-border.css">
+    <link rel="stylesheet" href="static/style.css">
+    <script defer="defer" src="static/site.js"></script>
+    </head>
+  <body>
+    <header class="site-header">
+      <div class="wrap">
+        <a class="brand" href=".">Formal PODC</a><nav class="top">
+          <a href=".">Search</a><a href="about/">About</a><a href="https://github.com/vasnesterov/formal_podc">GitHub</a></nav>
+        </div>
+      </header>
+    <main class="wrap"><article><nav class="breadcrumbs" aria-label="Breadcrumb">
+          <a href=".">Search</a><span class="sep">›</span><a href="PODC2022/">PODC 2022</a><span class="sep">›</span><a href="PODC2022/WearLeveling/">WearLeveling</a><span class="sep">›</span><a href="PODC2022/WearLeveling/src/">Lean source</a><span class="sep">›</span><span aria-current="page">Counter</span></nav>
+        <h1>
+          <code>Counter.lean</code></h1>
+        <div class="paper-links">
+          <p>
+            Source of <a href="PODC2022/WearLeveling/">Wear Leveling in Persistent Data Structures — PODC 2022</a> · <a href="https://github.com/vasnesterov/formal_podc/blob/main/Papers/PODC2022/WearLeveling/Counter.lean">GitHub</a> · hover over a name for its type and documentation</p>
+          </div>
+        <div class="lean-code lean-src">
+          <code class="hl lean block" data-lean-context="Counter"><span id="L1"><span class="kw">import</span> Mathlib</span>
+<span id="L2"><span class="kw">import</span> Podc.Computability.Distributed.SharedMemory.Persistent.Model</span>
+<span id="L3"></span>
+<span id="L4"><span class="dc">/-!</span></span>
+<span id="L5"><span class="dc"># The endurance-oblivious counter (Figure 1 of Liu–Golab, PODC 2022)</span></span>
+<span id="L6"></span>
+<span id="L7"><span class="dc">The round-robin fetch-and-increment counter of Figure 1, as an algorithm of the persistent</span></span>
+<span id="L8"><span class="dc">memory model `Cslib.SharedMemory.Persistent` (words behind a volatile write-back cache).</span></span>
+<span id="L9"></span>
+<span id="L10"><span class="dc">```</span></span>
+<span id="L11"><span class="dc">Persistent shared variables: A[0..k-1], each initially 0</span></span>
+<span id="L12"><span class="dc">Procedure Fetch-And-Increment()</span></span>
+<span id="L13"><span class="dc"> 1 iter ← A[k-1]</span></span>
+<span id="L14"><span class="dc"> 2 Flush(&amp;A[k-1])</span></span>
+<span id="L15"><span class="dc"> 3 index ← 0</span></span>
+<span id="L16"><span class="dc"> 4 while true do</span></span>
+<span id="L17"><span class="dc"> 5   if CAS(&amp;A[index], iter, iter+1) = true then</span></span>
+<span id="L18"><span class="dc"> 6     Flush(&amp;A[index])</span></span>
+<span id="L19"><span class="dc"> 7     return index + iter × k</span></span>
+<span id="L20"><span class="dc"> 8   else</span></span>
+<span id="L21"><span class="dc"> 9     Flush(&amp;A[index])</span></span>
+<span id="L22"><span class="dc">10     index ← (index + 1) mod k</span></span>
+<span id="L23"><span class="dc">11     if index = 0 then</span></span>
+<span id="L24"><span class="dc">12       iter ← A[k-1]</span></span>
+<span id="L25"><span class="dc">13       Flush(&amp;A[k-1])</span></span>
+<span id="L26"><span class="dc">```</span></span>
+<span id="L27"></span>
+<span id="L28"><span class="dc">Local states (`CL k`) are program counters carrying the local variables: `rd` (line 1, also</span></span>
+<span id="L29"><span class="dc">line 12), `fl iter` (line 2, also line 13; then `index ← 0`), `cas iter idx` (line 5),</span></span>
+<span id="L30"><span class="dc">`flS iter idx` (line 6), `ret iter idx` (line 7), `flF iter idx` (lines 9–11).</span></span>
+<span id="L31"></span>
+<span id="L32"><span class="dc">Words hold natural numbers (unbounded words: `b = ∞`); the `b`-bit version is discussed in the</span></span>
+<span id="L33"><span class="dc">README. The implemented object is `faiObj`, a fetch-and-increment counter over `ℕ` whose only</span></span>
+<span id="L34"><span class="dc">operation is FAI.</span></span>
+<span id="L35"></span>
+<span id="L36"><span class="dc">`stair n` is the array state after `n` increments in round-robin order (the representation</span></span>
+<span id="L37"><span class="dc">invariant of Section 3): `stair n i = ⌈(n - i) / k⌉`, written `(n + k - 1 - i) / k`.</span></span>
+<span id="L38"><span class="dc">-/</span></span>
+<span id="L39"></span>
+<span id="L40"><span class="kw">namespace</span> Podc.WearLeveling</span>
+<span id="L41"></span>
+<span id="L42"><span class="kw">set_option</span> <span class="const token" data-verso-hover="22">linter.unusedSectionVars</span> false</span>
+<span id="L43"></span>
+<span id="L44"><span class="kw">open</span> Cslib.SharedMemory Cslib.SharedMemory.Persistent</span>
+<span id="L45"></span>
+<span id="L46"><span class="dc">/-- The fetch-and-increment counter (only operation: FAI, returning the old value). -/</span></span>
+<span id="L47"><span class="kw">abbrev</span> <span class="const token" data-verso-hover="23">faiObj</span> : <span class="const token" data-verso-hover="20">ObjSpec</span> <span class="kw">where</span></span>
+<span id="L48">  <span class="const token" data-verso-hover="24">State</span> := <span class="const token" data-verso-hover="25">ℕ</span></span>
+<span id="L49">  <span class="const token" data-verso-hover="26">Op</span> := <span class="const token" data-verso-hover="27">Unit</span></span>
+<span id="L50">  <span class="const token" data-verso-hover="28">Resp</span> := <span class="const token" data-verso-hover="25">ℕ</span></span>
+<span id="L51">  <span class="const token" data-verso-hover="29">init</span> := <span class="nu">0</span></span>
+<span id="L52">  <span class="const token" data-verso-hover="30">δ</span> q _ := (q + <span class="nu">1</span>, q)</span>
+<span id="L53"></span>
+<span id="L54"><span class="kw">lemma</span> <span class="const token" data-verso-hover="31">faiObj_runOps</span> (q : <span class="const token" data-verso-hover="25">ℕ</span>) (os : <span class="const token" data-verso-hover="32">List</span> <span class="const token" data-verso-hover="27">Unit</span>) : <span class="const token" data-verso-hover="23">faiObj</span>.<span class="const token" data-verso-hover="33">runOps</span> q os = q + os.<span class="const token" data-verso-hover="34">length</span> := <span class="kw">by</span></span>
+<span id="L55">  <span class="kw">induction</span> os generalizing q <span class="kw">with</span></span>
+<span id="L56">  | <span class="const token" data-verso-hover="35">nil</span> =&gt; <span class="kw">rfl</span></span>
+<span id="L57">  | <span class="const token" data-verso-hover="36">cons</span> o os ih =&gt;</span>
+<span id="L58">    <span class="kw">show</span> <span class="const token" data-verso-hover="23">faiObj</span>.<span class="const token" data-verso-hover="33">runOps</span> (q + <span class="nu">1</span>) os = _</span>
+<span id="L59">    <span class="kw">rw</span> [ih]; <span class="kw">simp</span>; <span class="kw">omega</span></span>
+<span id="L60"></span>
+<span id="L61"><span class="kw">variable</span> (k : <span class="const token" data-verso-hover="25">ℕ</span>) [<span class="const token" data-verso-hover="37">NeZero</span> k]</span>
+<span id="L62"></span>
+<span id="L63"><span class="kw">lemma</span> <span class="const token" data-verso-hover="38">k_pos</span> : <span class="nu">0</span> &lt; k := <span class="const token" data-verso-hover="39">NeZero.pos</span> k</span>
+<span id="L64"></span>
+<span id="L65"><span class="dc">/-- The last index `k - 1`. -/</span></span>
+<span id="L66"><span class="kw">def</span> <span class="const token" data-verso-hover="40">last</span> : <span class="const token" data-verso-hover="41">Fin</span> k := ⟨k - <span class="nu">1</span>, <span class="kw">by</span> <span class="kw">have</span> := <span class="const token" data-verso-hover="38">k_pos</span> k; <span class="kw">omega</span>⟩</span>
+<span id="L67"></span>
+<span id="L68">@[<span class="kw">simp</span>] <span class="kw">lemma</span> <span class="const token" data-verso-hover="42">last_val</span> : (<span class="const token" data-verso-hover="40">last</span> k).<span class="const token" data-verso-hover="43">val</span> = k - <span class="nu">1</span> := <span class="const token" data-verso-hover="44">rfl</span></span>
+<span id="L69"></span>
+<span id="L70"><span class="dc">/-- Program counters (with local variables) of Figure 1. -/</span></span>
+<span id="L71"><span class="kw">inductive</span> <span class="const token" data-verso-hover="45">CL</span> (k : <span class="const token" data-verso-hover="25">ℕ</span>) <span class="kw">where</span></span>
+<span id="L72">  <span class="dc">/-- Line 1 / line 12: `iter ← A[k-1]`. -/</span></span>
+<span id="L73">  | <span class="const token" data-verso-hover="46">rd</span></span>
+<span id="L74">  <span class="dc">/-- Line 2 / line 13: `Flush(&amp;A[k-1])`, then `index ← 0`. -/</span></span>
+<span id="L75">  | <span class="const token" data-verso-hover="47">fl</span> (iter : <span class="const token" data-verso-hover="25">ℕ</span>)</span>
+<span id="L76">  <span class="dc">/-- Line 5: `CAS(&amp;A[index], iter, iter + 1)`. -/</span></span>
+<span id="L77">  | <span class="const token" data-verso-hover="48">cas</span> (iter : <span class="const token" data-verso-hover="25">ℕ</span>) (idx : <span class="const token" data-verso-hover="41">Fin</span> k)</span>
+<span id="L78">  <span class="dc">/-- Line 6: `Flush(&amp;A[index])` after a successful CAS. -/</span></span>
+<span id="L79">  | <span class="const token" data-verso-hover="49">flS</span> (iter : <span class="const token" data-verso-hover="25">ℕ</span>) (idx : <span class="const token" data-verso-hover="41">Fin</span> k)</span>
+<span id="L80">  <span class="dc">/-- Line 7: `return index + iter × k`. -/</span></span>
+<span id="L81">  | <span class="const token" data-verso-hover="50">ret</span> (iter : <span class="const token" data-verso-hover="25">ℕ</span>) (idx : <span class="const token" data-verso-hover="41">Fin</span> k)</span>
+<span id="L82">  <span class="dc">/-- Lines 9–11: `Flush(&amp;A[index])` after a failed CAS, then advance `index`. -/</span></span>
+<span id="L83">  | <span class="const token" data-verso-hover="51">flF</span> (iter : <span class="const token" data-verso-hover="25">ℕ</span>) (idx : <span class="const token" data-verso-hover="41">Fin</span> k)</span>
+<span id="L84"></span>
+<span id="L85"><span class="kw">variable</span> {k} <span class="kw">in</span></span>
+<span id="L86"><span class="dc">/-- Lines 10–11: the next program counter after a failed CAS and its flush. -/</span></span>
+<span id="L87"><span class="kw">def</span> <span class="const token" data-verso-hover="52">nextPC</span> (it : <span class="const token" data-verso-hover="25">ℕ</span>) (idx : <span class="const token" data-verso-hover="41">Fin</span> k) : <span class="const token" data-verso-hover="45">CL</span> k :=</span>
+<span id="L88">  <span class="kw">if</span> h : idx.<span class="const token" data-verso-hover="43">val</span> + <span class="nu">1</span> &lt; k <span class="kw">then</span> <span class="const token" data-verso-hover="48">.</span>cas it ⟨idx.<span class="const token" data-verso-hover="43">val</span> + <span class="nu">1</span>, h⟩ <span class="kw">else</span> <span class="const token" data-verso-hover="46">.</span>rd</span>
+<span id="L89"></span>
+<span id="L90"><span class="kw">lemma</span> <span class="const token" data-verso-hover="53">nextPC_of_lt</span> {it : <span class="const token" data-verso-hover="25">ℕ</span>} {idx : <span class="const token" data-verso-hover="41">Fin</span> k} (h : idx.<span class="const token" data-verso-hover="43">val</span> + <span class="nu">1</span> &lt; k) :</span>
+<span id="L91">    <span class="const token" data-verso-hover="52">nextPC</span> it idx = <span class="const token" data-verso-hover="48">.</span>cas it ⟨idx.<span class="const token" data-verso-hover="43">val</span> + <span class="nu">1</span>, h⟩ := <span class="const token" data-verso-hover="54">dite_eq_left</span> h</span>
+<span id="L92"></span>
+<span id="L93"><span class="kw">lemma</span> <span class="const token" data-verso-hover="55">nextPC_of_not_lt</span> {it : <span class="const token" data-verso-hover="25">ℕ</span>} {idx : <span class="const token" data-verso-hover="41">Fin</span> k} (h : ¬ idx.<span class="const token" data-verso-hover="43">val</span> + <span class="nu">1</span> &lt; k) :</span>
+<span id="L94">    <span class="const token" data-verso-hover="52">nextPC</span> it idx = <span class="const token" data-verso-hover="46">.</span>rd := <span class="const token" data-verso-hover="56">dite_eq_right</span> h</span>
+<span id="L95"></span>
+<span id="L96"><span class="dc">/-- The algorithm of Figure 1. -/</span></span>
+<span id="L97">@[reducible] <span class="kw">def</span> <span class="const token" data-verso-hover="57">counter</span> : <span class="const token" data-verso-hover="58">Alg</span> <span class="const token" data-verso-hover="23">faiObj</span> k <span class="const token" data-verso-hover="25">ℕ</span> <span class="kw">where</span></span>
+<span id="L98">  <span class="const token" data-verso-hover="59">L</span> := <span class="const token" data-verso-hover="45">CL</span> k</span>
+<span id="L99">  <span class="const token" data-verso-hover="60">init</span> := <span class="kw">fun</span> _ =&gt; <span class="nu">0</span></span>
+<span id="L100">  <span class="const token" data-verso-hover="61">start</span> := <span class="kw">fun</span> _ =&gt; <span class="const token" data-verso-hover="46">.</span>rd</span>
+<span id="L101">  <span class="const token" data-verso-hover="62">act</span></span>
+<span id="L102">    | <span class="const token" data-verso-hover="46">.</span>rd =&gt; <span class="const token" data-verso-hover="63">.</span>read (<span class="const token" data-verso-hover="40">last</span> k) <span class="const token" data-verso-hover="47">.</span>fl</span>
+<span id="L103">    | <span class="const token" data-verso-hover="47">.</span>fl it =&gt; <span class="const token" data-verso-hover="64">.</span>flush (<span class="const token" data-verso-hover="40">last</span> k) (<span class="const token" data-verso-hover="48">.</span>cas it <span class="nu">0</span>)</span>
+<span id="L104">    | <span class="const token" data-verso-hover="48">.</span>cas it idx =&gt; <span class="const token" data-verso-hover="65">.</span>cas idx it (it + <span class="nu">1</span>) (<span class="kw">fun</span> b =&gt; <span class="kw">if</span> b <span class="kw">then</span> <span class="const token" data-verso-hover="49">.</span>flS it idx <span class="kw">else</span> <span class="const token" data-verso-hover="51">.</span>flF it idx)</span>
+<span id="L105">    | <span class="const token" data-verso-hover="49">.</span>flS it idx =&gt; <span class="const token" data-verso-hover="64">.</span>flush idx (<span class="const token" data-verso-hover="50">.</span>ret it idx)</span>
+<span id="L106">    | <span class="const token" data-verso-hover="50">.</span>ret it idx =&gt; <span class="const token" data-verso-hover="66">.</span>ret (idx.<span class="const token" data-verso-hover="43">val</span> + it * k)</span>
+<span id="L107">    | <span class="const token" data-verso-hover="51">.</span>flF it idx =&gt; <span class="const token" data-verso-hover="64">.</span>flush idx (<span class="const token" data-verso-hover="52">nextPC</span> it idx)</span>
+<span id="L108"></span>
+<span id="L109"><span class="dc">/-! ### The staircase (representation invariant) -/</span></span>
+<span id="L110"></span>
+<span id="L111"><span class="dc">/-- The state of the array after `n` round-robin increments. -/</span></span>
+<span id="L112"><span class="kw">def</span> <span class="const token" data-verso-hover="67">stair</span> (n : <span class="const token" data-verso-hover="25">ℕ</span>) (i : <span class="const token" data-verso-hover="41">Fin</span> k) : <span class="const token" data-verso-hover="25">ℕ</span> := (n + k - <span class="nu">1</span> - i.<span class="const token" data-verso-hover="43">val</span>) / k</span>
+<span id="L113"></span>
+<span id="L114"><span class="kw">variable</span> {k}</span>
+<span id="L115"></span>
+<span id="L116"><span class="kw">lemma</span> <span class="const token" data-verso-hover="68">le_stair_iff</span> (c n : <span class="const token" data-verso-hover="25">ℕ</span>) (i : <span class="const token" data-verso-hover="41">Fin</span> k) : c ≤ <span class="const token" data-verso-hover="67">stair</span> k n i ↔ c * k + i.<span class="const token" data-verso-hover="43">val</span> &lt; n + k := <span class="kw">by</span></span>
+<span id="L117">  <span class="kw">have</span> hk := <span class="const token" data-verso-hover="38">k_pos</span> k</span>
+<span id="L118">  <span class="kw">have</span> hi := i.<span class="const token" data-verso-hover="69">isLt</span></span>
+<span id="L119">  <span class="kw">unfold</span> <span class="const token" data-verso-hover="67">stair</span></span>
+<span id="L120">  <span class="kw">rw</span> [<span class="const token" data-verso-hover="70">Nat.le_div_iff_mul_le</span> hk]</span>
+<span id="L121">  <span class="kw">omega</span></span>
+<span id="L122"></span>
+<span id="L123"><span class="kw">lemma</span> <span class="const token" data-verso-hover="71">stair_le_iff</span> (c n : <span class="const token" data-verso-hover="25">ℕ</span>) (i : <span class="const token" data-verso-hover="41">Fin</span> k) : <span class="const token" data-verso-hover="67">stair</span> k n i ≤ c ↔ n ≤ c * k + i.<span class="const token" data-verso-hover="43">val</span> := <span class="kw">by</span></span>
+<span id="L124">  <span class="kw">have</span> hk := <span class="const token" data-verso-hover="38">k_pos</span> k</span>
+<span id="L125">  <span class="kw">have</span> hi := i.<span class="const token" data-verso-hover="69">isLt</span></span>
+<span id="L126">  <span class="kw">unfold</span> <span class="const token" data-verso-hover="67">stair</span></span>
+<span id="L127">  <span class="kw">rw</span> [← <span class="const token" data-verso-hover="72">Nat.lt_succ_iff</span>, <span class="const token" data-verso-hover="73">Nat.div_lt_iff_lt_mul</span> hk, <span class="const token" data-verso-hover="74">Nat.succ_mul</span>]</span>
+<span id="L128">  <span class="kw">omega</span></span>
+<span id="L129"></span>
+<span id="L130"><span class="kw">lemma</span> <span class="const token" data-verso-hover="75">stair_zero</span> (i : <span class="const token" data-verso-hover="41">Fin</span> k) : <span class="const token" data-verso-hover="67">stair</span> k <span class="nu">0</span> i = <span class="nu">0</span> := <span class="kw">by</span></span>
+<span id="L131">  <span class="kw">have</span> := (<span class="const token" data-verso-hover="71">stair_le_iff</span> <span class="nu">0</span> <span class="nu">0</span> i).<span class="const token" data-verso-hover="76">2</span> (<span class="kw">by</span> <span class="kw">omega</span>); <span class="kw">omega</span></span>
+<span id="L132"></span>
+<span id="L133"><span class="kw">lemma</span> <span class="const token" data-verso-hover="77">stair_mono</span> {m n : <span class="const token" data-verso-hover="25">ℕ</span>} (h : m ≤ n) (i : <span class="const token" data-verso-hover="41">Fin</span> k) : <span class="const token" data-verso-hover="67">stair</span> k m i ≤ <span class="const token" data-verso-hover="67">stair</span> k n i := <span class="kw">by</span></span>
+<span id="L134">  <span class="kw">rw</span> [<span class="const token" data-verso-hover="68">le_stair_iff</span>]</span>
+<span id="L135">  <span class="kw">have</span> := (<span class="const token" data-verso-hover="68">le_stair_iff</span> (<span class="const token" data-verso-hover="67">stair</span> k m i) m i).<span class="const token" data-verso-hover="78">1</span> <span class="const token" data-verso-hover="79">le_rfl</span></span>
+<span id="L136">  <span class="kw">omega</span></span>
+<span id="L137"></span>
+<span id="L138"><span class="kw">lemma</span> <span class="const token" data-verso-hover="80">stair_anti</span> (n : <span class="const token" data-verso-hover="25">ℕ</span>) {i j : <span class="const token" data-verso-hover="41">Fin</span> k} (h : i ≤ j) : <span class="const token" data-verso-hover="67">stair</span> k n j ≤ <span class="const token" data-verso-hover="67">stair</span> k n i := <span class="kw">by</span></span>
+<span id="L139">  <span class="kw">rw</span> [<span class="const token" data-verso-hover="68">le_stair_iff</span>]</span>
+<span id="L140">  <span class="kw">have</span> := (<span class="const token" data-verso-hover="68">le_stair_iff</span> (<span class="const token" data-verso-hover="67">stair</span> k n j) n j).<span class="const token" data-verso-hover="78">1</span> <span class="const token" data-verso-hover="79">le_rfl</span></span>
+<span id="L141">  <span class="kw">have</span> : i.<span class="const token" data-verso-hover="43">val</span> ≤ j.<span class="const token" data-verso-hover="43">val</span> := h</span>
+<span id="L142">  <span class="kw">omega</span></span>
+<span id="L143"></span>
+<span id="L144"><span class="kw">lemma</span> <span class="const token" data-verso-hover="81">stair_last</span> (n : <span class="const token" data-verso-hover="25">ℕ</span>) : <span class="const token" data-verso-hover="67">stair</span> k n (<span class="const token" data-verso-hover="40">last</span> k) * k ≤ n := <span class="kw">by</span></span>
+<span id="L145">  <span class="kw">have</span> := (<span class="const token" data-verso-hover="68">le_stair_iff</span> (<span class="const token" data-verso-hover="67">stair</span> k n (<span class="const token" data-verso-hover="40">last</span> k)) n (<span class="const token" data-verso-hover="40">last</span> k)).<span class="const token" data-verso-hover="78">1</span> <span class="const token" data-verso-hover="79">le_rfl</span></span>
+<span id="L146">  <span class="kw">simp</span> only [<span class="const token" data-verso-hover="42">last_val</span>] <span class="kw">at</span> this</span>
+<span id="L147">  <span class="kw">have</span> := <span class="const token" data-verso-hover="38">k_pos</span> k</span>
+<span id="L148">  <span class="kw">omega</span></span>
+<span id="L149"></span>
+<span id="L150"><span class="kw">lemma</span> <span class="const token" data-verso-hover="82">stair_pos_self</span> (it : <span class="const token" data-verso-hover="25">ℕ</span>) (i : <span class="const token" data-verso-hover="41">Fin</span> k) : <span class="const token" data-verso-hover="67">stair</span> k (it * k + i.<span class="const token" data-verso-hover="43">val</span>) i = it := <span class="kw">by</span></span>
+<span id="L151">  <span class="kw">apply</span> <span class="const token" data-verso-hover="83">le_antisymm</span></span>
+<span id="L152">  · <span class="kw">rw</span> [<span class="const token" data-verso-hover="71">stair_le_iff</span>]</span>
+<span id="L153">  · <span class="kw">rw</span> [<span class="const token" data-verso-hover="68">le_stair_iff</span>]; <span class="kw">have</span> := <span class="const token" data-verso-hover="38">k_pos</span> k; <span class="kw">omega</span></span>
+<span id="L154"></span>
+<span id="L155"><span class="kw">lemma</span> <span class="const token" data-verso-hover="84">stair_succ_self</span> (it : <span class="const token" data-verso-hover="25">ℕ</span>) (i : <span class="const token" data-verso-hover="41">Fin</span> k) : <span class="const token" data-verso-hover="67">stair</span> k (it * k + i.<span class="const token" data-verso-hover="43">val</span> + <span class="nu">1</span>) i = it + <span class="nu">1</span> := <span class="kw">by</span></span>
+<span id="L156">  <span class="kw">have</span> := <span class="const token" data-verso-hover="38">k_pos</span> k</span>
+<span id="L157">  <span class="kw">apply</span> <span class="const token" data-verso-hover="83">le_antisymm</span></span>
+<span id="L158">  · <span class="kw">rw</span> [<span class="const token" data-verso-hover="71">stair_le_iff</span>, <span class="const token" data-verso-hover="74">Nat.succ_mul</span>]; <span class="kw">omega</span></span>
+<span id="L159">  · <span class="kw">rw</span> [<span class="const token" data-verso-hover="68">le_stair_iff</span>, <span class="const token" data-verso-hover="74">Nat.succ_mul</span>]; <span class="kw">omega</span></span>
+<span id="L160"></span>
+<span id="L161"><span class="kw">lemma</span> <span class="const token" data-verso-hover="85">stair_succ_ne</span> (it : <span class="const token" data-verso-hover="25">ℕ</span>) {i j : <span class="const token" data-verso-hover="41">Fin</span> k} (hj : j ≠ i) :</span>
+<span id="L162">    <span class="const token" data-verso-hover="67">stair</span> k (it * k + i.<span class="const token" data-verso-hover="43">val</span> + <span class="nu">1</span>) j = <span class="const token" data-verso-hover="67">stair</span> k (it * k + i.<span class="const token" data-verso-hover="43">val</span>) j := <span class="kw">by</span></span>
+<span id="L163">  <span class="kw">have</span> hk := <span class="const token" data-verso-hover="38">k_pos</span> k</span>
+<span id="L164">  <span class="kw">have</span> key : ∀ c, c * k + j.<span class="const token" data-verso-hover="43">val</span> ≠ it * k + i.<span class="const token" data-verso-hover="43">val</span> + k := <span class="kw">by</span></span>
+<span id="L165">    <span class="kw">intro</span> c hc</span>
+<span id="L166">    <span class="kw">have</span> h1 : (c * k + j.<span class="const token" data-verso-hover="43">val</span>) % k = j.<span class="const token" data-verso-hover="43">val</span> := <span class="kw">by</span> <span class="kw">simp</span> [<span class="const token" data-verso-hover="86">Nat.mul_add_mod_of_lt</span> j.<span class="const token" data-verso-hover="69">isLt</span>]</span>
+<span id="L167">    <span class="kw">have</span> h2 : (it * k + i.<span class="const token" data-verso-hover="43">val</span> + k) % k = i.<span class="const token" data-verso-hover="43">val</span> := <span class="kw">by</span></span>
+<span id="L168">      <span class="kw">rw</span> [<span class="kw">show</span> it * k + i.<span class="const token" data-verso-hover="43">val</span> + k = (it + <span class="nu">1</span>) * k + i.<span class="const token" data-verso-hover="43">val</span> <span class="kw">by</span> <span class="kw">rw</span> [<span class="const token" data-verso-hover="74">Nat.succ_mul</span>]; <span class="kw">omega</span>]</span>
+<span id="L169">      <span class="kw">simp</span> [<span class="const token" data-verso-hover="86">Nat.mul_add_mod_of_lt</span> i.<span class="const token" data-verso-hover="69">isLt</span>]</span>
+<span id="L170">    <span class="kw">exact</span> hj (<span class="const token" data-verso-hover="87">Fin.ext</span> (<span class="kw">by</span> <span class="kw">rw</span> [← h1, ← h2, hc]))</span>
+<span id="L171">  <span class="kw">apply</span> <span class="const token" data-verso-hover="83">le_antisymm</span></span>
+<span id="L172">  · <span class="kw">have</span> := (<span class="const token" data-verso-hover="68">le_stair_iff</span> (<span class="const token" data-verso-hover="67">stair</span> k (it * k + i.<span class="const token" data-verso-hover="43">val</span> + <span class="nu">1</span>) j) _ j).<span class="const token" data-verso-hover="78">1</span> <span class="const token" data-verso-hover="79">le_rfl</span></span>
+<span id="L173">    <span class="kw">rw</span> [<span class="const token" data-verso-hover="68">le_stair_iff</span>]</span>
+<span id="L174">    <span class="kw">have</span> := key (<span class="const token" data-verso-hover="67">stair</span> k (it * k + i.<span class="const token" data-verso-hover="43">val</span> + <span class="nu">1</span>) j)</span>
+<span id="L175">    <span class="kw">omega</span></span>
+<span id="L176">  · <span class="kw">have</span> := (<span class="const token" data-verso-hover="68">le_stair_iff</span> (<span class="const token" data-verso-hover="67">stair</span> k (it * k + i.<span class="const token" data-verso-hover="43">val</span>) j) _ j).<span class="const token" data-verso-hover="78">1</span> <span class="const token" data-verso-hover="79">le_rfl</span></span>
+<span id="L177">    <span class="kw">rw</span> [<span class="const token" data-verso-hover="68">le_stair_iff</span>]; <span class="kw">omega</span></span>
+<span id="L178"></span>
+<span id="L179"><span class="dc">/-- The staircase after one more increment, at position `it * k + i`. -/</span></span>
+<span id="L180"><span class="kw">lemma</span> <span class="const token" data-verso-hover="88">stair_succ</span> (it : <span class="const token" data-verso-hover="25">ℕ</span>) (i : <span class="const token" data-verso-hover="41">Fin</span> k) :</span>
+<span id="L181">    <span class="const token" data-verso-hover="67">stair</span> k (it * k + i.<span class="const token" data-verso-hover="43">val</span> + <span class="nu">1</span>) = <span class="const token" data-verso-hover="89">Function.update</span> (<span class="const token" data-verso-hover="67">stair</span> k (it * k + i.<span class="const token" data-verso-hover="43">val</span>)) i (it + <span class="nu">1</span>) := <span class="kw">by</span></span>
+<span id="L182">  <span class="kw">funext</span> j</span>
+<span id="L183">  <span class="kw">by_cases</span> hj : j = i</span>
+<span id="L184">  · <span class="kw">subst</span> hj; <span class="kw">simp</span> [<span class="const token" data-verso-hover="84">stair_succ_self</span>]</span>
+<span id="L185">  · <span class="kw">rw</span> [<span class="const token" data-verso-hover="90">Function.update_of_ne</span> hj, <span class="const token" data-verso-hover="85">stair_succ_ne</span> it hj]</span>
+<span id="L186"></span>
+<span id="L187"><span class="dc">/-- Every `n` is a position `it * k + i`. -/</span></span>
+<span id="L188"><span class="kw">lemma</span> <span class="const token" data-verso-hover="91">exists_pos</span> (n : <span class="const token" data-verso-hover="25">ℕ</span>) : ∃ it, ∃ i : <span class="const token" data-verso-hover="41">Fin</span> k, n = it * k + i.<span class="const token" data-verso-hover="43">val</span> :=</span>
+<span id="L189">  ⟨n / k, ⟨n % k, <span class="const token" data-verso-hover="92">Nat.mod_lt</span> _ (<span class="const token" data-verso-hover="38">k_pos</span> k)⟩, <span class="kw">by</span> <span class="kw">simp</span> [<span class="const token" data-verso-hover="93">Nat.div_add_mod'</span>]⟩</span>
+<span id="L190"></span>
+<span id="L191"><span class="dc">/-! ### Step equations -/</span></span>
+<span id="L192"></span>
+<span id="L193"><span class="kw">section</span> StepEqs</span>
+<span id="L194"></span>
+<span id="L195"><span class="kw">variable</span> {P : <span class="kw">Type</span>} [<span class="const token" data-verso-hover="94">DecidableEq</span> P] (W : <span class="const token" data-verso-hover="95">Wear</span> k <span class="const token" data-verso-hover="25">ℕ</span>) {C : <span class="const token" data-verso-hover="96">Cfg</span> (<span class="const token" data-verso-hover="57">counter</span> k) P} {p : P} {a : <span class="const token" data-verso-hover="25">ℕ</span>}</span>
+<span id="L196">  {o : <span class="const token" data-verso-hover="27">Unit</span>} {it : <span class="const token" data-verso-hover="25">ℕ</span>} {idx : <span class="const token" data-verso-hover="41">Fin</span> k}</span>
+<span id="L197"></span>
+<span id="L198"><span class="kw">open</span> Alg</span>
+<span id="L199"></span>
+<span id="L200"><span class="kw">lemma</span> <span class="const token" data-verso-hover="97">step_rd</span> (hp : C.<span class="const token" data-verso-hover="98">ts</span> p = <span class="const token" data-verso-hover="99">.</span>run a o <span class="const token" data-verso-hover="46">CL.rd</span>) :</span>
+<span id="L201">    <span class="const token" data-verso-hover="100">step1</span> W C (<span class="const token" data-verso-hover="101">.</span>step p) =</span>
+<span id="L202">      ({ C <span class="kw">with</span> <span class="const token" data-verso-hover="98">ts</span> := (<span class="const token" data-verso-hover="89">Function.update</span> C.<span class="const token" data-verso-hover="98">ts</span> p (<span class="const token" data-verso-hover="99">.</span>run a o (<span class="const token" data-verso-hover="47">CL.fl</span> (C.<span class="const token" data-verso-hover="102">cache</span> (<span class="const token" data-verso-hover="40">last</span> k))))) }, []) := <span class="kw">by</span></span>
+<span id="L203">  <span class="kw">simp</span> [<span class="const token" data-verso-hover="100">step1</span>, hp, <span class="const token" data-verso-hover="57">counter</span>]</span>
+<span id="L204"></span>
+<span id="L205"><span class="kw">lemma</span> <span class="const token" data-verso-hover="103">step_fl</span> (hp : C.<span class="const token" data-verso-hover="98">ts</span> p = <span class="const token" data-verso-hover="99">.</span>run a o (<span class="const token" data-verso-hover="47">CL.fl</span> it)) :</span>
+<span id="L206">    <span class="const token" data-verso-hover="100">step1</span> W C (<span class="const token" data-verso-hover="101">.</span>step p) =</span>
+<span id="L207">      ({ <span class="const token" data-verso-hover="104">writeBack</span> W C (<span class="const token" data-verso-hover="40">last</span> k) <span class="kw">with</span> <span class="const token" data-verso-hover="98">ts</span> := (<span class="const token" data-verso-hover="89">Function.update</span> C.<span class="const token" data-verso-hover="98">ts</span> p (<span class="const token" data-verso-hover="99">.</span>run a o (<span class="const token" data-verso-hover="48">CL.cas</span> it <span class="nu">0</span>))) },</span>
+<span id="L208">        []) := <span class="kw">by</span></span>
+<span id="L209">  <span class="kw">simp</span> [<span class="const token" data-verso-hover="100">step1</span>, hp, <span class="const token" data-verso-hover="57">counter</span>]</span>
+<span id="L210"></span>
+<span id="L211"><span class="kw">lemma</span> <span class="const token" data-verso-hover="105">step_cas_succ</span> (hp : C.<span class="const token" data-verso-hover="98">ts</span> p = <span class="const token" data-verso-hover="99">.</span>run a o (<span class="const token" data-verso-hover="48">CL.cas</span> it idx)) (hc : C.<span class="const token" data-verso-hover="102">cache</span> idx = it) :</span>
+<span id="L212">    <span class="const token" data-verso-hover="100">step1</span> W C (<span class="const token" data-verso-hover="101">.</span>step p) =</span>
+<span id="L213">      ({ C <span class="kw">with</span> <span class="const token" data-verso-hover="102">cache</span> := <span class="const token" data-verso-hover="89">Function.update</span> C.<span class="const token" data-verso-hover="102">cache</span> idx (it + <span class="nu">1</span>),</span>
+<span id="L214">                <span class="const token" data-verso-hover="106">dirty</span> := <span class="const token" data-verso-hover="89">Function.update</span> C.<span class="const token" data-verso-hover="106">dirty</span> idx <span class="const token" data-verso-hover="107">true</span>,</span>
+<span id="L215">                <span class="const token" data-verso-hover="98">ts</span> := (<span class="const token" data-verso-hover="89">Function.update</span> C.<span class="const token" data-verso-hover="98">ts</span> p (<span class="const token" data-verso-hover="99">.</span>run a o (<span class="const token" data-verso-hover="49">CL.flS</span> it idx))) }, []) := <span class="kw">by</span></span>
+<span id="L216">  <span class="kw">simp</span> [<span class="const token" data-verso-hover="100">step1</span>, hp, <span class="const token" data-verso-hover="57">counter</span>, hc]</span>
+<span id="L217"></span>
+<span id="L218"><span class="kw">lemma</span> <span class="const token" data-verso-hover="108">step_cas_fail</span> (hp : C.<span class="const token" data-verso-hover="98">ts</span> p = <span class="const token" data-verso-hover="99">.</span>run a o (<span class="const token" data-verso-hover="48">CL.cas</span> it idx)) (hc : C.<span class="const token" data-verso-hover="102">cache</span> idx ≠ it) :</span>
+<span id="L219">    <span class="const token" data-verso-hover="100">step1</span> W C (<span class="const token" data-verso-hover="101">.</span>step p) =</span>
+<span id="L220">      ({ C <span class="kw">with</span> <span class="const token" data-verso-hover="98">ts</span> := (<span class="const token" data-verso-hover="89">Function.update</span> C.<span class="const token" data-verso-hover="98">ts</span> p (<span class="const token" data-verso-hover="99">.</span>run a o (<span class="const token" data-verso-hover="51">CL.flF</span> it idx))) }, []) := <span class="kw">by</span></span>
+<span id="L221">  <span class="kw">simp</span> [<span class="const token" data-verso-hover="100">step1</span>, hp, <span class="const token" data-verso-hover="57">counter</span>, hc]</span>
+<span id="L222"></span>
+<span id="L223"><span class="kw">lemma</span> <span class="const token" data-verso-hover="109">step_flS</span> (hp : C.<span class="const token" data-verso-hover="98">ts</span> p = <span class="const token" data-verso-hover="99">.</span>run a o (<span class="const token" data-verso-hover="49">CL.flS</span> it idx)) :</span>
+<span id="L224">    <span class="const token" data-verso-hover="100">step1</span> W C (<span class="const token" data-verso-hover="101">.</span>step p) =</span>
+<span id="L225">      ({ <span class="const token" data-verso-hover="104">writeBack</span> W C idx <span class="kw">with</span> <span class="const token" data-verso-hover="98">ts</span> := (<span class="const token" data-verso-hover="89">Function.update</span> C.<span class="const token" data-verso-hover="98">ts</span> p (<span class="const token" data-verso-hover="99">.</span>run a o (<span class="const token" data-verso-hover="50">CL.ret</span> it idx))) },</span>
+<span id="L226">        []) := <span class="kw">by</span></span>
+<span id="L227">  <span class="kw">simp</span> [<span class="const token" data-verso-hover="100">step1</span>, hp, <span class="const token" data-verso-hover="57">counter</span>]</span>
+<span id="L228"></span>
+<span id="L229"><span class="kw">lemma</span> <span class="const token" data-verso-hover="110">step_ret</span> (hp : C.<span class="const token" data-verso-hover="98">ts</span> p = <span class="const token" data-verso-hover="99">.</span>run a o (<span class="const token" data-verso-hover="50">CL.ret</span> it idx)) :</span>
+<span id="L230">    <span class="const token" data-verso-hover="100">step1</span> W C (<span class="const token" data-verso-hover="101">.</span>step p) =</span>
+<span id="L231">      ({ C <span class="kw">with</span> <span class="const token" data-verso-hover="98">ts</span> := (<span class="const token" data-verso-hover="89">Function.update</span> C.<span class="const token" data-verso-hover="98">ts</span> p <span class="const token" data-verso-hover="111">.</span>idle) }, [<span class="const token" data-verso-hover="112">.</span>res a (idx.<span class="const token" data-verso-hover="43">val</span> + it * k)]) := <span class="kw">by</span></span>
+<span id="L232">  <span class="kw">simp</span> [<span class="const token" data-verso-hover="100">step1</span>, hp, <span class="const token" data-verso-hover="57">counter</span>]</span>
+<span id="L233"></span>
+<span id="L234"><span class="kw">lemma</span> <span class="const token" data-verso-hover="113">step_flF</span> (hp : C.<span class="const token" data-verso-hover="98">ts</span> p = <span class="const token" data-verso-hover="99">.</span>run a o (<span class="const token" data-verso-hover="51">CL.flF</span> it idx)) :</span>
+<span id="L235">    <span class="const token" data-verso-hover="100">step1</span> W C (<span class="const token" data-verso-hover="101">.</span>step p) =</span>
+<span id="L236">      ({ <span class="const token" data-verso-hover="104">writeBack</span> W C idx <span class="kw">with</span> <span class="const token" data-verso-hover="98">ts</span> := (<span class="const token" data-verso-hover="89">Function.update</span> C.<span class="const token" data-verso-hover="98">ts</span> p (<span class="const token" data-verso-hover="99">.</span>run a o (<span class="const token" data-verso-hover="52">nextPC</span> it idx))) },</span>
+<span id="L237">        []) := <span class="kw">by</span></span>
+<span id="L238">  <span class="kw">simp</span> [<span class="const token" data-verso-hover="100">step1</span>, hp, <span class="const token" data-verso-hover="57">counter</span>]</span>
+<span id="L239"></span>
+<span id="L240"><span class="kw">lemma</span> <span class="const token" data-verso-hover="114">step_idle</span> (hp : C.<span class="const token" data-verso-hover="98">ts</span> p = <span class="const token" data-verso-hover="111">.</span>idle) : <span class="const token" data-verso-hover="100">step1</span> W C (<span class="const token" data-verso-hover="101">.</span>step p) = (C, []) := <span class="kw">by</span></span>
+<span id="L241">  <span class="kw">simp</span> [<span class="const token" data-verso-hover="100">step1</span>, hp]</span>
+<span id="L242"></span>
+<span id="L243"><span class="kw">lemma</span> <span class="const token" data-verso-hover="115">inv_idle</span> (hp : C.<span class="const token" data-verso-hover="98">ts</span> p = <span class="const token" data-verso-hover="111">.</span>idle) (o : <span class="const token" data-verso-hover="27">Unit</span>) :</span>
+<span id="L244">    <span class="const token" data-verso-hover="100">step1</span> W C (<span class="const token" data-verso-hover="116">.</span>inv p o) =</span>
+<span id="L245">      ({ C <span class="kw">with</span> <span class="const token" data-verso-hover="98">ts</span> := <span class="const token" data-verso-hover="89">Function.update</span> C.<span class="const token" data-verso-hover="98">ts</span> p (<span class="const token" data-verso-hover="99">.</span>run C.<span class="const token" data-verso-hover="117">cnt</span> o <span class="const token" data-verso-hover="46">CL.rd</span>), <span class="const token" data-verso-hover="117">cnt</span> := C.<span class="const token" data-verso-hover="117">cnt</span> + <span class="nu">1</span> },</span>
+<span id="L246">        [<span class="const token" data-verso-hover="118">.</span>inv C.<span class="const token" data-verso-hover="117">cnt</span> p o]) := <span class="kw">by</span></span>
+<span id="L247">  <span class="kw">simp</span> [<span class="const token" data-verso-hover="100">step1</span>, hp, <span class="const token" data-verso-hover="57">counter</span>]</span>
+<span id="L248"></span>
+<span id="L249"><span class="kw">end</span> StepEqs</span>
+<span id="L250"></span>
+<span id="L251"><span class="kw">end</span> Podc.WearLeveling</span>
+<span id="L252"></span>
+</code></div>
+        <script>
+          window.versoHoversUrl = "PODC2022/WearLeveling/-hovers.json";</script>
+        <script src="static/lean/popper.js"></script>
+        <script src="static/lean/tippy.js"></script>
+        <script src="static/lean/marked.js"></script>
+        <script src="static/lean/highlighting.js"></script>
+        <script src="static/lean/lean.js"></script>
+        </article></main><footer class="site-footer"><div class="wrap">
+        Machine-checked formalizations of PODC papers in Lean 4. Generated with <a href="https://github.com/leanprover/verso">Verso</a> from the README files of <a href="https://github.com/vasnesterov/formal_podc">vasnesterov/formal_podc</a>.</div>
+      </footer></body>
+  </html>
+

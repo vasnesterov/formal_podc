@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="light dark">
+    <link rel="icon" href="data:,">
+    <title>StabilizingByzStorage: Regular.lean · Formal PODC</title><base href="../../../.././"><link rel="stylesheet" href="static/lean/verso-vars.css">
+    <link rel="stylesheet" href="static/lean/highlighting.css">
+    <link rel="stylesheet" href="static/lean/tippy-border.css">
+    <link rel="stylesheet" href="static/style.css">
+    <script defer="defer" src="static/site.js"></script>
+    </head>
+  <body>
+    <header class="site-header">
+      <div class="wrap">
+        <a class="brand" href=".">Formal PODC</a><nav class="top">
+          <a href=".">Search</a><a href="about/">About</a><a href="https://github.com/vasnesterov/formal_podc">GitHub</a></nav>
+        </div>
+      </header>
+    <main class="wrap"><article><nav class="breadcrumbs" aria-label="Breadcrumb">
+          <a href=".">Search</a><span class="sep">›</span><a href="PODC2015/">PODC 2015</a><span class="sep">›</span><a href="PODC2015/StabilizingByzStorage/">StabilizingByzStorage</a><span class="sep">›</span><a href="PODC2015/StabilizingByzStorage/src/">Lean source</a><span class="sep">›</span><span aria-current="page">Regular</span></nav>
+        <h1>
+          <code>Regular.lean</code></h1>
+        <div class="paper-links">
+          <p>
+            Source of <a href="PODC2015/StabilizingByzStorage/">Stabilizing Byzantine Server-Based Storage — PODC 2015</a> · <a href="https://github.com/vasnesterov/formal_podc/blob/main/Papers/PODC2015/StabilizingByzStorage/Regular.lean">GitHub</a> · hover over a name for its type and documentation</p>
+          </div>
+        <div class="lean-code lean-src">
+          <code class="hl lean block" data-lean-context="Regular"><span id="L1"><span class="kw">import</span> Papers.PODC2015.StabilizingByzStorage.Server</span>
+<span id="L2"></span>
+<span id="L3"><span class="dc">/-!</span></span>
+<span id="L4"><span class="dc"># Fig. 2: the stabilizing SWSR regular register</span></span>
+<span id="L5"></span>
+<span id="L6"><span class="dc">Same system as `Atomic.lean` (servers and `ss-broadcast` from `Server.lean`), with the client code of</span></span>
+<span id="L7"><span class="dc">Fig. 2: no sequence numbers, payload `D = V`.</span></span>
+<span id="L8"></span>
+<span id="L9"><span class="dc">The state also carries **ghost** variables, which no guard of the algorithm reads; they only record</span></span>
+<span id="L10"><span class="dc">the history needed to state and prove regularity:</span></span>
+<span id="L11"><span class="dc">* `vals`: the values of the writes invoked so far (in order), `nDone`: how many of them completed;</span></span>
+<span id="L12"><span class="dc">* `base`: the value of `nDone` when the current read was invoked (writes `0, …, base - 1` completed</span></span>
+<span id="L13"><span class="dc">  before it, `base - 1` is the last one);</span></span>
+<span id="L14"><span class="dc">* per server (`Ghost`): for every pending writer message, the index of the write that broadcast it</span></span>
+<span id="L15"><span class="dc">  (`none` for the initial contents of the link); for every pending reader message, whether it is the</span></span>
+<span id="L16"><span class="dc">  `READ(true)` (`some true`) or a `READ(false)` (`some false`) of the current read (`none`: older or</span></span>
+<span id="L17"><span class="dc">  initial message); the indices of the writes that last set `last_val` and `helping_val`; whether</span></span>
+<span id="L18"><span class="dc">  the server has delivered the `READ(true)` of the current read (`rtd`).</span></span>
+<span id="L19"></span>
+<span id="L20"><span class="dc">`Init σ`: arbitrary server states and links (transient failures end at time `0`), both clients</span></span>
+<span id="L21"><span class="dc">between operations, empty ghost history.</span></span>
+<span id="L22"><span class="dc">-/</span></span>
+<span id="L23"></span>
+<span id="L24"><span class="kw">namespace</span> Podc.StabilizingByzStorage.Regular</span>
+<span id="L25"></span>
+<span id="L26"><span class="kw">open</span> Podc.StabilizingByzStorage</span>
+<span id="L27"></span>
+<span id="L28"><span class="dc">/-- Phases of `write(v)` (Fig. 2). -/</span></span>
+<span id="L29"><span class="kw">inductive</span> <span class="const token" data-verso-hover="199">WPhase</span> (V : <span class="kw">Type</span>) <span class="kw">where</span></span>
+<span id="L30">  | <span class="const token" data-verso-hover="200">idle</span></span>
+<span id="L31">  <span class="dc">/-- line 01 in progress -/</span></span>
+<span id="L32">  | <span class="const token" data-verso-hover="201">bcastWrite</span> (v : V)</span>
+<span id="L33">  <span class="dc">/-- line 02 -/</span></span>
+<span id="L34">  | <span class="const token" data-verso-hover="202">waitAck</span> (v : V)</span>
+<span id="L35">  <span class="dc">/-- line 04 in progress -/</span></span>
+<span id="L36">  | <span class="const token" data-verso-hover="203">bcastHelp</span></span>
+<span id="L37">  <span class="kw">deriving</span> <span class="const token" data-verso-hover="29">DecidableEq</span>, <span class="const token" data-verso-hover="30">Repr</span></span>
+<span id="L38"></span>
+<span id="L39"><span class="dc">/-- Phases of `read()` (Fig. 2). -/</span></span>
+<span id="L40"><span class="kw">inductive</span> <span class="const token" data-verso-hover="204">RPhase</span> <span class="kw">where</span></span>
+<span id="L41">  | <span class="const token" data-verso-hover="205">idle</span></span>
+<span id="L42">  <span class="dc">/-- line 09 in progress -/</span></span>
+<span id="L43">  | <span class="const token" data-verso-hover="206">bcastLoop</span></span>
+<span id="L44">  <span class="dc">/-- line 11 -/</span></span>
+<span id="L45">  | <span class="const token" data-verso-hover="207">waitLoop</span></span>
+<span id="L46">  <span class="kw">deriving</span> <span class="const token" data-verso-hover="29">DecidableEq</span>, <span class="const token" data-verso-hover="30">Repr</span></span>
+<span id="L47"></span>
+<span id="L48"><span class="dc">/-- Ghost information about a server (never read by the algorithm). -/</span></span>
+<span id="L49"><span class="kw">structure</span> <span class="const token" data-verso-hover="208">Ghost</span> <span class="kw">where</span></span>
+<span id="L50">  <span class="dc">/-- Index of the write that broadcast each pending writer message (`none`: initial garbage). -/</span></span>
+<span id="L51">  <span class="const token" data-verso-hover="209">wtags</span> : <span class="const token" data-verso-hover="110">List</span> (<span class="const token" data-verso-hover="75">Option</span> <span class="const token" data-verso-hover="19">ℕ</span>)</span>
+<span id="L52">  <span class="dc">/-- For each pending reader message: `some true` = `READ(true)` of the current read,</span></span>
+<span id="L53"><span class="dc">  `some false` = a later `READ(false)` of the current read, `none` = any other message. -/</span></span>
+<span id="L54">  <span class="const token" data-verso-hover="210">rtags</span> : <span class="const token" data-verso-hover="110">List</span> (<span class="const token" data-verso-hover="75">Option</span> <span class="const token" data-verso-hover="59">Bool</span>)</span>
+<span id="L55">  <span class="dc">/-- Index of the write whose `WRITE` set `last_val` (`none`: initial value or garbage). -/</span></span>
+<span id="L56">  <span class="const token" data-verso-hover="211">lastTag</span> : <span class="const token" data-verso-hover="75">Option</span> <span class="const token" data-verso-hover="19">ℕ</span></span>
+<span id="L57">  <span class="dc">/-- Index of the write whose `NEW_HELP_VAL` set `helping_val` (`none` otherwise). -/</span></span>
+<span id="L58">  <span class="const token" data-verso-hover="212">helpTag</span> : <span class="const token" data-verso-hover="75">Option</span> <span class="const token" data-verso-hover="19">ℕ</span></span>
+<span id="L59">  <span class="dc">/-- The server has delivered the `READ(true)` of the current read. -/</span></span>
+<span id="L60">  <span class="const token" data-verso-hover="213">rtd</span> : <span class="const token" data-verso-hover="59">Bool</span></span>
+<span id="L61">  <span class="kw">deriving</span> <span class="const token" data-verso-hover="29">DecidableEq</span>, <span class="const token" data-verso-hover="30">Repr</span></span>
+<span id="L62"></span>
+<span id="L63"><span class="dc">/-- Global state. -/</span></span>
+<span id="L64"><span class="kw">structure</span> <span class="const token" data-verso-hover="214">State</span> (n : <span class="const token" data-verso-hover="19">ℕ</span>) (V : <span class="kw">Type</span>) <span class="kw">where</span></span>
+<span id="L65">  <span class="const token" data-verso-hover="215">srv</span> : <span class="const token" data-verso-hover="20">Fin</span> n → <span class="const token" data-verso-hover="45">Server</span> V</span>
+<span id="L66">  <span class="const token" data-verso-hover="216">w</span> : <span class="const token" data-verso-hover="199">WPhase</span> V</span>
+<span id="L67">  <span class="const token" data-verso-hover="217">r</span> : <span class="const token" data-verso-hover="204">RPhase</span></span>
+<span id="L68">  <span class="dc">/-- ghost -/</span></span>
+<span id="L69">  <span class="const token" data-verso-hover="218">g</span> : <span class="const token" data-verso-hover="20">Fin</span> n → <span class="const token" data-verso-hover="208">Ghost</span></span>
+<span id="L70">  <span class="dc">/-- ghost: values of the writes invoked so far -/</span></span>
+<span id="L71">  <span class="const token" data-verso-hover="219">vals</span> : <span class="const token" data-verso-hover="110">List</span> V</span>
+<span id="L72">  <span class="dc">/-- ghost: number of completed writes -/</span></span>
+<span id="L73">  <span class="const token" data-verso-hover="220">nDone</span> : <span class="const token" data-verso-hover="19">ℕ</span></span>
+<span id="L74">  <span class="dc">/-- ghost: `nDone` at the invocation of the current read -/</span></span>
+<span id="L75">  <span class="const token" data-verso-hover="221">base</span> : <span class="const token" data-verso-hover="19">ℕ</span></span>
+<span id="L76"></span>
+<span id="L77"><span class="kw">inductive</span> <span class="const token" data-verso-hover="222">Label</span> (V : <span class="kw">Type</span>) <span class="kw">where</span></span>
+<span id="L78">  | <span class="const token" data-verso-hover="223">invWrite</span> (v : V)</span>
+<span id="L79">  | <span class="const token" data-verso-hover="224">retWrite</span></span>
+<span id="L80">  | <span class="const token" data-verso-hover="225">invRead</span></span>
+<span id="L81">  | <span class="const token" data-verso-hover="226">retRead</span> (v : V)</span>
+<span id="L82">  | <span class="const token" data-verso-hover="227">tau</span></span>
+<span id="L83">  <span class="kw">deriving</span> <span class="const token" data-verso-hover="29">DecidableEq</span>, <span class="const token" data-verso-hover="30">Repr</span></span>
+<span id="L84"></span>
+<span id="L85"><span class="kw">variable</span> {n : <span class="const token" data-verso-hover="19">ℕ</span>} {V : <span class="kw">Type</span>} [<span class="const token" data-verso-hover="29">DecidableEq</span> V]</span>
+<span id="L86"></span>
+<span id="L87"><span class="kw">namespace</span> Ghost</span>
+<span id="L88"></span>
+<span id="L89"><span class="dc">/-- Ghost update when the server delivers its oldest writer message `m`. -/</span></span>
+<span id="L90"><span class="kw">def</span> <span class="const token" data-verso-hover="228">deliverW</span> (g : <span class="const token" data-verso-hover="208">Ghost</span>) (isWrite : <span class="const token" data-verso-hover="59">Bool</span>) : <span class="const token" data-verso-hover="208">Ghost</span> :=</span>
+<span id="L91">  <span class="kw">match</span> g.<span class="const token" data-verso-hover="209">wtags</span> <span class="kw">with</span></span>
+<span id="L92">  | [] =&gt; g</span>
+<span id="L93">  | tg :: rest =&gt;</span>
+<span id="L94">    <span class="kw">if</span> isWrite <span class="kw">then</span> { g <span class="kw">with</span> <span class="const token" data-verso-hover="209">wtags</span> := rest, <span class="const token" data-verso-hover="211">lastTag</span> := tg } <span class="kw">else</span> { g <span class="kw">with</span> <span class="const token" data-verso-hover="209">wtags</span> := rest, <span class="const token" data-verso-hover="212">helpTag</span> := tg }</span>
+<span id="L95"></span>
+<span id="L96"><span class="dc">/-- Ghost update when the server delivers its oldest reader message `READ(b)`. -/</span></span>
+<span id="L97"><span class="kw">def</span> <span class="const token" data-verso-hover="229">deliverR</span> (g : <span class="const token" data-verso-hover="208">Ghost</span>) (b : <span class="const token" data-verso-hover="59">Bool</span>) : <span class="const token" data-verso-hover="208">Ghost</span> :=</span>
+<span id="L98">  <span class="kw">match</span> g.<span class="const token" data-verso-hover="210">rtags</span> <span class="kw">with</span></span>
+<span id="L99">  | [] =&gt; g</span>
+<span id="L100">  | tg :: rest =&gt;</span>
+<span id="L101">    { g <span class="kw">with</span> <span class="const token" data-verso-hover="210">rtags</span> := rest, <span class="const token" data-verso-hover="212">helpTag</span> := <span class="kw">if</span> b <span class="kw">then</span> <span class="const token" data-verso-hover="106">none</span> <span class="kw">else</span> g.<span class="const token" data-verso-hover="212">helpTag</span>,</span>
+<span id="L102">             <span class="const token" data-verso-hover="213">rtd</span> := <span class="kw">if</span> tg = <span class="const token" data-verso-hover="78">some</span> <span class="const token" data-verso-hover="91">true</span> <span class="kw">then</span> <span class="const token" data-verso-hover="91">true</span> <span class="kw">else</span> g.<span class="const token" data-verso-hover="213">rtd</span> }</span>
+<span id="L103"></span>
+<span id="L104"><span class="kw">end</span> Ghost</span>
+<span id="L105"></span>
+<span id="L106"><span class="dc">/-- Is the oldest pending writer message a `WRITE`? -/</span></span>
+<span id="L107"><span class="kw">def</span> <span class="const token" data-verso-hover="230">headIsWrite</span> (s : <span class="const token" data-verso-hover="45">Server</span> V) : <span class="const token" data-verso-hover="59">Bool</span> :=</span>
+<span id="L108">  <span class="kw">match</span> s.<span class="const token" data-verso-hover="64">wq</span> <span class="kw">with</span></span>
+<span id="L109">  | <span class="const token" data-verso-hover="71">.</span>write _ :: _ =&gt; <span class="const token" data-verso-hover="91">true</span></span>
+<span id="L110">  | _ =&gt; <span class="const token" data-verso-hover="84">false</span></span>
+<span id="L111"></span>
+<span id="L112"><span class="dc">/-- The value of the oldest pending reader message. -/</span></span>
+<span id="L113"><span class="kw">def</span> <span class="const token" data-verso-hover="231">headR</span> (s : <span class="const token" data-verso-hover="45">Server</span> V) : <span class="const token" data-verso-hover="59">Bool</span> := s.<span class="const token" data-verso-hover="68">rq</span>.<span class="const token" data-verso-hover="232">headD</span> <span class="const token" data-verso-hover="84">false</span></span>
+<span id="L114"></span>
+<span id="L115"><span class="dc">/-- Initial states: arbitrary servers and links, clients between operations, empty ghost history. -/</span></span>
+<span id="L116"><span class="kw">def</span> <span class="const token" data-verso-hover="233">Init</span> (σ : <span class="const token" data-verso-hover="214">State</span> n V) : <span class="kw">Prop</span> :=</span>
+<span id="L117">  σ.<span class="const token" data-verso-hover="216">w</span> = <span class="const token" data-verso-hover="200">.</span>idle ∧ σ.<span class="const token" data-verso-hover="217">r</span> = <span class="const token" data-verso-hover="205">.</span>idle ∧ σ.<span class="const token" data-verso-hover="219">vals</span> = [] ∧ σ.<span class="const token" data-verso-hover="220">nDone</span> = <span class="nu">0</span> ∧</span>
+<span id="L118">  ∀ s, (σ.<span class="const token" data-verso-hover="218">g</span> s).<span class="const token" data-verso-hover="209">wtags</span> = (σ.<span class="const token" data-verso-hover="215">srv</span> s).<span class="const token" data-verso-hover="64">wq</span>.<span class="const token" data-verso-hover="114">map</span> (<span class="kw">fun</span> _ =&gt; <span class="const token" data-verso-hover="106">none</span>) ∧</span>
+<span id="L119">    (σ.<span class="const token" data-verso-hover="218">g</span> s).<span class="const token" data-verso-hover="210">rtags</span> = (σ.<span class="const token" data-verso-hover="215">srv</span> s).<span class="const token" data-verso-hover="68">rq</span>.<span class="const token" data-verso-hover="114">map</span> (<span class="kw">fun</span> _ =&gt; <span class="const token" data-verso-hover="106">none</span>) ∧</span>
+<span id="L120">    (σ.<span class="const token" data-verso-hover="218">g</span> s).<span class="const token" data-verso-hover="211">lastTag</span> = <span class="const token" data-verso-hover="106">none</span> ∧ (σ.<span class="const token" data-verso-hover="218">g</span> s).<span class="const token" data-verso-hover="212">helpTag</span> = <span class="const token" data-verso-hover="106">none</span></span>
+<span id="L121"></span>
+<span id="L122"><span class="kw">variable</span> (t : <span class="const token" data-verso-hover="19">ℕ</span>) (B : <span class="const token" data-verso-hover="61">Finset</span> (<span class="const token" data-verso-hover="20">Fin</span> n))</span>
+<span id="L123"></span>
+<span id="L124"><span class="dc">/-- One step of the system of Fig. 2. -/</span></span>
+<span id="L125"><span class="kw">inductive</span> <span class="const token" data-verso-hover="234">Step</span> : <span class="const token" data-verso-hover="214">State</span> n V → <span class="const token" data-verso-hover="222">Label</span> V → <span class="const token" data-verso-hover="214">State</span> n V → <span class="kw">Prop</span></span>
+<span id="L126">  <span class="dc">/-- A server delivers the oldest message from the writer (lines 19–21). -/</span></span>
+<span id="L127">  | <span class="const token" data-verso-hover="235">delivW</span> (σ : <span class="const token" data-verso-hover="214">State</span> n V) (s : <span class="const token" data-verso-hover="20">Fin</span> n) (h : (σ.<span class="const token" data-verso-hover="215">srv</span> s).<span class="const token" data-verso-hover="64">wq</span> ≠ []) :</span>
+<span id="L128">      <span class="const token" data-verso-hover="234">Step</span> σ <span class="const token" data-verso-hover="227">.</span>tau { σ <span class="kw">with</span></span>
+<span id="L129">        <span class="const token" data-verso-hover="215">srv</span> := <span class="const token" data-verso-hover="65">Function.update</span> σ.<span class="const token" data-verso-hover="215">srv</span> s (σ.<span class="const token" data-verso-hover="215">srv</span> s).<span class="const token" data-verso-hover="66">deliverW</span></span>
+<span id="L130">        <span class="const token" data-verso-hover="218">g</span> := <span class="const token" data-verso-hover="65">Function.update</span> σ.<span class="const token" data-verso-hover="218">g</span> s ((σ.<span class="const token" data-verso-hover="218">g</span> s).<span class="const token" data-verso-hover="228">deliverW</span> (<span class="const token" data-verso-hover="230">headIsWrite</span> (σ.<span class="const token" data-verso-hover="215">srv</span> s))) }</span>
+<span id="L131">  <span class="dc">/-- A server delivers the oldest message from the reader (lines 22–23). -/</span></span>
+<span id="L132">  | <span class="const token" data-verso-hover="236">delivR</span> (σ : <span class="const token" data-verso-hover="214">State</span> n V) (s : <span class="const token" data-verso-hover="20">Fin</span> n) (h : (σ.<span class="const token" data-verso-hover="215">srv</span> s).<span class="const token" data-verso-hover="68">rq</span> ≠ []) :</span>
+<span id="L133">      <span class="const token" data-verso-hover="234">Step</span> σ <span class="const token" data-verso-hover="227">.</span>tau { σ <span class="kw">with</span></span>
+<span id="L134">        <span class="const token" data-verso-hover="215">srv</span> := <span class="const token" data-verso-hover="65">Function.update</span> σ.<span class="const token" data-verso-hover="215">srv</span> s (σ.<span class="const token" data-verso-hover="215">srv</span> s).<span class="const token" data-verso-hover="69">deliverR</span></span>
+<span id="L135">        <span class="const token" data-verso-hover="218">g</span> := <span class="const token" data-verso-hover="65">Function.update</span> σ.<span class="const token" data-verso-hover="218">g</span> s ((σ.<span class="const token" data-verso-hover="218">g</span> s).<span class="const token" data-verso-hover="229">deliverR</span> (<span class="const token" data-verso-hover="231">headR</span> (σ.<span class="const token" data-verso-hover="215">srv</span> s))) }</span>
+<span id="L136">  <span class="dc">/-- Line 01: `ss_broadcast WRITE(v)`. -/</span></span>
+<span id="L137">  | <span class="const token" data-verso-hover="237">invWrite</span> (σ : <span class="const token" data-verso-hover="214">State</span> n V) (v : V) (h : σ.<span class="const token" data-verso-hover="216">w</span> = <span class="const token" data-verso-hover="200">.</span>idle) :</span>
+<span id="L138">      <span class="const token" data-verso-hover="234">Step</span> σ (<span class="const token" data-verso-hover="223">.</span>invWrite v) { σ <span class="kw">with</span></span>
+<span id="L139">        <span class="const token" data-verso-hover="216">w</span> := <span class="const token" data-verso-hover="201">.</span>bcastWrite v</span>
+<span id="L140">        <span class="const token" data-verso-hover="215">srv</span> := <span class="kw">fun</span> s =&gt; (σ.<span class="const token" data-verso-hover="215">srv</span> s).<span class="const token" data-verso-hover="57">bcastW</span> (<span class="const token" data-verso-hover="71">.</span>write v)</span>
+<span id="L141">        <span class="const token" data-verso-hover="218">g</span> := <span class="kw">fun</span> s =&gt; { σ.<span class="const token" data-verso-hover="218">g</span> s <span class="kw">with</span> <span class="const token" data-verso-hover="209">wtags</span> := (σ.<span class="const token" data-verso-hover="218">g</span> s).<span class="const token" data-verso-hover="209">wtags</span> ++ [<span class="const token" data-verso-hover="78">some</span> σ.<span class="const token" data-verso-hover="219">vals</span>.<span class="const token" data-verso-hover="170">length</span>] }</span>
+<span id="L142">        <span class="const token" data-verso-hover="219">vals</span> := σ.<span class="const token" data-verso-hover="219">vals</span> ++ [v] }</span>
+<span id="L143">  <span class="dc">/-- End of the broadcast of line 01. -/</span></span>
+<span id="L144">  | <span class="const token" data-verso-hover="238">endWrite</span> (σ : <span class="const token" data-verso-hover="214">State</span> n V) (v : V) (h : σ.<span class="const token" data-verso-hover="216">w</span> = <span class="const token" data-verso-hover="201">.</span>bcastWrite v)</span>
+<span id="L145">      (hs : n - <span class="nu">2</span> * t ≤ <span class="const token" data-verso-hover="73">syncW</span> B σ.<span class="const token" data-verso-hover="215">srv</span>) :</span>
+<span id="L146">      <span class="const token" data-verso-hover="234">Step</span> σ <span class="const token" data-verso-hover="227">.</span>tau { σ <span class="kw">with</span> <span class="const token" data-verso-hover="216">w</span> := <span class="const token" data-verso-hover="202">.</span>waitAck v }</span>
+<span id="L147">  <span class="dc">/-- Lines 02–03, 06: `4t + 1` of the `n - t` acks carry the same `w ≠ ⊥`: return. -/</span></span>
+<span id="L148">  | <span class="const token" data-verso-hover="239">ackDone</span> (σ : <span class="const token" data-verso-hover="214">State</span> n V) (v : V) (h : σ.<span class="const token" data-verso-hover="216">w</span> = <span class="const token" data-verso-hover="202">.</span>waitAck v) (Q : <span class="const token" data-verso-hover="61">Finset</span> (<span class="const token" data-verso-hover="20">Fin</span> n))</span>
+<span id="L149">      (acks : <span class="const token" data-verso-hover="20">Fin</span> n → <span class="const token" data-verso-hover="75">Option</span> V) (hQ : Q.<span class="const token" data-verso-hover="76">card</span> = n - t)</span>
+<span id="L150">      (hacks : ∀ s ∈ Q, s ∉ B → (σ.<span class="const token" data-verso-hover="215">srv</span> s).<span class="const token" data-verso-hover="77">wack</span> = <span class="const token" data-verso-hover="78">some</span> (acks s))</span>
+<span id="L151">      (hc : ∃ w, <span class="nu">4</span> * t + <span class="nu">1</span> ≤ <span class="const token" data-verso-hover="79">cnt</span> Q acks (<span class="const token" data-verso-hover="78">some</span> w)) :</span>
+<span id="L152">      <span class="const token" data-verso-hover="234">Step</span> σ <span class="const token" data-verso-hover="224">.</span>retWrite { σ <span class="kw">with</span> <span class="const token" data-verso-hover="216">w</span> := <span class="const token" data-verso-hover="200">.</span>idle, <span class="const token" data-verso-hover="220">nDone</span> := σ.<span class="const token" data-verso-hover="220">nDone</span> + <span class="nu">1</span> }</span>
+<span id="L153">  <span class="dc">/-- Lines 02–04: otherwise `ss_broadcast NEW_HELP_VAL(v)`. -/</span></span>
+<span id="L154">  | <span class="const token" data-verso-hover="240">ackHelp</span> (σ : <span class="const token" data-verso-hover="214">State</span> n V) (v : V) (h : σ.<span class="const token" data-verso-hover="216">w</span> = <span class="const token" data-verso-hover="202">.</span>waitAck v) (Q : <span class="const token" data-verso-hover="61">Finset</span> (<span class="const token" data-verso-hover="20">Fin</span> n))</span>
+<span id="L155">      (acks : <span class="const token" data-verso-hover="20">Fin</span> n → <span class="const token" data-verso-hover="75">Option</span> V) (hQ : Q.<span class="const token" data-verso-hover="76">card</span> = n - t)</span>
+<span id="L156">      (hacks : ∀ s ∈ Q, s ∉ B → (σ.<span class="const token" data-verso-hover="215">srv</span> s).<span class="const token" data-verso-hover="77">wack</span> = <span class="const token" data-verso-hover="78">some</span> (acks s))</span>
+<span id="L157">      (hc : ¬ ∃ w, <span class="nu">4</span> * t + <span class="nu">1</span> ≤ <span class="const token" data-verso-hover="79">cnt</span> Q acks (<span class="const token" data-verso-hover="78">some</span> w)) :</span>
+<span id="L158">      <span class="const token" data-verso-hover="234">Step</span> σ <span class="const token" data-verso-hover="227">.</span>tau { σ <span class="kw">with</span></span>
+<span id="L159">        <span class="const token" data-verso-hover="216">w</span> := <span class="const token" data-verso-hover="203">.</span>bcastHelp</span>
+<span id="L160">        <span class="const token" data-verso-hover="215">srv</span> := <span class="kw">fun</span> s =&gt; (σ.<span class="const token" data-verso-hover="215">srv</span> s).<span class="const token" data-verso-hover="57">bcastW</span> (<span class="const token" data-verso-hover="81">.</span>newHelp v)</span>
+<span id="L161">        <span class="const token" data-verso-hover="218">g</span> := <span class="kw">fun</span> s =&gt; { σ.<span class="const token" data-verso-hover="218">g</span> s <span class="kw">with</span> <span class="const token" data-verso-hover="209">wtags</span> := (σ.<span class="const token" data-verso-hover="218">g</span> s).<span class="const token" data-verso-hover="209">wtags</span> ++ [<span class="const token" data-verso-hover="78">some</span> (σ.<span class="const token" data-verso-hover="219">vals</span>.<span class="const token" data-verso-hover="170">length</span> - <span class="nu">1</span>)] } }</span>
+<span id="L162">  <span class="dc">/-- End of the broadcast of line 04; return (line 06). -/</span></span>
+<span id="L163">  | <span class="const token" data-verso-hover="241">endHelp</span> (σ : <span class="const token" data-verso-hover="214">State</span> n V) (h : σ.<span class="const token" data-verso-hover="216">w</span> = <span class="const token" data-verso-hover="203">.</span>bcastHelp) (hs : n - <span class="nu">2</span> * t ≤ <span class="const token" data-verso-hover="73">syncW</span> B σ.<span class="const token" data-verso-hover="215">srv</span>) :</span>
+<span id="L164">      <span class="const token" data-verso-hover="234">Step</span> σ <span class="const token" data-verso-hover="224">.</span>retWrite { σ <span class="kw">with</span> <span class="const token" data-verso-hover="216">w</span> := <span class="const token" data-verso-hover="200">.</span>idle, <span class="const token" data-verso-hover="220">nDone</span> := σ.<span class="const token" data-verso-hover="220">nDone</span> + <span class="nu">1</span> }</span>
+<span id="L165">  <span class="dc">/-- Lines 07–09: `ss_broadcast READ(true)`. -/</span></span>
+<span id="L166">  | <span class="const token" data-verso-hover="242">invRead</span> (σ : <span class="const token" data-verso-hover="214">State</span> n V) (h : σ.<span class="const token" data-verso-hover="217">r</span> = <span class="const token" data-verso-hover="205">.</span>idle) :</span>
+<span id="L167">      <span class="const token" data-verso-hover="234">Step</span> σ <span class="const token" data-verso-hover="225">.</span>invRead { σ <span class="kw">with</span></span>
+<span id="L168">        <span class="const token" data-verso-hover="217">r</span> := <span class="const token" data-verso-hover="206">.</span>bcastLoop</span>
+<span id="L169">        <span class="const token" data-verso-hover="215">srv</span> := <span class="kw">fun</span> s =&gt; (σ.<span class="const token" data-verso-hover="215">srv</span> s).<span class="const token" data-verso-hover="60">bcastR</span> <span class="const token" data-verso-hover="91">true</span></span>
+<span id="L170">        <span class="const token" data-verso-hover="218">g</span> := <span class="kw">fun</span> s =&gt; { σ.<span class="const token" data-verso-hover="218">g</span> s <span class="kw">with</span></span>
+<span id="L171">          <span class="const token" data-verso-hover="210">rtags</span> := (σ.<span class="const token" data-verso-hover="218">g</span> s).<span class="const token" data-verso-hover="210">rtags</span>.<span class="const token" data-verso-hover="114">map</span> (<span class="kw">fun</span> _ =&gt; <span class="const token" data-verso-hover="106">none</span>) ++ [<span class="const token" data-verso-hover="78">some</span> <span class="const token" data-verso-hover="91">true</span>], <span class="const token" data-verso-hover="213">rtd</span> := <span class="const token" data-verso-hover="84">false</span> }</span>
+<span id="L172">        <span class="const token" data-verso-hover="221">base</span> := σ.<span class="const token" data-verso-hover="220">nDone</span> }</span>
+<span id="L173">  <span class="dc">/-- End of the broadcast of line 09. -/</span></span>
+<span id="L174">  | <span class="const token" data-verso-hover="243">endLoop</span> (σ : <span class="const token" data-verso-hover="214">State</span> n V) (h : σ.<span class="const token" data-verso-hover="217">r</span> = <span class="const token" data-verso-hover="206">.</span>bcastLoop) (hs : n - <span class="nu">2</span> * t ≤ <span class="const token" data-verso-hover="86">syncR</span> B σ.<span class="const token" data-verso-hover="215">srv</span>) :</span>
+<span id="L175">      <span class="const token" data-verso-hover="234">Step</span> σ <span class="const token" data-verso-hover="227">.</span>tau { σ <span class="kw">with</span> <span class="const token" data-verso-hover="217">r</span> := <span class="const token" data-verso-hover="207">.</span>waitLoop }</span>
+<span id="L176">  <span class="dc">/-- Lines 11–13: a `last_val` `v` has `2t + 1` copies: return it. -/</span></span>
+<span id="L177">  | <span class="const token" data-verso-hover="244">retLast</span> (σ : <span class="const token" data-verso-hover="214">State</span> n V) (h : σ.<span class="const token" data-verso-hover="217">r</span> = <span class="const token" data-verso-hover="207">.</span>waitLoop) (Q : <span class="const token" data-verso-hover="61">Finset</span> (<span class="const token" data-verso-hover="20">Fin</span> n))</span>
+<span id="L178">      (reps : <span class="const token" data-verso-hover="20">Fin</span> n → V × <span class="const token" data-verso-hover="75">Option</span> V) (hQ : Q.<span class="const token" data-verso-hover="76">card</span> = n - t)</span>
+<span id="L179">      (hreps : ∀ s ∈ Q, s ∉ B → (σ.<span class="const token" data-verso-hover="215">srv</span> s).<span class="const token" data-verso-hover="88">rack</span> = <span class="const token" data-verso-hover="78">some</span> (reps s))</span>
+<span id="L180">      (v : V) (hd : <span class="nu">2</span> * t + <span class="nu">1</span> ≤ <span class="const token" data-verso-hover="79">cnt</span> Q (<span class="kw">fun</span> s =&gt; (reps s).<span class="const token" data-verso-hover="90">1</span>) v) :</span>
+<span id="L181">      <span class="const token" data-verso-hover="234">Step</span> σ (<span class="const token" data-verso-hover="226">.</span>retRead v) { σ <span class="kw">with</span> <span class="const token" data-verso-hover="217">r</span> := <span class="const token" data-verso-hover="205">.</span>idle }</span>
+<span id="L182">  <span class="dc">/-- Lines 11, 14–15: no `last_val` has `2t + 1` copies, a helping value `w ≠ ⊥` has. -/</span></span>
+<span id="L183">  | <span class="const token" data-verso-hover="245">retHelp</span> (σ : <span class="const token" data-verso-hover="214">State</span> n V) (h : σ.<span class="const token" data-verso-hover="217">r</span> = <span class="const token" data-verso-hover="207">.</span>waitLoop) (Q : <span class="const token" data-verso-hover="61">Finset</span> (<span class="const token" data-verso-hover="20">Fin</span> n))</span>
+<span id="L184">      (reps : <span class="const token" data-verso-hover="20">Fin</span> n → V × <span class="const token" data-verso-hover="75">Option</span> V) (hQ : Q.<span class="const token" data-verso-hover="76">card</span> = n - t)</span>
+<span id="L185">      (hreps : ∀ s ∈ Q, s ∉ B → (σ.<span class="const token" data-verso-hover="215">srv</span> s).<span class="const token" data-verso-hover="88">rack</span> = <span class="const token" data-verso-hover="78">some</span> (reps s))</span>
+<span id="L186">      (hl : ¬ ∃ v, <span class="nu">2</span> * t + <span class="nu">1</span> ≤ <span class="const token" data-verso-hover="79">cnt</span> Q (<span class="kw">fun</span> s =&gt; (reps s).<span class="const token" data-verso-hover="90">1</span>) v)</span>
+<span id="L187">      (v : V) (hd : <span class="nu">2</span> * t + <span class="nu">1</span> ≤ <span class="const token" data-verso-hover="79">cnt</span> Q (<span class="kw">fun</span> s =&gt; (reps s).<span class="const token" data-verso-hover="89">2</span>) (<span class="const token" data-verso-hover="78">some</span> v)) :</span>
+<span id="L188">      <span class="const token" data-verso-hover="234">Step</span> σ (<span class="const token" data-verso-hover="226">.</span>retRead v) { σ <span class="kw">with</span> <span class="const token" data-verso-hover="217">r</span> := <span class="const token" data-verso-hover="205">.</span>idle }</span>
+<span id="L189">  <span class="dc">/-- Lines 11–18: neither test succeeds: `ss_broadcast READ(false)`. -/</span></span>
+<span id="L190">  | <span class="const token" data-verso-hover="246">retry</span> (σ : <span class="const token" data-verso-hover="214">State</span> n V) (h : σ.<span class="const token" data-verso-hover="217">r</span> = <span class="const token" data-verso-hover="207">.</span>waitLoop) (Q : <span class="const token" data-verso-hover="61">Finset</span> (<span class="const token" data-verso-hover="20">Fin</span> n))</span>
+<span id="L191">      (reps : <span class="const token" data-verso-hover="20">Fin</span> n → V × <span class="const token" data-verso-hover="75">Option</span> V) (hQ : Q.<span class="const token" data-verso-hover="76">card</span> = n - t)</span>
+<span id="L192">      (hreps : ∀ s ∈ Q, s ∉ B → (σ.<span class="const token" data-verso-hover="215">srv</span> s).<span class="const token" data-verso-hover="88">rack</span> = <span class="const token" data-verso-hover="78">some</span> (reps s))</span>
+<span id="L193">      (hl : ¬ ∃ v, <span class="nu">2</span> * t + <span class="nu">1</span> ≤ <span class="const token" data-verso-hover="79">cnt</span> Q (<span class="kw">fun</span> s =&gt; (reps s).<span class="const token" data-verso-hover="90">1</span>) v)</span>
+<span id="L194">      (hh : ¬ ∃ v, <span class="nu">2</span> * t + <span class="nu">1</span> ≤ <span class="const token" data-verso-hover="79">cnt</span> Q (<span class="kw">fun</span> s =&gt; (reps s).<span class="const token" data-verso-hover="89">2</span>) (<span class="const token" data-verso-hover="78">some</span> v)) :</span>
+<span id="L195">      <span class="const token" data-verso-hover="234">Step</span> σ <span class="const token" data-verso-hover="227">.</span>tau { σ <span class="kw">with</span></span>
+<span id="L196">        <span class="const token" data-verso-hover="217">r</span> := <span class="const token" data-verso-hover="206">.</span>bcastLoop</span>
+<span id="L197">        <span class="const token" data-verso-hover="215">srv</span> := <span class="kw">fun</span> s =&gt; (σ.<span class="const token" data-verso-hover="215">srv</span> s).<span class="const token" data-verso-hover="60">bcastR</span> <span class="const token" data-verso-hover="84">false</span></span>
+<span id="L198">        <span class="const token" data-verso-hover="218">g</span> := <span class="kw">fun</span> s =&gt; { σ.<span class="const token" data-verso-hover="218">g</span> s <span class="kw">with</span> <span class="const token" data-verso-hover="210">rtags</span> := (σ.<span class="const token" data-verso-hover="218">g</span> s).<span class="const token" data-verso-hover="210">rtags</span> ++ [<span class="const token" data-verso-hover="78">some</span> <span class="const token" data-verso-hover="84">false</span>] } }</span>
+<span id="L199"></span>
+<span id="L200"><span class="dc">/-- A step of an execution: a step of the system, or a stutter. -/</span></span>
+<span id="L201"><span class="kw">def</span> <span class="const token" data-verso-hover="247">Next</span> (σ : <span class="const token" data-verso-hover="214">State</span> n V) (ℓ : <span class="const token" data-verso-hover="222">Label</span> V) (σ' : <span class="const token" data-verso-hover="214">State</span> n V) : <span class="kw">Prop</span> :=</span>
+<span id="L202">  <span class="const token" data-verso-hover="234">Step</span> t B σ ℓ σ' ∨ (σ' = σ ∧ ℓ = <span class="const token" data-verso-hover="227">.</span>tau)</span>
+<span id="L203"></span>
+<span id="L204"><span class="dc">/-- States reachable from `σ₀`. -/</span></span>
+<span id="L205"><span class="kw">inductive</span> <span class="const token" data-verso-hover="248">Reach</span> (σ₀ : <span class="const token" data-verso-hover="214">State</span> n V) : <span class="const token" data-verso-hover="214">State</span> n V → <span class="kw">Prop</span></span>
+<span id="L206">  | <span class="const token" data-verso-hover="249">refl</span> : <span class="const token" data-verso-hover="248">Reach</span> σ₀ σ₀</span>
+<span id="L207">  | <span class="const token" data-verso-hover="250">step</span> {σ σ' : <span class="const token" data-verso-hover="214">State</span> n V} {ℓ : <span class="const token" data-verso-hover="222">Label</span> V} : <span class="const token" data-verso-hover="248">Reach</span> σ₀ σ → <span class="const token" data-verso-hover="234">Step</span> t B σ ℓ σ' → <span class="const token" data-verso-hover="248">Reach</span> σ₀ σ'</span>
+<span id="L208"></span>
+<span id="L209"><span class="kw">end</span> Podc.StabilizingByzStorage.Regular</span>
+<span id="L210"></span>
+</code></div>
+        <script>
+          window.versoHoversUrl = "PODC2015/StabilizingByzStorage/-hovers.json";</script>
+        <script src="static/lean/popper.js"></script>
+        <script src="static/lean/tippy.js"></script>
+        <script src="static/lean/marked.js"></script>
+        <script src="static/lean/highlighting.js"></script>
+        <script src="static/lean/lean.js"></script>
+        </article></main><footer class="site-footer"><div class="wrap">
+        Machine-checked formalizations of PODC papers in Lean 4. Generated with <a href="https://github.com/leanprover/verso">Verso</a> from the README files of <a href="https://github.com/vasnesterov/formal_podc">vasnesterov/formal_podc</a>.</div>
+      </footer></body>
+  </html>
+

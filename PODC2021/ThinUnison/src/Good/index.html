@@ -1,0 +1,491 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="light dark">
+    <link rel="icon" href="data:,">
+    <title>ThinUnison: Good.lean · Formal PODC</title><base href="../../../.././"><link rel="stylesheet" href="static/lean/verso-vars.css">
+    <link rel="stylesheet" href="static/lean/highlighting.css">
+    <link rel="stylesheet" href="static/lean/tippy-border.css">
+    <link rel="stylesheet" href="static/style.css">
+    <script defer="defer" src="static/site.js"></script>
+    </head>
+  <body>
+    <header class="site-header">
+      <div class="wrap">
+        <a class="brand" href=".">Formal PODC</a><nav class="top">
+          <a href=".">Search</a><a href="about/">About</a><a href="https://github.com/vasnesterov/formal_podc">GitHub</a></nav>
+        </div>
+      </header>
+    <main class="wrap"><article><nav class="breadcrumbs" aria-label="Breadcrumb">
+          <a href=".">Search</a><span class="sep">›</span><a href="PODC2021/">PODC 2021</a><span class="sep">›</span><a href="PODC2021/ThinUnison/">ThinUnison</a><span class="sep">›</span><a href="PODC2021/ThinUnison/src/">Lean source</a><span class="sep">›</span><span aria-current="page">Good</span></nav>
+        <h1>
+          <code>Good.lean</code></h1>
+        <div class="paper-links">
+          <p>
+            Source of <a href="PODC2021/ThinUnison/">A Thin Self-Stabilizing Asynchronous Unison Algorithm — PODC 2021</a> · <a href="https://github.com/vasnesterov/formal_podc/blob/main/Papers/PODC2021/ThinUnison/Good.lean">GitHub</a> · hover over a name for its type and documentation</p>
+          </div>
+        <div class="lean-code lean-src">
+          <code class="hl lean block" data-lean-context="Good"><span id="L1"><span class="kw">import</span> Papers.PODC2021.ThinUnison.Observations</span>
+<span id="L2"><span class="kw">import</span> Cslib.Computability.Distributed.SelfStabilization.Unison</span>
+<span id="L3"><span class="kw">import</span> Cslib.Foundations.Combinatorics.SimpleGraph.Spanner</span>
+<span id="L4"><span class="kw">import</span> Mathlib</span>
+<span id="L5"></span>
+<span id="L6"><span class="dc">/-!</span></span>
+<span id="L7"><span class="dc"># AlgAU: post-stabilization dynamics (Section 2.3.2)</span></span>
+<span id="L8"></span>
+<span id="L9"><span class="dc">Emek, Keren. *A Thin Self-Stabilizing Asynchronous Unison Algorithm with Applications to Fault</span></span>
+<span id="L10"><span class="dc">Tolerant Biological Networks*, PODC 2021 ([EK21]).</span></span>
+<span id="L11"></span>
+<span id="L12"><span class="dc">* Lemma 2.10 of [EK21] (`AURun.allGood_succ`, `AURun.allGood_le`): a good graph stays good.</span></span>
+<span id="L13"><span class="dc">* Clock lemmas: adjacent levels have clock values differing by at most one (`clock_of_lAdj`), and</span></span>
+<span id="L14"><span class="dc">  an AA transition increments the clock (`clock_aa`).</span></span>
+<span id="L15"><span class="dc">* Lemma 2.11 of [EK21] together with safety (`AURun.auFrom_of_allGood`): once the graph is good,</span></span>
+<span id="L16"><span class="dc">  the execution solves asynchronous unison.</span></span>
+<span id="L17"></span>
+<span id="L18"><span class="dc">## Proof of liveness</span></span>
+<span id="L19"></span>
+<span id="L20"><span class="dc">The paper's proof (via Observation 2.8, "`ℓ_min` increases every round") reasons informally about</span></span>
+<span id="L21"><span class="dc">the cyclic order of the levels. We instead *unwrap* the clocks: fixing a time `t` (at which the</span></span>
+<span id="L22"><span class="dc">graph is good) and a base node `r`, every node `v` gets an integer offset `o_v` with</span></span>
+<span id="L23"><span class="dc">`pos(λ_v^t) ≡ pos(λ_r^t) + o_v (mod 2k)` and `|o_u - o_v| ≤ 1` across edges (this uses</span></span>
+<span id="L24"><span class="dc">`D + 2 ≤ k`). The unwrapped clock `U_v(s) = o_v + #(clock changes of v in [t, s))` keeps both</span></span>
+<span id="L25"><span class="dc">properties (`AURun.uclk_inv`); hence its spread is at most `D`, and the minimal unwrapped clock</span></span>
+<span id="L26"><span class="dc">increases by at least one per round (`AURun.uclk_rho`, `AURun.uclk_rho_iter`).</span></span>
+<span id="L27"><span class="dc">-/</span></span>
+<span id="L28"></span>
+<span id="L29"><span class="kw">namespace</span> ThinUnison</span>
+<span id="L30"></span>
+<span id="L31"><span class="kw">open</span> Cslib.StoneAge</span>
+<span id="L32"></span>
+<span id="L33"><span class="dc">/-! ## Pure level/clock arithmetic -/</span></span>
+<span id="L34"></span>
+<span id="L35"><span class="kw">section</span> Pure</span>
+<span id="L36"></span>
+<span id="L37"><span class="kw">variable</span> {k : <span class="const token" data-verso-hover="45">ℕ</span>}</span>
+<span id="L38"></span>
+<span id="L39"><span class="dc">/-- An AA move of a node at level `a` relative to a neighbour at level `b`. -/</span></span>
+<span id="L40"><span class="kw">def</span> <span class="const token" data-verso-hover="114">AAMove</span> (k : <span class="const token" data-verso-hover="45">ℕ</span>) (a a' b : <span class="const token" data-verso-hover="66">ℤ</span>) : <span class="kw">Prop</span> := a' = a ∨ ((b = a ∨ b = <span class="const token" data-verso-hover="67">fwd</span> k a) ∧ a' = <span class="const token" data-verso-hover="67">fwd</span> k a)</span>
+<span id="L41"></span>
+<span id="L42"><span class="dc">/-- Core of Lemma 2.10: AA moves preserve adjacency of levels (including the `{k, -k}` case). -/</span></span>
+<span id="L43"><span class="kw">theorem</span> <span class="const token" data-verso-hover="115">lAdj_aaMove</span> {a b a' b' : <span class="const token" data-verso-hover="66">ℤ</span>} (ha : <span class="const token" data-verso-hover="65">IsLevel</span> k a) (hb : <span class="const token" data-verso-hover="65">IsLevel</span> k b) (h : <span class="const token" data-verso-hover="70">LAdj</span> k a b)</span>
+<span id="L44">    (ma : <span class="const token" data-verso-hover="114">AAMove</span> k a a' b) (mb : <span class="const token" data-verso-hover="114">AAMove</span> k b b' a) : <span class="const token" data-verso-hover="70">LAdj</span> k a' b' := <span class="kw">by</span></span>
+<span id="L45">  <span class="kw">unfold</span> <span class="const token" data-verso-hover="114">AAMove</span> <span class="kw">at</span> ma mb</span>
+<span id="L46">  <span class="kw">rcases</span> ma <span class="kw">with</span> <span class="kw">rfl</span> | ⟨h1, <span class="kw">rfl</span>⟩ &lt;;&gt; <span class="kw">rcases</span> mb <span class="kw">with</span> <span class="kw">rfl</span> | ⟨h2, <span class="kw">rfl</span>⟩ &lt;;&gt;</span>
+<span id="L47">    (<span class="kw">try</span> <span class="kw">rcases</span> h1 <span class="kw">with</span> <span class="kw">rfl</span> | <span class="kw">rfl</span>) &lt;;&gt; (<span class="kw">try</span> <span class="kw">rcases</span> h2 <span class="kw">with</span> h2 | h2) &lt;;&gt;</span>
+<span id="L48">    <span class="kw">rcases</span> h <span class="kw">with</span> h | h | h &lt;;&gt; lvl_omega</span>
+<span id="L49"></span>
+<span id="L50"><span class="kw">theorem</span> <span class="const token" data-verso-hover="116">pos_nonneg</span> {ℓ : <span class="const token" data-verso-hover="66">ℤ</span>} (h : <span class="const token" data-verso-hover="65">IsLevel</span> k ℓ) : <span class="nu">0</span> ≤ <span class="const token" data-verso-hover="96">pos</span> k ℓ := <span class="kw">by</span></span>
+<span id="L51">  <span class="kw">unfold</span> <span class="const token" data-verso-hover="96">pos</span>; <span class="kw">split_ifs</span> &lt;;&gt; lvl_omega</span>
+<span id="L52"></span>
+<span id="L53"><span class="kw">theorem</span> <span class="const token" data-verso-hover="117">pos_lt</span> {ℓ : <span class="const token" data-verso-hover="66">ℤ</span>} (h : <span class="const token" data-verso-hover="65">IsLevel</span> k ℓ) : <span class="const token" data-verso-hover="96">pos</span> k ℓ &lt; <span class="nu">2</span> * k := <span class="kw">by</span></span>
+<span id="L54">  <span class="kw">unfold</span> <span class="const token" data-verso-hover="96">pos</span>; <span class="kw">split_ifs</span> &lt;;&gt; lvl_omega</span>
+<span id="L55"></span>
+<span id="L56"><span class="kw">theorem</span> <span class="const token" data-verso-hover="118">pos_fwd</span> {ℓ : <span class="const token" data-verso-hover="66">ℤ</span>} (h : <span class="const token" data-verso-hover="65">IsLevel</span> k ℓ) :</span>
+<span id="L57">    <span class="const token" data-verso-hover="96">pos</span> k (<span class="const token" data-verso-hover="67">fwd</span> k ℓ) = <span class="const token" data-verso-hover="96">pos</span> k ℓ + <span class="nu">1</span> ∨ <span class="const token" data-verso-hover="96">pos</span> k (<span class="const token" data-verso-hover="67">fwd</span> k ℓ) = <span class="const token" data-verso-hover="96">pos</span> k ℓ + <span class="nu">1</span> - <span class="nu">2</span> * k := <span class="kw">by</span></span>
+<span id="L58">  <span class="kw">unfold</span> <span class="const token" data-verso-hover="96">pos</span>; <span class="kw">split_ifs</span> &lt;;&gt; lvl_omega</span>
+<span id="L59"></span>
+<span id="L60"><span class="kw">theorem</span> <span class="const token" data-verso-hover="119">pos_of_lAdj</span> {a b : <span class="const token" data-verso-hover="66">ℤ</span>} (ha : <span class="const token" data-verso-hover="65">IsLevel</span> k a) (hb : <span class="const token" data-verso-hover="65">IsLevel</span> k b) (h : <span class="const token" data-verso-hover="70">LAdj</span> k a b) :</span>
+<span id="L61">    ∃ δ : <span class="const token" data-verso-hover="66">ℤ</span>, -<span class="nu">1</span> ≤ δ ∧ δ ≤ <span class="nu">1</span> ∧ (<span class="const token" data-verso-hover="96">pos</span> k b = <span class="const token" data-verso-hover="96">pos</span> k a + δ ∨ <span class="const token" data-verso-hover="96">pos</span> k b = <span class="const token" data-verso-hover="96">pos</span> k a + δ + <span class="nu">2</span> * k ∨</span>
+<span id="L62">      <span class="const token" data-verso-hover="96">pos</span> k b = <span class="const token" data-verso-hover="96">pos</span> k a + δ - <span class="nu">2</span> * k) := <span class="kw">by</span></span>
+<span id="L63">  <span class="kw">have</span> h1 := <span class="const token" data-verso-hover="116">pos_nonneg</span> ha; <span class="kw">have</span> h2 := <span class="const token" data-verso-hover="116">pos_nonneg</span> hb</span>
+<span id="L64">  <span class="kw">have</span> h3 := <span class="const token" data-verso-hover="117">pos_lt</span> ha; <span class="kw">have</span> h4 := <span class="const token" data-verso-hover="117">pos_lt</span> hb</span>
+<span id="L65">  <span class="kw">rcases</span> h <span class="kw">with</span> <span class="kw">rfl</span> | <span class="kw">rfl</span> | <span class="kw">rfl</span></span>
+<span id="L66">  · <span class="kw">exact</span> ⟨<span class="nu">0</span>, <span class="kw">by</span> <span class="kw">omega</span>, <span class="kw">by</span> <span class="kw">omega</span>, <span class="kw">by</span> <span class="kw">omega</span>⟩</span>
+<span id="L67">  · <span class="kw">rcases</span> <span class="const token" data-verso-hover="118">pos_fwd</span> hb <span class="kw">with</span> h | h</span>
+<span id="L68">    · <span class="kw">exact</span> ⟨-<span class="nu">1</span>, <span class="kw">by</span> <span class="kw">omega</span>, <span class="kw">by</span> <span class="kw">omega</span>, <span class="kw">by</span> <span class="kw">omega</span>⟩</span>
+<span id="L69">    · <span class="kw">exact</span> ⟨-<span class="nu">1</span>, <span class="kw">by</span> <span class="kw">omega</span>, <span class="kw">by</span> <span class="kw">omega</span>, <span class="kw">by</span> <span class="kw">omega</span>⟩</span>
+<span id="L70">  · <span class="kw">rcases</span> <span class="const token" data-verso-hover="118">pos_fwd</span> ha <span class="kw">with</span> h | h</span>
+<span id="L71">    · <span class="kw">exact</span> ⟨<span class="nu">1</span>, <span class="kw">by</span> <span class="kw">omega</span>, <span class="kw">by</span> <span class="kw">omega</span>, <span class="kw">by</span> <span class="kw">omega</span>⟩</span>
+<span id="L72">    · <span class="kw">exact</span> ⟨<span class="nu">1</span>, <span class="kw">by</span> <span class="kw">omega</span>, <span class="kw">by</span> <span class="kw">omega</span>, <span class="kw">by</span> <span class="kw">omega</span>⟩</span>
+<span id="L73"></span>
+<span id="L74"><span class="dc">/-- Integers that are congruent modulo `n` and differ by less than `n` are equal. -/</span></span>
+<span id="L75"><span class="kw">theorem</span> <span class="const token" data-verso-hover="120">eq_of_intCast_eq</span> {n : <span class="const token" data-verso-hover="45">ℕ</span>} {a b : <span class="const token" data-verso-hover="66">ℤ</span>} (h : (a : <span class="const token" data-verso-hover="98">ZMod</span> n) = b) (h1 : a - b &lt; n)</span>
+<span id="L76">    (h2 : b - a &lt; n) : a = b := <span class="kw">by</span></span>
+<span id="L77">  <span class="kw">rw</span> [<span class="const token" data-verso-hover="121">ZMod.intCast_eq_intCast_iff_dvd_sub</span>] <span class="kw">at</span> h</span>
+<span id="L78">  <span class="kw">have</span> := <span class="const token" data-verso-hover="122">Int.eq_zero_of_abs_lt_dvd</span> h (<span class="const token" data-verso-hover="123">abs_lt</span>.<span class="const token" data-verso-hover="124">2</span> ⟨<span class="kw">by</span> <span class="kw">omega</span>, <span class="kw">by</span> <span class="kw">omega</span>⟩)</span>
+<span id="L79">  <span class="kw">omega</span></span>
+<span id="L80"></span>
+<span id="L81"><span class="dc">/-- An AA transition increments the clock: `pos(φ(ℓ)) ≡ pos(ℓ) + 1 (mod 2k)`. -/</span></span>
+<span id="L82"><span class="kw">theorem</span> <span class="const token" data-verso-hover="125">pos_fwd_cast</span> {ℓ : <span class="const token" data-verso-hover="66">ℤ</span>} (h : <span class="const token" data-verso-hover="65">IsLevel</span> k ℓ) :</span>
+<span id="L83">    ((<span class="const token" data-verso-hover="96">pos</span> k (<span class="const token" data-verso-hover="67">fwd</span> k ℓ) : <span class="const token" data-verso-hover="66">ℤ</span>) : <span class="const token" data-verso-hover="98">ZMod</span> (<span class="nu">2</span> * k)) = (<span class="const token" data-verso-hover="96">pos</span> k ℓ : <span class="const token" data-verso-hover="98">ZMod</span> (<span class="nu">2</span> * k)) + <span class="nu">1</span> := <span class="kw">by</span></span>
+<span id="L84">  <span class="kw">rcases</span> <span class="const token" data-verso-hover="118">pos_fwd</span> h <span class="kw">with</span> h | h &lt;;&gt; <span class="kw">rw</span> [h]</span>
+<span id="L85">  · <span class="kw">push_cast</span>; <span class="kw">ring</span></span>
+<span id="L86">  · <span class="kw">have</span> : ((<span class="nu">2</span> * k : <span class="const token" data-verso-hover="45">ℕ</span>) : <span class="const token" data-verso-hover="98">ZMod</span> (<span class="nu">2</span> * k)) = <span class="nu">0</span> := <span class="const token" data-verso-hover="126">ZMod.natCast_self</span> _</span>
+<span id="L87">    <span class="kw">push_cast</span> <span class="kw">at</span> this ⊢; <span class="kw">rw</span> [this]; <span class="kw">ring</span></span>
+<span id="L88"></span>
+<span id="L89"><span class="dc">/-- Clock values (`pos` modulo `2k`) determine the level. -/</span></span>
+<span id="L90"><span class="kw">theorem</span> <span class="const token" data-verso-hover="127">eq_of_pos_cast</span> {a b : <span class="const token" data-verso-hover="66">ℤ</span>} (ha : <span class="const token" data-verso-hover="65">IsLevel</span> k a) (hb : <span class="const token" data-verso-hover="65">IsLevel</span> k b)</span>
+<span id="L91">    (h : (<span class="const token" data-verso-hover="96">pos</span> k a : <span class="const token" data-verso-hover="98">ZMod</span> (<span class="nu">2</span> * k)) = (<span class="const token" data-verso-hover="96">pos</span> k b : <span class="const token" data-verso-hover="98">ZMod</span> (<span class="nu">2</span> * k))) : a = b := <span class="kw">by</span></span>
+<span id="L92">  <span class="kw">have</span> h1 := <span class="const token" data-verso-hover="116">pos_nonneg</span> ha; <span class="kw">have</span> h2 := <span class="const token" data-verso-hover="116">pos_nonneg</span> hb</span>
+<span id="L93">  <span class="kw">have</span> h3 := <span class="const token" data-verso-hover="117">pos_lt</span> ha; <span class="kw">have</span> h4 := <span class="const token" data-verso-hover="117">pos_lt</span> hb</span>
+<span id="L94">  <span class="kw">have</span> := <span class="const token" data-verso-hover="120">eq_of_intCast_eq</span> (n := <span class="nu">2</span> * k) h (<span class="kw">by</span> <span class="kw">push_cast</span>; <span class="kw">omega</span>) (<span class="kw">by</span> <span class="kw">push_cast</span>; <span class="kw">omega</span>)</span>
+<span id="L95">  <span class="kw">unfold</span> <span class="const token" data-verso-hover="96">pos</span> <span class="kw">at</span> this; <span class="kw">split_ifs</span> <span class="kw">at</span> this &lt;;&gt; lvl_omega</span>
+<span id="L96"></span>
+<span id="L97"><span class="dc">/-- Adjacent levels have clock values differing by at most one (as integers modulo `2k`). -/</span></span>
+<span id="L98"><span class="kw">theorem</span> <span class="const token" data-verso-hover="128">pos_cast_of_lAdj</span> {a b : <span class="const token" data-verso-hover="66">ℤ</span>} (ha : <span class="const token" data-verso-hover="65">IsLevel</span> k a) (hb : <span class="const token" data-verso-hover="65">IsLevel</span> k b) (h : <span class="const token" data-verso-hover="70">LAdj</span> k a b) :</span>
+<span id="L99">    ∃ δ : <span class="const token" data-verso-hover="66">ℤ</span>, -<span class="nu">1</span> ≤ δ ∧ δ ≤ <span class="nu">1</span> ∧</span>
+<span id="L100">      (<span class="const token" data-verso-hover="96">pos</span> k b : <span class="const token" data-verso-hover="98">ZMod</span> (<span class="nu">2</span> * k)) = (<span class="const token" data-verso-hover="96">pos</span> k a : <span class="const token" data-verso-hover="98">ZMod</span> (<span class="nu">2</span> * k)) + (δ : <span class="const token" data-verso-hover="98">ZMod</span> (<span class="nu">2</span> * k)) := <span class="kw">by</span></span>
+<span id="L101">  <span class="kw">obtain</span> ⟨δ, h1, h2, h3⟩ := <span class="const token" data-verso-hover="119">pos_of_lAdj</span> ha hb h</span>
+<span id="L102">  <span class="kw">refine</span> ⟨δ, h1, h2, ?_⟩</span>
+<span id="L103">  <span class="kw">have</span> : ((<span class="nu">2</span> * k : <span class="const token" data-verso-hover="45">ℕ</span>) : <span class="const token" data-verso-hover="98">ZMod</span> (<span class="nu">2</span> * k)) = <span class="nu">0</span> := <span class="const token" data-verso-hover="126">ZMod.natCast_self</span> _</span>
+<span id="L104">  <span class="kw">push_cast</span> <span class="kw">at</span> this</span>
+<span id="L105">  <span class="kw">rcases</span> h3 <span class="kw">with</span> h3 | h3 | h3 &lt;;&gt; <span class="kw">rw</span> [h3] &lt;;&gt; <span class="kw">push_cast</span> &lt;;&gt; (<span class="kw">try</span> <span class="kw">rw</span> [this]) &lt;;&gt; <span class="kw">ring</span></span>
+<span id="L106"></span>
+<span id="L107"><span class="kw">theorem</span> <span class="const token" data-verso-hover="129">two_ne_zero_zmod</span> (hk : <span class="nu">2</span> ≤ k) : (<span class="nu">2</span> : <span class="const token" data-verso-hover="98">ZMod</span> (<span class="nu">2</span> * k)) ≠ <span class="nu">0</span> := <span class="kw">by</span></span>
+<span id="L108">  <span class="kw">intro</span> h</span>
+<span id="L109">  <span class="kw">have</span> := <span class="const token" data-verso-hover="120">eq_of_intCast_eq</span> (n := <span class="nu">2</span> * k) (a := <span class="nu">2</span>) (b := <span class="nu">0</span>) (<span class="kw">by</span> <span class="kw">simpa</span> <span class="kw">using</span> h)</span>
+<span id="L110">    (<span class="kw">by</span> <span class="kw">push_cast</span>; <span class="kw">omega</span>) (<span class="kw">by</span> <span class="kw">push_cast</span>; <span class="kw">omega</span>)</span>
+<span id="L111">  <span class="kw">omega</span></span>
+<span id="L112"></span>
+<span id="L113"><span class="dc">/-- Adjacent levels have adjacent clock values (the safety condition of AU). -/</span></span>
+<span id="L114"><span class="kw">theorem</span> <span class="const token" data-verso-hover="130">clock_of_lAdj</span> {ν μ : <span class="const token" data-verso-hover="79">Turn</span> k} (h : <span class="const token" data-verso-hover="70">LAdj</span> k ν.<span class="const token" data-verso-hover="80">lvl</span> μ.<span class="const token" data-verso-hover="80">lvl</span>) :</span>
+<span id="L115">    <span class="const token" data-verso-hover="97">clock</span> μ = <span class="const token" data-verso-hover="97">clock</span> ν - <span class="nu">1</span> ∨ <span class="const token" data-verso-hover="97">clock</span> μ = <span class="const token" data-verso-hover="97">clock</span> ν ∨ <span class="const token" data-verso-hover="97">clock</span> μ = <span class="const token" data-verso-hover="97">clock</span> ν + <span class="nu">1</span> := <span class="kw">by</span></span>
+<span id="L116">  <span class="kw">obtain</span> ⟨δ, h1, h2, h3⟩ := <span class="const token" data-verso-hover="128">pos_cast_of_lAdj</span> ν.<span class="const token" data-verso-hover="82">isLevel</span> μ.<span class="const token" data-verso-hover="82">isLevel</span> h</span>
+<span id="L117">  <span class="kw">unfold</span> <span class="const token" data-verso-hover="97">clock</span>; <span class="kw">rw</span> [h3]</span>
+<span id="L118">  <span class="kw">obtain</span> <span class="kw">rfl</span> | <span class="kw">rfl</span> | <span class="kw">rfl</span> : δ = -<span class="nu">1</span> ∨ δ = <span class="nu">0</span> ∨ δ = <span class="nu">1</span> := <span class="kw">by</span> <span class="kw">omega</span></span>
+<span id="L119">  · <span class="kw">left</span>; <span class="kw">push_cast</span>; <span class="kw">ring</span></span>
+<span id="L120">  · <span class="kw">right</span>; <span class="kw">left</span>; <span class="kw">push_cast</span>; <span class="kw">ring</span></span>
+<span id="L121">  · <span class="kw">right</span>; <span class="kw">right</span>; <span class="kw">push_cast</span>; <span class="kw">ring</span></span>
+<span id="L122"></span>
+<span id="L123"><span class="dc">/-- An AA transition increments the clock by one. -/</span></span>
+<span id="L124"><span class="kw">theorem</span> <span class="const token" data-verso-hover="131">clock_aa</span> (ν : <span class="const token" data-verso-hover="79">Turn</span> k) : <span class="const token" data-verso-hover="97">clock</span> ν.<span class="const token" data-verso-hover="85">aa</span> = <span class="const token" data-verso-hover="97">clock</span> ν + <span class="nu">1</span> := <span class="const token" data-verso-hover="125">pos_fwd_cast</span> ν.<span class="const token" data-verso-hover="82">isLevel</span></span>
+<span id="L125"></span>
+<span id="L126"><span class="kw">end</span> Pure</span>
+<span id="L127"></span>
+<span id="L128"><span class="dc">/-! ## Lemma 2.10: a good graph stays good -/</span></span>
+<span id="L129"></span>
+<span id="L130"><span class="kw">namespace</span> AURun</span>
+<span id="L131"></span>
+<span id="L132"><span class="kw">variable</span> {V : <span class="kw">Type</span>*} {G : <span class="const token" data-verso-hover="31">SimpleGraph</span> V} {k : <span class="const token" data-verso-hover="45">ℕ</span>} {A : <span class="const token" data-verso-hover="45">ℕ</span> → <span class="const token" data-verso-hover="54">Set</span> V} {C : <span class="const token" data-verso-hover="45">ℕ</span> → V → <span class="const token" data-verso-hover="79">Turn</span> k}</span>
+<span id="L133"><span class="kw">variable</span> (hC : <span class="const token" data-verso-hover="132">AURun</span> G A C)</span>
+<span id="L134"><span class="kw">include</span> hC</span>
+<span id="L135"></span>
+<span id="L136"><span class="dc">/-- In a good graph, the only possible transitions are of type AA. -/</span></span>
+<span id="L137"><span class="kw">theorem</span> <span class="const token" data-verso-hover="133">good_step</span> {t : <span class="const token" data-verso-hover="45">ℕ</span>} (hg : <span class="const token" data-verso-hover="111">AllGood</span> G C t) (v : V) :</span>
+<span id="L138">    C (t + <span class="nu">1</span>) v = C t v ∨ (v ∈ A t ∧ <span class="const token" data-verso-hover="134">AAN</span> G C t v ∧ (C (t + <span class="nu">1</span>) v).<span class="const token" data-verso-hover="80">lvl</span> = <span class="const token" data-verso-hover="67">fwd</span> k (C t v).<span class="const token" data-verso-hover="80">lvl</span> ∧</span>
+<span id="L139">      (C (t + <span class="nu">1</span>) v).<span class="const token" data-verso-hover="81">faulty</span> = <span class="const token" data-verso-hover="86">false</span>) := <span class="kw">by</span></span>
+<span id="L140">  <span class="kw">obtain</span> ⟨hp, hf, hn⟩ := hg v</span>
+<span id="L141">  <span class="kw">rcases</span> hC.<span class="const token" data-verso-hover="135">step_cases</span> t v <span class="kw">with</span> h | ⟨h1, -, h2, h3, h4⟩ | ⟨-, -, h2, -⟩ | ⟨-, h2, -⟩</span>
+<span id="L142">  · <span class="kw">exact</span> <span class="const token" data-verso-hover="37">Or.inl</span> h</span>
+<span id="L143">  · <span class="kw">exact</span> <span class="const token" data-verso-hover="38">Or.inr</span> ⟨h1, h2, h3, h4⟩</span>
+<span id="L144">  · <span class="kw">exfalso</span></span>
+<span id="L145">    <span class="kw">rcases</span> h2.<span class="const token" data-verso-hover="95">2</span> <span class="kw">with</span> h | ⟨u, hu, h, -⟩</span>
+<span id="L146">    · <span class="kw">exact</span> h hp</span>
+<span id="L147">    · <span class="kw">simp</span> [hn u hu] <span class="kw">at</span> h</span>
+<span id="L148">  · <span class="kw">simp</span> [hf] <span class="kw">at</span> h2</span>
+<span id="L149"></span>
+<span id="L150"><span class="kw">theorem</span> <span class="const token" data-verso-hover="136">aaMove_of_good</span> {t : <span class="const token" data-verso-hover="45">ℕ</span>} (hg : <span class="const token" data-verso-hover="111">AllGood</span> G C t) {v u : V} (h : G.<span class="const token" data-verso-hover="105">Adj</span> v u) :</span>
+<span id="L151">    <span class="const token" data-verso-hover="114">AAMove</span> k (C t v).<span class="const token" data-verso-hover="80">lvl</span> (C (t + <span class="nu">1</span>) v).<span class="const token" data-verso-hover="80">lvl</span> (C t u).<span class="const token" data-verso-hover="80">lvl</span> := <span class="kw">by</span></span>
+<span id="L152">  <span class="kw">rcases</span> hC.<span class="const token" data-verso-hover="133">good_step</span> hg v <span class="kw">with</span> h1 | ⟨-, h2, h3, -⟩</span>
+<span id="L153">  · <span class="kw">left</span>; <span class="kw">rw</span> [h1]</span>
+<span id="L154">  · <span class="kw">right</span>; <span class="kw">exact</span> ⟨(h2 u h).<span class="const token" data-verso-hover="95">2</span>, h3⟩</span>
+<span id="L155"></span>
+<span id="L156"><span class="dc">/-- Lemma 2.10 of [EK21]: if the graph is good at time `t`, it is good at time `t + 1`. -/</span></span>
+<span id="L157"><span class="kw">theorem</span> <span class="const token" data-verso-hover="137">allGood_succ</span> {t : <span class="const token" data-verso-hover="45">ℕ</span>} (hg : <span class="const token" data-verso-hover="111">AllGood</span> G C t) : <span class="const token" data-verso-hover="111">AllGood</span> G C (t + <span class="nu">1</span>) := <span class="kw">by</span></span>
+<span id="L158">  <span class="kw">have</span> hf : ∀ v, (C (t + <span class="nu">1</span>) v).<span class="const token" data-verso-hover="81">faulty</span> = <span class="const token" data-verso-hover="86">false</span> := <span class="kw">fun</span> v =&gt; <span class="kw">by</span></span>
+<span id="L159">    <span class="kw">rcases</span> hC.<span class="const token" data-verso-hover="133">good_step</span> hg v <span class="kw">with</span> h | ⟨-, -, -, h⟩</span>
+<span id="L160">    · <span class="kw">rw</span> [h]; <span class="kw">exact</span> (hg v).<span class="const token" data-verso-hover="95">2</span><span class="nu">.</span><span class="const token" data-verso-hover="93">1</span></span>
+<span id="L161">    · <span class="kw">exact</span> h</span>
+<span id="L162">  <span class="kw">refine</span> <span class="kw">fun</span> v =&gt; ⟨<span class="kw">fun</span> u hu =&gt; ?_, hf v, <span class="kw">fun</span> u _ =&gt; hf u⟩</span>
+<span id="L163">  <span class="kw">exact</span> <span class="const token" data-verso-hover="115">lAdj_aaMove</span> (C t v).<span class="const token" data-verso-hover="82">isLevel</span> (C t u).<span class="const token" data-verso-hover="82">isLevel</span> ((hg v).<span class="const token" data-verso-hover="93">1</span> u hu) (hC.<span class="const token" data-verso-hover="136">aaMove_of_good</span> hg hu)</span>
+<span id="L164">    (hC.<span class="const token" data-verso-hover="136">aaMove_of_good</span> hg hu.<span class="const token" data-verso-hover="138">symm</span>)</span>
+<span id="L165"></span>
+<span id="L166"><span class="dc">/-- Lemma 2.10 of [EK21], iterated. -/</span></span>
+<span id="L167"><span class="kw">theorem</span> <span class="const token" data-verso-hover="139">allGood_le</span> {t s : <span class="const token" data-verso-hover="45">ℕ</span>} (hg : <span class="const token" data-verso-hover="111">AllGood</span> G C t) (hts : t ≤ s) : <span class="const token" data-verso-hover="111">AllGood</span> G C s := <span class="kw">by</span></span>
+<span id="L168">  <span class="kw">induction</span> s, hts <span class="kw">using</span> <span class="const token" data-verso-hover="140">Nat.le_induction</span> <span class="kw">with</span></span>
+<span id="L169">  | base =&gt; <span class="kw">exact</span> hg</span>
+<span id="L170">  | <span class="const token" data-verso-hover="141">succ</span> n _ ih =&gt; <span class="kw">exact</span> hC.<span class="const token" data-verso-hover="137">allGood_succ</span> ih</span>
+<span id="L171"></span>
+<span id="L172"><span class="kw">end</span> AURun</span>
+<span id="L173"></span>
+<span id="L174"><span class="dc">/-! ## Unwrapped clocks -/</span></span>
+<span id="L175"></span>
+<span id="L176"><span class="kw">section</span> Unwrap</span>
+<span id="L177"></span>
+<span id="L178"><span class="kw">variable</span> {V : <span class="kw">Type</span>*} {G : <span class="const token" data-verso-hover="31">SimpleGraph</span> V} {k : <span class="const token" data-verso-hover="45">ℕ</span>} {A : <span class="const token" data-verso-hover="45">ℕ</span> → <span class="const token" data-verso-hover="54">Set</span> V} {C : <span class="const token" data-verso-hover="45">ℕ</span> → V → <span class="const token" data-verso-hover="79">Turn</span> k}</span>
+<span id="L179"></span>
+<span id="L180"><span class="kw">variable</span> (C) <span class="kw">in</span></span>
+<span id="L181"><span class="dc">/-- The number of output (clock) changes of `v` during `[a, b)`. -/</span></span>
+<span id="L182"><span class="kw">def</span> <span class="const token" data-verso-hover="142">nChg</span> (v : V) (a b : <span class="const token" data-verso-hover="45">ℕ</span>) : <span class="const token" data-verso-hover="45">ℕ</span> :=</span>
+<span id="L183">  ((<span class="const token" data-verso-hover="143">Finset.Ico</span> a b).<span class="const token" data-verso-hover="144">filter</span> (<span class="kw">fun</span> s =&gt; <span class="const token" data-verso-hover="99">output</span> (C (s + <span class="nu">1</span>) v) ≠ <span class="const token" data-verso-hover="99">output</span> (C s v))).<span class="const token" data-verso-hover="145">card</span></span>
+<span id="L184"></span>
+<span id="L185"><span class="kw">variable</span> (C) <span class="kw">in</span></span>
+<span id="L186"><span class="dc">/-- The unwrapped clock of `v` at time `s`, relative to the start time `t` and offsets `o`. -/</span></span>
+<span id="L187"><span class="kw">def</span> <span class="const token" data-verso-hover="146">uclk</span> (o : V → <span class="const token" data-verso-hover="66">ℤ</span>) (t s : <span class="const token" data-verso-hover="45">ℕ</span>) (v : V) : <span class="const token" data-verso-hover="66">ℤ</span> := o v + (<span class="const token" data-verso-hover="142">nChg</span> C v t s : <span class="const token" data-verso-hover="66">ℤ</span>)</span>
+<span id="L188"></span>
+<span id="L189"><span class="kw">theorem</span> <span class="const token" data-verso-hover="147">nChg_self</span> (v : V) (a : <span class="const token" data-verso-hover="45">ℕ</span>) : <span class="const token" data-verso-hover="142">nChg</span> C v a a = <span class="nu">0</span> := <span class="kw">by</span> <span class="kw">simp</span> [<span class="const token" data-verso-hover="142">nChg</span>]</span>
+<span id="L190"></span>
+<span id="L191"><span class="kw">theorem</span> <span class="const token" data-verso-hover="148">uclk_self</span> (o : V → <span class="const token" data-verso-hover="66">ℤ</span>) (t : <span class="const token" data-verso-hover="45">ℕ</span>) (v : V) : <span class="const token" data-verso-hover="146">uclk</span> C o t t v = o v := <span class="kw">by</span></span>
+<span id="L192">  <span class="kw">simp</span> [<span class="const token" data-verso-hover="146">uclk</span>, <span class="const token" data-verso-hover="147">nChg_self</span>]</span>
+<span id="L193"></span>
+<span id="L194"><span class="kw">theorem</span> <span class="const token" data-verso-hover="149">nChg_succ</span> (v : V) {a b : <span class="const token" data-verso-hover="45">ℕ</span>} (hab : a ≤ b) :</span>
+<span id="L195">    <span class="const token" data-verso-hover="142">nChg</span> C v a (b + <span class="nu">1</span>) =</span>
+<span id="L196">      <span class="const token" data-verso-hover="142">nChg</span> C v a b + <span class="kw">if</span> <span class="const token" data-verso-hover="99">output</span> (C (b + <span class="nu">1</span>) v) ≠ <span class="const token" data-verso-hover="99">output</span> (C b v) <span class="kw">then</span> <span class="nu">1</span> <span class="kw">else</span> <span class="nu">0</span> := <span class="kw">by</span></span>
+<span id="L197">  <span class="kw">unfold</span> <span class="const token" data-verso-hover="142">nChg</span></span>
+<span id="L198">  <span class="kw">rw</span> [<span class="const token" data-verso-hover="150">Nat.Ico_succ_right_eq_insert_Ico</span> hab, <span class="const token" data-verso-hover="151">Finset.filter_insert</span>]</span>
+<span id="L199">  <span class="kw">split_ifs</span> <span class="kw">with</span> h</span>
+<span id="L200">  · <span class="kw">rw</span> [<span class="const token" data-verso-hover="152">Finset.card_insert_of_notMem</span>]; <span class="kw">simp</span></span>
+<span id="L201">  · <span class="kw">rfl</span></span>
+<span id="L202"></span>
+<span id="L203"><span class="kw">theorem</span> <span class="const token" data-verso-hover="153">uclk_succ</span> (o : V → <span class="const token" data-verso-hover="66">ℤ</span>) (v : V) {t s : <span class="const token" data-verso-hover="45">ℕ</span>} (hts : t ≤ s) :</span>
+<span id="L204">    <span class="const token" data-verso-hover="146">uclk</span> C o t (s + <span class="nu">1</span>) v =</span>
+<span id="L205">      <span class="const token" data-verso-hover="146">uclk</span> C o t s v + <span class="kw">if</span> <span class="const token" data-verso-hover="99">output</span> (C (s + <span class="nu">1</span>) v) ≠ <span class="const token" data-verso-hover="99">output</span> (C s v) <span class="kw">then</span> <span class="nu">1</span> <span class="kw">else</span> <span class="nu">0</span> := <span class="kw">by</span></span>
+<span id="L206">  <span class="kw">unfold</span> <span class="const token" data-verso-hover="146">uclk</span>; <span class="kw">rw</span> [<span class="const token" data-verso-hover="149">nChg_succ</span> v hts]; <span class="kw">split_ifs</span> &lt;;&gt; <span class="kw">push_cast</span> &lt;;&gt; <span class="kw">ring</span></span>
+<span id="L207"></span>
+<span id="L208"><span class="kw">theorem</span> <span class="const token" data-verso-hover="154">nChg_mono</span> (v : V) {a b b' : <span class="const token" data-verso-hover="45">ℕ</span>} (h : b ≤ b') : <span class="const token" data-verso-hover="142">nChg</span> C v a b ≤ <span class="const token" data-verso-hover="142">nChg</span> C v a b' :=</span>
+<span id="L209">  <span class="const token" data-verso-hover="155">Finset.card_le_card</span> (<span class="const token" data-verso-hover="156">Finset.filter_subset_filter</span> _ (<span class="const token" data-verso-hover="157">Finset.Ico_subset_Ico</span> <span class="const token" data-verso-hover="55">le_rfl</span> h))</span>
+<span id="L210"></span>
+<span id="L211"><span class="kw">theorem</span> <span class="const token" data-verso-hover="158">uclk_mono</span> (o : V → <span class="const token" data-verso-hover="66">ℤ</span>) (v : V) {t s s' : <span class="const token" data-verso-hover="45">ℕ</span>} (h : s ≤ s') :</span>
+<span id="L212">    <span class="const token" data-verso-hover="146">uclk</span> C o t s v ≤ <span class="const token" data-verso-hover="146">uclk</span> C o t s' v := <span class="kw">by</span></span>
+<span id="L213">  <span class="kw">unfold</span> <span class="const token" data-verso-hover="146">uclk</span>; <span class="kw">have</span> := <span class="const token" data-verso-hover="154">nChg_mono</span> (C := C) v (a := t) h; <span class="kw">omega</span></span>
+<span id="L214"></span>
+<span id="L215"><span class="dc">/-- A function that grows by at most one across each edge grows by at most the length along a</span></span>
+<span id="L216"><span class="dc">walk. -/</span></span>
+<span id="L217"><span class="kw">theorem</span> <span class="const token" data-verso-hover="159">le_add_length_of_walk</span> {f : V → <span class="const token" data-verso-hover="66">ℤ</span>} (hf : ∀ a b, G.<span class="const token" data-verso-hover="105">Adj</span> a b → f a ≤ f b + <span class="nu">1</span>) {a b : V}</span>
+<span id="L218">    (p : G.<span class="const token" data-verso-hover="160">Walk</span> a b) : f a ≤ f b + p.<span class="const token" data-verso-hover="161">length</span> := <span class="kw">by</span></span>
+<span id="L219">  <span class="kw">induction</span> p <span class="kw">with</span></span>
+<span id="L220">  | <span class="const token" data-verso-hover="162">nil</span> =&gt; <span class="kw">simp</span></span>
+<span id="L221">  | <span class="const token" data-verso-hover="163">cons</span> h q ih =&gt; <span class="kw">have</span> := hf _ _ h; <span class="kw">simp</span> only [<span class="const token" data-verso-hover="164">SimpleGraph.Walk.length_cons</span>]; <span class="kw">push_cast</span>; <span class="kw">omega</span></span>
+<span id="L222"></span>
+<span id="L223"><span class="kw">end</span> Unwrap</span>
+<span id="L224"></span>
+<span id="L225"><span class="kw">namespace</span> AURun</span>
+<span id="L226"></span>
+<span id="L227"><span class="kw">variable</span> {V : <span class="kw">Type</span>*} {G : <span class="const token" data-verso-hover="31">SimpleGraph</span> V} {k : <span class="const token" data-verso-hover="45">ℕ</span>} {A : <span class="const token" data-verso-hover="45">ℕ</span> → <span class="const token" data-verso-hover="54">Set</span> V} {C : <span class="const token" data-verso-hover="45">ℕ</span> → V → <span class="const token" data-verso-hover="79">Turn</span> k}</span>
+<span id="L228"><span class="kw">variable</span> (hC : <span class="const token" data-verso-hover="132">AURun</span> G A C)</span>
+<span id="L229"><span class="kw">include</span> hC</span>
+<span id="L230"></span>
+<span id="L231"><span class="kw">omit</span> hC <span class="kw">in</span></span>
+<span id="L232"><span class="dc">/-- An AA transition between able turns changes the output. -/</span></span>
+<span id="L233"><span class="kw">theorem</span> <span class="const token" data-verso-hover="165">output_ne_of_fwd</span> {ν μ : <span class="const token" data-verso-hover="79">Turn</span> k} (h : μ.<span class="const token" data-verso-hover="80">lvl</span> = <span class="const token" data-verso-hover="67">fwd</span> k ν.<span class="const token" data-verso-hover="80">lvl</span>) (hν : ν.<span class="const token" data-verso-hover="81">faulty</span> = <span class="const token" data-verso-hover="86">false</span>)</span>
+<span id="L234">    (hμ : μ.<span class="const token" data-verso-hover="81">faulty</span> = <span class="const token" data-verso-hover="86">false</span>) : <span class="const token" data-verso-hover="99">output</span> μ ≠ <span class="const token" data-verso-hover="99">output</span> ν := <span class="kw">by</span></span>
+<span id="L235">  <span class="kw">simp</span> only [<span class="const token" data-verso-hover="99">output</span>, hν, hμ, <span class="const token" data-verso-hover="166">Bool.false_eq_true</span>, <span class="const token" data-verso-hover="167">ite_false</span>, <span class="const token" data-verso-hover="168">ne_eq</span>, <span class="const token" data-verso-hover="169">Option.some.injEq</span>]</span>
+<span id="L236">  <span class="kw">unfold</span> <span class="const token" data-verso-hover="97">clock</span>; <span class="kw">rw</span> [h, <span class="const token" data-verso-hover="125">pos_fwd_cast</span> ν.<span class="const token" data-verso-hover="82">isLevel</span>]</span>
+<span id="L237">  <span class="kw">intro</span> h4</span>
+<span id="L238">  <span class="kw">exact</span> (<span class="const token" data-verso-hover="170">ZMod.one_eq_zero_iff</span> (n := <span class="nu">2</span> * k)).<span class="const token" data-verso-hover="171">not</span>.<span class="const token" data-verso-hover="124">2</span> (<span class="kw">by</span> <span class="kw">omega</span>) (<span class="kw">by</span> <span class="kw">simpa</span> <span class="kw">using</span> h4)</span>
+<span id="L239"></span>
+<span id="L240"><span class="dc">/-- In a good graph, a node whose output does not change keeps its turn. -/</span></span>
+<span id="L241"><span class="kw">theorem</span> <span class="const token" data-verso-hover="172">eq_of_not_chg</span> {s : <span class="const token" data-verso-hover="45">ℕ</span>} (hg : <span class="const token" data-verso-hover="111">AllGood</span> G C s) {v : V}</span>
+<span id="L242">    (h : ¬ <span class="const token" data-verso-hover="99">output</span> (C (s + <span class="nu">1</span>) v) ≠ <span class="const token" data-verso-hover="99">output</span> (C s v)) : C (s + <span class="nu">1</span>) v = C s v := <span class="kw">by</span></span>
+<span id="L243">  <span class="kw">rcases</span> hC.<span class="const token" data-verso-hover="133">good_step</span> hg v <span class="kw">with</span> h1 | ⟨-, -, h2, h3⟩</span>
+<span id="L244">  · <span class="kw">exact</span> h1</span>
+<span id="L245">  · <span class="kw">exact</span> <span class="const token" data-verso-hover="173">absurd</span> (<span class="const token" data-verso-hover="165">output_ne_of_fwd</span> h2 (hg v).<span class="const token" data-verso-hover="95">2</span><span class="nu">.</span><span class="const token" data-verso-hover="93">1</span> h3) h</span>
+<span id="L246"></span>
+<span id="L247"><span class="dc">/-- In a good graph, an output change is an AA transition. -/</span></span>
+<span id="L248"><span class="kw">theorem</span> <span class="const token" data-verso-hover="174">aa_of_chg</span> {s : <span class="const token" data-verso-hover="45">ℕ</span>} (hg : <span class="const token" data-verso-hover="111">AllGood</span> G C s) {v : V}</span>
+<span id="L249">    (h : <span class="const token" data-verso-hover="99">output</span> (C (s + <span class="nu">1</span>) v) ≠ <span class="const token" data-verso-hover="99">output</span> (C s v)) :</span>
+<span id="L250">    v ∈ A s ∧ <span class="const token" data-verso-hover="134">AAN</span> G C s v ∧ (C (s + <span class="nu">1</span>) v).<span class="const token" data-verso-hover="80">lvl</span> = <span class="const token" data-verso-hover="67">fwd</span> k (C s v).<span class="const token" data-verso-hover="80">lvl</span> := <span class="kw">by</span></span>
+<span id="L251">  <span class="kw">rcases</span> hC.<span class="const token" data-verso-hover="133">good_step</span> hg v <span class="kw">with</span> h1 | ⟨h1, h2, h3, -⟩</span>
+<span id="L252">  · <span class="kw">rw</span> [h1] <span class="kw">at</span> h; <span class="kw">exact</span> <span class="const token" data-verso-hover="173">absurd</span> <span class="const token" data-verso-hover="36">rfl</span> h</span>
+<span id="L253">  · <span class="kw">exact</span> ⟨h1, h2, h3⟩</span>
+<span id="L254"></span>
+<span id="L255"><span class="dc">/-- In a good graph, an AA transition changes the output. -/</span></span>
+<span id="L256"><span class="kw">theorem</span> <span class="const token" data-verso-hover="175">chg_of_aa</span> {s : <span class="const token" data-verso-hover="45">ℕ</span>} (hg : <span class="const token" data-verso-hover="111">AllGood</span> G C s) {v : V}</span>
+<span id="L257">    (h : (C (s + <span class="nu">1</span>) v).<span class="const token" data-verso-hover="80">lvl</span> = <span class="const token" data-verso-hover="67">fwd</span> k (C s v).<span class="const token" data-verso-hover="80">lvl</span>) : <span class="const token" data-verso-hover="99">output</span> (C (s + <span class="nu">1</span>) v) ≠ <span class="const token" data-verso-hover="99">output</span> (C s v) :=</span>
+<span id="L258">  <span class="const token" data-verso-hover="165">output_ne_of_fwd</span> h (hg v).<span class="const token" data-verso-hover="95">2</span><span class="nu">.</span><span class="const token" data-verso-hover="93">1</span> (hC.<span class="const token" data-verso-hover="137">allGood_succ</span> hg v).<span class="const token" data-verso-hover="95">2</span><span class="nu">.</span><span class="const token" data-verso-hover="93">1</span></span>
+<span id="L259"></span>
+<span id="L260"><span class="dc">/-- The invariant of the unwrapped clocks: from a good time `t` on, the unwrapped clock `U_v(s)`</span></span>
+<span id="L261"><span class="dc">represents the clock of `v` (relative to the base value `B`), and differs by at most one across</span></span>
+<span id="L262"><span class="dc">edges. -/</span></span>
+<span id="L263"><span class="kw">theorem</span> <span class="const token" data-verso-hover="176">uclk_inv</span> (hk : <span class="nu">2</span> ≤ k) {t : <span class="const token" data-verso-hover="45">ℕ</span>} (hg : <span class="const token" data-verso-hover="111">AllGood</span> G C t) (o : V → <span class="const token" data-verso-hover="66">ℤ</span>) (B : <span class="const token" data-verso-hover="98">ZMod</span> (<span class="nu">2</span> * k))</span>
+<span id="L264">    (h1 : ∀ v, (<span class="const token" data-verso-hover="96">pos</span> k (C t v).<span class="const token" data-verso-hover="80">lvl</span> : <span class="const token" data-verso-hover="98">ZMod</span> (<span class="nu">2</span> * k)) = B + (o v : <span class="const token" data-verso-hover="98">ZMod</span> (<span class="nu">2</span> * k)))</span>
+<span id="L265">    (h2 : ∀ u v, G.<span class="const token" data-verso-hover="105">Adj</span> u v → o u ≤ o v + <span class="nu">1</span>) {s : <span class="const token" data-verso-hover="45">ℕ</span>} (hs : t ≤ s) :</span>
+<span id="L266">    (∀ v, (<span class="const token" data-verso-hover="96">pos</span> k (C s v).<span class="const token" data-verso-hover="80">lvl</span> : <span class="const token" data-verso-hover="98">ZMod</span> (<span class="nu">2</span> * k)) = B + (<span class="const token" data-verso-hover="146">uclk</span> C o t s v : <span class="const token" data-verso-hover="98">ZMod</span> (<span class="nu">2</span> * k))) ∧</span>
+<span id="L267">      ∀ u v, G.<span class="const token" data-verso-hover="105">Adj</span> u v → <span class="const token" data-verso-hover="146">uclk</span> C o t s u ≤ <span class="const token" data-verso-hover="146">uclk</span> C o t s v + <span class="nu">1</span> := <span class="kw">by</span></span>
+<span id="L268">  <span class="kw">induction</span> s, hs <span class="kw">using</span> <span class="const token" data-verso-hover="140">Nat.le_induction</span> <span class="kw">with</span></span>
+<span id="L269">  | base =&gt; <span class="kw">simpa</span> [<span class="const token" data-verso-hover="148">uclk_self</span>] <span class="kw">using</span> ⟨h1, h2⟩</span>
+<span id="L270">  | <span class="const token" data-verso-hover="141">succ</span> s hs ih =&gt;</span>
+<span id="L271">    <span class="kw">obtain</span> ⟨i1, i2⟩ := ih</span>
+<span id="L272">    <span class="kw">have</span> hgs := hC.<span class="const token" data-verso-hover="139">allGood_le</span> hg hs</span>
+<span id="L273">    <span class="kw">refine</span> ⟨<span class="kw">fun</span> v =&gt; ?_, <span class="kw">fun</span> u v huv =&gt; ?_⟩</span>
+<span id="L274">    · <span class="kw">rw</span> [<span class="const token" data-verso-hover="153">uclk_succ</span> o v hs]</span>
+<span id="L275">      <span class="kw">by_cases</span> hc : <span class="const token" data-verso-hover="99">output</span> (C (s + <span class="nu">1</span>) v) ≠ <span class="const token" data-verso-hover="99">output</span> (C s v)</span>
+<span id="L276">      · <span class="kw">obtain</span> ⟨-, -, h3⟩ := hC.<span class="const token" data-verso-hover="174">aa_of_chg</span> hgs hc</span>
+<span id="L277">        <span class="kw">rw</span> [<span class="const token" data-verso-hover="177">ite_eq_left</span> hc, h3, <span class="const token" data-verso-hover="125">pos_fwd_cast</span> (C s v).<span class="const token" data-verso-hover="82">isLevel</span>, i1 v]; <span class="kw">push_cast</span>; <span class="kw">ring</span></span>
+<span id="L278">      · <span class="kw">rw</span> [<span class="const token" data-verso-hover="178">ite_eq_right</span> hc, hC.<span class="const token" data-verso-hover="172">eq_of_not_chg</span> hgs hc, i1 v]; <span class="kw">simp</span></span>
+<span id="L279">    · <span class="kw">rw</span> [<span class="const token" data-verso-hover="153">uclk_succ</span> o u hs, <span class="const token" data-verso-hover="153">uclk_succ</span> o v hs]</span>
+<span id="L280">      <span class="kw">have</span> i2' := i2 u v huv</span>
+<span id="L281">      <span class="kw">have</span> i2'' := i2 v u huv.<span class="const token" data-verso-hover="138">symm</span></span>
+<span id="L282">      <span class="kw">by_cases</span> hcu : <span class="const token" data-verso-hover="99">output</span> (C (s + <span class="nu">1</span>) u) ≠ <span class="const token" data-verso-hover="99">output</span> (C s u)</span>
+<span id="L283">      · <span class="kw">by_cases</span> hcv : <span class="const token" data-verso-hover="99">output</span> (C (s + <span class="nu">1</span>) v) ≠ <span class="const token" data-verso-hover="99">output</span> (C s v)</span>
+<span id="L284">        · <span class="kw">simp</span> only [<span class="const token" data-verso-hover="177">ite_eq_left</span> hcu, <span class="const token" data-verso-hover="177">ite_eq_left</span> hcv]; <span class="kw">omega</span></span>
+<span id="L285">        · <span class="kw">simp</span> only [<span class="const token" data-verso-hover="177">ite_eq_left</span> hcu, <span class="const token" data-verso-hover="178">ite_eq_right</span> hcv]</span>
+<span id="L286">          <span class="kw">by_contra</span> hlt</span>
+<span id="L287">          <span class="kw">have</span> heq : <span class="const token" data-verso-hover="146">uclk</span> C o t s u = <span class="const token" data-verso-hover="146">uclk</span> C o t s v + <span class="nu">1</span> := <span class="kw">by</span> <span class="kw">omega</span></span>
+<span id="L288">          <span class="kw">obtain</span> ⟨-, h3, -⟩ := hC.<span class="const token" data-verso-hover="174">aa_of_chg</span> hgs hcu</span>
+<span id="L289">          <span class="kw">have</span> eu := i1 u</span>
+<span id="L290">          <span class="kw">have</span> ev := i1 v</span>
+<span id="L291">          <span class="kw">rw</span> [heq] <span class="kw">at</span> eu</span>
+<span id="L292">          <span class="kw">rcases</span> (h3 v huv).<span class="const token" data-verso-hover="95">2</span> <span class="kw">with</span> h4 | h4</span>
+<span id="L293">          · <span class="kw">rw</span> [h4, eu] <span class="kw">at</span> ev</span>
+<span id="L294">            <span class="kw">exact</span> (<span class="const token" data-verso-hover="170">ZMod.one_eq_zero_iff</span> (n := <span class="nu">2</span> * k)).<span class="const token" data-verso-hover="171">not</span>.<span class="const token" data-verso-hover="124">2</span> (<span class="kw">by</span> <span class="kw">omega</span>)</span>
+<span id="L295">              (<span class="kw">by</span> <span class="kw">push_cast</span> <span class="kw">at</span> ev; linear_combination ev)</span>
+<span id="L296">          · <span class="kw">rw</span> [h4, <span class="const token" data-verso-hover="125">pos_fwd_cast</span> (C s u).<span class="const token" data-verso-hover="82">isLevel</span>, eu] <span class="kw">at</span> ev</span>
+<span id="L297">            <span class="kw">exact</span> <span class="const token" data-verso-hover="129">two_ne_zero_zmod</span> hk (<span class="kw">by</span> <span class="kw">push_cast</span> <span class="kw">at</span> ev; linear_combination ev)</span>
+<span id="L298">      · <span class="kw">simp</span> only [<span class="const token" data-verso-hover="178">ite_eq_right</span> hcu]; <span class="kw">split_ifs</span> &lt;;&gt; <span class="kw">omega</span></span>
+<span id="L299"></span>
+<span id="L300"><span class="dc">/-- A node that is not activated keeps its unwrapped clock. -/</span></span>
+<span id="L301"><span class="kw">theorem</span> <span class="const token" data-verso-hover="179">uclk_eq_of_not_mem</span> (o : V → <span class="const token" data-verso-hover="66">ℤ</span>) {t τ s : <span class="const token" data-verso-hover="45">ℕ</span>} (htτ : t ≤ τ) (hτs : τ ≤ s) {w : V}</span>
+<span id="L302">    (h : ∀ s', τ ≤ s' → s' &lt; s → w ∉ A s') : <span class="const token" data-verso-hover="146">uclk</span> C o t s w = <span class="const token" data-verso-hover="146">uclk</span> C o t τ w := <span class="kw">by</span></span>
+<span id="L303">  <span class="kw">induction</span> s, hτs <span class="kw">using</span> <span class="const token" data-verso-hover="140">Nat.le_induction</span> <span class="kw">with</span></span>
+<span id="L304">  | base =&gt; <span class="kw">rfl</span></span>
+<span id="L305">  | <span class="const token" data-verso-hover="141">succ</span> n hn ih =&gt;</span>
+<span id="L306">    <span class="kw">rw</span> [<span class="const token" data-verso-hover="153">uclk_succ</span> o w (htτ.<span class="const token" data-verso-hover="180">trans</span> hn), hC.<span class="const token" data-verso-hover="181">succ_of_not_mem</span> (h n hn (<span class="const token" data-verso-hover="182">Nat.lt_succ_self</span> n)),</span>
+<span id="L307">      ih <span class="kw">fun</span> s' h1 h2 =&gt; h s' h1 (<span class="kw">by</span> <span class="kw">omega</span>)]</span>
+<span id="L308">    <span class="kw">simp</span></span>
+<span id="L309"></span>
+<span id="L310"><span class="dc">/-- One round increases the minimal unwrapped clock (more precisely: any lower bound `M` on the</span></span>
+<span id="L311"><span class="dc">unwrapped clocks at time `τ` is exceeded at time `ϱ(τ)`). A node `w` with `U_w(τ) = M` stays at</span></span>
+<span id="L312"><span class="dc">`M` until its first activation in `[τ, ϱ(τ))`; at that time all its neighbours have unwrapped</span></span>
+<span id="L313"><span class="dc">clocks `M` or `M + 1`, hence levels `λ_w` or `φ(λ_w)`, so `w` performs an AA transition. -/</span></span>
+<span id="L314"><span class="kw">theorem</span> <span class="const token" data-verso-hover="183">uclk_rho</span> [<span class="const token" data-verso-hover="184">Finite</span> V] (hA : <span class="const token" data-verso-hover="57">Fair</span> A) (hk : <span class="nu">2</span> ≤ k) {t : <span class="const token" data-verso-hover="45">ℕ</span>} (hg : <span class="const token" data-verso-hover="111">AllGood</span> G C t)</span>
+<span id="L315">    (o : V → <span class="const token" data-verso-hover="66">ℤ</span>) (B : <span class="const token" data-verso-hover="98">ZMod</span> (<span class="nu">2</span> * k))</span>
+<span id="L316">    (h1 : ∀ v, (<span class="const token" data-verso-hover="96">pos</span> k (C t v).<span class="const token" data-verso-hover="80">lvl</span> : <span class="const token" data-verso-hover="98">ZMod</span> (<span class="nu">2</span> * k)) = B + (o v : <span class="const token" data-verso-hover="98">ZMod</span> (<span class="nu">2</span> * k)))</span>
+<span id="L317">    (h2 : ∀ u v, G.<span class="const token" data-verso-hover="105">Adj</span> u v → o u ≤ o v + <span class="nu">1</span>) {τ : <span class="const token" data-verso-hover="45">ℕ</span>} (hτ : t ≤ τ) {M : <span class="const token" data-verso-hover="66">ℤ</span>}</span>
+<span id="L318">    (hM : ∀ w, M ≤ <span class="const token" data-verso-hover="146">uclk</span> C o t τ w) (w : V) : M + <span class="nu">1</span> ≤ <span class="const token" data-verso-hover="146">uclk</span> C o t (<span class="const token" data-verso-hover="185">rho</span> A τ) w := <span class="kw">by</span></span>
+<span id="L319">  <span class="kw">obtain</span> ⟨s, hs1, hs2, hs3, hs4⟩ := <span class="const token" data-verso-hover="186">exists_first_act</span> hA w τ</span>
+<span id="L320">  <span class="kw">by_cases</span> hw : M + <span class="nu">1</span> ≤ <span class="const token" data-verso-hover="146">uclk</span> C o t τ w</span>
+<span id="L321">  · <span class="kw">exact</span> hw.<span class="const token" data-verso-hover="180">trans</span> (<span class="const token" data-verso-hover="158">uclk_mono</span> o w (<span class="const token" data-verso-hover="187">le_rho</span> hA τ))</span>
+<span id="L322">  <span class="kw">have</span> hwM : <span class="const token" data-verso-hover="146">uclk</span> C o t τ w = M := <span class="kw">by</span> <span class="kw">have</span> := hM w; <span class="kw">omega</span></span>
+<span id="L323">  <span class="kw">have</span> hws : <span class="const token" data-verso-hover="146">uclk</span> C o t s w = M := (hC.<span class="const token" data-verso-hover="179">uclk_eq_of_not_mem</span> o hτ hs1 hs4).<span class="const token" data-verso-hover="188">trans</span> hwM</span>
+<span id="L324">  <span class="kw">have</span> hts : t ≤ s := hτ.<span class="const token" data-verso-hover="180">trans</span> hs1</span>
+<span id="L325">  <span class="kw">have</span> hgs := hC.<span class="const token" data-verso-hover="139">allGood_le</span> hg hts</span>
+<span id="L326">  <span class="kw">obtain</span> ⟨i1, i2⟩ := hC.<span class="const token" data-verso-hover="176">uclk_inv</span> hk hg o B h1 h2 hts</span>
+<span id="L327">  <span class="kw">have</span> haan : <span class="const token" data-verso-hover="134">AAN</span> G C s w := <span class="kw">by</span></span>
+<span id="L328">    <span class="kw">intro</span> u hu</span>
+<span id="L329">    <span class="kw">refine</span> ⟨(hgs u).<span class="const token" data-verso-hover="95">2</span><span class="nu">.</span><span class="const token" data-verso-hover="93">1</span>, ?_⟩</span>
+<span id="L330">    <span class="kw">have</span> l1 : M ≤ <span class="const token" data-verso-hover="146">uclk</span> C o t s u := (hM u).<span class="const token" data-verso-hover="180">trans</span> (<span class="const token" data-verso-hover="158">uclk_mono</span> o u hs1)</span>
+<span id="L331">    <span class="kw">have</span> l2 := i2 u w hu.<span class="const token" data-verso-hover="138">symm</span></span>
+<span id="L332">    <span class="kw">have</span> eu := i1 u</span>
+<span id="L333">    <span class="kw">have</span> ew := i1 w</span>
+<span id="L334">    <span class="kw">rw</span> [hws] <span class="kw">at</span> ew l2</span>
+<span id="L335">    <span class="kw">obtain</span> h | h : <span class="const token" data-verso-hover="146">uclk</span> C o t s u = M ∨ <span class="const token" data-verso-hover="146">uclk</span> C o t s u = M + <span class="nu">1</span> := <span class="kw">by</span> <span class="kw">omega</span></span>
+<span id="L336">    · <span class="kw">left</span></span>
+<span id="L337">      <span class="kw">exact</span> <span class="const token" data-verso-hover="127">eq_of_pos_cast</span> (C s u).<span class="const token" data-verso-hover="82">isLevel</span> (C s w).<span class="const token" data-verso-hover="82">isLevel</span> (<span class="kw">by</span> <span class="kw">rw</span> [eu, ew, h])</span>
+<span id="L338">    · <span class="kw">right</span></span>
+<span id="L339">      <span class="kw">refine</span> <span class="const token" data-verso-hover="127">eq_of_pos_cast</span> (C s u).<span class="const token" data-verso-hover="82">isLevel</span> (C s w).<span class="const token" data-verso-hover="85">aa</span>.<span class="const token" data-verso-hover="82">isLevel</span> ?_</span>
+<span id="L340">      <span class="kw">rw</span> [<span class="const token" data-verso-hover="125">pos_fwd_cast</span> (C s w).<span class="const token" data-verso-hover="82">isLevel</span>, eu, ew, h]</span>
+<span id="L341">      <span class="kw">push_cast</span>; <span class="kw">ring</span></span>
+<span id="L342">  <span class="kw">have</span> hchg := hC.<span class="const token" data-verso-hover="175">chg_of_aa</span> hgs (hC.<span class="const token" data-verso-hover="189">succ_aa</span> hs3 (hgs w).<span class="const token" data-verso-hover="95">2</span><span class="nu">.</span><span class="const token" data-verso-hover="93">1</span> haan).<span class="const token" data-verso-hover="93">1</span></span>
+<span id="L343">  <span class="kw">have</span> e := <span class="const token" data-verso-hover="153">uclk_succ</span> (C := C) o w hts</span>
+<span id="L344">  <span class="kw">rw</span> [<span class="const token" data-verso-hover="177">ite_eq_left</span> hchg, hws] <span class="kw">at</span> e</span>
+<span id="L345">  <span class="kw">rw</span> [← e]</span>
+<span id="L346">  <span class="kw">exact</span> <span class="const token" data-verso-hover="158">uclk_mono</span> o w (<span class="kw">by</span> <span class="kw">omega</span>)</span>
+<span id="L347"></span>
+<span id="L348"><span class="dc">/-- `j` rounds increase the minimal unwrapped clock by at least `j`. -/</span></span>
+<span id="L349"><span class="kw">theorem</span> <span class="const token" data-verso-hover="190">uclk_rho_iter</span> [<span class="const token" data-verso-hover="184">Finite</span> V] (hA : <span class="const token" data-verso-hover="57">Fair</span> A) (hk : <span class="nu">2</span> ≤ k) {t : <span class="const token" data-verso-hover="45">ℕ</span>} (hg : <span class="const token" data-verso-hover="111">AllGood</span> G C t)</span>
+<span id="L350">    (o : V → <span class="const token" data-verso-hover="66">ℤ</span>) (B : <span class="const token" data-verso-hover="98">ZMod</span> (<span class="nu">2</span> * k))</span>
+<span id="L351">    (h1 : ∀ v, (<span class="const token" data-verso-hover="96">pos</span> k (C t v).<span class="const token" data-verso-hover="80">lvl</span> : <span class="const token" data-verso-hover="98">ZMod</span> (<span class="nu">2</span> * k)) = B + (o v : <span class="const token" data-verso-hover="98">ZMod</span> (<span class="nu">2</span> * k)))</span>
+<span id="L352">    (h2 : ∀ u v, G.<span class="const token" data-verso-hover="105">Adj</span> u v → o u ≤ o v + <span class="nu">1</span>) (j : <span class="const token" data-verso-hover="45">ℕ</span>) {τ : <span class="const token" data-verso-hover="45">ℕ</span>} (hτ : t ≤ τ) {M : <span class="const token" data-verso-hover="66">ℤ</span>}</span>
+<span id="L353">    (hM : ∀ w, M ≤ <span class="const token" data-verso-hover="146">uclk</span> C o t τ w) (w : V) : M + j ≤ <span class="const token" data-verso-hover="146">uclk</span> C o t ((<span class="const token" data-verso-hover="185">rho</span> A)^[j] τ) w := <span class="kw">by</span></span>
+<span id="L354">  <span class="kw">induction</span> j generalizing τ M <span class="kw">with</span></span>
+<span id="L355">  | <span class="const token" data-verso-hover="191">zero</span> =&gt; <span class="kw">simpa</span> <span class="kw">using</span> hM w</span>
+<span id="L356">  | <span class="const token" data-verso-hover="141">succ</span> j ih =&gt;</span>
+<span id="L357">    <span class="kw">rw</span> [<span class="const token" data-verso-hover="192">Function.iterate_succ_apply</span>]</span>
+<span id="L358">    <span class="kw">have</span> := ih (hτ.<span class="const token" data-verso-hover="180">trans</span> (<span class="const token" data-verso-hover="187">le_rho</span> hA τ)) (M := M + <span class="nu">1</span>) (hC.<span class="const token" data-verso-hover="183">uclk_rho</span> hA hk hg o B h1 h2 hτ hM)</span>
+<span id="L359">    <span class="kw">push_cast</span>; <span class="kw">linarith</span></span>
+<span id="L360"></span>
+<span id="L361"><span class="kw">omit</span> hC <span class="kw">in</span></span>
+<span id="L362"><span class="dc">/-- Along a walk of a good graph, clock values change by at most one per edge (cf. Obs. 2.7). -/</span></span>
+<span id="L363"><span class="kw">theorem</span> <span class="const token" data-verso-hover="193">pos_walk</span> {t : <span class="const token" data-verso-hover="45">ℕ</span>} (hg : <span class="const token" data-verso-hover="111">AllGood</span> G C t) {r w : V} (p : G.<span class="const token" data-verso-hover="160">Walk</span> r w) :</span>
+<span id="L364">    ∃ z : <span class="const token" data-verso-hover="66">ℤ</span>, -(p.<span class="const token" data-verso-hover="161">length</span> : <span class="const token" data-verso-hover="66">ℤ</span>) ≤ z ∧ z ≤ p.<span class="const token" data-verso-hover="161">length</span> ∧</span>
+<span id="L365">      (<span class="const token" data-verso-hover="96">pos</span> k (C t w).<span class="const token" data-verso-hover="80">lvl</span> : <span class="const token" data-verso-hover="98">ZMod</span> (<span class="nu">2</span> * k)) =</span>
+<span id="L366">        (<span class="const token" data-verso-hover="96">pos</span> k (C t r).<span class="const token" data-verso-hover="80">lvl</span> : <span class="const token" data-verso-hover="98">ZMod</span> (<span class="nu">2</span> * k)) + (z : <span class="const token" data-verso-hover="98">ZMod</span> (<span class="nu">2</span> * k)) := <span class="kw">by</span></span>
+<span id="L367">  <span class="kw">induction</span> p <span class="kw">with</span></span>
+<span id="L368">  | <span class="const token" data-verso-hover="162">nil</span> =&gt; <span class="kw">exact</span> ⟨<span class="nu">0</span>, <span class="kw">by</span> <span class="kw">simp</span>, <span class="kw">by</span> <span class="kw">simp</span>, <span class="kw">by</span> <span class="kw">simp</span>⟩</span>
+<span id="L369">  | @<span class="const token" data-verso-hover="163">cons</span> a b c hab q ih =&gt;</span>
+<span id="L370">    <span class="kw">obtain</span> ⟨z, hz1, hz2, hz⟩ := ih</span>
+<span id="L371">    <span class="kw">obtain</span> ⟨δ, hδ1, hδ2, hδ⟩ := <span class="const token" data-verso-hover="128">pos_cast_of_lAdj</span> (C t a).<span class="const token" data-verso-hover="82">isLevel</span> (C t b).<span class="const token" data-verso-hover="82">isLevel</span> ((hg a).<span class="const token" data-verso-hover="93">1</span> b hab)</span>
+<span id="L372">    <span class="kw">refine</span> ⟨δ + z, ?_, ?_, ?_⟩</span>
+<span id="L373">    · <span class="kw">simp</span> only [<span class="const token" data-verso-hover="164">SimpleGraph.Walk.length_cons</span>]; <span class="kw">push_cast</span>; <span class="kw">omega</span></span>
+<span id="L374">    · <span class="kw">simp</span> only [<span class="const token" data-verso-hover="164">SimpleGraph.Walk.length_cons</span>]; <span class="kw">push_cast</span>; <span class="kw">omega</span></span>
+<span id="L375">    · <span class="kw">rw</span> [hz, hδ]; <span class="kw">push_cast</span>; <span class="kw">ring</span></span>
+<span id="L376"></span>
+<span id="L377"><span class="kw">omit</span> hC <span class="kw">in</span></span>
+<span id="L378"><span class="dc">/-- Lifting the clocks of a good graph to integers (cf. Obs. 2.8): if `D + 2 ≤ k`, there are</span></span>
+<span id="L379"><span class="dc">integer offsets `o_v` with `pos(λ_v) ≡ B + o_v (mod 2k)` that differ by at most one across</span></span>
+<span id="L380"><span class="dc">edges. -/</span></span>
+<span id="L381"><span class="kw">theorem</span> <span class="const token" data-verso-hover="9">exists_offsets</span> {d : <span class="const token" data-verso-hover="45">ℕ</span>} (hd : G.<span class="const token" data-verso-hover="194">ediam</span> ≤ d) (hdk : d + <span class="nu">2</span> ≤ k) {t : <span class="const token" data-verso-hover="45">ℕ</span>} (hg : <span class="const token" data-verso-hover="111">AllGood</span> G C t)</span>
+<span id="L382">    (r : V) : ∃ (o : V → <span class="const token" data-verso-hover="66">ℤ</span>) (B : <span class="const token" data-verso-hover="98">ZMod</span> (<span class="nu">2</span> * k)),</span>
+<span id="L383">      (∀ v, (<span class="const token" data-verso-hover="96">pos</span> k (C t v).<span class="const token" data-verso-hover="80">lvl</span> : <span class="const token" data-verso-hover="98">ZMod</span> (<span class="nu">2</span> * k)) = B + (o v : <span class="const token" data-verso-hover="98">ZMod</span> (<span class="nu">2</span> * k))) ∧</span>
+<span id="L384">      ∀ u v, G.<span class="const token" data-verso-hover="105">Adj</span> u v → o u ≤ o v + <span class="nu">1</span> := <span class="kw">by</span></span>
+<span id="L385">  <span class="kw">have</span> : <span class="const token" data-verso-hover="195">NeZero</span> (<span class="nu">2</span> * k) := ⟨<span class="kw">by</span> <span class="kw">omega</span>⟩</span>
+<span id="L386">  <span class="kw">set</span> B : <span class="const token" data-verso-hover="98">ZMod</span> (<span class="nu">2</span> * k) := (<span class="const token" data-verso-hover="96">pos</span> k (C t r).<span class="const token" data-verso-hover="80">lvl</span> : <span class="const token" data-verso-hover="98">ZMod</span> (<span class="nu">2</span> * k))</span>
+<span id="L387">  <span class="kw">let</span> o : V → <span class="const token" data-verso-hover="66">ℤ</span> := <span class="kw">fun</span> w =&gt; ((<span class="const token" data-verso-hover="96">pos</span> k (C t w).<span class="const token" data-verso-hover="80">lvl</span> : <span class="const token" data-verso-hover="98">ZMod</span> (<span class="nu">2</span> * k)) - B).<span class="const token" data-verso-hover="196">valMinAbs</span></span>
+<span id="L388">  <span class="kw">have</span> ho : ∀ w, (o w : <span class="const token" data-verso-hover="98">ZMod</span> (<span class="nu">2</span> * k)) = (<span class="const token" data-verso-hover="96">pos</span> k (C t w).<span class="const token" data-verso-hover="80">lvl</span> : <span class="const token" data-verso-hover="98">ZMod</span> (<span class="nu">2</span> * k)) - B := <span class="kw">fun</span> w =&gt;</span>
+<span id="L389">    <span class="const token" data-verso-hover="197">ZMod.coe_valMinAbs</span> _</span>
+<span id="L390">  <span class="kw">have</span> hb : ∀ w, -(d : <span class="const token" data-verso-hover="66">ℤ</span>) ≤ o w ∧ o w ≤ d := <span class="kw">by</span></span>
+<span id="L391">    <span class="kw">intro</span> w</span>
+<span id="L392">    <span class="kw">obtain</span> ⟨p, hp⟩ := <span class="const token" data-verso-hover="198">SimpleGraph.ediam_le_coe_iff</span>.<span class="const token" data-verso-hover="199">1</span> hd r w</span>
+<span id="L393">    <span class="kw">obtain</span> ⟨z, hz1, hz2, hz⟩ := <span class="const token" data-verso-hover="193">pos_walk</span> hg p</span>
+<span id="L394">    <span class="kw">have</span> h1 : (o w : <span class="const token" data-verso-hover="98">ZMod</span> (<span class="nu">2</span> * k)) = (z : <span class="const token" data-verso-hover="98">ZMod</span> (<span class="nu">2</span> * k)) := <span class="kw">by</span> <span class="kw">rw</span> [ho, hz]; <span class="kw">ring</span></span>
+<span id="L395">    <span class="kw">have</span> h2 := <span class="const token" data-verso-hover="200">ZMod.natAbs_valMinAbs_le</span> ((<span class="const token" data-verso-hover="96">pos</span> k (C t w).<span class="const token" data-verso-hover="80">lvl</span> : <span class="const token" data-verso-hover="98">ZMod</span> (<span class="nu">2</span> * k)) - B)</span>
+<span id="L396">    <span class="kw">have</span> h3 : (o w).<span class="const token" data-verso-hover="201">natAbs</span> ≤ k := <span class="kw">by</span></span>
+<span id="L397">      <span class="kw">show</span> (((<span class="const token" data-verso-hover="96">pos</span> k (C t w).<span class="const token" data-verso-hover="80">lvl</span> : <span class="const token" data-verso-hover="98">ZMod</span> (<span class="nu">2</span> * k)) - B).<span class="const token" data-verso-hover="196">valMinAbs</span>).<span class="const token" data-verso-hover="201">natAbs</span> ≤ k; <span class="kw">omega</span></span>
+<span id="L398">    <span class="kw">have</span> := <span class="const token" data-verso-hover="120">eq_of_intCast_eq</span> h1 (<span class="kw">by</span> <span class="kw">push_cast</span>; <span class="kw">omega</span>) (<span class="kw">by</span> <span class="kw">push_cast</span>; <span class="kw">omega</span>)</span>
+<span id="L399">    <span class="kw">omega</span></span>
+<span id="L400">  <span class="kw">refine</span> ⟨o, B, <span class="kw">fun</span> v =&gt; <span class="kw">by</span> <span class="kw">rw</span> [ho]; <span class="kw">ring</span>, <span class="kw">fun</span> u v huv =&gt; ?_⟩</span>
+<span id="L401">  <span class="kw">obtain</span> ⟨δ, hδ1, hδ2, hδ⟩ := <span class="const token" data-verso-hover="128">pos_cast_of_lAdj</span> (C t u).<span class="const token" data-verso-hover="82">isLevel</span> (C t v).<span class="const token" data-verso-hover="82">isLevel</span> ((hg u).<span class="const token" data-verso-hover="93">1</span> v huv)</span>
+<span id="L402">  <span class="kw">have</span> h1 : (o v : <span class="const token" data-verso-hover="98">ZMod</span> (<span class="nu">2</span> * k)) = ((o u + δ : <span class="const token" data-verso-hover="66">ℤ</span>) : <span class="const token" data-verso-hover="98">ZMod</span> (<span class="nu">2</span> * k)) := <span class="kw">by</span></span>
+<span id="L403">    <span class="kw">rw</span> [ho, hδ]; <span class="kw">push_cast</span>; <span class="kw">rw</span> [ho]; <span class="kw">ring</span></span>
+<span id="L404">  <span class="kw">have</span> := hb u; <span class="kw">have</span> := hb v</span>
+<span id="L405">  <span class="kw">have</span> := <span class="const token" data-verso-hover="120">eq_of_intCast_eq</span> h1 (<span class="kw">by</span> <span class="kw">push_cast</span>; <span class="kw">omega</span>) (<span class="kw">by</span> <span class="kw">push_cast</span>; <span class="kw">omega</span>)</span>
+<span id="L406">  <span class="kw">omega</span></span>
+<span id="L407"></span>
+<span id="L408"><span class="dc">/-- Lemma 2.10, Lemma 2.11 and safety, i.e. "a good graph has stabilized", of [EK21]: if `G`</span></span>
+<span id="L409"><span class="dc">has diameter at most `D`, `D + 2 ≤ k` and the graph is good at time `T`, then from time `T` on the</span></span>
+<span id="L410"><span class="dc">execution solves asynchronous unison (all nodes are able; neighbouring clocks differ by at most</span></span>
+<span id="L411"><span class="dc">one; clocks only advance by `+1`; every node advances its clock at least `i` times during</span></span>
+<span id="L412"><span class="dc">`[t, ϱ^{D+i}(t))` for every `t ≥ T`). -/</span></span>
+<span id="L413"><span class="kw">theorem</span> <span class="const token" data-verso-hover="18">auFrom_of_allGood</span> [<span class="const token" data-verso-hover="184">Finite</span> V] (hA : <span class="const token" data-verso-hover="57">Fair</span> A) {d T : <span class="const token" data-verso-hover="45">ℕ</span>} (hd : G.<span class="const token" data-verso-hover="194">ediam</span> ≤ d)</span>
+<span id="L414">    (hk : d + <span class="nu">2</span> ≤ k) (hT : <span class="const token" data-verso-hover="111">AllGood</span> G C T) :</span>
+<span id="L415">    <span class="const token" data-verso-hover="202">AUFrom</span> G A (<span class="const token" data-verso-hover="99">output</span> (k := k)) C d T <span class="kw">where</span></span>
+<span id="L416">  <span class="const token" data-verso-hover="203">output</span> t ht v := <span class="kw">by</span> <span class="kw">simp</span> [<span class="const token" data-verso-hover="99">output</span>, (hC.<span class="const token" data-verso-hover="139">allGood_le</span> hT ht v).<span class="const token" data-verso-hover="95">2</span><span class="nu">.</span><span class="const token" data-verso-hover="93">1</span>]</span>
+<span id="L417">  <span class="const token" data-verso-hover="204">safety</span> t ht u v huv c c' hu hv := <span class="kw">by</span></span>
+<span id="L418">    <span class="kw">have</span> hg := hC.<span class="const token" data-verso-hover="139">allGood_le</span> hT ht</span>
+<span id="L419">    <span class="kw">simp</span> only [<span class="const token" data-verso-hover="99">output</span>, (hg u).<span class="const token" data-verso-hover="95">2</span><span class="nu">.</span><span class="const token" data-verso-hover="93">1</span>, (hg v).<span class="const token" data-verso-hover="95">2</span><span class="nu">.</span><span class="const token" data-verso-hover="93">1</span>, <span class="const token" data-verso-hover="166">Bool.false_eq_true</span>, <span class="const token" data-verso-hover="167">ite_false</span>,</span>
+<span id="L420">      <span class="const token" data-verso-hover="169">Option.some.injEq</span>] <span class="kw">at</span> hu hv</span>
+<span id="L421">    <span class="kw">subst</span> hu hv</span>
+<span id="L422">    <span class="kw">exact</span> <span class="const token" data-verso-hover="130">clock_of_lAdj</span> ((hg u).<span class="const token" data-verso-hover="93">1</span> v huv)</span>
+<span id="L423">  <span class="const token" data-verso-hover="205">incr</span> t ht v c c' h h' := <span class="kw">by</span></span>
+<span id="L424">    <span class="kw">have</span> hg := hC.<span class="const token" data-verso-hover="139">allGood_le</span> hT ht</span>
+<span id="L425">    <span class="kw">rcases</span> hC.<span class="const token" data-verso-hover="133">good_step</span> hg v <span class="kw">with</span> h1 | ⟨-, -, h2, h3⟩</span>
+<span id="L426">    · <span class="kw">rw</span> [h1, h] <span class="kw">at</span> h'; <span class="kw">left</span>; <span class="kw">exact</span> (<span class="const token" data-verso-hover="206">Option.some.inj</span> h').<span class="const token" data-verso-hover="39">symm</span></span>
+<span id="L427">    · <span class="kw">right</span></span>
+<span id="L428">      <span class="kw">simp</span> only [<span class="const token" data-verso-hover="99">output</span>, (hg v).<span class="const token" data-verso-hover="95">2</span><span class="nu">.</span><span class="const token" data-verso-hover="93">1</span>, h3, <span class="const token" data-verso-hover="166">Bool.false_eq_true</span>, <span class="const token" data-verso-hover="167">ite_false</span>,</span>
+<span id="L429">        <span class="const token" data-verso-hover="169">Option.some.injEq</span>] <span class="kw">at</span> h h'</span>
+<span id="L430">      <span class="kw">subst</span> h h'</span>
+<span id="L431">      <span class="kw">unfold</span> <span class="const token" data-verso-hover="97">clock</span>; <span class="kw">rw</span> [h2, <span class="const token" data-verso-hover="125">pos_fwd_cast</span> (C t v).<span class="const token" data-verso-hover="82">isLevel</span>]</span>
+<span id="L432">  <span class="const token" data-verso-hover="207">liveness</span> t ht v i := <span class="kw">by</span></span>
+<span id="L433">    <span class="kw">have</span> hg := hC.<span class="const token" data-verso-hover="139">allGood_le</span> hT ht</span>
+<span id="L434">    <span class="kw">obtain</span> ⟨o, B, h1, h2⟩ := <span class="const token" data-verso-hover="9">exists_offsets</span> hd hk hg v</span>
+<span id="L435">    <span class="kw">have</span> hM : ∀ w, o v - d ≤ <span class="const token" data-verso-hover="146">uclk</span> C o t t w := <span class="kw">by</span></span>
+<span id="L436">      <span class="kw">intro</span> w</span>
+<span id="L437">      <span class="kw">obtain</span> ⟨p, hp⟩ := <span class="const token" data-verso-hover="198">SimpleGraph.ediam_le_coe_iff</span>.<span class="const token" data-verso-hover="199">1</span> hd v w</span>
+<span id="L438">      <span class="kw">have</span> := <span class="const token" data-verso-hover="159">le_add_length_of_walk</span> h2 p</span>
+<span id="L439">      <span class="kw">rw</span> [<span class="const token" data-verso-hover="148">uclk_self</span>]; <span class="kw">omega</span></span>
+<span id="L440">    <span class="kw">have</span> key := hC.<span class="const token" data-verso-hover="190">uclk_rho_iter</span> hA (<span class="kw">by</span> <span class="kw">omega</span>) hg o B h1 h2 (d + i) <span class="const token" data-verso-hover="55">le_rfl</span> hM v</span>
+<span id="L441">    <span class="kw">show</span> i ≤ <span class="const token" data-verso-hover="142">nChg</span> C v t _</span>
+<span id="L442">    <span class="kw">unfold</span> <span class="const token" data-verso-hover="146">uclk</span> <span class="kw">at</span> key</span>
+<span id="L443">    <span class="kw">push_cast</span> <span class="kw">at</span> key</span>
+<span id="L444">    <span class="kw">omega</span></span>
+<span id="L445"></span>
+<span id="L446"><span class="kw">end</span> AURun</span>
+<span id="L447"></span>
+<span id="L448"><span class="kw">end</span> ThinUnison</span>
+<span id="L449"></span>
+</code></div>
+        <script>
+          window.versoHoversUrl = "PODC2021/ThinUnison/-hovers.json";</script>
+        <script src="static/lean/popper.js"></script>
+        <script src="static/lean/tippy.js"></script>
+        <script src="static/lean/marked.js"></script>
+        <script src="static/lean/highlighting.js"></script>
+        <script src="static/lean/lean.js"></script>
+        </article></main><footer class="site-footer"><div class="wrap">
+        Machine-checked formalizations of PODC papers in Lean 4. Generated with <a href="https://github.com/leanprover/verso">Verso</a> from the README files of <a href="https://github.com/vasnesterov/formal_podc">vasnesterov/formal_podc</a>.</div>
+      </footer></body>
+  </html>
+

@@ -1,0 +1,419 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="light dark">
+    <link rel="icon" href="data:,">
+    <title>RationalConsensus: Model.lean · Formal PODC</title><base href="../../../.././"><link rel="stylesheet" href="static/lean/verso-vars.css">
+    <link rel="stylesheet" href="static/lean/highlighting.css">
+    <link rel="stylesheet" href="static/lean/tippy-border.css">
+    <link rel="stylesheet" href="static/style.css">
+    <script defer="defer" src="static/site.js"></script>
+    </head>
+  <body>
+    <header class="site-header">
+      <div class="wrap">
+        <a class="brand" href=".">Formal PODC</a><nav class="top">
+          <a href=".">Search</a><a href="about/">About</a><a href="https://github.com/vasnesterov/formal_podc">GitHub</a></nav>
+        </div>
+      </header>
+    <main class="wrap"><article><nav class="breadcrumbs" aria-label="Breadcrumb">
+          <a href=".">Search</a><span class="sep">›</span><a href="PODC2016/">PODC 2016</a><span class="sep">›</span><a href="PODC2016/RationalConsensus/">RationalConsensus</a><span class="sep">›</span><a href="PODC2016/RationalConsensus/src/">Lean source</a><span class="sep">›</span><span aria-current="page">Model</span></nav>
+        <h1>
+          <code>Model.lean</code></h1>
+        <div class="paper-links">
+          <p>
+            Source of <a href="PODC2016/RationalConsensus/">Rational Consensus — PODC 2016</a> · <a href="https://github.com/vasnesterov/formal_podc/blob/main/Papers/PODC2016/RationalConsensus/Model.lean">GitHub</a> · hover over a name for its type and documentation</p>
+          </div>
+        <div class="lean-code lean-src">
+          <code class="hl lean block" data-lean-context="Model"><span id="L1"><span class="kw">import</span> Mathlib</span>
+<span id="L2"><span class="kw">import</span> Cslib.Computability.Distributed.SyncCrash.Model</span>
+<span id="L3"></span>
+<span id="L4"><span class="dc">/-!</span></span>
+<span id="L5"><span class="dc"># Rational consensus: the game (Section 2 of Halpern–Vilaça)</span></span>
+<span id="L6"></span>
+<span id="L7"><span class="dc">The consensus game of [Halpern, Vilaça, *Rational Consensus*, PODC 2016] on top of CSLib's</span></span>
+<span id="L8"><span class="dc">synchronous crash model (`Cslib.SyncCrash`).</span></span>
+<span id="L9"></span>
+<span id="L10"><span class="dc">* **Agents** `P` (a finite type, `n = |P|`), synchronous rounds, reliable channels, crash failures.</span></span>
+<span id="L11"><span class="dc">* **Strategies.** A strategy profile is a CSLib lock-step protocol</span></span>
+<span id="L12"><span class="dc">  (`Cslib.Byzantine.LockStep.Protocol`) whose input is the pair *(initial preference, random seed)*:</span></span>
+<span id="L13"><span class="dc">  agent `p` with preference `v` and seed `ω p : Ω` sends `σ.send p (v, ω p) h q` to `q` and has</span></span>
+<span id="L14"><span class="dc">  decided `σ.decide p (v, ω p) h` after history `h` (the list of inboxes received so far).</span></span>
+<span id="L15"><span class="dc">  Randomization is thus by private seeds; the seed vector `ω : P → Ω` is drawn from an arbitrary</span></span>
+<span id="L16"><span class="dc">  probability measure `μ`. Decisions are `Option Bool`: `some b` decides `b`, `none` decides `⊥`.</span></span>
+<span id="L17"><span class="dc">* **Contexts** (`Context`): initial preferences and a failure pattern (crash round and the set of</span></span>
+<span id="L18"><span class="dc">  agents still reached in the crashing round), exactly as `Cslib.SyncCrash.Run` without the inputs.</span></span>
+<span id="L19"><span class="dc">* **Outcome** (`outcome`): consensus on `b` iff every nonfaulty agent's (first) decision is `b`.</span></span>
+<span id="L20"><span class="dc">* **Utilities** (`Utility`): agents *care only about consensus*: `β₀ i &gt; β₁ i &gt; β₂ i` are `i`'s</span></span>
+<span id="L21"><span class="dc">  utilities for consensus on its own preference, consensus on the other value, and no consensus.</span></span>
+<span id="L22"><span class="dc">* **Solution concepts.** `SolvesFairConsensus μ σ f` (agreement, termination, integrity, validity</span></span>
+<span id="L23"><span class="dc">  almost surely, plus fairness) and `IsEpsNash μ u σ ε f` (`ε`–`f`-Nash equilibrium: in every</span></span>
+<span id="L24"><span class="dc">  context with at most `f` faulty agents no agent gains more than `ε` by a unilateral deviation).</span></span>
+<span id="L25"></span>
+<span id="L26"><span class="dc">The simulation lemmas at the end (`status_ignore`, `status_congr_silent`) are the two</span></span>
+<span id="L27"><span class="dc">indistinguishability arguments used in the proof of Theorem 1.</span></span>
+<span id="L28"><span class="dc">-/</span></span>
+<span id="L29"></span>
+<span id="L30"><span class="kw">namespace</span> Podc.RationalConsensus</span>
+<span id="L31"></span>
+<span id="L32"><span class="kw">open</span> Cslib Cslib.SyncCrash MeasureTheory</span>
+<span id="L33"><span class="kw">open</span> <span class="kw">scoped</span> ENNReal</span>
+<span id="L34"></span>
+<span id="L35"><span class="dc">/-- Outcomes of a run of the consensus game. -/</span></span>
+<span id="L36"><span class="kw">inductive</span> <span class="const token" data-verso-hover="119">Outcome</span></span>
+<span id="L37">  <span class="dc">/-- All nonfaulty agents decided the value `b`. -/</span></span>
+<span id="L38">  | <span class="const token" data-verso-hover="120">cons</span> (b : <span class="const token" data-verso-hover="89">Bool</span>)</span>
+<span id="L39">  <span class="dc">/-- No consensus. -/</span></span>
+<span id="L40">  | <span class="const token" data-verso-hover="121">noCons</span></span>
+<span id="L41">  <span class="kw">deriving</span> <span class="const token" data-verso-hover="122">DecidableEq</span>, <span class="const token" data-verso-hover="123">Fintype</span></span>
+<span id="L42"></span>
+<span id="L43"><span class="const token" data-verso-hover="124">instance</span> : <span class="const token" data-verso-hover="125">MeasurableSpace</span> <span class="const token" data-verso-hover="119">Outcome</span> := ⊤</span>
+<span id="L44"></span>
+<span id="L45"><span class="const token" data-verso-hover="126">instance</span> : <span class="const token" data-verso-hover="127">DiscreteMeasurableSpace</span> <span class="const token" data-verso-hover="119">Outcome</span> := ⟨<span class="kw">fun</span> _ =&gt; <span class="const token" data-verso-hover="128">trivial</span>⟩</span>
+<span id="L46"></span>
+<span id="L47"><span class="dc">/-- A strategy profile: a lock-step protocol with input *(preference, seed)* and decisions in</span></span>
+<span id="L48"><span class="dc">`Option Bool` (`none` = `⊥`). -/</span></span>
+<span id="L49"><span class="kw">abbrev</span> <span class="const token" data-verso-hover="129">Profile</span> (P M Ω : <span class="kw">Type</span>*) :=</span>
+<span id="L50">  <span class="const token" data-verso-hover="130">Cslib.Byzantine.LockStep.Protocol</span> P (<span class="const token" data-verso-hover="89">Bool</span> × Ω) M (<span class="const token" data-verso-hover="131">Option</span> <span class="const token" data-verso-hover="89">Bool</span>)</span>
+<span id="L51"></span>
+<span id="L52"><span class="dc">/-- A context: initial preferences and a failure pattern. `crash p = some m`: `p` crashes in round</span></span>
+<span id="L53"><span class="dc">`m ≥ 1`, sending its round-`m` messages only to `reach p`. -/</span></span>
+<span id="L54"><span class="kw">structure</span> <span class="const token" data-verso-hover="132">Context</span> (P : <span class="kw">Type</span>*) <span class="kw">where</span></span>
+<span id="L55">  <span class="dc">/-- Initial preferences. -/</span></span>
+<span id="L56">  <span class="const token" data-verso-hover="133">pref</span> : P → <span class="const token" data-verso-hover="89">Bool</span></span>
+<span id="L57">  <span class="dc">/-- Crash round (`none` = nonfaulty). -/</span></span>
+<span id="L58">  <span class="const token" data-verso-hover="134">crash</span> : P → <span class="const token" data-verso-hover="131">Option</span> <span class="const token" data-verso-hover="33">ℕ</span></span>
+<span id="L59">  <span class="dc">/-- Agents reached in the crashing round. -/</span></span>
+<span id="L60">  <span class="const token" data-verso-hover="135">reach</span> : P → <span class="const token" data-verso-hover="36">Set</span> P</span>
+<span id="L61"></span>
+<span id="L62"><span class="kw">namespace</span> Context</span>
+<span id="L63"></span>
+<span id="L64"><span class="kw">variable</span> {P Ω : <span class="kw">Type</span>*} (c : <span class="const token" data-verso-hover="132">Context</span> P)</span>
+<span id="L65"></span>
+<span id="L66"><span class="dc">/-- The run of the crash model determined by a context and a seed vector. -/</span></span>
+<span id="L67"><span class="kw">def</span> <span class="const token" data-verso-hover="136">run</span> (ω : P → Ω) : <span class="const token" data-verso-hover="137">SyncCrash.Run</span> P (<span class="const token" data-verso-hover="89">Bool</span> × Ω) :=</span>
+<span id="L68">  ⟨<span class="kw">fun</span> p =&gt; (c.<span class="const token" data-verso-hover="133">pref</span> p, ω p), c.<span class="const token" data-verso-hover="134">crash</span>, c.<span class="const token" data-verso-hover="135">reach</span>⟩</span>
+<span id="L69"></span>
+<span id="L70"><span class="dc">/-- `p` is faulty in the context. -/</span></span>
+<span id="L71"><span class="kw">def</span> <span class="const token" data-verso-hover="138">Faulty</span> (p : P) : <span class="kw">Prop</span> := c.<span class="const token" data-verso-hover="134">crash</span> p ≠ <span class="const token" data-verso-hover="9">none</span></span>
+<span id="L72"></span>
+<span id="L73"><span class="kw">open</span> Classical <span class="kw">in</span></span>
+<span id="L74"><span class="dc">/-- The set of faulty agents. -/</span></span>
+<span id="L75"><span class="kw">noncomputable</span> <span class="kw">def</span> <span class="const token" data-verso-hover="139">faulty</span> [<span class="const token" data-verso-hover="123">Fintype</span> P] : <span class="const token" data-verso-hover="45">Finset</span> P := <span class="const token" data-verso-hover="38">Finset.univ</span>.<span class="const token" data-verso-hover="39">filter</span> c.<span class="const token" data-verso-hover="138">Faulty</span></span>
+<span id="L76"></span>
+<span id="L77"><span class="dc">/-- At most `f` agents crash (and crash rounds are `≥ 1`). -/</span></span>
+<span id="L78"><span class="kw">def</span> <span class="const token" data-verso-hover="140">Admissible</span> [<span class="const token" data-verso-hover="123">Fintype</span> P] (f : <span class="const token" data-verso-hover="33">ℕ</span>) : <span class="kw">Prop</span> :=</span>
+<span id="L79">  c.<span class="const token" data-verso-hover="139">faulty</span>.<span class="const token" data-verso-hover="40">card</span> ≤ f ∧ ∀ p m, c.<span class="const token" data-verso-hover="134">crash</span> p = <span class="const token" data-verso-hover="93">some</span> m → <span class="nu">1</span> ≤ m</span>
+<span id="L80"></span>
+<span id="L81">@[<span class="kw">simp</span>] <span class="kw">lemma</span> <span class="const token" data-verso-hover="141">run_crash</span> (ω : P → Ω) : (c.<span class="const token" data-verso-hover="136">run</span> ω).<span class="const token" data-verso-hover="142">crash</span> = c.<span class="const token" data-verso-hover="134">crash</span> := <span class="const token" data-verso-hover="27">rfl</span></span>
+<span id="L82"></span>
+<span id="L83">@[<span class="kw">simp</span>] <span class="kw">lemma</span> <span class="const token" data-verso-hover="143">run_reach</span> (ω : P → Ω) : (c.<span class="const token" data-verso-hover="136">run</span> ω).<span class="const token" data-verso-hover="144">reach</span> = c.<span class="const token" data-verso-hover="135">reach</span> := <span class="const token" data-verso-hover="27">rfl</span></span>
+<span id="L84"></span>
+<span id="L85">@[<span class="kw">simp</span>] <span class="kw">lemma</span> <span class="const token" data-verso-hover="145">run_input</span> (ω : P → Ω) (p : P) : (c.<span class="const token" data-verso-hover="136">run</span> ω).<span class="const token" data-verso-hover="146">input</span> p = (c.<span class="const token" data-verso-hover="133">pref</span> p, ω p) := <span class="const token" data-verso-hover="27">rfl</span></span>
+<span id="L86"></span>
+<span id="L87"><span class="kw">lemma</span> <span class="const token" data-verso-hover="147">faulty_run_iff</span> (ω : P → Ω) (p : P) : (c.<span class="const token" data-verso-hover="136">run</span> ω).<span class="const token" data-verso-hover="148">Faulty</span> p ↔ c.<span class="const token" data-verso-hover="138">Faulty</span> p := <span class="const token" data-verso-hover="149">Iff.rfl</span></span>
+<span id="L88"></span>
+<span id="L89"><span class="kw">end</span> Context</span>
+<span id="L90"></span>
+<span id="L91"><span class="kw">variable</span> {P M Ω : <span class="kw">Type</span>*}</span>
+<span id="L92"></span>
+<span id="L93"><span class="kw">section</span> Decisions</span>
+<span id="L94"></span>
+<span id="L95"><span class="kw">variable</span> (σ : <span class="const token" data-verso-hover="129">Profile</span> P M Ω) (c : <span class="const token" data-verso-hover="132">Context</span> P) (ω : P → Ω)</span>
+<span id="L96"></span>
+<span id="L97"><span class="dc">/-- The decision status of `p` at time `t` (`none`: undecided, or crashed by time `t`). -/</span></span>
+<span id="L98"><span class="kw">noncomputable</span> <span class="kw">def</span> <span class="const token" data-verso-hover="150">status</span> (p : P) (t : <span class="const token" data-verso-hover="33">ℕ</span>) : <span class="const token" data-verso-hover="131">Option</span> (<span class="const token" data-verso-hover="131">Option</span> <span class="const token" data-verso-hover="89">Bool</span>) :=</span>
+<span id="L99">  (<span class="const token" data-verso-hover="151">SyncCrash.state</span> σ (c.<span class="const token" data-verso-hover="136">run</span> ω) p t).<span class="const token" data-verso-hover="152">bind</span> <span class="kw">fun</span> s =&gt; σ.<span class="const token" data-verso-hover="153">decide</span> p s.<span class="const token" data-verso-hover="49">1</span> s.<span class="const token" data-verso-hover="58">2</span></span>
+<span id="L100"></span>
+<span id="L101"><span class="dc">/-- The (first, hence only: *Integrity*) decision of `p` is `o`. -/</span></span>
+<span id="L102"><span class="kw">def</span> <span class="const token" data-verso-hover="154">Decides</span> (p : P) (o : <span class="const token" data-verso-hover="131">Option</span> <span class="const token" data-verso-hover="89">Bool</span>) : <span class="kw">Prop</span> :=</span>
+<span id="L103">  <span class="const token" data-verso-hover="155">Cslib.Byzantine.LockStep.FirstSome</span> (<span class="const token" data-verso-hover="150">status</span> σ c ω p) o</span>
+<span id="L104"></span>
+<span id="L105"><span class="dc">/-- All nonfaulty agents decide `b`. -/</span></span>
+<span id="L106"><span class="kw">def</span> <span class="const token" data-verso-hover="156">ConsOn</span> (b : <span class="const token" data-verso-hover="89">Bool</span>) : <span class="kw">Prop</span> := ∀ p, ¬ c.<span class="const token" data-verso-hover="138">Faulty</span> p → <span class="const token" data-verso-hover="154">Decides</span> σ c ω p (<span class="const token" data-verso-hover="93">some</span> b)</span>
+<span id="L107"></span>
+<span id="L108"><span class="kw">open</span> Classical <span class="kw">in</span></span>
+<span id="L109"><span class="dc">/-- The outcome of the run. (If there is no nonfaulty agent, there is no consensus.) -/</span></span>
+<span id="L110"><span class="kw">noncomputable</span> <span class="kw">def</span> <span class="const token" data-verso-hover="157">outcome</span> : <span class="const token" data-verso-hover="119">Outcome</span> :=</span>
+<span id="L111">  <span class="kw">if</span> <span class="const token" data-verso-hover="156">ConsOn</span> σ c ω <span class="const token" data-verso-hover="10">true</span> ∧ ¬ <span class="const token" data-verso-hover="156">ConsOn</span> σ c ω <span class="const token" data-verso-hover="25">false</span> <span class="kw">then</span> <span class="const token" data-verso-hover="120">.</span>cons <span class="const token" data-verso-hover="10">true</span></span>
+<span id="L112">  <span class="kw">else</span> <span class="kw">if</span> <span class="const token" data-verso-hover="156">ConsOn</span> σ c ω <span class="const token" data-verso-hover="25">false</span> ∧ ¬ <span class="const token" data-verso-hover="156">ConsOn</span> σ c ω <span class="const token" data-verso-hover="10">true</span> <span class="kw">then</span> <span class="const token" data-verso-hover="120">.</span>cons <span class="const token" data-verso-hover="25">false</span></span>
+<span id="L113">  <span class="kw">else</span> <span class="const token" data-verso-hover="121">.</span>noCons</span>
+<span id="L114"></span>
+<span id="L115"><span class="dc">/-- Agreement, termination and validity in one run (integrity holds by construction: `Decides`</span></span>
+<span id="L116"><span class="dc">is the first decision). -/</span></span>
+<span id="L117"><span class="kw">structure</span> <span class="const token" data-verso-hover="158">IsConsensusRun</span> : <span class="kw">Prop</span> <span class="kw">where</span></span>
+<span id="L118">  <span class="dc">/-- Agreement: no two nonfaulty agents decide differently. -/</span></span>
+<span id="L119">  <span class="const token" data-verso-hover="159">agreement</span> : ∀ p q, ¬ c.<span class="const token" data-verso-hover="138">Faulty</span> p → ¬ c.<span class="const token" data-verso-hover="138">Faulty</span> q → ∀ o o',</span>
+<span id="L120">    <span class="const token" data-verso-hover="154">Decides</span> σ c ω p o → <span class="const token" data-verso-hover="154">Decides</span> σ c ω q o' → o = o'</span>
+<span id="L121">  <span class="dc">/-- Termination: every nonfaulty agent decides. -/</span></span>
+<span id="L122">  <span class="const token" data-verso-hover="160">termination</span> : ∀ p, ¬ c.<span class="const token" data-verso-hover="138">Faulty</span> p → ∃ o, <span class="const token" data-verso-hover="154">Decides</span> σ c ω p o</span>
+<span id="L123">  <span class="dc">/-- Validity: a decided value (`⊥` is not a value) is the initial preference of some agent. -/</span></span>
+<span id="L124">  <span class="const token" data-verso-hover="161">validity</span> : ∀ p o, <span class="const token" data-verso-hover="154">Decides</span> σ c ω p o → ∃ b, o = <span class="const token" data-verso-hover="93">some</span> b ∧ ∃ q, c.<span class="const token" data-verso-hover="133">pref</span> q = b</span>
+<span id="L125"></span>
+<span id="L126"><span class="kw">end</span> Decisions</span>
+<span id="L127"></span>
+<span id="L128"><span class="dc">/-- Agents *care only about consensus*: `β₀ i &gt; β₁ i &gt; β₂ i`. -/</span></span>
+<span id="L129"><span class="kw">structure</span> <span class="const token" data-verso-hover="28">Utility</span> (P : <span class="kw">Type</span>*) <span class="kw">where</span></span>
+<span id="L130">  <span class="dc">/-- Utility of `i` for a consensus on its own initial preference. -/</span></span>
+<span id="L131">  <span class="const token" data-verso-hover="162">β₀</span> : P → <span class="const token" data-verso-hover="163">ℝ</span></span>
+<span id="L132">  <span class="dc">/-- Utility of `i` for a consensus on the other value. -/</span></span>
+<span id="L133">  <span class="const token" data-verso-hover="164">β₁</span> : P → <span class="const token" data-verso-hover="163">ℝ</span></span>
+<span id="L134">  <span class="dc">/-- Utility of `i` if there is no consensus. -/</span></span>
+<span id="L135">  <span class="const token" data-verso-hover="165">β₂</span> : P → <span class="const token" data-verso-hover="163">ℝ</span></span>
+<span id="L136">  <span class="const token" data-verso-hover="166">lt₀₁</span> : ∀ i, <span class="const token" data-verso-hover="164">β₁</span> i &lt; <span class="const token" data-verso-hover="162">β₀</span> i</span>
+<span id="L137">  <span class="const token" data-verso-hover="167">lt₁₂</span> : ∀ i, <span class="const token" data-verso-hover="165">β₂</span> i &lt; <span class="const token" data-verso-hover="164">β₁</span> i</span>
+<span id="L138"></span>
+<span id="L139"><span class="dc">/-- The utility of agent `i` with initial preference `v` for an outcome. -/</span></span>
+<span id="L140"><span class="kw">def</span> <span class="const token" data-verso-hover="168">Utility.val</span> (u : <span class="const token" data-verso-hover="28">Utility</span> P) (i : P) (v : <span class="const token" data-verso-hover="89">Bool</span>) : <span class="const token" data-verso-hover="119">Outcome</span> → <span class="const token" data-verso-hover="163">ℝ</span></span>
+<span id="L141">  | <span class="const token" data-verso-hover="120">.</span>cons b =&gt; <span class="kw">if</span> b = v <span class="kw">then</span> u.<span class="const token" data-verso-hover="162">β₀</span> i <span class="kw">else</span> u.<span class="const token" data-verso-hover="164">β₁</span> i</span>
+<span id="L142">  | <span class="const token" data-verso-hover="121">.</span>noCons =&gt; u.<span class="const token" data-verso-hover="165">β₂</span> i</span>
+<span id="L143"></span>
+<span id="L144"><span class="dc">/-- `i`'s expected utility for the profile `σ` in the context `c` (the expectation is over the</span></span>
+<span id="L145"><span class="dc">seeds). -/</span></span>
+<span id="L146"><span class="kw">noncomputable</span> <span class="kw">def</span> <span class="const token" data-verso-hover="169">expUtil</span> [<span class="const token" data-verso-hover="125">MeasurableSpace</span> Ω] (μ : <span class="const token" data-verso-hover="170">Measure</span> (P → Ω)) (u : <span class="const token" data-verso-hover="28">Utility</span> P) (σ : <span class="const token" data-verso-hover="129">Profile</span> P M Ω)</span>
+<span id="L147">    (c : <span class="const token" data-verso-hover="132">Context</span> P) (i : P) : <span class="const token" data-verso-hover="163">ℝ</span> :=</span>
+<span id="L148">  ∫ ω, u.<span class="const token" data-verso-hover="168">val</span> i (c.<span class="const token" data-verso-hover="133">pref</span> i) (<span class="const token" data-verso-hover="157">outcome</span> σ c ω) ∂μ</span>
+<span id="L149"></span>
+<span id="L150"><span class="dc">/-- Agent `i` deviates to (the `i`-component of) `τ`. -/</span></span>
+<span id="L151"><span class="kw">def</span> <span class="const token" data-verso-hover="171">deviate</span> [<span class="const token" data-verso-hover="122">DecidableEq</span> P] (σ τ : <span class="const token" data-verso-hover="129">Profile</span> P M Ω) (i : P) : <span class="const token" data-verso-hover="129">Profile</span> P M Ω <span class="kw">where</span></span>
+<span id="L152">  <span class="const token" data-verso-hover="172">send</span> p := <span class="kw">if</span> p = i <span class="kw">then</span> τ.<span class="const token" data-verso-hover="172">send</span> p <span class="kw">else</span> σ.<span class="const token" data-verso-hover="172">send</span> p</span>
+<span id="L153">  <span class="const token" data-verso-hover="153">decide</span> p := <span class="kw">if</span> p = i <span class="kw">then</span> τ.<span class="const token" data-verso-hover="153">decide</span> p <span class="kw">else</span> σ.<span class="const token" data-verso-hover="153">decide</span> p</span>
+<span id="L154"></span>
+<span id="L155"><span class="kw">section</span> Defs</span>
+<span id="L156"></span>
+<span id="L157"><span class="kw">variable</span> [<span class="const token" data-verso-hover="123">Fintype</span> P]</span>
+<span id="L158"></span>
+<span id="L159"><span class="kw">open</span> Classical <span class="kw">in</span></span>
+<span id="L160"><span class="dc">/-- **Fair consensus** (Section 2): in every context with at most `f` failures, agreement,</span></span>
+<span id="L161"><span class="dc">termination, integrity and validity hold almost surely, and if `k` nonfaulty agents prefer `b`, the</span></span>
+<span id="L162"><span class="dc">probability of a consensus on `b` is at least `k / n`. -/</span></span>
+<span id="L163"><span class="kw">structure</span> <span class="const token" data-verso-hover="15">SolvesFairConsensus</span> [<span class="const token" data-verso-hover="125">MeasurableSpace</span> Ω] (μ : <span class="const token" data-verso-hover="170">Measure</span> (P → Ω)) (σ : <span class="const token" data-verso-hover="129">Profile</span> P M Ω) (f : <span class="const token" data-verso-hover="33">ℕ</span>) : <span class="kw">Prop</span> <span class="kw">where</span></span>
+<span id="L164">  <span class="const token" data-verso-hover="173">consensus</span> : ∀ c : <span class="const token" data-verso-hover="132">Context</span> P, c.<span class="const token" data-verso-hover="140">Admissible</span> f → ∀ᵐ ω ∂μ, <span class="const token" data-verso-hover="158">IsConsensusRun</span> σ c ω</span>
+<span id="L165">  <span class="const token" data-verso-hover="174">fair</span> : ∀ c : <span class="const token" data-verso-hover="132">Context</span> P, c.<span class="const token" data-verso-hover="140">Admissible</span> f → ∀ b : <span class="const token" data-verso-hover="89">Bool</span>,</span>
+<span id="L166">    ((<span class="const token" data-verso-hover="38">Finset.univ</span>.<span class="const token" data-verso-hover="39">filter</span> <span class="kw">fun</span> p =&gt; ¬ c.<span class="const token" data-verso-hover="138">Faulty</span> p ∧ c.<span class="const token" data-verso-hover="133">pref</span> p = b).<span class="const token" data-verso-hover="40">card</span> : <span class="const token" data-verso-hover="113">ℝ</span>≥0∞) / <span class="const token" data-verso-hover="41">Fintype.card</span> P ≤</span>
+<span id="L167">      μ {ω | <span class="const token" data-verso-hover="157">outcome</span> σ c ω = <span class="const token" data-verso-hover="120">.</span>cons b}</span>
+<span id="L168"></span>
+<span id="L169"><span class="dc">/-- **`ε`–`f`-Nash equilibrium** (Section 2): for every context with at most `f` faulty agents and</span></span>
+<span id="L170"><span class="dc">every agent `i`, no strategy of `i` improves `i`'s expected utility by more than `ε`. We require</span></span>
+<span id="L171"><span class="dc">the outcome to be measurable, so that expected utilities are meaningful; only deviations with a</span></span>
+<span id="L172"><span class="dc">measurable outcome are considered (this only makes "not an equilibrium" harder to prove). -/</span></span>
+<span id="L173"><span class="kw">def</span> <span class="const token" data-verso-hover="16">IsEpsNash</span> [<span class="const token" data-verso-hover="122">DecidableEq</span> P] [<span class="const token" data-verso-hover="125">MeasurableSpace</span> Ω] (μ : <span class="const token" data-verso-hover="170">Measure</span> (P → Ω)) (u : <span class="const token" data-verso-hover="28">Utility</span> P) (σ : <span class="const token" data-verso-hover="129">Profile</span> P M Ω) (ε : <span class="const token" data-verso-hover="163">ℝ</span>)</span>
+<span id="L174">    (f : <span class="const token" data-verso-hover="33">ℕ</span>) : <span class="kw">Prop</span> :=</span>
+<span id="L175">  ∀ c : <span class="const token" data-verso-hover="132">Context</span> P, c.<span class="const token" data-verso-hover="140">Admissible</span> f → <span class="const token" data-verso-hover="175">AEMeasurable</span> (<span class="const token" data-verso-hover="157">outcome</span> σ c) μ ∧</span>
+<span id="L176">    ∀ (i : P) (τ : <span class="const token" data-verso-hover="129">Profile</span> P M Ω), <span class="const token" data-verso-hover="175">AEMeasurable</span> (<span class="const token" data-verso-hover="157">outcome</span> (<span class="const token" data-verso-hover="171">deviate</span> σ τ i) c) μ →</span>
+<span id="L177">      <span class="const token" data-verso-hover="169">expUtil</span> μ u (<span class="const token" data-verso-hover="171">deviate</span> σ τ i) c i ≤ <span class="const token" data-verso-hover="169">expUtil</span> μ u σ c i + ε</span>
+<span id="L178"></span>
+<span id="L179"><span class="dc">/-- **`f`-Nash equilibrium** = `0`–`f`-Nash equilibrium. -/</span></span>
+<span id="L180"><span class="kw">def</span> <span class="const token" data-verso-hover="30">IsNash</span> [<span class="const token" data-verso-hover="122">DecidableEq</span> P] [<span class="const token" data-verso-hover="125">MeasurableSpace</span> Ω] (μ : <span class="const token" data-verso-hover="170">Measure</span> (P → Ω)) (u : <span class="const token" data-verso-hover="28">Utility</span> P) (σ : <span class="const token" data-verso-hover="129">Profile</span> P M Ω)</span>
+<span id="L181">    (f : <span class="const token" data-verso-hover="33">ℕ</span>) : <span class="kw">Prop</span> :=</span>
+<span id="L182">  <span class="const token" data-verso-hover="16">IsEpsNash</span> μ u σ <span class="nu">0</span> f</span>
+<span id="L183"></span>
+<span id="L184"><span class="kw">end</span> Defs</span>
+<span id="L185"></span>
+<span id="L186"><span class="dc">/-! ### Basic lemmas on outcomes -/</span></span>
+<span id="L187"></span>
+<span id="L188"><span class="kw">section</span> Lemmas</span>
+<span id="L189"></span>
+<span id="L190"><span class="kw">variable</span> {σ : <span class="const token" data-verso-hover="129">Profile</span> P M Ω} {c : <span class="const token" data-verso-hover="132">Context</span> P} {ω : P → Ω}</span>
+<span id="L191"></span>
+<span id="L192"><span class="kw">lemma</span> <span class="const token" data-verso-hover="176">Decides.unique</span> {p : P} {o o' : <span class="const token" data-verso-hover="131">Option</span> <span class="const token" data-verso-hover="89">Bool</span>} (h : <span class="const token" data-verso-hover="154">Decides</span> σ c ω p o)</span>
+<span id="L193">    (h' : <span class="const token" data-verso-hover="154">Decides</span> σ c ω p o') : o = o' :=</span>
+<span id="L194">  <span class="const token" data-verso-hover="177">Cslib.Byzantine.LockStep.FirstSome.unique</span> h h'</span>
+<span id="L195"></span>
+<span id="L196"><span class="kw">lemma</span> <span class="const token" data-verso-hover="178">not_consOn_of_consOn</span> {b : <span class="const token" data-verso-hover="89">Bool</span>} {p : P} (hp : ¬ c.<span class="const token" data-verso-hover="138">Faulty</span> p) (h : <span class="const token" data-verso-hover="156">ConsOn</span> σ c ω b) :</span>
+<span id="L197">    ¬ <span class="const token" data-verso-hover="156">ConsOn</span> σ c ω (!b) := <span class="kw">by</span></span>
+<span id="L198">  <span class="kw">intro</span> h'</span>
+<span id="L199">  <span class="kw">have</span> := (h p hp).<span class="const token" data-verso-hover="176">unique</span> (h' p hp)</span>
+<span id="L200">  <span class="kw">cases</span> b &lt;;&gt; <span class="kw">simp</span> <span class="kw">at</span> this</span>
+<span id="L201"></span>
+<span id="L202"><span class="dc">/-- If some agent is nonfaulty, the outcome is `cons b` iff all nonfaulty agents decide `b`. -/</span></span>
+<span id="L203"><span class="kw">lemma</span> <span class="const token" data-verso-hover="179">outcome_eq_cons_iff</span> {p : P} (hp : ¬ c.<span class="const token" data-verso-hover="138">Faulty</span> p) (b : <span class="const token" data-verso-hover="89">Bool</span>) :</span>
+<span id="L204">    <span class="const token" data-verso-hover="157">outcome</span> σ c ω = <span class="const token" data-verso-hover="120">.</span>cons b ↔ <span class="const token" data-verso-hover="156">ConsOn</span> σ c ω b := <span class="kw">by</span></span>
+<span id="L205">  <span class="kw">have</span> h1 := <span class="const token" data-verso-hover="178">not_consOn_of_consOn</span> (σ := σ) (ω := ω) (b := <span class="const token" data-verso-hover="10">true</span>) hp</span>
+<span id="L206">  <span class="kw">have</span> h2 := <span class="const token" data-verso-hover="178">not_consOn_of_consOn</span> (σ := σ) (ω := ω) (b := <span class="const token" data-verso-hover="25">false</span>) hp</span>
+<span id="L207">  <span class="kw">simp</span> only [<span class="const token" data-verso-hover="180">Bool.not_true</span>, <span class="const token" data-verso-hover="181">Bool.not_false</span>] <span class="kw">at</span> h1 h2</span>
+<span id="L208">  <span class="kw">unfold</span> <span class="const token" data-verso-hover="157">outcome</span></span>
+<span id="L209">  <span class="kw">cases</span> b &lt;;&gt; <span class="kw">by_cases</span> ht : <span class="const token" data-verso-hover="156">ConsOn</span> σ c ω <span class="const token" data-verso-hover="10">true</span> &lt;;&gt; <span class="kw">by_cases</span> hf : <span class="const token" data-verso-hover="156">ConsOn</span> σ c ω <span class="const token" data-verso-hover="25">false</span> &lt;;&gt;</span>
+<span id="L210">    <span class="kw">simp_all</span></span>
+<span id="L211"></span>
+<span id="L212"><span class="dc">/-- In a consensus run with a nonfaulty agent, the outcome is a consensus on some value. -/</span></span>
+<span id="L213"><span class="kw">lemma</span> <span class="const token" data-verso-hover="182">IsConsensusRun.exists_outcome</span> {p : P} (hp : ¬ c.<span class="const token" data-verso-hover="138">Faulty</span> p) (h : <span class="const token" data-verso-hover="158">IsConsensusRun</span> σ c ω) :</span>
+<span id="L214">    ∃ b, <span class="const token" data-verso-hover="157">outcome</span> σ c ω = <span class="const token" data-verso-hover="120">.</span>cons b := <span class="kw">by</span></span>
+<span id="L215">  <span class="kw">obtain</span> ⟨o, ho⟩ := h.<span class="const token" data-verso-hover="160">termination</span> p hp</span>
+<span id="L216">  <span class="kw">obtain</span> ⟨b, <span class="kw">rfl</span>, -⟩ := h.<span class="const token" data-verso-hover="161">validity</span> p o ho</span>
+<span id="L217">  <span class="kw">refine</span> ⟨b, (<span class="const token" data-verso-hover="179">outcome_eq_cons_iff</span> hp b).<span class="const token" data-verso-hover="103">2</span> <span class="kw">fun</span> q hq =&gt; ?_⟩</span>
+<span id="L218">  <span class="kw">obtain</span> ⟨o', ho'⟩ := h.<span class="const token" data-verso-hover="160">termination</span> q hq</span>
+<span id="L219">  <span class="kw">rwa</span> [← h.<span class="const token" data-verso-hover="159">agreement</span> p q hp hq _ _ ho ho'] <span class="kw">at</span> ho'</span>
+<span id="L220"></span>
+<span id="L221"><span class="kw">lemma</span> <span class="const token" data-verso-hover="183">outcome_eq_of_status</span> {σ' : <span class="const token" data-verso-hover="129">Profile</span> P M Ω} {c' : <span class="const token" data-verso-hover="132">Context</span> P} {ω' : P → Ω}</span>
+<span id="L222">    (hF : ∀ p, c.<span class="const token" data-verso-hover="138">Faulty</span> p ↔ c'.<span class="const token" data-verso-hover="138">Faulty</span> p)</span>
+<span id="L223">    (hs : ∀ p, ¬ c.<span class="const token" data-verso-hover="138">Faulty</span> p → <span class="const token" data-verso-hover="150">status</span> σ c ω p = <span class="const token" data-verso-hover="150">status</span> σ' c' ω' p) :</span>
+<span id="L224">    <span class="const token" data-verso-hover="157">outcome</span> σ c ω = <span class="const token" data-verso-hover="157">outcome</span> σ' c' ω' := <span class="kw">by</span></span>
+<span id="L225">  <span class="kw">have</span> hc : ∀ b, <span class="const token" data-verso-hover="156">ConsOn</span> σ c ω b ↔ <span class="const token" data-verso-hover="156">ConsOn</span> σ' c' ω' b := <span class="kw">by</span></span>
+<span id="L226">    <span class="kw">intro</span> b</span>
+<span id="L227">    <span class="kw">simp</span> only [<span class="const token" data-verso-hover="156">ConsOn</span>, <span class="const token" data-verso-hover="154">Decides</span>]</span>
+<span id="L228">    <span class="kw">refine</span> <span class="const token" data-verso-hover="184">forall_congr'</span> <span class="kw">fun</span> p =&gt; ?_</span>
+<span id="L229">    <span class="kw">by_cases</span> hp : c.<span class="const token" data-verso-hover="138">Faulty</span> p</span>
+<span id="L230">    · <span class="kw">exact</span> ⟨<span class="kw">fun</span> _ h =&gt; <span class="const token" data-verso-hover="185">absurd</span> ((hF p).<span class="const token" data-verso-hover="100">1</span> hp) h, <span class="kw">fun</span> _ h =&gt; <span class="const token" data-verso-hover="185">absurd</span> hp h⟩</span>
+<span id="L231">    · <span class="kw">rw</span> [hs p hp]; <span class="kw">exact</span> ⟨<span class="kw">fun</span> h _ =&gt; h hp, <span class="kw">fun</span> h _ =&gt; h ((hF p).<span class="const token" data-verso-hover="186">not</span>.<span class="const token" data-verso-hover="100">1</span> hp)⟩</span>
+<span id="L232">  <span class="kw">have</span> hc' : ∀ b, <span class="const token" data-verso-hover="156">ConsOn</span> σ c ω b = <span class="const token" data-verso-hover="156">ConsOn</span> σ' c' ω' b := <span class="kw">fun</span> b =&gt; <span class="const token" data-verso-hover="14">propext</span> (hc b)</span>
+<span id="L233">  <span class="kw">unfold</span> <span class="const token" data-verso-hover="157">outcome</span></span>
+<span id="L234">  <span class="kw">rw</span> [hc' <span class="const token" data-verso-hover="10">true</span>, hc' <span class="const token" data-verso-hover="25">false</span>]</span>
+<span id="L235"></span>
+<span id="L236"><span class="kw">end</span> Lemmas</span>
+<span id="L237"></span>
+<span id="L238"><span class="dc">/-! ### Simulation lemmas -/</span></span>
+<span id="L239"></span>
+<span id="L240"><span class="kw">section</span> Simulation</span>
+<span id="L241"></span>
+<span id="L242"><span class="kw">variable</span> [<span class="const token" data-verso-hover="122">DecidableEq</span> P]</span>
+<span id="L243"></span>
+<span id="L244"><span class="kw">open</span> Cslib.Byzantine.LockStep</span>
+<span id="L245"></span>
+<span id="L246"><span class="dc">/-- Erase the message from `i` in the inbox of round `t₀ + 1` of a history. -/</span></span>
+<span id="L247"><span class="kw">def</span> <span class="const token" data-verso-hover="187">eraseMsg</span> (i : P) (t₀ : <span class="const token" data-verso-hover="33">ℕ</span>) (h : <span class="const token" data-verso-hover="188">History</span> P M) : <span class="const token" data-verso-hover="188">History</span> P M :=</span>
+<span id="L248">  h.<span class="const token" data-verso-hover="189">mapIdx</span> <span class="kw">fun</span> k inbox =&gt; <span class="kw">if</span> k = t₀ <span class="kw">then</span> <span class="const token" data-verso-hover="57">Function.update</span> inbox i <span class="const token" data-verso-hover="9">none</span> <span class="kw">else</span> inbox</span>
+<span id="L249"></span>
+<span id="L250"><span class="kw">lemma</span> <span class="const token" data-verso-hover="190">eraseMsg_append_singleton</span> (i : P) (t₀ : <span class="const token" data-verso-hover="33">ℕ</span>) (h : <span class="const token" data-verso-hover="188">History</span> P M) (x : <span class="const token" data-verso-hover="191">Inbox</span> P M) :</span>
+<span id="L251">    <span class="const token" data-verso-hover="187">eraseMsg</span> i t₀ (h ++ [x]) =</span>
+<span id="L252">      <span class="const token" data-verso-hover="187">eraseMsg</span> i t₀ h ++ [<span class="kw">if</span> h.<span class="const token" data-verso-hover="94">length</span> = t₀ <span class="kw">then</span> <span class="const token" data-verso-hover="57">Function.update</span> x i <span class="const token" data-verso-hover="9">none</span> <span class="kw">else</span> x] := <span class="kw">by</span></span>
+<span id="L253">  <span class="kw">simp</span> [<span class="const token" data-verso-hover="187">eraseMsg</span>, <span class="const token" data-verso-hover="192">List.mapIdx_append</span>]</span>
+<span id="L254"></span>
+<span id="L255"><span class="dc">/-- The profile in which everybody runs `σ` but ignores the message from `i` received in round</span></span>
+<span id="L256"><span class="dc">`t₀ + 1` (only its component at the deviating agent matters). -/</span></span>
+<span id="L257"><span class="kw">def</span> <span class="const token" data-verso-hover="193">ignore</span> (σ : <span class="const token" data-verso-hover="129">Profile</span> P M Ω) (i : P) (t₀ : <span class="const token" data-verso-hover="33">ℕ</span>) : <span class="const token" data-verso-hover="129">Profile</span> P M Ω <span class="kw">where</span></span>
+<span id="L258">  <span class="const token" data-verso-hover="172">send</span> p x h := σ.<span class="const token" data-verso-hover="172">send</span> p x (<span class="const token" data-verso-hover="187">eraseMsg</span> i t₀ h)</span>
+<span id="L259">  <span class="const token" data-verso-hover="153">decide</span> p x h := σ.<span class="const token" data-verso-hover="153">decide</span> p x (<span class="const token" data-verso-hover="187">eraseMsg</span> i t₀ h)</span>
+<span id="L260"></span>
+<span id="L261">@[<span class="kw">simp</span>] <span class="kw">lemma</span> <span class="const token" data-verso-hover="194">deviate_send_self</span> (σ τ : <span class="const token" data-verso-hover="129">Profile</span> P M Ω) (i : P) :</span>
+<span id="L262">    (<span class="const token" data-verso-hover="171">deviate</span> σ τ i).<span class="const token" data-verso-hover="172">send</span> i = τ.<span class="const token" data-verso-hover="172">send</span> i := <span class="kw">by</span> <span class="kw">simp</span> [<span class="const token" data-verso-hover="171">deviate</span>]</span>
+<span id="L263"></span>
+<span id="L264">@[<span class="kw">simp</span>] <span class="kw">lemma</span> <span class="const token" data-verso-hover="195">deviate_send_ne</span> (σ τ : <span class="const token" data-verso-hover="129">Profile</span> P M Ω) {i p : P} (h : p ≠ i) :</span>
+<span id="L265">    (<span class="const token" data-verso-hover="171">deviate</span> σ τ i).<span class="const token" data-verso-hover="172">send</span> p = σ.<span class="const token" data-verso-hover="172">send</span> p := <span class="kw">by</span> <span class="kw">simp</span> [<span class="const token" data-verso-hover="171">deviate</span>, h]</span>
+<span id="L266"></span>
+<span id="L267">@[<span class="kw">simp</span>] <span class="kw">lemma</span> <span class="const token" data-verso-hover="196">deviate_decide_self</span> (σ τ : <span class="const token" data-verso-hover="129">Profile</span> P M Ω) (i : P) :</span>
+<span id="L268">    (<span class="const token" data-verso-hover="171">deviate</span> σ τ i).<span class="const token" data-verso-hover="153">decide</span> i = τ.<span class="const token" data-verso-hover="153">decide</span> i := <span class="kw">by</span> <span class="kw">simp</span> [<span class="const token" data-verso-hover="171">deviate</span>]</span>
+<span id="L269"></span>
+<span id="L270">@[<span class="kw">simp</span>] <span class="kw">lemma</span> <span class="const token" data-verso-hover="197">deviate_decide_ne</span> (σ τ : <span class="const token" data-verso-hover="129">Profile</span> P M Ω) {i p : P} (h : p ≠ i) :</span>
+<span id="L271">    (<span class="const token" data-verso-hover="171">deviate</span> σ τ i).<span class="const token" data-verso-hover="153">decide</span> p = σ.<span class="const token" data-verso-hover="153">decide</span> p := <span class="kw">by</span> <span class="kw">simp</span> [<span class="const token" data-verso-hover="171">deviate</span>, h]</span>
+<span id="L272"></span>
+<span id="L273"><span class="dc">/-- **Pretending not to have received a message.** Let the run `r'` deliver exactly the messages</span></span>
+<span id="L274"><span class="dc">of `r`, plus the message from `i` to `j ≠ i` in round `t₀ + 1` (which `r` does not deliver). If</span></span>
+<span id="L275"><span class="dc">`j` ignores that message, every agent has the same history in `r'` as in `r` (`j` up to the</span></span>
+<span id="L276"><span class="dc">erased message). -/</span></span>
+<span id="L277"><span class="kw">lemma</span> <span class="const token" data-verso-hover="17">hist_ignore</span> (σ : <span class="const token" data-verso-hover="129">Profile</span> P M Ω) {r r' : <span class="const token" data-verso-hover="137">SyncCrash.Run</span> P (<span class="const token" data-verso-hover="89">Bool</span> × Ω)} {i j : P} {t₀ : <span class="const token" data-verso-hover="33">ℕ</span>}</span>
+<span id="L278">    (hij : i ≠ j) (hin : ∀ p, r.<span class="const token" data-verso-hover="146">input</span> p = r'.<span class="const token" data-verso-hover="146">input</span> p)</span>
+<span id="L279">    (hD : ∀ p q t, p ≠ q → (r'.<span class="const token" data-verso-hover="198">Deliv</span> p q t ↔ r.<span class="const token" data-verso-hover="198">Deliv</span> p q t ∨ (p = i ∧ q = j ∧ t = t₀)))</span>
+<span id="L280">    (hn : ¬ r.<span class="const token" data-verso-hover="198">Deliv</span> i j t₀) (t : <span class="const token" data-verso-hover="33">ℕ</span>) :</span>
+<span id="L281">    <span class="const token" data-verso-hover="187">eraseMsg</span> i t₀ (<span class="const token" data-verso-hover="199">hist</span> (<span class="const token" data-verso-hover="171">deviate</span> σ (<span class="const token" data-verso-hover="193">ignore</span> σ i t₀) j) r' t j) = <span class="const token" data-verso-hover="199">hist</span> σ r t j ∧</span>
+<span id="L282">      ∀ p, p ≠ j → <span class="const token" data-verso-hover="199">hist</span> (<span class="const token" data-verso-hover="171">deviate</span> σ (<span class="const token" data-verso-hover="193">ignore</span> σ i t₀) j) r' t p = <span class="const token" data-verso-hover="199">hist</span> σ r t p := <span class="kw">by</span></span>
+<span id="L283">  <span class="kw">set</span> σ' := <span class="const token" data-verso-hover="171">deviate</span> σ (<span class="const token" data-verso-hover="193">ignore</span> σ i t₀) j</span>
+<span id="L284">  <span class="kw">induction</span> t <span class="kw">with</span></span>
+<span id="L285">  | <span class="const token" data-verso-hover="200">zero</span> =&gt; <span class="kw">exact</span> ⟨<span class="kw">by</span> <span class="kw">simp</span> [<span class="const token" data-verso-hover="187">eraseMsg</span>], <span class="kw">fun</span> p _ =&gt; <span class="kw">by</span> <span class="kw">simp</span>⟩</span>
+<span id="L286">  | <span class="const token" data-verso-hover="201">succ</span> t ih =&gt;</span>
+<span id="L287">    <span class="cm">--</span><span class="cm"> the messages coincide except for the one from `i` to `j` in round `t₀ + 1`</span></span>
+<span id="L288">    <span class="kw">have</span> hmsg : ∀ y q, ¬ (y = i ∧ q = j ∧ t = t₀) → <span class="const token" data-verso-hover="202">msg</span> σ' r' y q t = <span class="const token" data-verso-hover="202">msg</span> σ r y q t := <span class="kw">by</span></span>
+<span id="L289">      <span class="kw">intro</span> y q hyq</span>
+<span id="L290">      <span class="kw">rw</span> [<span class="const token" data-verso-hover="203">msg_eq_deliv</span>, <span class="const token" data-verso-hover="203">msg_eq_deliv</span>]</span>
+<span id="L291">      <span class="kw">have</span> hd : y ≠ q → (r'.<span class="const token" data-verso-hover="198">Deliv</span> y q t ↔ r.<span class="const token" data-verso-hover="198">Deliv</span> y q t) := <span class="kw">fun</span> hne =&gt; <span class="kw">by</span></span>
+<span id="L292">        <span class="kw">rw</span> [hD y q t hne]; <span class="kw">tauto</span></span>
+<span id="L293">      <span class="kw">by_cases</span> hyq' : y ≠ q ∧ r.<span class="const token" data-verso-hover="198">Deliv</span> y q t</span>
+<span id="L294">      · <span class="kw">rw</span> [<span class="const token" data-verso-hover="204">ite_eq_left</span> ⟨hyq'.<span class="const token" data-verso-hover="66">1</span>, (hd hyq'.<span class="const token" data-verso-hover="66">1</span>).<span class="const token" data-verso-hover="103">2</span> hyq'.<span class="const token" data-verso-hover="67">2</span>⟩, <span class="const token" data-verso-hover="204">ite_eq_left</span> hyq', ← hin y]</span>
+<span id="L295">        <span class="kw">by_cases</span> hy : y = j</span>
+<span id="L296">        · <span class="kw">subst</span> hy; <span class="kw">rw</span> [<span class="const token" data-verso-hover="194">deviate_send_self</span>]; <span class="kw">exact</span> <span class="const token" data-verso-hover="205">congrArg</span> (σ.<span class="const token" data-verso-hover="172">send</span> y _ · q) ih.<span class="const token" data-verso-hover="66">1</span></span>
+<span id="L297">        · <span class="kw">rw</span> [<span class="const token" data-verso-hover="195">deviate_send_ne</span> _ _ hy, ih.<span class="const token" data-verso-hover="67">2</span> y hy]</span>
+<span id="L298">      · <span class="kw">rw</span> [<span class="const token" data-verso-hover="206">ite_eq_right</span> hyq', <span class="const token" data-verso-hover="206">ite_eq_right</span>]</span>
+<span id="L299">        <span class="kw">rintro</span> ⟨h1, h2⟩; <span class="kw">exact</span> hyq' ⟨h1, (hd h1).<span class="const token" data-verso-hover="100">1</span> h2⟩</span>
+<span id="L300">    <span class="kw">refine</span> ⟨?_, <span class="kw">fun</span> p hp =&gt; ?_⟩</span>
+<span id="L301">    · <span class="kw">rw</span> [<span class="const token" data-verso-hover="207">SyncCrash.hist_succ</span>, <span class="const token" data-verso-hover="207">SyncCrash.hist_succ</span>, <span class="const token" data-verso-hover="190">eraseMsg_append_singleton</span>, ih.<span class="const token" data-verso-hover="66">1</span>, <span class="const token" data-verso-hover="208">SyncCrash.length_hist</span>]</span>
+<span id="L302">      <span class="kw">congr</span> <span class="nu">2</span></span>
+<span id="L303">      <span class="kw">funext</span> y</span>
+<span id="L304">      <span class="kw">by_cases</span> hc : t = t₀ ∧ y = i</span>
+<span id="L305">      · <span class="kw">obtain</span> ⟨<span class="kw">rfl</span>, <span class="kw">rfl</span>⟩ := hc</span>
+<span id="L306">        <span class="kw">simp</span> only [<span class="const token" data-verso-hover="209">ite_true</span>, <span class="const token" data-verso-hover="62">Function.update_self</span>]</span>
+<span id="L307">        <span class="kw">rw</span> [<span class="const token" data-verso-hover="203">msg_eq_deliv</span>, <span class="const token" data-verso-hover="206">ite_eq_right</span> (<span class="kw">fun</span> h =&gt; hn h.<span class="const token" data-verso-hover="67">2</span>)]</span>
+<span id="L308">      · <span class="kw">have</span> : (<span class="kw">if</span> t = t₀ <span class="kw">then</span> <span class="const token" data-verso-hover="57">Function.update</span> (<span class="kw">fun</span> p =&gt; <span class="const token" data-verso-hover="202">msg</span> σ' r' p j t) i <span class="const token" data-verso-hover="9">none</span> <span class="kw">else</span></span>
+<span id="L309">            <span class="kw">fun</span> p =&gt; <span class="const token" data-verso-hover="202">msg</span> σ' r' p j t) y = <span class="const token" data-verso-hover="202">msg</span> σ' r' y j t := <span class="kw">by</span></span>
+<span id="L310">          <span class="kw">split_ifs</span> <span class="kw">with</span> h</span>
+<span id="L311">          · <span class="kw">rw</span> [<span class="const token" data-verso-hover="68">Function.update_of_ne</span> (<span class="kw">fun</span> hy =&gt; hc ⟨h, hy⟩)]</span>
+<span id="L312">          · <span class="kw">rfl</span></span>
+<span id="L313">        <span class="kw">rw</span> [this, hmsg y j (<span class="kw">fun</span> h =&gt; hc ⟨h.<span class="const token" data-verso-hover="67">2</span><span class="nu">.</span><span class="const token" data-verso-hover="67">2</span>, h.<span class="const token" data-verso-hover="66">1</span>⟩)]</span>
+<span id="L314">    · <span class="kw">rw</span> [<span class="const token" data-verso-hover="207">SyncCrash.hist_succ</span>, <span class="const token" data-verso-hover="207">SyncCrash.hist_succ</span>, ih.<span class="const token" data-verso-hover="67">2</span> p hp]</span>
+<span id="L315">      <span class="kw">congr</span> <span class="nu">2</span></span>
+<span id="L316">      <span class="kw">funext</span> y</span>
+<span id="L317">      <span class="kw">exact</span> hmsg y p (<span class="kw">fun</span> h =&gt; hp h.<span class="const token" data-verso-hover="67">2</span><span class="nu">.</span><span class="const token" data-verso-hover="66">1</span>)</span>
+<span id="L318"></span>
+<span id="L319"><span class="dc">/-- Under the hypotheses of `hist_ignore`, every agent other than `i` (alive in the same rounds in</span></span>
+<span id="L320"><span class="dc">both runs) has the same decision status in `r'` with `j` ignoring the message as in `r`. -/</span></span>
+<span id="L321"><span class="kw">lemma</span> <span class="const token" data-verso-hover="210">status_ignore</span> (σ : <span class="const token" data-verso-hover="129">Profile</span> P M Ω) {c c' : <span class="const token" data-verso-hover="132">Context</span> P} {ω : P → Ω} {i j : P} {t₀ : <span class="const token" data-verso-hover="33">ℕ</span>}</span>
+<span id="L322">    (hij : i ≠ j) (hpref : c.<span class="const token" data-verso-hover="133">pref</span> = c'.<span class="const token" data-verso-hover="133">pref</span>) (hcr : ∀ p, p ≠ i → c.<span class="const token" data-verso-hover="134">crash</span> p = c'.<span class="const token" data-verso-hover="134">crash</span> p)</span>
+<span id="L323">    (hD : ∀ p q t, p ≠ q →</span>
+<span id="L324">      ((c'.<span class="const token" data-verso-hover="136">run</span> ω).<span class="const token" data-verso-hover="198">Deliv</span> p q t ↔ (c.<span class="const token" data-verso-hover="136">run</span> ω).<span class="const token" data-verso-hover="198">Deliv</span> p q t ∨ (p = i ∧ q = j ∧ t = t₀)))</span>
+<span id="L325">    (hn : ¬ (c.<span class="const token" data-verso-hover="136">run</span> ω).<span class="const token" data-verso-hover="198">Deliv</span> i j t₀) (p : P) (hp : p ≠ i) :</span>
+<span id="L326">    <span class="const token" data-verso-hover="150">status</span> (<span class="const token" data-verso-hover="171">deviate</span> σ (<span class="const token" data-verso-hover="193">ignore</span> σ i t₀) j) c' ω p = <span class="const token" data-verso-hover="150">status</span> σ c ω p := <span class="kw">by</span></span>
+<span id="L327">  <span class="kw">funext</span> t</span>
+<span id="L328">  <span class="kw">have</span> hh := <span class="const token" data-verso-hover="17">hist_ignore</span> σ hij (<span class="kw">fun</span> q =&gt; <span class="kw">by</span> <span class="kw">simp</span> [hpref]) hD hn t</span>
+<span id="L329">  <span class="kw">have</span> hal : (c'.<span class="const token" data-verso-hover="136">run</span> ω).<span class="const token" data-verso-hover="211">Alive</span> p t ↔ (c.<span class="const token" data-verso-hover="136">run</span> ω).<span class="const token" data-verso-hover="211">Alive</span> p t := <span class="kw">by</span></span>
+<span id="L330">    <span class="kw">simp</span> [<span class="const token" data-verso-hover="211">SyncCrash.Run.Alive</span>, hcr p hp]</span>
+<span id="L331">  <span class="kw">simp</span> only [<span class="const token" data-verso-hover="150">status</span>, <span class="const token" data-verso-hover="151">SyncCrash.state</span>]</span>
+<span id="L332">  <span class="kw">by_cases</span> ha : (c.<span class="const token" data-verso-hover="136">run</span> ω).<span class="const token" data-verso-hover="211">Alive</span> p t</span>
+<span id="L333">  · <span class="kw">rw</span> [<span class="const token" data-verso-hover="204">ite_eq_left</span> (hal.<span class="const token" data-verso-hover="103">2</span> ha), <span class="const token" data-verso-hover="204">ite_eq_left</span> ha]</span>
+<span id="L334">    <span class="kw">simp</span> only [<span class="const token" data-verso-hover="212">Option.bind_some</span>, <span class="const token" data-verso-hover="145">Context.run_input</span>, hpref]</span>
+<span id="L335">    <span class="kw">by_cases</span> hpj : p = j</span>
+<span id="L336">    · <span class="kw">subst</span> hpj; <span class="kw">rw</span> [<span class="const token" data-verso-hover="196">deviate_decide_self</span>]; <span class="kw">exact</span> <span class="const token" data-verso-hover="205">congrArg</span> (σ.<span class="const token" data-verso-hover="153">decide</span> p _ ·) hh.<span class="const token" data-verso-hover="66">1</span></span>
+<span id="L337">    · <span class="kw">rw</span> [<span class="const token" data-verso-hover="197">deviate_decide_ne</span> _ _ hpj, hh.<span class="const token" data-verso-hover="67">2</span> p hpj]</span>
+<span id="L338">  · <span class="kw">rw</span> [<span class="const token" data-verso-hover="206">ite_eq_right</span> (<span class="kw">fun</span> h =&gt; ha (hal.<span class="const token" data-verso-hover="100">1</span> h)), <span class="const token" data-verso-hover="206">ite_eq_right</span> ha]; <span class="kw">rfl</span></span>
+<span id="L339"></span>
+<span id="L340"><span class="dc">/-- **A silent agent.** If `i` never delivers a message (e.g. it crashes in round `1` reaching</span></span>
+<span id="L341"><span class="dc">nobody), the other agents cannot tell `i`'s input: two contexts that differ only in `i`'s</span></span>
+<span id="L342"><span class="dc">preference give every other agent the same decision status. -/</span></span>
+<span id="L343"><span class="kw">lemma</span> <span class="const token" data-verso-hover="18">status_congr_silent</span> (σ : <span class="const token" data-verso-hover="129">Profile</span> P M Ω) {c c' : <span class="const token" data-verso-hover="132">Context</span> P} (ω : P → Ω) {i : P}</span>
+<span id="L344">    (hpref : ∀ p, p ≠ i → c.<span class="const token" data-verso-hover="133">pref</span> p = c'.<span class="const token" data-verso-hover="133">pref</span> p) (hcr : c.<span class="const token" data-verso-hover="134">crash</span> = c'.<span class="const token" data-verso-hover="134">crash</span>)</span>
+<span id="L345">    (hre : c.<span class="const token" data-verso-hover="135">reach</span> = c'.<span class="const token" data-verso-hover="135">reach</span>) (hsil : ∀ q t, ¬ (c.<span class="const token" data-verso-hover="136">run</span> ω).<span class="const token" data-verso-hover="198">Deliv</span> i q t) (p : P) (hp : p ≠ i) :</span>
+<span id="L346">    <span class="const token" data-verso-hover="150">status</span> σ c ω p = <span class="const token" data-verso-hover="150">status</span> σ c' ω p := <span class="kw">by</span></span>
+<span id="L347">  <span class="kw">have</span> hD : ∀ p q t, (c.<span class="const token" data-verso-hover="136">run</span> ω).<span class="const token" data-verso-hover="198">Deliv</span> p q t ↔ (c'.<span class="const token" data-verso-hover="136">run</span> ω).<span class="const token" data-verso-hover="198">Deliv</span> p q t := <span class="kw">by</span></span>
+<span id="L348">    <span class="kw">intro</span> p q t; <span class="kw">simp</span> [<span class="const token" data-verso-hover="198">SyncCrash.Run.Deliv</span>, <span class="const token" data-verso-hover="211">SyncCrash.Run.Alive</span>, hcr, hre]</span>
+<span id="L349">  <span class="kw">have</span> hh : ∀ t, ∀ p, p ≠ i → <span class="const token" data-verso-hover="199">hist</span> σ (c.<span class="const token" data-verso-hover="136">run</span> ω) t p = <span class="const token" data-verso-hover="199">hist</span> σ (c'.<span class="const token" data-verso-hover="136">run</span> ω) t p := <span class="kw">by</span></span>
+<span id="L350">    <span class="kw">intro</span> t</span>
+<span id="L351">    <span class="kw">induction</span> t <span class="kw">with</span></span>
+<span id="L352">    | <span class="const token" data-verso-hover="200">zero</span> =&gt; <span class="kw">intros</span>; <span class="kw">rfl</span></span>
+<span id="L353">    | <span class="const token" data-verso-hover="201">succ</span> t ih =&gt;</span>
+<span id="L354">      <span class="kw">intro</span> p hp</span>
+<span id="L355">      <span class="kw">rw</span> [<span class="const token" data-verso-hover="207">SyncCrash.hist_succ</span>, <span class="const token" data-verso-hover="207">SyncCrash.hist_succ</span>, ih p hp]</span>
+<span id="L356">      <span class="kw">congr</span> <span class="nu">2</span></span>
+<span id="L357">      <span class="kw">funext</span> y</span>
+<span id="L358">      <span class="kw">by_cases</span> hy : y = i</span>
+<span id="L359">      · <span class="kw">subst</span> hy</span>
+<span id="L360">        <span class="kw">rw</span> [<span class="const token" data-verso-hover="203">msg_eq_deliv</span>, <span class="const token" data-verso-hover="203">msg_eq_deliv</span>, <span class="const token" data-verso-hover="206">ite_eq_right</span> (<span class="kw">fun</span> h =&gt; hsil p t h.<span class="const token" data-verso-hover="67">2</span>),</span>
+<span id="L361">          <span class="const token" data-verso-hover="206">ite_eq_right</span> (<span class="kw">fun</span> h =&gt; hsil p t ((hD _ _ _).<span class="const token" data-verso-hover="103">2</span> h.<span class="const token" data-verso-hover="67">2</span>))]</span>
+<span id="L362">      · <span class="kw">exact</span> <span class="const token" data-verso-hover="213">msg_congr</span> (<span class="kw">by</span> <span class="kw">simp</span> [hpref y hy]) (<span class="kw">fun</span> _ =&gt; ih y hy) (hD y p t)</span>
+<span id="L363">  <span class="kw">funext</span> t</span>
+<span id="L364">  <span class="kw">have</span> hst : <span class="const token" data-verso-hover="151">SyncCrash.state</span> σ (c.<span class="const token" data-verso-hover="136">run</span> ω) p t = <span class="const token" data-verso-hover="151">SyncCrash.state</span> σ (c'.<span class="const token" data-verso-hover="136">run</span> ω) p t := <span class="kw">by</span></span>
+<span id="L365">    <span class="kw">unfold</span> <span class="const token" data-verso-hover="151">SyncCrash.state</span></span>
+<span id="L366">    <span class="kw">have</span> hal : (c.<span class="const token" data-verso-hover="136">run</span> ω).<span class="const token" data-verso-hover="211">Alive</span> p t ↔ (c'.<span class="const token" data-verso-hover="136">run</span> ω).<span class="const token" data-verso-hover="211">Alive</span> p t := <span class="kw">by</span></span>
+<span id="L367">      <span class="kw">simp</span> [<span class="const token" data-verso-hover="211">SyncCrash.Run.Alive</span>, hcr]</span>
+<span id="L368">    <span class="kw">by_cases</span> ha : (c.<span class="const token" data-verso-hover="136">run</span> ω).<span class="const token" data-verso-hover="211">Alive</span> p t</span>
+<span id="L369">    · <span class="kw">rw</span> [<span class="const token" data-verso-hover="204">ite_eq_left</span> ha, <span class="const token" data-verso-hover="204">ite_eq_left</span> (hal.<span class="const token" data-verso-hover="100">1</span> ha), <span class="const token" data-verso-hover="145">Context.run_input</span>, <span class="const token" data-verso-hover="145">Context.run_input</span>, hpref p hp,</span>
+<span id="L370">        hh t p hp]</span>
+<span id="L371">    · <span class="kw">rw</span> [<span class="const token" data-verso-hover="206">ite_eq_right</span> ha, <span class="const token" data-verso-hover="206">ite_eq_right</span> (<span class="kw">fun</span> h =&gt; ha (hal.<span class="const token" data-verso-hover="103">2</span> h))]</span>
+<span id="L372">  <span class="kw">simp</span> only [<span class="const token" data-verso-hover="150">status</span>, hst]</span>
+<span id="L373"></span>
+<span id="L374"><span class="kw">end</span> Simulation</span>
+<span id="L375"></span>
+<span id="L376"><span class="kw">end</span> Podc.RationalConsensus</span>
+<span id="L377"></span>
+</code></div>
+        <script>
+          window.versoHoversUrl = "PODC2016/RationalConsensus/-hovers.json";</script>
+        <script src="static/lean/popper.js"></script>
+        <script src="static/lean/tippy.js"></script>
+        <script src="static/lean/marked.js"></script>
+        <script src="static/lean/highlighting.js"></script>
+        <script src="static/lean/lean.js"></script>
+        </article></main><footer class="site-footer"><div class="wrap">
+        Machine-checked formalizations of PODC papers in Lean 4. Generated with <a href="https://github.com/leanprover/verso">Verso</a> from the README files of <a href="https://github.com/vasnesterov/formal_podc">vasnesterov/formal_podc</a>.</div>
+      </footer></body>
+  </html>
+

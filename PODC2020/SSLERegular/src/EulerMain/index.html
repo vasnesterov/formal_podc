@@ -1,0 +1,491 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="light dark">
+    <link rel="icon" href="data:,">
+    <title>SSLERegular: EulerMain.lean · Formal PODC</title><base href="../../../.././"><link rel="stylesheet" href="static/lean/verso-vars.css">
+    <link rel="stylesheet" href="static/lean/highlighting.css">
+    <link rel="stylesheet" href="static/lean/tippy-border.css">
+    <link rel="stylesheet" href="static/style.css">
+    <script defer="defer" src="static/site.js"></script>
+    </head>
+  <body>
+    <header class="site-header">
+      <div class="wrap">
+        <a class="brand" href=".">Formal PODC</a><nav class="top">
+          <a href=".">Search</a><a href="about/">About</a><a href="https://github.com/vasnesterov/formal_podc">GitHub</a></nav>
+        </div>
+      </header>
+    <main class="wrap"><article><nav class="breadcrumbs" aria-label="Breadcrumb">
+          <a href=".">Search</a><span class="sep">›</span><a href="PODC2020/">PODC 2020</a><span class="sep">›</span><a href="PODC2020/SSLERegular/">SSLERegular</a><span class="sep">›</span><a href="PODC2020/SSLERegular/src/">Lean source</a><span class="sep">›</span><span aria-current="page">EulerMain</span></nav>
+        <h1>
+          <code>EulerMain.lean</code></h1>
+        <div class="paper-links">
+          <p>
+            Source of <a href="PODC2020/SSLERegular/">Self-Stabilizing Leader Election in Regular Graphs — PODC 2020</a> · <a href="https://github.com/vasnesterov/formal_podc/blob/main/Papers/PODC2020/SSLERegular/EulerMain.lean">GitHub</a> · hover over a name for its type and documentation</p>
+          </div>
+        <div class="lean-code lean-src">
+          <code class="hl lean block" data-lean-context="EulerMain"><span id="L1"><span class="kw">import</span> Papers.PODC2020.SSLERegular.EulerReach</span>
+<span id="L2"><span class="kw">import</span> Papers.PODC2020.SSLERegular.GoodExists</span>
+<span id="L3"><span class="kw">import</span> Papers.PODC2020.SSLERegular.ErrorReach</span>
+<span id="L4"></span>
+<span id="L5"><span class="dc">/-!</span></span>
+<span id="L6"><span class="dc"># Theorem 3.3 for the repaired SS-EulerCycle</span></span>
+<span id="L7"></span>
+<span id="L8"><span class="dc">* `good_validStable`: legitimate configurations (`Good`) are valid output-stable (Lemma 3.1,</span></span>
+<span id="L9"><span class="dc">  stability part): every interaction keeps the configuration legitimate, the ring leader never</span></span>
+<span id="L10"><span class="dc">  moves, and there is exactly one token, so the multiple-leader detection never fires.</span></span>
+<span id="L11"><span class="dc">* `single_reach` / `multi_reach` (Lemma 3.2): from a coherent configuration with a single virtual</span></span>
+<span id="L12"><span class="dc">  ring a legitimate configuration is reachable (or an error); with several virtual rings an error</span></span>
+<span id="L13"><span class="dc">  is reachable (each ring elects a leader, the tokens are moved to two adjacent nodes).</span></span>
+<span id="L14"><span class="dc">* `repaired_selfStab` (**Theorem 3.3, repaired**): on every connected `2k`-regular graph,</span></span>
+<span id="L15"><span class="dc">  `k ≥ 1`, for every ring protocol satisfying `RingSpec`, the repaired SS-EulerCycle solves SSLE:</span></span>
+<span id="L16"><span class="dc">  from every configuration a valid output-stable configuration is reachable; hence every globally</span></span>
+<span id="L17"><span class="dc">  fair execution stabilizes (`repaired_solvesSSLE`) and so does the random scheduler with</span></span>
+<span id="L18"><span class="dc">  probability 1 (`Cslib.TransitionSystem.tendsto_compl_of_reach`).</span></span>
+<span id="L19"><span class="dc">-/</span></span>
+<span id="L20"></span>
+<span id="L21"><span class="kw">set_option</span> <span class="const token" data-verso-hover="245">linter.unusedSectionVars</span> false</span>
+<span id="L22"></span>
+<span id="L23"><span class="kw">open</span> Finset</span>
+<span id="L24"></span>
+<span id="L25"><span class="kw">namespace</span> SSLERegular</span>
+<span id="L26"></span>
+<span id="L27"><span class="kw">universe</span> u</span>
+<span id="L28"></span>
+<span id="L29"><span class="kw">variable</span> {RS : <span class="kw">Type</span>*} {k : <span class="const token" data-verso-hover="39">ℕ</span>} {V : <span class="kw">Type</span> u} [<span class="const token" data-verso-hover="88">DecidableEq</span> V] [<span class="const token" data-verso-hover="109">Fintype</span> V] {G : <span class="const token" data-verso-hover="89">SimpleGraph</span> V}</span>
+<span id="L30">  [<span class="const token" data-verso-hover="135">DecidableRel</span> G.<span class="const token" data-verso-hover="91">Adj</span>] {R : <span class="const token" data-verso-hover="52">RingProtocol</span> RS}</span>
+<span id="L31"></span>
+<span id="L32"><span class="kw">section</span> Coherent</span>
+<span id="L33"></span>
+<span id="L34"><span class="kw">variable</span> {S : V → <span class="const token" data-verso-hover="250">Skel</span> k} (hdeg : ∀ v, G.<span class="const token" data-verso-hover="147">degree</span> v = <span class="nu">2</span> * k) (hinj : <span class="const token" data-verso-hover="257">InjCol</span> G S) (hok : <span class="const token" data-verso-hover="259">EdgeOK</span> G S)</span>
+<span id="L35"></span>
+<span id="L36"><span class="kw">lemma</span> <span class="const token" data-verso-hover="335">vperm_ne</span> (w : V × <span class="const token" data-verso-hover="82">Fin</span> k) : <span class="const token" data-verso-hover="13">vperm</span> hdeg hinj hok w ≠ w :=</span>
+<span id="L37">  <span class="kw">fun</span> h =&gt; <span class="const token" data-verso-hover="262">node_ne_vperm</span> hdeg hinj hok w (<span class="const token" data-verso-hover="217">congrArg</span> <span class="const token" data-verso-hover="58">Prod.fst</span> h).<span class="const token" data-verso-hover="258">symm</span></span>
+<span id="L38"></span>
+<span id="L39"><span class="kw">lemma</span> <span class="const token" data-verso-hover="336">vperm_vperm_ne</span> (w : V × <span class="const token" data-verso-hover="82">Fin</span> k) : <span class="const token" data-verso-hover="13">vperm</span> hdeg hinj hok (<span class="const token" data-verso-hover="13">vperm</span> hdeg hinj hok w) ≠ w := <span class="kw">by</span></span>
+<span id="L40">  <span class="kw">intro</span> h</span>
+<span id="L41">  <span class="kw">have</span> e2 := <span class="const token" data-verso-hover="270">vedge_vperm</span> hdeg hinj hok (<span class="const token" data-verso-hover="13">vperm</span> hdeg hinj hok w)</span>
+<span id="L42">  <span class="kw">rw</span> [h] <span class="kw">at</span> e2</span>
+<span id="L43">  <span class="kw">exact</span> <span class="const token" data-verso-hover="279">edge_not_rev</span> hdeg hinj hok (<span class="const token" data-verso-hover="270">vedge_vperm</span> hdeg hinj hok w) _ _ e2</span>
+<span id="L44"></span>
+<span id="L45"><span class="dc">/-- The cycle of `w0`. -/</span></span>
+<span id="L46"><span class="kw">abbrev</span> <span class="const token" data-verso-hover="337">Cyc</span> (w0 : V × <span class="const token" data-verso-hover="82">Fin</span> k) := {x // (<span class="const token" data-verso-hover="13">vperm</span> hdeg hinj hok).<span class="const token" data-verso-hover="312">SameCycle</span> w0 x}</span>
+<span id="L47"></span>
+<span id="L48"><span class="dc">/-- The virtual ring through `w0` as a directed ring. -/</span></span>
+<span id="L49"><span class="kw">noncomputable</span> <span class="kw">def</span> <span class="const token" data-verso-hover="338">cycτ</span> (w0 : V × <span class="const token" data-verso-hover="82">Fin</span> k) : <span class="const token" data-verso-hover="309">Equiv.Perm</span> (<span class="const token" data-verso-hover="337">Cyc</span> hdeg hinj hok w0) :=</span>
+<span id="L50">  (<span class="const token" data-verso-hover="13">vperm</span> hdeg hinj hok).<span class="const token" data-verso-hover="339">subtypePerm</span> (<span class="kw">fun</span> _ =&gt; <span class="const token" data-verso-hover="340">Equiv.Perm.sameCycle_apply_right</span>)</span>
+<span id="L51"></span>
+<span id="L52"><span class="kw">lemma</span> <span class="const token" data-verso-hover="341">cycτ_val</span> (w0 : V × <span class="const token" data-verso-hover="82">Fin</span> k) (x : <span class="const token" data-verso-hover="337">Cyc</span> hdeg hinj hok w0) :</span>
+<span id="L53">    <span class="const token" data-verso-hover="13">vperm</span> hdeg hinj hok x.<span class="const token" data-verso-hover="218">val</span> = (<span class="const token" data-verso-hover="338">cycτ</span> hdeg hinj hok w0 x).<span class="const token" data-verso-hover="218">val</span> := <span class="const token" data-verso-hover="71">rfl</span></span>
+<span id="L54"></span>
+<span id="L55"><span class="kw">lemma</span> <span class="const token" data-verso-hover="342">cycτ_single</span> (w0 : V × <span class="const token" data-verso-hover="82">Fin</span> k) (x y : <span class="const token" data-verso-hover="337">Cyc</span> hdeg hinj hok w0) :</span>
+<span id="L56">    (<span class="const token" data-verso-hover="338">cycτ</span> hdeg hinj hok w0).<span class="const token" data-verso-hover="312">SameCycle</span> x y := <span class="kw">by</span></span>
+<span id="L57">  <span class="kw">obtain</span> ⟨i, hi⟩ := x.<span class="const token" data-verso-hover="343">2</span>.<span class="const token" data-verso-hover="344">symm</span>.<span class="const token" data-verso-hover="345">trans</span> y.<span class="const token" data-verso-hover="343">2</span></span>
+<span id="L58">  <span class="kw">refine</span> ⟨i, <span class="const token" data-verso-hover="331">Subtype.ext</span> ?_⟩</span>
+<span id="L59">  <span class="kw">rw</span> [<span class="const token" data-verso-hover="338">cycτ</span>, <span class="const token" data-verso-hover="346">Equiv.Perm.subtypePerm_zpow</span>]</span>
+<span id="L60">  <span class="kw">simpa</span> <span class="kw">using</span> hi</span>
+<span id="L61"></span>
+<span id="L62"><span class="kw">lemma</span> <span class="const token" data-verso-hover="347">three_le_cycle</span> (w : V × <span class="const token" data-verso-hover="82">Fin</span> k) : <span class="nu">3</span> ≤ <span class="const token" data-verso-hover="136">Fintype.card</span> (<span class="const token" data-verso-hover="337">Cyc</span> hdeg hinj hok w) := <span class="kw">by</span></span>
+<span id="L63">  <span class="kw">classical</span></span>
+<span id="L64">  <span class="kw">set</span> σ := <span class="const token" data-verso-hover="13">vperm</span> hdeg hinj hok</span>
+<span id="L65">  <span class="kw">have</span> h1 := <span class="const token" data-verso-hover="335">vperm_ne</span> hdeg hinj hok w</span>
+<span id="L66">  <span class="kw">have</span> h2 := <span class="const token" data-verso-hover="336">vperm_vperm_ne</span> hdeg hinj hok w</span>
+<span id="L67">  <span class="kw">have</span> h3 : σ (σ w) ≠ σ w := <span class="kw">fun</span> h =&gt; h1 (σ.<span class="const token" data-verso-hover="348">injective</span> h)</span>
+<span id="L68">  <span class="kw">let</span> a : <span class="const token" data-verso-hover="337">Cyc</span> hdeg hinj hok w := ⟨w, <span class="const token" data-verso-hover="349">Equiv.Perm.SameCycle.refl</span> _ _⟩</span>
+<span id="L69">  <span class="kw">let</span> b : <span class="const token" data-verso-hover="337">Cyc</span> hdeg hinj hok w := ⟨σ w, <span class="const token" data-verso-hover="340">Equiv.Perm.sameCycle_apply_right</span>.<span class="const token" data-verso-hover="133">2</span> a.<span class="const token" data-verso-hover="343">2</span>⟩</span>
+<span id="L70">  <span class="kw">let</span> c : <span class="const token" data-verso-hover="337">Cyc</span> hdeg hinj hok w := ⟨σ (σ w), <span class="const token" data-verso-hover="340">Equiv.Perm.sameCycle_apply_right</span>.<span class="const token" data-verso-hover="133">2</span> b.<span class="const token" data-verso-hover="343">2</span>⟩</span>
+<span id="L71">  <span class="kw">have</span> hinj3 : <span class="const token" data-verso-hover="191">Function.Injective</span> ![a, b, c] := <span class="kw">by</span></span>
+<span id="L72">    <span class="kw">intro</span> i j hij</span>
+<span id="L73">    <span class="kw">have</span> := <span class="const token" data-verso-hover="217">congrArg</span> <span class="const token" data-verso-hover="218">Subtype.val</span> hij</span>
+<span id="L74">    <span class="kw">fin_cases</span> i &lt;;&gt; <span class="kw">fin_cases</span> j &lt;;&gt; <span class="kw">simp</span> only [a, b, c, <span class="const token" data-verso-hover="350">Matrix.cons_val_zero</span>, <span class="const token" data-verso-hover="351">Matrix.cons_val_one</span>,</span>
+<span id="L75">      <span class="const token" data-verso-hover="352">Matrix.cons_val_two</span>, <span class="const token" data-verso-hover="353">Matrix.head_cons</span>, <span class="const token" data-verso-hover="354">Matrix.tail_cons</span>, <span class="const token" data-verso-hover="355">Fin.zero_eta</span>, <span class="const token" data-verso-hover="356">Fin.mk_one</span>,</span>
+<span id="L76">      <span class="const token" data-verso-hover="357">Fin.reduceFinMk</span>] <span class="kw">at</span> this ⊢ &lt;;&gt;</span>
+<span id="L77">      <span class="kw">first</span> | <span class="kw">rfl</span> | <span class="kw">exact</span> <span class="const token" data-verso-hover="123">absurd</span> this h1.<span class="const token" data-verso-hover="134">symm</span> | <span class="kw">exact</span> <span class="const token" data-verso-hover="123">absurd</span> this h2.<span class="const token" data-verso-hover="134">symm</span> | <span class="kw">exact</span> <span class="const token" data-verso-hover="123">absurd</span> this h1 |</span>
+<span id="L78">        <span class="kw">exact</span> <span class="const token" data-verso-hover="123">absurd</span> this h2 | <span class="kw">exact</span> <span class="const token" data-verso-hover="123">absurd</span> this h3 | <span class="kw">exact</span> <span class="const token" data-verso-hover="123">absurd</span> this h3.<span class="const token" data-verso-hover="134">symm</span></span>
+<span id="L79">  <span class="kw">simpa</span> <span class="kw">using</span> <span class="const token" data-verso-hover="358">Fintype.card_le_of_injective</span> _ hinj3</span>
+<span id="L80"></span>
+<span id="L81"><span class="kw">lemma</span> <span class="const token" data-verso-hover="359">period_eq_card</span> {W : <span class="kw">Type</span>*} [<span class="const token" data-verso-hover="109">Fintype</span> W] [<span class="const token" data-verso-hover="88">DecidableEq</span> W] (σ : <span class="const token" data-verso-hover="309">Equiv.Perm</span> W) (w : W)</span>
+<span id="L82">    (h : ∀ w', σ.<span class="const token" data-verso-hover="312">SameCycle</span> w w') : <span class="const token" data-verso-hover="360">Function.minimalPeriod</span> σ w = <span class="const token" data-verso-hover="136">Fintype.card</span> W := <span class="kw">by</span></span>
+<span id="L83">  <span class="kw">have</span> hb : <span class="const token" data-verso-hover="213">Function.Bijective</span> (<span class="kw">fun</span> t : <span class="const token" data-verso-hover="82">Fin</span> (<span class="const token" data-verso-hover="360">Function.minimalPeriod</span> σ w) =&gt; (σ ^ (t : <span class="const token" data-verso-hover="39">ℕ</span>)) w) := <span class="kw">by</span></span>
+<span id="L84">    <span class="kw">refine</span> ⟨<span class="kw">fun</span> a b hab =&gt; <span class="const token" data-verso-hover="209">Fin.ext</span> (<span class="const token" data-verso-hover="361">pow_inj_period</span> σ w a.<span class="const token" data-verso-hover="202">2</span> b.<span class="const token" data-verso-hover="202">2</span> hab), <span class="kw">fun</span> w' =&gt; ?_⟩</span>
+<span id="L85">    <span class="kw">obtain</span> ⟨t, ht, htw⟩ := (<span class="const token" data-verso-hover="362">sameCycle_iff_exists_lt</span> σ w).<span class="const token" data-verso-hover="117">1</span> (h w')</span>
+<span id="L86">    <span class="kw">exact</span> ⟨⟨t, ht⟩, htw⟩</span>
+<span id="L87">  <span class="kw">rw</span> [← <span class="const token" data-verso-hover="363">Fintype.card_of_bijective</span> hb, <span class="const token" data-verso-hover="142">Fintype.card_fin</span>]</span>
+<span id="L88"></span>
+<span id="L89"><span class="kw">end</span> Coherent</span>
+<span id="L90"></span>
+<span id="L91"><span class="kw">lemma</span> <span class="const token" data-verso-hover="364">good_of</span> (hdeg : ∀ v, G.<span class="const token" data-verso-hover="147">degree</span> v = <span class="nu">2</span> * k) {D : V → <span class="const token" data-verso-hover="42">EState</span> k RS} {S : V → <span class="const token" data-verso-hover="250">Skel</span> k}</span>
+<span id="L92">    (hinj : <span class="const token" data-verso-hover="257">InjCol</span> G S) (hok : <span class="const token" data-verso-hover="259">EdgeOK</span> G S) (hSD : <span class="const token" data-verso-hover="315">skelOf</span> D = S) (hB : <span class="const token" data-verso-hover="249">Base</span> G S D)</span>
+<span id="L93">    (hs : ∀ w w', (<span class="const token" data-verso-hover="13">vperm</span> hdeg hinj hok).<span class="const token" data-verso-hover="312">SameCycle</span> w w')</span>
+<span id="L94">    (hr : <span class="const token" data-verso-hover="310">RingValidOn</span> R (<span class="const token" data-verso-hover="13">vperm</span> hdeg hinj hok) (<span class="kw">fun</span> w =&gt; (<span class="const token" data-verso-hover="246">vn</span> D w).<span class="const token" data-verso-hover="220">ringState</span>)) (w0 : V × <span class="const token" data-verso-hover="82">Fin</span> k)</span>
+<span id="L95">    (hl : R.<span class="const token" data-verso-hover="229">lead</span> (<span class="const token" data-verso-hover="246">vn</span> D w0).<span class="const token" data-verso-hover="220">ringState</span> = <span class="const token" data-verso-hover="56">true</span>) (ht : <span class="const token" data-verso-hover="316">TokLegit</span> (<span class="const token" data-verso-hover="13">vperm</span> hdeg hinj hok) (<span class="const token" data-verso-hover="246">vn</span> D) w0) :</span>
+<span id="L96">    <span class="const token" data-verso-hover="317">Good</span> G R hdeg D := <span class="kw">by</span></span>
+<span id="L97">  <span class="kw">subst</span> hSD; <span class="kw">exact</span> ⟨hinj, hok, hB, hs, hr, w0, hl, ht⟩</span>
+<span id="L98"></span>
+<span id="L99"><span class="dc">/-! ### Legitimate configurations are valid output-stable -/</span></span>
+<span id="L100"></span>
+<span id="L101"><span class="dc">/-- **Closure** (Lemma 3.1, stability): one interaction keeps a legitimate configuration</span></span>
+<span id="L102"><span class="dc">legitimate and does not change any ring-leader output. -/</span></span>
+<span id="L103"><span class="kw">lemma</span> <span class="const token" data-verso-hover="365">good_step</span> (hdeg : ∀ v, G.<span class="const token" data-verso-hover="147">degree</span> v = <span class="nu">2</span> * k) {D D' : V → <span class="const token" data-verso-hover="42">EState</span> k RS} (hD : <span class="const token" data-verso-hover="317">Good</span> G R hdeg D)</span>
+<span id="L104">    (h : (<span class="const token" data-verso-hover="92">ssEuler</span> <span class="const token" data-verso-hover="56">true</span> k R).<span class="const token" data-verso-hover="93">Step</span> G D D') :</span>
+<span id="L105">    <span class="const token" data-verso-hover="317">Good</span> G R hdeg D' ∧ ∀ w, R.<span class="const token" data-verso-hover="229">lead</span> (<span class="const token" data-verso-hover="246">vn</span> D' w).<span class="const token" data-verso-hover="220">ringState</span> = R.<span class="const token" data-verso-hover="229">lead</span> (<span class="const token" data-verso-hover="246">vn</span> D w).<span class="const token" data-verso-hover="220">ringState</span> := <span class="kw">by</span></span>
+<span id="L106">  <span class="kw">classical</span></span>
+<span id="L107">  <span class="kw">obtain</span> ⟨hinj, hok, hB, hs, hr, w0, hl, m, hm, b, htl⟩ := hD</span>
+<span id="L108">  <span class="kw">set</span> σ := <span class="const token" data-verso-hover="13">vperm</span> hdeg hinj hok <span class="kw">with</span> hσ</span>
+<span id="L109">  <span class="kw">have</span> hN : <span class="const token" data-verso-hover="360">Function.minimalPeriod</span> σ w0 = <span class="const token" data-verso-hover="136">Fintype.card</span> (V × <span class="const token" data-verso-hover="82">Fin</span> k) := <span class="const token" data-verso-hover="359">period_eq_card</span> σ w0 (hs w0)</span>
+<span id="L110">  <span class="kw">set</span> N := <span class="const token" data-verso-hover="136">Fintype.card</span> (V × <span class="const token" data-verso-hover="82">Fin</span> k) <span class="kw">with</span> hNdef</span>
+<span id="L111">  <span class="kw">have</span> hNpos : <span class="nu">0</span> &lt; N := hN ▸ <span class="const token" data-verso-hover="366">period_pos</span> σ w0</span>
+<span id="L112">  <span class="kw">have</span> hpos : ∀ w, ∃ t &lt; N, (σ ^ t) w0 = w := <span class="kw">fun</span> w =&gt; <span class="kw">by</span></span>
+<span id="L113">    <span class="kw">rw</span> [← hN]; <span class="kw">exact</span> (<span class="const token" data-verso-hover="362">sameCycle_iff_exists_lt</span> σ w0).<span class="const token" data-verso-hover="117">1</span> (hs w0 w)</span>
+<span id="L114">  <span class="cm">--</span><span class="cm"> leaders: only `w0`</span></span>
+<span id="L115">  <span class="kw">have</span> hlead : ∀ t &lt; N, R.<span class="const token" data-verso-hover="229">lead</span> (<span class="const token" data-verso-hover="246">vn</span> D ((σ ^ t) w0)).<span class="const token" data-verso-hover="220">ringState</span> = <span class="const token" data-verso-hover="235">decide</span> (t = <span class="nu">0</span>) := <span class="kw">by</span></span>
+<span id="L116">    <span class="kw">intro</span> t ht</span>
+<span id="L117">    <span class="kw">obtain</span> ⟨-, x, -, hu⟩ := hr</span>
+<span id="L118">    <span class="kw">by_cases</span> h0 : t = <span class="nu">0</span></span>
+<span id="L119">    · <span class="kw">subst</span> h0; <span class="kw">simpa</span> <span class="kw">using</span> hl</span>
+<span id="L120">    · <span class="kw">rw</span> [<span class="const token" data-verso-hover="367">decide_eq_false</span> h0]</span>
+<span id="L121">      <span class="kw">by_contra</span> hne</span>
+<span id="L122">      <span class="kw">have</span> h1 : R.<span class="const token" data-verso-hover="229">lead</span> (<span class="const token" data-verso-hover="246">vn</span> D ((σ ^ t) w0)).<span class="const token" data-verso-hover="220">ringState</span> = <span class="const token" data-verso-hover="56">true</span> := <span class="kw">by</span> <span class="kw">simpa</span> <span class="kw">using</span> hne</span>
+<span id="L123">      <span class="kw">have</span> := (hu _ h1).<span class="const token" data-verso-hover="272">trans</span> (hu _ hl).<span class="const token" data-verso-hover="258">symm</span></span>
+<span id="L124">      <span class="kw">exact</span> h0 (<span class="const token" data-verso-hover="361">pow_inj_period</span> σ w0 (hN ▸ ht) (hN ▸ hNpos) (<span class="kw">by</span> <span class="kw">simpa</span> <span class="kw">using</span> this))</span>
+<span id="L125">  <span class="cm">--</span><span class="cm"> the common part: after the edge step on `w`</span></span>
+<span id="L126">  <span class="kw">have</span> after : ∀ (w : V × <span class="const token" data-verso-hover="82">Fin</span> k) (ρ : RS → RS → RS × RS),</span>
+<span id="L127">      ρ (<span class="const token" data-verso-hover="246">vn</span> D w).<span class="const token" data-verso-hover="220">ringState</span> (<span class="const token" data-verso-hover="246">vn</span> D (σ w)).<span class="const token" data-verso-hover="220">ringState</span> ∈ R.<span class="const token" data-verso-hover="137">δ</span> (<span class="const token" data-verso-hover="246">vn</span> D w).<span class="const token" data-verso-hover="220">ringState</span> (<span class="const token" data-verso-hover="246">vn</span> D (σ w)).<span class="const token" data-verso-hover="220">ringState</span> →</span>
+<span id="L128">      (∀ a c, a ≠ c → ¬ <span class="const token" data-verso-hover="261">TokBoth</span> (<span class="const token" data-verso-hover="260">vnAfter</span> hdeg hinj hok R D ρ w) a c) ∧</span>
+<span id="L129">      ∀ D' : V → <span class="const token" data-verso-hover="42">EState</span> k RS, <span class="const token" data-verso-hover="249">Base</span> G (<span class="const token" data-verso-hover="315">skelOf</span> D) D' → <span class="const token" data-verso-hover="246">vn</span> D' = <span class="const token" data-verso-hover="260">vnAfter</span> hdeg hinj hok R D ρ w →</span>
+<span id="L130">        <span class="const token" data-verso-hover="317">Good</span> G R hdeg D' ∧ ∀ w, R.<span class="const token" data-verso-hover="229">lead</span> (<span class="const token" data-verso-hover="246">vn</span> D' w).<span class="const token" data-verso-hover="220">ringState</span> = R.<span class="const token" data-verso-hover="229">lead</span> (<span class="const token" data-verso-hover="246">vn</span> D w).<span class="const token" data-verso-hover="220">ringState</span> := <span class="kw">by</span></span>
+<span id="L131">    <span class="kw">intro</span> w ρ hρ</span>
+<span id="L132">    <span class="kw">obtain</span> ⟨t, ht, <span class="kw">rfl</span>⟩ := hpos w</span>
+<span id="L133">    <span class="kw">have</span> hrs : <span class="const token" data-verso-hover="308">RingStepOn</span> R σ (<span class="kw">fun</span> w =&gt; (<span class="const token" data-verso-hover="246">vn</span> D w).<span class="const token" data-verso-hover="220">ringState</span>)</span>
+<span id="L134">        (<span class="kw">fun</span> w' =&gt; (<span class="const token" data-verso-hover="260">vnAfter</span> hdeg hinj hok R D ρ ((σ ^ t) w0) w').<span class="const token" data-verso-hover="220">ringState</span>) := <span class="kw">by</span></span>
+<span id="L135">      <span class="kw">refine</span> ⟨(σ ^ t) w0, _, hρ, ?_⟩</span>
+<span id="L136">      <span class="kw">have</span> := <span class="const token" data-verso-hover="368">ring_vnAfter</span> (R := R) hdeg hinj hok σ <span class="const token" data-verso-hover="181">id</span> <span class="const token" data-verso-hover="369">Function.injective_id</span> (<span class="kw">fun</span> _ =&gt; <span class="const token" data-verso-hover="71">rfl</span>) D ρ</span>
+<span id="L137">        ((σ ^ t) w0)</span>
+<span id="L138">      <span class="kw">simpa</span> <span class="kw">using</span> this</span>
+<span id="L139">    <span class="kw">have</span> hlead' := hr.<span class="const token" data-verso-hover="69">1</span> _ (<span class="const token" data-verso-hover="303">Relation.ReflTransGen.single</span> hrs)</span>
+<span id="L140">    <span class="kw">have</span> hlb : R.<span class="const token" data-verso-hover="229">lead</span> (ρ (<span class="const token" data-verso-hover="246">vn</span> D ((σ ^ t) w0)).<span class="const token" data-verso-hover="220">ringState</span></span>
+<span id="L141">        (<span class="const token" data-verso-hover="246">vn</span> D (σ ((σ ^ t) w0))).<span class="const token" data-verso-hover="220">ringState</span>).<span class="const token" data-verso-hover="59">2</span> =</span>
+<span id="L142">          <span class="const token" data-verso-hover="235">decide</span> (<span class="const token" data-verso-hover="370">TokenRing.succP</span> (<span class="const token" data-verso-hover="360">Function.minimalPeriod</span> σ w0) t = <span class="nu">0</span>) := <span class="kw">by</span></span>
+<span id="L143">      <span class="kw">have</span> h1 := hlead' (σ ((σ ^ t) w0))</span>
+<span id="L144">      <span class="kw">have</span> hv2 : <span class="const token" data-verso-hover="260">vnAfter</span> hdeg hinj hok R D ρ ((σ ^ t) w0) (σ ((σ ^ t) w0)) =</span>
+<span id="L145">          (<span class="const token" data-verso-hover="228">vEdge</span> R ρ (<span class="const token" data-verso-hover="246">vn</span> D ((σ ^ t) w0)) (<span class="const token" data-verso-hover="246">vn</span> D (σ ((σ ^ t) w0)))).<span class="const token" data-verso-hover="59">2</span> := <span class="kw">by</span></span>
+<span id="L146">        <span class="kw">simp</span> [<span class="const token" data-verso-hover="260">vnAfter</span>, hσ]</span>
+<span id="L147">      <span class="kw">simp</span> only <span class="kw">at</span> h1</span>
+<span id="L148">      <span class="kw">rw</span> [hv2, (<span class="const token" data-verso-hover="371">vEdge_ringState</span> (R := R) ρ _ _).<span class="const token" data-verso-hover="67">2</span>] <span class="kw">at</span> h1</span>
+<span id="L149">      <span class="kw">rw</span> [h1, <span class="const token" data-verso-hover="372">apply_pow_succP</span> σ w0 t (hN ▸ ht), hlead _ (<span class="kw">by</span></span>
+<span id="L150">        <span class="kw">rw</span> [← hN]; <span class="kw">unfold</span> <span class="const token" data-verso-hover="370">TokenRing.succP</span>; <span class="kw">split_ifs</span> &lt;;&gt; <span class="kw">omega</span>), hN]</span>
+<span id="L151">    <span class="kw">have</span> htok := <span class="const token" data-verso-hover="373">vnAfter_tok</span> (R := R) hdeg hinj hok D ρ w0 (t := t) (hN ▸ ht) hlb</span>
+<span id="L152">    <span class="kw">rw</span> [hN] <span class="kw">at</span> htok</span>
+<span id="L153">    <span class="kw">have</span> hL : <span class="const token" data-verso-hover="374">TokenRing.Legit</span> N m b (<span class="kw">fun</span> s =&gt; (<span class="const token" data-verso-hover="246">vn</span> D ((σ ^ s) w0)).<span class="const token" data-verso-hover="221">token</span>,</span>
+<span id="L154">        <span class="kw">fun</span> s =&gt; (<span class="const token" data-verso-hover="246">vn</span> D ((σ ^ s) w0)).<span class="const token" data-verso-hover="222">bit</span>) := <span class="kw">fun</span> s hs =&gt; htl s hs</span>
+<span id="L155">    <span class="kw">have</span> hN2 : <span class="nu">2</span> ≤ N := <span class="kw">by</span></span>
+<span id="L156">      <span class="kw">have</span> h3 := <span class="const token" data-verso-hover="347">three_le_cycle</span> hdeg hinj hok w0</span>
+<span id="L157">      <span class="kw">have</span> h4 : <span class="const token" data-verso-hover="136">Fintype.card</span> (<span class="const token" data-verso-hover="337">Cyc</span> hdeg hinj hok w0) ≤ N :=</span>
+<span id="L158">        <span class="const token" data-verso-hover="358">Fintype.card_le_of_injective</span> <span class="const token" data-verso-hover="218">Subtype.val</span> <span class="const token" data-verso-hover="375">Subtype.val_injective</span></span>
+<span id="L159">      <span class="kw">omega</span></span>
+<span id="L160">    <span class="kw">obtain</span> ⟨m', hm', b', hL'⟩ : ∃ m' &lt; N, ∃ b', <span class="const token" data-verso-hover="374">TokenRing.Legit</span> N m' b'</span>
+<span id="L161">        (<span class="const token" data-verso-hover="376">TokenRing.stepT</span> N (<span class="kw">fun</span> s =&gt; (<span class="const token" data-verso-hover="246">vn</span> D ((σ ^ s) w0)).<span class="const token" data-verso-hover="221">token</span>,</span>
+<span id="L162">          <span class="kw">fun</span> s =&gt; (<span class="const token" data-verso-hover="246">vn</span> D ((σ ^ s) w0)).<span class="const token" data-verso-hover="222">bit</span>) t) := <span class="kw">by</span></span>
+<span id="L163">      <span class="kw">obtain</span> ⟨h1, h2⟩ := hL.<span class="const token" data-verso-hover="32">step</span> hN2 hm ht</span>
+<span id="L164">      <span class="kw">by_cases</span> htm : t = m</span>
+<span id="L165">      · <span class="kw">refine</span> ⟨_, ?_, _, h2 htm⟩</span>
+<span id="L166">        <span class="kw">unfold</span> <span class="const token" data-verso-hover="370">TokenRing.succP</span>; <span class="kw">split_ifs</span> &lt;;&gt; <span class="kw">omega</span></span>
+<span id="L167">      · <span class="kw">exact</span> ⟨m, hm, b, <span class="kw">by</span> <span class="kw">rw</span> [h1 htm]; <span class="kw">exact</span> hL⟩</span>
+<span id="L168">    <span class="kw">have</span> hFtok : ∀ s &lt; N, (<span class="const token" data-verso-hover="260">vnAfter</span> hdeg hinj hok R D ρ ((σ ^ t) w0) ((σ ^ s) w0)).<span class="const token" data-verso-hover="221">token</span> =</span>
+<span id="L169">        <span class="const token" data-verso-hover="235">decide</span> (s = m') := <span class="kw">fun</span> s hs =&gt; ((htok s hs).<span class="const token" data-verso-hover="69">1</span>.<span class="const token" data-verso-hover="272">trans</span> (hL' s hs).<span class="const token" data-verso-hover="69">1</span>)</span>
+<span id="L170">    <span class="kw">refine</span> ⟨<span class="kw">fun</span> a c hac ⟨p, q, hp, hq⟩ =&gt; ?_, <span class="kw">fun</span> D' hB' hvn =&gt; ?_⟩</span>
+<span id="L171">    · <span class="kw">obtain</span> ⟨s1, hs1, e1⟩ := hpos (c, p)</span>
+<span id="L172">      <span class="kw">obtain</span> ⟨s2, hs2, e2⟩ := hpos (a, q)</span>
+<span id="L173">      <span class="kw">rw</span> [← e1, hFtok s1 hs1] <span class="kw">at</span> hp</span>
+<span id="L174">      <span class="kw">rw</span> [← e2, hFtok s2 hs2] <span class="kw">at</span> hq</span>
+<span id="L175">      <span class="kw">simp</span> only [<span class="const token" data-verso-hover="377">decide_eq_true_eq</span>] <span class="kw">at</span> hp hq</span>
+<span id="L176">      <span class="kw">subst</span> hp hq</span>
+<span id="L177">      <span class="kw">exact</span> hac (<span class="const token" data-verso-hover="217">congrArg</span> <span class="const token" data-verso-hover="58">Prod.fst</span> (e2.<span class="const token" data-verso-hover="258">symm</span>.<span class="const token" data-verso-hover="272">trans</span> e1))</span>
+<span id="L178">    · <span class="kw">have</span> hleadD : ∀ w, R.<span class="const token" data-verso-hover="229">lead</span> (<span class="const token" data-verso-hover="246">vn</span> D' w).<span class="const token" data-verso-hover="220">ringState</span> = R.<span class="const token" data-verso-hover="229">lead</span> (<span class="const token" data-verso-hover="246">vn</span> D w).<span class="const token" data-verso-hover="220">ringState</span> := <span class="kw">by</span></span>
+<span id="L179">        <span class="kw">rw</span> [hvn]; <span class="kw">exact</span> hlead'</span>
+<span id="L180">      <span class="kw">refine</span> ⟨<span class="const token" data-verso-hover="364">good_of</span> hdeg hinj hok (<span class="const token" data-verso-hover="378">funext</span> hB'.<span class="const token" data-verso-hover="69">1</span>) hB' hs ?_ w0 (<span class="kw">by</span> <span class="kw">rw</span> [hleadD]; <span class="kw">exact</span> hl)</span>
+<span id="L181">        ⟨m', hm', b', <span class="kw">fun</span> s hs =&gt; ?_⟩, hleadD⟩</span>
+<span id="L182">      · <span class="kw">rw</span> [hvn]; <span class="kw">exact</span> hr.<span class="const token" data-verso-hover="313">step</span> hrs</span>
+<span id="L183">      · <span class="kw">rw</span> [hvn]; <span class="kw">exact</span> ⟨(htok s hs).<span class="const token" data-verso-hover="69">1</span>.<span class="const token" data-verso-hover="272">trans</span> (hL' s hs).<span class="const token" data-verso-hover="69">1</span>, (htok s hs).<span class="const token" data-verso-hover="67">2</span>.<span class="const token" data-verso-hover="272">trans</span> (hL' s hs).<span class="const token" data-verso-hover="67">2</span>⟩</span>
+<span id="L184">  <span class="kw">obtain</span> ⟨u, x, hux, o, ⟨ch, hch, <span class="kw">rfl</span>⟩, <span class="kw">rfl</span>⟩ := h</span>
+<span id="L185">  <span class="kw">rcases</span> <span class="const token" data-verso-hover="379">exists_vperm_of_adj</span> hdeg hinj hok hux <span class="kw">with</span> ⟨i, hi⟩ | ⟨j, hj⟩</span>
+<span id="L186">  · <span class="kw">subst</span> hi</span>
+<span id="L187">    <span class="kw">obtain</span> ⟨hT, hG⟩ := after (u, i) ch.<span class="const token" data-verso-hover="226">ρ</span> (hch.<span class="const token" data-verso-hover="69">1</span> _ _)</span>
+<span id="L188">    <span class="kw">obtain</span> ⟨-, h2⟩ := <span class="const token" data-verso-hover="269">interact_fwd</span> hdeg hinj hok R hB (u, i) ch hch</span>
+<span id="L189">    <span class="kw">obtain</span> ⟨hB', hvn⟩ := h2 (hT _ _ (<span class="const token" data-verso-hover="262">node_ne_vperm</span> hdeg hinj hok (u, i)))</span>
+<span id="L190">    <span class="kw">exact</span> hG _ hB' hvn</span>
+<span id="L191">  · <span class="kw">subst</span> hj</span>
+<span id="L192">    <span class="kw">obtain</span> ⟨hT, hG⟩ := after (x, j) ch.<span class="const token" data-verso-hover="226">ρ</span> (hch.<span class="const token" data-verso-hover="69">1</span> _ _)</span>
+<span id="L193">    <span class="kw">obtain</span> ⟨-, h2⟩ := <span class="const token" data-verso-hover="278">interact_bwd</span> hdeg hinj hok R hB (x, j) ch hch</span>
+<span id="L194">    <span class="kw">obtain</span> ⟨hB', hvn⟩ := h2 (hT _ _ (<span class="const token" data-verso-hover="262">node_ne_vperm</span> hdeg hinj hok (x, j)).<span class="const token" data-verso-hover="134">symm</span>)</span>
+<span id="L195">    <span class="kw">exact</span> hG _ hB' hvn</span>
+<span id="L196"></span>
+<span id="L197"><span class="kw">lemma</span> <span class="const token" data-verso-hover="380">good_reach</span> (hdeg : ∀ v, G.<span class="const token" data-verso-hover="147">degree</span> v = <span class="nu">2</span> * k) {D D' : V → <span class="const token" data-verso-hover="42">EState</span> k RS}</span>
+<span id="L198">    (hD : <span class="const token" data-verso-hover="317">Good</span> G R hdeg D) (h : (<span class="const token" data-verso-hover="92">ssEuler</span> <span class="const token" data-verso-hover="56">true</span> k R).<span class="const token" data-verso-hover="102">Reachable</span> G D D') :</span>
+<span id="L199">    <span class="const token" data-verso-hover="317">Good</span> G R hdeg D' ∧ ∀ w, R.<span class="const token" data-verso-hover="229">lead</span> (<span class="const token" data-verso-hover="246">vn</span> D' w).<span class="const token" data-verso-hover="220">ringState</span> = R.<span class="const token" data-verso-hover="229">lead</span> (<span class="const token" data-verso-hover="246">vn</span> D w).<span class="const token" data-verso-hover="220">ringState</span> := <span class="kw">by</span></span>
+<span id="L200">  <span class="kw">induction</span> h <span class="kw">with</span></span>
+<span id="L201">  | <span class="const token" data-verso-hover="104">refl</span> =&gt; <span class="kw">exact</span> ⟨hD, <span class="kw">fun</span> _ =&gt; <span class="const token" data-verso-hover="71">rfl</span>⟩</span>
+<span id="L202">  | <span class="const token" data-verso-hover="107">tail</span> _ hst ih =&gt;</span>
+<span id="L203">    <span class="kw">obtain</span> ⟨h1, h2⟩ := <span class="const token" data-verso-hover="365">good_step</span> hdeg ih.<span class="const token" data-verso-hover="69">1</span> hst</span>
+<span id="L204">    <span class="kw">exact</span> ⟨h1, <span class="kw">fun</span> w =&gt; (h2 w).<span class="const token" data-verso-hover="272">trans</span> (ih.<span class="const token" data-verso-hover="67">2</span> w)⟩</span>
+<span id="L205"></span>
+<span id="L206"><span class="dc">/-- **Lemma 3.1 (repaired), stability**: legitimate configurations are valid output-stable. -/</span></span>
+<span id="L207"><span class="kw">theorem</span> <span class="const token" data-verso-hover="25">good_validStable</span> (hdeg : ∀ v, G.<span class="const token" data-verso-hover="147">degree</span> v = <span class="nu">2</span> * k) {D : V → <span class="const token" data-verso-hover="42">EState</span> k RS}</span>
+<span id="L208">    (hD : <span class="const token" data-verso-hover="317">Good</span> G R hdeg D) : (<span class="const token" data-verso-hover="92">ssEuler</span> <span class="const token" data-verso-hover="56">true</span> k R).<span class="const token" data-verso-hover="334">ValidStable</span> G (<span class="const token" data-verso-hover="234">EState.out</span> R) D := <span class="kw">by</span></span>
+<span id="L209">  <span class="kw">classical</span></span>
+<span id="L210">  <span class="kw">refine</span> ⟨<span class="kw">fun</span> D' hD' v =&gt; ?_, ?_⟩</span>
+<span id="L211">  · <span class="kw">have</span> := (<span class="const token" data-verso-hover="380">good_reach</span> hdeg hD hD').<span class="const token" data-verso-hover="67">2</span></span>
+<span id="L212">    <span class="kw">simp</span> only [<span class="const token" data-verso-hover="234">EState.out</span>]</span>
+<span id="L213">    <span class="kw">congr</span> <span class="nu">1</span></span>
+<span id="L214">    <span class="kw">apply</span> <span class="const token" data-verso-hover="35">propext</span></span>
+<span id="L215">    <span class="kw">exact</span> <span class="const token" data-verso-hover="381">exists_congr</span> <span class="kw">fun</span> i =&gt; <span class="kw">by</span> <span class="kw">rw</span> [<span class="kw">show</span> (D' v).<span class="const token" data-verso-hover="74">node</span> i = <span class="const token" data-verso-hover="246">vn</span> D' (v, i) <span class="kw">from</span> <span class="const token" data-verso-hover="71">rfl</span>, this]; <span class="kw">rfl</span></span>
+<span id="L216">  · <span class="kw">obtain</span> ⟨hinj, hok, -, -, ⟨-, xl, hxl, hu⟩, -⟩ := hD</span>
+<span id="L217">    <span class="kw">unfold</span> <span class="const token" data-verso-hover="382">GProtocol.numLeaders</span></span>
+<span id="L218">    <span class="kw">rw</span> [<span class="const token" data-verso-hover="383">Finset.card_eq_one</span>]</span>
+<span id="L219">    <span class="kw">refine</span> ⟨xl.<span class="const token" data-verso-hover="58">1</span>, <span class="const token" data-verso-hover="384">Finset.ext</span> <span class="kw">fun</span> v =&gt; ?_⟩</span>
+<span id="L220">    <span class="kw">simp</span> only [<span class="const token" data-verso-hover="163">Finset.mem_filter</span>, <span class="const token" data-verso-hover="119">Finset.mem_univ</span>, <span class="const token" data-verso-hover="307">true_and</span>, <span class="const token" data-verso-hover="385">Finset.mem_singleton</span>, <span class="const token" data-verso-hover="234">EState.out</span>,</span>
+<span id="L221">      <span class="const token" data-verso-hover="377">decide_eq_true_eq</span>]</span>
+<span id="L222">    <span class="kw">constructor</span></span>
+<span id="L223">    · <span class="kw">rintro</span> ⟨i, hi⟩</span>
+<span id="L224">      <span class="kw">exact</span> <span class="const token" data-verso-hover="217">congrArg</span> <span class="const token" data-verso-hover="58">Prod.fst</span> (hu (v, i) hi)</span>
+<span id="L225">    · <span class="kw">rintro</span> <span class="kw">rfl</span></span>
+<span id="L226">      <span class="kw">exact</span> ⟨xl.<span class="const token" data-verso-hover="59">2</span>, hxl⟩</span>
+<span id="L227"></span>
+<span id="L228"><span class="dc">/-! ### Reaching a legitimate configuration or an error (Lemma 3.2) -/</span></span>
+<span id="L229"></span>
+<span id="L230"><span class="kw">section</span> Reach</span>
+<span id="L231"></span>
+<span id="L232"><span class="kw">variable</span> {S : V → <span class="const token" data-verso-hover="250">Skel</span> k} (hdeg : ∀ v, G.<span class="const token" data-verso-hover="147">degree</span> v = <span class="nu">2</span> * k) (hinj : <span class="const token" data-verso-hover="257">InjCol</span> G S) (hok : <span class="const token" data-verso-hover="259">EdgeOK</span> G S)</span>
+<span id="L233"></span>
+<span id="L234"><span class="dc">/-- **Single virtual ring**: elect a ring leader, then let the token circulate twice. -/</span></span>
+<span id="L235"><span class="kw">lemma</span> <span class="const token" data-verso-hover="27">single_reach</span> (hR : ∀ a b, (R.<span class="const token" data-verso-hover="137">δ</span> a b).<span class="const token" data-verso-hover="138">Nonempty</span>) (hRS : <span class="const token" data-verso-hover="20">RingSpec</span>.{u} R)</span>
+<span id="L236">    {C : V → <span class="const token" data-verso-hover="42">EState</span> k RS} (hB : <span class="const token" data-verso-hover="249">Base</span> G S C)</span>
+<span id="L237">    (hs : ∀ w w', (<span class="const token" data-verso-hover="13">vperm</span> hdeg hinj hok).<span class="const token" data-verso-hover="312">SameCycle</span> w w') (w : V × <span class="const token" data-verso-hover="82">Fin</span> k) :</span>
+<span id="L238">    ∃ D, (<span class="const token" data-verso-hover="92">ssEuler</span> <span class="const token" data-verso-hover="56">true</span> k R).<span class="const token" data-verso-hover="102">Reachable</span> G C D ∧ (<span class="const token" data-verso-hover="282">Err</span> D ∨ <span class="const token" data-verso-hover="317">Good</span> G R hdeg D) := <span class="kw">by</span></span>
+<span id="L239">  <span class="kw">classical</span></span>
+<span id="L240">  <span class="kw">set</span> σ := <span class="const token" data-verso-hover="13">vperm</span> hdeg hinj hok <span class="kw">with</span> hσ</span>
+<span id="L241">  <span class="kw">have</span> hcard : <span class="nu">3</span> ≤ <span class="const token" data-verso-hover="136">Fintype.card</span> (V × <span class="const token" data-verso-hover="82">Fin</span> k) := (<span class="const token" data-verso-hover="347">three_le_cycle</span> hdeg hinj hok w).<span class="const token" data-verso-hover="290">trans</span></span>
+<span id="L242">    (<span class="const token" data-verso-hover="358">Fintype.card_le_of_injective</span> <span class="const token" data-verso-hover="218">Subtype.val</span> <span class="const token" data-verso-hover="375">Subtype.val_injective</span>)</span>
+<span id="L243">  <span class="kw">obtain</span> ⟨c', hc', hv⟩ := hRS (V × <span class="const token" data-verso-hover="82">Fin</span> k) σ hs hcard (<span class="kw">fun</span> w =&gt; (<span class="const token" data-verso-hover="246">vn</span> C w).<span class="const token" data-verso-hover="220">ringState</span>)</span>
+<span id="L244">  <span class="kw">obtain</span> ⟨D1, h1, hD1⟩ := <span class="const token" data-verso-hover="386">lift_ring</span> (R := R) hdeg hinj hok σ <span class="const token" data-verso-hover="181">id</span> <span class="const token" data-verso-hover="369">Function.injective_id</span></span>
+<span id="L245">    (<span class="kw">fun</span> _ =&gt; <span class="const token" data-verso-hover="71">rfl</span>) hR C hB c' hc'</span>
+<span id="L246">  <span class="kw">rcases</span> hD1 <span class="kw">with</span> hE | ⟨hB1, hr1, -⟩</span>
+<span id="L247">  · <span class="kw">exact</span> ⟨D1, h1, <span class="const token" data-verso-hover="301">Or.inl</span> hE⟩</span>
+<span id="L248">  <span class="kw">have</span> hv1 : <span class="const token" data-verso-hover="310">RingValidOn</span> R σ (<span class="kw">fun</span> x =&gt; (<span class="const token" data-verso-hover="246">vn</span> D1 (<span class="const token" data-verso-hover="181">id</span> x)).<span class="const token" data-verso-hover="220">ringState</span>) := <span class="kw">by</span> <span class="kw">rw</span> [hr1]; <span class="kw">exact</span> hv</span>
+<span id="L249">  <span class="kw">obtain</span> ⟨xl, hxl, -⟩ := hv.<span class="const token" data-verso-hover="67">2</span></span>
+<span id="L250">  <span class="kw">have</span> hxl1 : R.<span class="const token" data-verso-hover="229">lead</span> (<span class="const token" data-verso-hover="246">vn</span> D1 (<span class="const token" data-verso-hover="181">id</span> xl)).<span class="const token" data-verso-hover="220">ringState</span> = <span class="const token" data-verso-hover="56">true</span> := <span class="kw">by</span></span>
+<span id="L251">    <span class="kw">have</span> := <span class="const token" data-verso-hover="79">congrFun</span> hr1 xl; <span class="kw">rw</span> [this]; <span class="kw">exact</span> hxl</span>
+<span id="L252">  <span class="kw">have</span> hN : <span class="const token" data-verso-hover="360">Function.minimalPeriod</span> σ (<span class="const token" data-verso-hover="181">id</span> xl) = <span class="const token" data-verso-hover="136">Fintype.card</span> (V × <span class="const token" data-verso-hover="82">Fin</span> k) :=</span>
+<span id="L253">    <span class="const token" data-verso-hover="359">period_eq_card</span> σ _ (hs _)</span>
+<span id="L254">  <span class="kw">obtain</span> ⟨D2, h2, hD2⟩ := <span class="const token" data-verso-hover="387">token_run</span> (R := R) hdeg hinj hok σ <span class="const token" data-verso-hover="181">id</span> <span class="const token" data-verso-hover="369">Function.injective_id</span></span>
+<span id="L255">    (<span class="kw">fun</span> _ =&gt; <span class="const token" data-verso-hover="71">rfl</span>) hR D1 hB1 hv1 xl hxl1 (<span class="kw">fun</span> t =&gt; ⟨_, <span class="const token" data-verso-hover="71">rfl</span>⟩)</span>
+<span id="L256">    (<span class="nu">2</span> * <span class="const token" data-verso-hover="360">Function.minimalPeriod</span> σ (<span class="const token" data-verso-hover="181">id</span> xl) + <span class="nu">0</span>)</span>
+<span id="L257">  <span class="kw">rcases</span> hD2 <span class="kw">with</span> hE | ⟨hB2, hr2, hl2, -, ht2⟩</span>
+<span id="L258">  · <span class="kw">exact</span> ⟨D2, h1.<span class="const token" data-verso-hover="115">trans</span> h2, <span class="const token" data-verso-hover="301">Or.inl</span> hE⟩</span>
+<span id="L259">  <span class="kw">have</span> hL := <span class="const token" data-verso-hover="14">TokenRing.run_legit</span> (N := <span class="const token" data-verso-hover="360">Function.minimalPeriod</span> σ (<span class="const token" data-verso-hover="181">id</span> xl)) (<span class="kw">by</span> <span class="kw">omega</span>)</span>
+<span id="L260">    (<span class="kw">fun</span> t =&gt; (<span class="const token" data-verso-hover="246">vn</span> D1 ((σ ^ t) (<span class="const token" data-verso-hover="181">id</span> xl))).<span class="const token" data-verso-hover="221">token</span>, <span class="kw">fun</span> t =&gt; (<span class="const token" data-verso-hover="246">vn</span> D1 ((σ ^ t) (<span class="const token" data-verso-hover="181">id</span> xl))).<span class="const token" data-verso-hover="222">bit</span>)</span>
+<span id="L261">    (p := <span class="nu">0</span>) (<span class="kw">by</span> <span class="kw">omega</span>)</span>
+<span id="L262">  <span class="kw">refine</span> ⟨D2, h1.<span class="const token" data-verso-hover="115">trans</span> h2, <span class="const token" data-verso-hover="305">Or.inr</span> (<span class="const token" data-verso-hover="364">good_of</span> hdeg hinj hok (<span class="const token" data-verso-hover="378">funext</span> hB2.<span class="const token" data-verso-hover="69">1</span>) hB2 hs hr2 xl</span>
+<span id="L263">    (<span class="kw">by</span> <span class="kw">rw</span> [<span class="kw">show</span> <span class="const token" data-verso-hover="246">vn</span> D2 xl = <span class="const token" data-verso-hover="246">vn</span> D2 (<span class="const token" data-verso-hover="181">id</span> xl) <span class="kw">from</span> <span class="const token" data-verso-hover="71">rfl</span>, hl2 xl]; <span class="kw">exact</span> hxl1)</span>
+<span id="L264">    ⟨<span class="nu">0</span>, <span class="kw">by</span> <span class="kw">omega</span>, (<span class="const token" data-verso-hover="246">vn</span> D1 ((σ ^ <span class="nu">0</span>) (<span class="const token" data-verso-hover="181">id</span> xl))).<span class="const token" data-verso-hover="222">bit</span>, <span class="kw">fun</span> t ht =&gt; ?_⟩)⟩</span>
+<span id="L265">  <span class="kw">rw</span> [← hN] <span class="kw">at</span> ht</span>
+<span id="L266">  <span class="kw">exact</span> ⟨(ht2 t ht).<span class="const token" data-verso-hover="69">1</span>.<span class="const token" data-verso-hover="272">trans</span> (hL t ht).<span class="const token" data-verso-hover="69">1</span>, (ht2 t ht).<span class="const token" data-verso-hover="67">2</span>.<span class="const token" data-verso-hover="272">trans</span> (hL t ht).<span class="const token" data-verso-hover="67">2</span>⟩</span>
+<span id="L267"></span>
+<span id="L268"><span class="dc">/-- **Several virtual rings**: elect a leader on two rings sharing a node, move their tokens to</span></span>
+<span id="L269"><span class="dc">adjacent nodes; the multiple-leader detection fires. -/</span></span>
+<span id="L270"><span class="kw">lemma</span> <span class="const token" data-verso-hover="11">multi_reach</span> (hconn : G.<span class="const token" data-verso-hover="110">Connected</span>) (hR : ∀ a b, (R.<span class="const token" data-verso-hover="137">δ</span> a b).<span class="const token" data-verso-hover="138">Nonempty</span>)</span>
+<span id="L271">    (hRS : <span class="const token" data-verso-hover="20">RingSpec</span>.{u} R) {C : V → <span class="const token" data-verso-hover="42">EState</span> k RS} (hB : <span class="const token" data-verso-hover="249">Base</span> G S C)</span>
+<span id="L272">    (hm : ¬ ∀ w w', (<span class="const token" data-verso-hover="13">vperm</span> hdeg hinj hok).<span class="const token" data-verso-hover="312">SameCycle</span> w w') :</span>
+<span id="L273">    ∃ D, (<span class="const token" data-verso-hover="92">ssEuler</span> <span class="const token" data-verso-hover="56">true</span> k R).<span class="const token" data-verso-hover="102">Reachable</span> G C D ∧ <span class="const token" data-verso-hover="282">Err</span> D := <span class="kw">by</span></span>
+<span id="L274">  <span class="kw">classical</span></span>
+<span id="L275">  <span class="kw">set</span> σ := <span class="const token" data-verso-hover="13">vperm</span> hdeg hinj hok <span class="kw">with</span> hσ</span>
+<span id="L276">  <span class="cm">--</span><span class="cm"> a node with virtual nodes on two different rings</span></span>
+<span id="L277">  <span class="kw">obtain</span> ⟨v, i, j, hij⟩ : ∃ v i j, ¬ σ.<span class="const token" data-verso-hover="312">SameCycle</span> (v, i) (v, j) := <span class="kw">by</span></span>
+<span id="L278">    <span class="kw">by_contra</span> hcon</span>
+<span id="L279">    push <span class="const token" data-verso-hover="284">Not</span> <span class="kw">at</span> hcon</span>
+<span id="L280">    <span class="kw">apply</span> hm</span>
+<span id="L281">    <span class="kw">have</span> key : ∀ u x, G.<span class="const token" data-verso-hover="101">Reachable</span> u x → ∀ i j, σ.<span class="const token" data-verso-hover="312">SameCycle</span> (u, i) (x, j) := <span class="kw">by</span></span>
+<span id="L282">      <span class="kw">intro</span> u x hr</span>
+<span id="L283">      <span class="kw">obtain</span> ⟨p⟩ := hr</span>
+<span id="L284">      <span class="kw">induction</span> p <span class="kw">with</span></span>
+<span id="L285">      | <span class="const token" data-verso-hover="103">nil</span> =&gt; <span class="kw">exact</span> hcon _</span>
+<span id="L286">      | @<span class="const token" data-verso-hover="105">cons</span> a b c hadj p ih =&gt;</span>
+<span id="L287">        <span class="kw">intro</span> i j</span>
+<span id="L288">        <span class="kw">rcases</span> <span class="const token" data-verso-hover="379">exists_vperm_of_adj</span> hdeg hinj hok hadj <span class="kw">with</span> ⟨i0, hi0⟩ | ⟨j0, hj0⟩</span>
+<span id="L289">        · <span class="kw">have</span> h1 : σ.<span class="const token" data-verso-hover="312">SameCycle</span> (a, i0) (σ (a, i0)) :=</span>
+<span id="L290">            <span class="const token" data-verso-hover="340">Equiv.Perm.sameCycle_apply_right</span>.<span class="const token" data-verso-hover="133">2</span> (<span class="const token" data-verso-hover="349">Equiv.Perm.SameCycle.refl</span> _ _)</span>
+<span id="L291">          <span class="kw">have</span> he : σ (a, i0) = (b, (σ (a, i0)).<span class="const token" data-verso-hover="59">2</span>) := <span class="const token" data-verso-hover="388">Prod.ext</span> hi0 <span class="const token" data-verso-hover="71">rfl</span></span>
+<span id="L292">          <span class="kw">rw</span> [he] <span class="kw">at</span> h1</span>
+<span id="L293">          <span class="kw">exact</span> (hcon a i i0).<span class="const token" data-verso-hover="345">trans</span> (h1.<span class="const token" data-verso-hover="345">trans</span> (ih _ j))</span>
+<span id="L294">        · <span class="kw">have</span> h1 : σ.<span class="const token" data-verso-hover="312">SameCycle</span> (b, j0) (σ (b, j0)) :=</span>
+<span id="L295">            <span class="const token" data-verso-hover="340">Equiv.Perm.sameCycle_apply_right</span>.<span class="const token" data-verso-hover="133">2</span> (<span class="const token" data-verso-hover="349">Equiv.Perm.SameCycle.refl</span> _ _)</span>
+<span id="L296">          <span class="kw">have</span> he : σ (b, j0) = (a, (σ (b, j0)).<span class="const token" data-verso-hover="59">2</span>) := <span class="const token" data-verso-hover="388">Prod.ext</span> hj0 <span class="const token" data-verso-hover="71">rfl</span></span>
+<span id="L297">          <span class="kw">rw</span> [he] <span class="kw">at</span> h1</span>
+<span id="L298">          <span class="kw">exact</span> (hcon a i _).<span class="const token" data-verso-hover="345">trans</span> (h1.<span class="const token" data-verso-hover="344">symm</span>.<span class="const token" data-verso-hover="345">trans</span> (ih j0 j))</span>
+<span id="L299">    <span class="kw">intro</span> w w'</span>
+<span id="L300">    <span class="kw">exact</span> key w.<span class="const token" data-verso-hover="58">1</span> w'.<span class="const token" data-verso-hover="58">1</span> (hconn.<span class="const token" data-verso-hover="114">preconnected</span> w.<span class="const token" data-verso-hover="58">1</span> w'.<span class="const token" data-verso-hover="58">1</span>) w.<span class="const token" data-verso-hover="59">2</span> w'.<span class="const token" data-verso-hover="59">2</span></span>
+<span id="L301">  <span class="kw">set</span> a : V × <span class="const token" data-verso-hover="82">Fin</span> k := (v, i) <span class="kw">with</span> ha</span>
+<span id="L302">  <span class="kw">set</span> b : V × <span class="const token" data-verso-hover="82">Fin</span> k := (v, j) <span class="kw">with</span> hb</span>
+<span id="L303">  <span class="kw">have</span> hnotB : ∀ x : <span class="const token" data-verso-hover="337">Cyc</span> hdeg hinj hok b, x.<span class="const token" data-verso-hover="218">val</span> ≠ a := <span class="kw">fun</span> x hx =&gt; hij (<span class="kw">by</span></span>
+<span id="L304">    <span class="kw">have</span> := x.<span class="const token" data-verso-hover="343">2</span>; <span class="kw">rw</span> [hx] <span class="kw">at</span> this; <span class="kw">exact</span> this.<span class="const token" data-verso-hover="344">symm</span>)</span>
+<span id="L305">  <span class="kw">have</span> hnotA : ∀ x : <span class="const token" data-verso-hover="337">Cyc</span> hdeg hinj hok a, x.<span class="const token" data-verso-hover="218">val</span> ≠ σ b := <span class="kw">fun</span> x hx =&gt; hij (<span class="kw">by</span></span>
+<span id="L306">    <span class="kw">have</span> := x.<span class="const token" data-verso-hover="343">2</span>; <span class="kw">rw</span> [hx] <span class="kw">at</span> this; <span class="kw">exact</span> this.<span class="const token" data-verso-hover="345">trans</span> (<span class="const token" data-verso-hover="340">Equiv.Perm.sameCycle_apply_right</span>.<span class="const token" data-verso-hover="117">1</span></span>
+<span id="L307">      (<span class="const token" data-verso-hover="349">Equiv.Perm.SameCycle.refl</span> _ _)))</span>
+<span id="L308">  <span class="cm">--</span><span class="cm"> 1. ring of `a`</span></span>
+<span id="L309">  <span class="kw">obtain</span> ⟨cA, hcA, hvA⟩ := hRS (<span class="const token" data-verso-hover="337">Cyc</span> hdeg hinj hok a) (<span class="const token" data-verso-hover="338">cycτ</span> hdeg hinj hok a)</span>
+<span id="L310">    (<span class="const token" data-verso-hover="342">cycτ_single</span> hdeg hinj hok a) (<span class="const token" data-verso-hover="347">three_le_cycle</span> hdeg hinj hok a)</span>
+<span id="L311">    (<span class="kw">fun</span> x =&gt; (<span class="const token" data-verso-hover="246">vn</span> C x.<span class="const token" data-verso-hover="218">val</span>).<span class="const token" data-verso-hover="220">ringState</span>)</span>
+<span id="L312">  <span class="kw">obtain</span> ⟨D1, h1, hD1⟩ := <span class="const token" data-verso-hover="386">lift_ring</span> (R := R) hdeg hinj hok (<span class="const token" data-verso-hover="338">cycτ</span> hdeg hinj hok a) <span class="const token" data-verso-hover="218">Subtype.val</span></span>
+<span id="L313">    <span class="const token" data-verso-hover="375">Subtype.val_injective</span> (<span class="const token" data-verso-hover="341">cycτ_val</span> hdeg hinj hok a) hR C hB cA hcA</span>
+<span id="L314">  <span class="kw">rcases</span> hD1 <span class="kw">with</span> hE | ⟨hB1, hr1, -⟩</span>
+<span id="L315">  · <span class="kw">exact</span> ⟨D1, h1, hE⟩</span>
+<span id="L316">  <span class="cm">--</span><span class="cm"> 2. ring of `b`</span></span>
+<span id="L317">  <span class="kw">obtain</span> ⟨cB, hcB, hvB⟩ := hRS (<span class="const token" data-verso-hover="337">Cyc</span> hdeg hinj hok b) (<span class="const token" data-verso-hover="338">cycτ</span> hdeg hinj hok b)</span>
+<span id="L318">    (<span class="const token" data-verso-hover="342">cycτ_single</span> hdeg hinj hok b) (<span class="const token" data-verso-hover="347">three_le_cycle</span> hdeg hinj hok b)</span>
+<span id="L319">    (<span class="kw">fun</span> x =&gt; (<span class="const token" data-verso-hover="246">vn</span> D1 x.<span class="const token" data-verso-hover="218">val</span>).<span class="const token" data-verso-hover="220">ringState</span>)</span>
+<span id="L320">  <span class="kw">obtain</span> ⟨D2, h2, hD2⟩ := <span class="const token" data-verso-hover="386">lift_ring</span> (R := R) hdeg hinj hok (<span class="const token" data-verso-hover="338">cycτ</span> hdeg hinj hok b) <span class="const token" data-verso-hover="218">Subtype.val</span></span>
+<span id="L321">    <span class="const token" data-verso-hover="375">Subtype.val_injective</span> (<span class="const token" data-verso-hover="341">cycτ_val</span> hdeg hinj hok b) hR D1 hB1 cB hcB</span>
+<span id="L322">  <span class="kw">rcases</span> hD2 <span class="kw">with</span> hE | ⟨hB2, hr2, hout2⟩</span>
+<span id="L323">  · <span class="kw">exact</span> ⟨D2, h1.<span class="const token" data-verso-hover="115">trans</span> h2, hE⟩</span>
+<span id="L324">  <span class="kw">have</span> outB : ∀ x : <span class="const token" data-verso-hover="337">Cyc</span> hdeg hinj hok a, ∀ y : <span class="const token" data-verso-hover="337">Cyc</span> hdeg hinj hok b, y.<span class="const token" data-verso-hover="218">val</span> ≠ x.<span class="const token" data-verso-hover="218">val</span> :=</span>
+<span id="L325">    <span class="kw">fun</span> x y hxy =&gt; hij (x.<span class="const token" data-verso-hover="343">2</span>.<span class="const token" data-verso-hover="345">trans</span> (<span class="kw">by</span> <span class="kw">rw</span> [← hxy]; <span class="kw">exact</span> y.<span class="const token" data-verso-hover="343">2</span>.<span class="const token" data-verso-hover="344">symm</span>))</span>
+<span id="L326">  <span class="kw">have</span> hvA2 : <span class="const token" data-verso-hover="310">RingValidOn</span> R (<span class="const token" data-verso-hover="338">cycτ</span> hdeg hinj hok a) (<span class="kw">fun</span> x =&gt; (<span class="const token" data-verso-hover="246">vn</span> D2 x.<span class="const token" data-verso-hover="218">val</span>).<span class="const token" data-verso-hover="220">ringState</span>) := <span class="kw">by</span></span>
+<span id="L327">    <span class="kw">have</span> : (<span class="kw">fun</span> x : <span class="const token" data-verso-hover="337">Cyc</span> hdeg hinj hok a =&gt; (<span class="const token" data-verso-hover="246">vn</span> D2 x.<span class="const token" data-verso-hover="218">val</span>).<span class="const token" data-verso-hover="220">ringState</span>) = cA := <span class="kw">by</span></span>
+<span id="L328">      <span class="kw">funext</span> x; <span class="kw">rw</span> [hout2 x.<span class="const token" data-verso-hover="218">val</span> (<span class="kw">fun</span> y =&gt; outB x y)]; <span class="kw">exact</span> <span class="const token" data-verso-hover="79">congrFun</span> hr1 x</span>
+<span id="L329">    <span class="kw">rw</span> [this]; <span class="kw">exact</span> hvA</span>
+<span id="L330">  <span class="cm">--</span><span class="cm"> 3. token of ring `a` to `a`</span></span>
+<span id="L331">  <span class="kw">obtain</span> ⟨xlA, hxlA, -⟩ := hvA2.<span class="const token" data-verso-hover="67">2</span></span>
+<span id="L332">  <span class="kw">obtain</span> ⟨p, hp, hpa⟩ := (<span class="const token" data-verso-hover="362">sameCycle_iff_exists_lt</span> σ xlA.<span class="const token" data-verso-hover="218">val</span>).<span class="const token" data-verso-hover="117">1</span> (xlA.<span class="const token" data-verso-hover="343">2</span>.<span class="const token" data-verso-hover="344">symm</span>)</span>
+<span id="L333">  <span class="kw">obtain</span> ⟨D3, h3, hD3⟩ := <span class="const token" data-verso-hover="387">token_run</span> (R := R) hdeg hinj hok (<span class="const token" data-verso-hover="338">cycτ</span> hdeg hinj hok a) <span class="const token" data-verso-hover="218">Subtype.val</span></span>
+<span id="L334">    <span class="const token" data-verso-hover="375">Subtype.val_injective</span> (<span class="const token" data-verso-hover="341">cycτ_val</span> hdeg hinj hok a) hR D2 hB2 hvA2 xlA hxlA</span>
+<span id="L335">    (<span class="kw">fun</span> t =&gt; ⟨⟨_, xlA.<span class="const token" data-verso-hover="343">2</span>.<span class="const token" data-verso-hover="345">trans</span> ⟨t, <span class="kw">by</span> <span class="kw">simp</span>⟩⟩, <span class="const token" data-verso-hover="71">rfl</span>⟩)</span>
+<span id="L336">    (<span class="nu">2</span> * <span class="const token" data-verso-hover="360">Function.minimalPeriod</span> σ xlA.<span class="const token" data-verso-hover="218">val</span> + p)</span>
+<span id="L337">  <span class="kw">rcases</span> hD3 <span class="kw">with</span> hE | ⟨hB3, -, -, hout3, ht3⟩</span>
+<span id="L338">  · <span class="kw">exact</span> ⟨D3, (h1.<span class="const token" data-verso-hover="115">trans</span> h2).<span class="const token" data-verso-hover="115">trans</span> h3, hE⟩</span>
+<span id="L339">  <span class="kw">have</span> hNA : <span class="nu">2</span> ≤ <span class="const token" data-verso-hover="360">Function.minimalPeriod</span> σ xlA.<span class="const token" data-verso-hover="218">val</span> := <span class="kw">by</span></span>
+<span id="L340">    <span class="kw">by_contra</span> hlt</span>
+<span id="L341">    <span class="kw">have</span> hpos := <span class="const token" data-verso-hover="366">period_pos</span> σ xlA.<span class="const token" data-verso-hover="218">val</span></span>
+<span id="L342">    <span class="kw">have</span> h1' : <span class="const token" data-verso-hover="360">Function.minimalPeriod</span> σ xlA.<span class="const token" data-verso-hover="218">val</span> = <span class="nu">1</span> := <span class="kw">by</span> <span class="kw">omega</span></span>
+<span id="L343">    <span class="kw">have</span> := <span class="const token" data-verso-hover="389">pow_period</span> σ xlA.<span class="const token" data-verso-hover="218">val</span></span>
+<span id="L344">    <span class="kw">rw</span> [h1', <span class="const token" data-verso-hover="390">pow_one</span>] <span class="kw">at</span> this</span>
+<span id="L345">    <span class="kw">exact</span> <span class="const token" data-verso-hover="335">vperm_ne</span> hdeg hinj hok _ this</span>
+<span id="L346">  <span class="kw">have</span> hLA := <span class="const token" data-verso-hover="14">TokenRing.run_legit</span> hNA</span>
+<span id="L347">    (<span class="kw">fun</span> t =&gt; (<span class="const token" data-verso-hover="246">vn</span> D2 ((σ ^ t) xlA.<span class="const token" data-verso-hover="218">val</span>)).<span class="const token" data-verso-hover="221">token</span>, <span class="kw">fun</span> t =&gt; (<span class="const token" data-verso-hover="246">vn</span> D2 ((σ ^ t) xlA.<span class="const token" data-verso-hover="218">val</span>)).<span class="const token" data-verso-hover="222">bit</span>) hp</span>
+<span id="L348">  <span class="kw">have</span> htokA : (<span class="const token" data-verso-hover="246">vn</span> D3 a).<span class="const token" data-verso-hover="221">token</span> = <span class="const token" data-verso-hover="56">true</span> := <span class="kw">by</span></span>
+<span id="L349">    <span class="kw">rw</span> [← hpa, (ht3 p hp).<span class="const token" data-verso-hover="69">1</span>, (hLA p hp).<span class="const token" data-verso-hover="69">1</span>]; <span class="kw">simp</span></span>
+<span id="L350">  <span class="cm">--</span><span class="cm"> 4. token of ring `b` to `σ b`</span></span>
+<span id="L351">  <span class="kw">have</span> hvB3 : <span class="const token" data-verso-hover="310">RingValidOn</span> R (<span class="const token" data-verso-hover="338">cycτ</span> hdeg hinj hok b) (<span class="kw">fun</span> x =&gt; (<span class="const token" data-verso-hover="246">vn</span> D3 x.<span class="const token" data-verso-hover="218">val</span>).<span class="const token" data-verso-hover="220">ringState</span>) := <span class="kw">by</span></span>
+<span id="L352">    <span class="kw">have</span> : (<span class="kw">fun</span> x : <span class="const token" data-verso-hover="337">Cyc</span> hdeg hinj hok b =&gt; (<span class="const token" data-verso-hover="246">vn</span> D3 x.<span class="const token" data-verso-hover="218">val</span>).<span class="const token" data-verso-hover="220">ringState</span>) = cB := <span class="kw">by</span></span>
+<span id="L353">      <span class="kw">funext</span> y; <span class="kw">rw</span> [hout3 y.<span class="const token" data-verso-hover="218">val</span> (<span class="kw">fun</span> x hx =&gt; outB x y hx.<span class="const token" data-verso-hover="258">symm</span>)]; <span class="kw">exact</span> <span class="const token" data-verso-hover="79">congrFun</span> hr2 y</span>
+<span id="L354">    <span class="kw">rw</span> [this]; <span class="kw">exact</span> hvB</span>
+<span id="L355">  <span class="kw">obtain</span> ⟨xlB, hxlB, -⟩ := hvB3.<span class="const token" data-verso-hover="67">2</span></span>
+<span id="L356">  <span class="kw">have</span> hσb : σ.<span class="const token" data-verso-hover="312">SameCycle</span> xlB.<span class="const token" data-verso-hover="218">val</span> (σ b) :=</span>
+<span id="L357">    xlB.<span class="const token" data-verso-hover="343">2</span>.<span class="const token" data-verso-hover="344">symm</span>.<span class="const token" data-verso-hover="345">trans</span> (<span class="const token" data-verso-hover="340">Equiv.Perm.sameCycle_apply_right</span>.<span class="const token" data-verso-hover="133">2</span> (<span class="const token" data-verso-hover="349">Equiv.Perm.SameCycle.refl</span> _ _))</span>
+<span id="L358">  <span class="kw">obtain</span> ⟨q, hq, hqb⟩ := (<span class="const token" data-verso-hover="362">sameCycle_iff_exists_lt</span> σ xlB.<span class="const token" data-verso-hover="218">val</span>).<span class="const token" data-verso-hover="117">1</span> hσb</span>
+<span id="L359">  <span class="kw">obtain</span> ⟨D4, h4, hD4⟩ := <span class="const token" data-verso-hover="387">token_run</span> (R := R) hdeg hinj hok (<span class="const token" data-verso-hover="338">cycτ</span> hdeg hinj hok b) <span class="const token" data-verso-hover="218">Subtype.val</span></span>
+<span id="L360">    <span class="const token" data-verso-hover="375">Subtype.val_injective</span> (<span class="const token" data-verso-hover="341">cycτ_val</span> hdeg hinj hok b) hR D3 hB3 hvB3 xlB hxlB</span>
+<span id="L361">    (<span class="kw">fun</span> t =&gt; ⟨⟨_, xlB.<span class="const token" data-verso-hover="343">2</span>.<span class="const token" data-verso-hover="345">trans</span> ⟨t, <span class="kw">by</span> <span class="kw">simp</span>⟩⟩, <span class="const token" data-verso-hover="71">rfl</span>⟩)</span>
+<span id="L362">    (<span class="nu">2</span> * <span class="const token" data-verso-hover="360">Function.minimalPeriod</span> σ xlB.<span class="const token" data-verso-hover="218">val</span> + q)</span>
+<span id="L363">  <span class="kw">rcases</span> hD4 <span class="kw">with</span> hE | ⟨hB4, -, -, hout4, ht4⟩</span>
+<span id="L364">  · <span class="kw">exact</span> ⟨D4, ((h1.<span class="const token" data-verso-hover="115">trans</span> h2).<span class="const token" data-verso-hover="115">trans</span> h3).<span class="const token" data-verso-hover="115">trans</span> h4, hE⟩</span>
+<span id="L365">  <span class="kw">have</span> hNB : <span class="nu">2</span> ≤ <span class="const token" data-verso-hover="360">Function.minimalPeriod</span> σ xlB.<span class="const token" data-verso-hover="218">val</span> := <span class="kw">by</span></span>
+<span id="L366">    <span class="kw">by_contra</span> hlt</span>
+<span id="L367">    <span class="kw">have</span> hpos := <span class="const token" data-verso-hover="366">period_pos</span> σ xlB.<span class="const token" data-verso-hover="218">val</span></span>
+<span id="L368">    <span class="kw">have</span> h1' : <span class="const token" data-verso-hover="360">Function.minimalPeriod</span> σ xlB.<span class="const token" data-verso-hover="218">val</span> = <span class="nu">1</span> := <span class="kw">by</span> <span class="kw">omega</span></span>
+<span id="L369">    <span class="kw">have</span> := <span class="const token" data-verso-hover="389">pow_period</span> σ xlB.<span class="const token" data-verso-hover="218">val</span></span>
+<span id="L370">    <span class="kw">rw</span> [h1', <span class="const token" data-verso-hover="390">pow_one</span>] <span class="kw">at</span> this</span>
+<span id="L371">    <span class="kw">exact</span> <span class="const token" data-verso-hover="335">vperm_ne</span> hdeg hinj hok _ this</span>
+<span id="L372">  <span class="kw">have</span> hLB := <span class="const token" data-verso-hover="14">TokenRing.run_legit</span> hNB</span>
+<span id="L373">    (<span class="kw">fun</span> t =&gt; (<span class="const token" data-verso-hover="246">vn</span> D3 ((σ ^ t) xlB.<span class="const token" data-verso-hover="218">val</span>)).<span class="const token" data-verso-hover="221">token</span>, <span class="kw">fun</span> t =&gt; (<span class="const token" data-verso-hover="246">vn</span> D3 ((σ ^ t) xlB.<span class="const token" data-verso-hover="218">val</span>)).<span class="const token" data-verso-hover="222">bit</span>) hq</span>
+<span id="L374">  <span class="kw">have</span> htokB : (<span class="const token" data-verso-hover="246">vn</span> D4 (σ b)).<span class="const token" data-verso-hover="221">token</span> = <span class="const token" data-verso-hover="56">true</span> := <span class="kw">by</span></span>
+<span id="L375">    <span class="kw">rw</span> [← hqb, (ht4 q hq).<span class="const token" data-verso-hover="69">1</span>, (hLB q hq).<span class="const token" data-verso-hover="69">1</span>]; <span class="kw">simp</span></span>
+<span id="L376">  <span class="kw">have</span> htokA4 : (<span class="const token" data-verso-hover="246">vn</span> D4 a).<span class="const token" data-verso-hover="221">token</span> = <span class="const token" data-verso-hover="56">true</span> := <span class="kw">by</span></span>
+<span id="L377">    <span class="kw">rw</span> [hout4 a (<span class="kw">fun</span> y =&gt; hnotB y)]; <span class="kw">exact</span> htokA</span>
+<span id="L378">  <span class="cm">--</span><span class="cm"> 5. the interaction on the virtual edge `b → σ b` detects two tokens</span></span>
+<span id="L379">  <span class="kw">obtain</span> ⟨ch0, hch0, -⟩ := <span class="const token" data-verso-hover="139">exists_valid_choice</span> R hR (D4 v).<span class="const token" data-verso-hover="45">color</span> (D4 v)</span>
+<span id="L380">  <span class="kw">let</span> ch : <span class="const token" data-verso-hover="41">EChoice</span> k RS := { ch0 <span class="kw">with</span> <span class="const token" data-verso-hover="49">b1</span> := <span class="const token" data-verso-hover="56">true</span> }</span>
+<span id="L381">  <span class="kw">have</span> hch : ch.<span class="const token" data-verso-hover="53">Valid</span> R := hch0</span>
+<span id="L382">  <span class="kw">obtain</span> ⟨hT1, -⟩ := <span class="const token" data-verso-hover="269">interact_fwd</span> hdeg hinj hok R hB4 b ch hch</span>
+<span id="L383">  <span class="kw">have</span> hab : a ≠ b := <span class="kw">fun</span> h =&gt; hij (<span class="kw">by</span> <span class="kw">rw</span> [h])</span>
+<span id="L384">  <span class="kw">have</span> haσ : a ≠ σ b := <span class="kw">fun</span> h =&gt; hnotA ⟨a, <span class="const token" data-verso-hover="349">Equiv.Perm.SameCycle.refl</span> _ _⟩ h</span>
+<span id="L385">  <span class="kw">have</span> hT : <span class="const token" data-verso-hover="261">TokBoth</span> (<span class="const token" data-verso-hover="260">vnAfter</span> hdeg hinj hok R D4 ch.<span class="const token" data-verso-hover="226">ρ</span> b) b.<span class="const token" data-verso-hover="58">1</span> (σ b).<span class="const token" data-verso-hover="58">1</span> := <span class="kw">by</span></span>
+<span id="L386">    <span class="kw">refine</span> ⟨(σ b).<span class="const token" data-verso-hover="59">2</span>, i, ?_, ?_⟩</span>
+<span id="L387">    · <span class="kw">have</span> hv : <span class="const token" data-verso-hover="260">vnAfter</span> hdeg hinj hok R D4 ch.<span class="const token" data-verso-hover="226">ρ</span> b ((σ b).<span class="const token" data-verso-hover="58">1</span>, (σ b).<span class="const token" data-verso-hover="59">2</span>) =</span>
+<span id="L388">          (<span class="const token" data-verso-hover="228">vEdge</span> R ch.<span class="const token" data-verso-hover="226">ρ</span> (<span class="const token" data-verso-hover="246">vn</span> D4 b) (<span class="const token" data-verso-hover="246">vn</span> D4 (σ b))).<span class="const token" data-verso-hover="59">2</span> := <span class="kw">by</span> <span class="kw">simp</span> [<span class="const token" data-verso-hover="260">vnAfter</span>, hσ]</span>
+<span id="L389">      <span class="kw">rw</span> [hv]</span>
+<span id="L390">      <span class="kw">obtain</span> ⟨hF1, hF2⟩ := <span class="const token" data-verso-hover="391">vEdge_tok</span> (R := R) ch.<span class="const token" data-verso-hover="226">ρ</span> (<span class="const token" data-verso-hover="246">vn</span> D4 b) (<span class="const token" data-verso-hover="246">vn</span> D4 (σ b))</span>
+<span id="L391">      <span class="kw">by_cases</span> hf : (R.<span class="const token" data-verso-hover="229">lead</span> (ch.<span class="const token" data-verso-hover="226">ρ</span> (<span class="const token" data-verso-hover="246">vn</span> D4 b).<span class="const token" data-verso-hover="220">ringState</span> (<span class="const token" data-verso-hover="246">vn</span> D4 (σ b)).<span class="const token" data-verso-hover="220">ringState</span>).<span class="const token" data-verso-hover="59">2</span> = <span class="const token" data-verso-hover="94">false</span> ∧</span>
+<span id="L392">          (<span class="const token" data-verso-hover="246">vn</span> D4 (σ b)).<span class="const token" data-verso-hover="222">bit</span> ≠ (<span class="const token" data-verso-hover="246">vn</span> D4 b).<span class="const token" data-verso-hover="222">bit</span>) ∨</span>
+<span id="L393">          (R.<span class="const token" data-verso-hover="229">lead</span> (ch.<span class="const token" data-verso-hover="226">ρ</span> (<span class="const token" data-verso-hover="246">vn</span> D4 b).<span class="const token" data-verso-hover="220">ringState</span> (<span class="const token" data-verso-hover="246">vn</span> D4 (σ b)).<span class="const token" data-verso-hover="220">ringState</span>).<span class="const token" data-verso-hover="59">2</span> = <span class="const token" data-verso-hover="56">true</span> ∧</span>
+<span id="L394">          (<span class="const token" data-verso-hover="246">vn</span> D4 b).<span class="const token" data-verso-hover="222">bit</span> = (<span class="const token" data-verso-hover="246">vn</span> D4 (σ b)).<span class="const token" data-verso-hover="222">bit</span>)</span>
+<span id="L395">      · <span class="kw">exact</span> (hF1 hf).<span class="const token" data-verso-hover="67">2</span><span class="nu">.</span><span class="const token" data-verso-hover="67">2</span><span class="nu">.</span><span class="const token" data-verso-hover="69">1</span></span>
+<span id="L396">      · <span class="kw">rw</span> [(hF2 hf).<span class="const token" data-verso-hover="67">2</span><span class="nu">.</span><span class="const token" data-verso-hover="67">2</span><span class="nu">.</span><span class="const token" data-verso-hover="69">1</span>]; <span class="kw">exact</span> htokB</span>
+<span id="L397">    · <span class="kw">have</span> hv : <span class="const token" data-verso-hover="260">vnAfter</span> hdeg hinj hok R D4 ch.<span class="const token" data-verso-hover="226">ρ</span> b (b.<span class="const token" data-verso-hover="58">1</span>, i) = <span class="const token" data-verso-hover="246">vn</span> D4 a := <span class="kw">by</span></span>
+<span id="L398">        <span class="kw">simp</span> only [<span class="const token" data-verso-hover="260">vnAfter</span>]</span>
+<span id="L399">        <span class="kw">rw</span> [<span class="const token" data-verso-hover="268">Function.update_of_ne</span> haσ, <span class="const token" data-verso-hover="268">Function.update_of_ne</span> hab]</span>
+<span id="L400">      <span class="kw">rw</span> [hv]; <span class="kw">exact</span> htokA4</span>
+<span id="L401">  <span class="kw">exact</span> ⟨_, (((h1.<span class="const token" data-verso-hover="115">trans</span> h2).<span class="const token" data-verso-hover="115">trans</span> h3).<span class="const token" data-verso-hover="115">trans</span> h4).<span class="const token" data-verso-hover="107">tail</span></span>
+<span id="L402">    (<span class="const token" data-verso-hover="95">step_of_choice</span> <span class="const token" data-verso-hover="56">true</span> D4 (<span class="const token" data-verso-hover="263">adj_vperm</span> hdeg hinj hok b) ch hch), b.<span class="const token" data-verso-hover="58">1</span>, (hT1 hT).<span class="const token" data-verso-hover="272">trans</span> <span class="const token" data-verso-hover="71">rfl</span>⟩</span>
+<span id="L403"></span>
+<span id="L404"><span class="kw">end</span> Reach</span>
+<span id="L405"></span>
+<span id="L406"><span class="dc">/-- **Theorem 3.3 (repaired SS-EulerCycle)**, reachability form. On every connected `2k`-regular</span></span>
+<span id="L407"><span class="dc">graph (`k ≥ 1`) and for every ring protocol with nonempty transition sets satisfying `RingSpec`</span></span>
+<span id="L408"><span class="dc">(SSLE on directed rings, the property of the Ring-Protocol of [11]), from every configuration of</span></span>
+<span id="L409"><span class="dc">the repaired SS-EulerCycle a valid output-stable configuration is reachable. -/</span></span>
+<span id="L410"><span class="kw">theorem</span> <span class="const token" data-verso-hover="28">repaired_selfStab</span> (hconn : G.<span class="const token" data-verso-hover="110">Connected</span>) (hdeg : ∀ v, G.<span class="const token" data-verso-hover="147">degree</span> v = <span class="nu">2</span> * k) (hk : <span class="nu">1</span> ≤ k)</span>
+<span id="L411">    (hR : ∀ a b, (R.<span class="const token" data-verso-hover="137">δ</span> a b).<span class="const token" data-verso-hover="138">Nonempty</span>) (hRS : <span class="const token" data-verso-hover="20">RingSpec</span>.{u} R) (r0 : RS) :</span>
+<span id="L412">    (<span class="const token" data-verso-hover="92">ssEuler</span> <span class="const token" data-verso-hover="56">true</span> k R).<span class="const token" data-verso-hover="392">SelfStab</span> G (<span class="const token" data-verso-hover="234">EState.out</span> R) := <span class="kw">by</span></span>
+<span id="L413">  <span class="kw">classical</span></span>
+<span id="L414">  <span class="kw">obtain</span> ⟨Dg, hDg⟩ := <span class="const token" data-verso-hover="24">exists_good</span> hconn hdeg hk hRS r0</span>
+<span id="L415">  <span class="kw">have</span> hV : <span class="nu">2</span> ≤ <span class="const token" data-verso-hover="136">Fintype.card</span> V := <span class="kw">by</span></span>
+<span id="L416">    <span class="kw">obtain</span> ⟨v⟩ := hconn.<span class="const token" data-verso-hover="171">nonempty</span></span>
+<span id="L417">    <span class="kw">have</span> := G.<span class="const token" data-verso-hover="393">degree_lt_card_verts</span> v</span>
+<span id="L418">    <span class="kw">rw</span> [hdeg v] <span class="kw">at</span> this; <span class="kw">omega</span></span>
+<span id="L419">  <span class="kw">refine</span> <span class="const token" data-verso-hover="22">GProtocol.derc_lemma'</span> <span class="const token" data-verso-hover="282">Err</span> ?_ ?_</span>
+<span id="L420">  · <span class="kw">rintro</span> C ⟨u, hu⟩</span>
+<span id="L421">    <span class="kw">exact</span> ⟨Dg, <span class="const token" data-verso-hover="25">good_validStable</span> hdeg hDg, <span class="const token" data-verso-hover="12">err_reach_all</span> hconn hV hR hk <span class="const token" data-verso-hover="56">true</span> C hu Dg⟩</span>
+<span id="L422">  · <span class="kw">intro</span> C _</span>
+<span id="L423">    <span class="kw">rcases</span> <span class="const token" data-verso-hover="26">error_or_coherent</span> (G := G) hR hk C <span class="kw">with</span> ⟨D, hD, hE⟩ | ⟨hinj, hok, hB⟩</span>
+<span id="L424">    · <span class="kw">exact</span> <span class="const token" data-verso-hover="301">Or.inl</span> ⟨D, hE, hD⟩</span>
+<span id="L425">    <span class="kw">by_cases</span> hs : ∀ w w', (<span class="const token" data-verso-hover="13">vperm</span> hdeg hinj hok).<span class="const token" data-verso-hover="312">SameCycle</span> w w'</span>
+<span id="L426">    · <span class="kw">obtain</span> ⟨v⟩ := hconn.<span class="const token" data-verso-hover="171">nonempty</span></span>
+<span id="L427">      <span class="kw">obtain</span> ⟨D, hD, hD'⟩ := <span class="const token" data-verso-hover="27">single_reach</span> hdeg hinj hok hR hRS hB hs (v, ⟨<span class="nu">0</span>, hk⟩)</span>
+<span id="L428">      <span class="kw">rcases</span> hD' <span class="kw">with</span> hE | hG</span>
+<span id="L429">      · <span class="kw">exact</span> <span class="const token" data-verso-hover="301">Or.inl</span> ⟨D, hE, hD⟩</span>
+<span id="L430">      · <span class="kw">exact</span> <span class="const token" data-verso-hover="305">Or.inr</span> ⟨D, <span class="const token" data-verso-hover="25">good_validStable</span> hdeg hG, hD⟩</span>
+<span id="L431">    · <span class="kw">obtain</span> ⟨D, hD, hE⟩ := <span class="const token" data-verso-hover="11">multi_reach</span> hdeg hinj hok hconn hR hRS hB hs</span>
+<span id="L432">      <span class="kw">exact</span> <span class="const token" data-verso-hover="301">Or.inl</span> ⟨D, hE, hD⟩</span>
+<span id="L433"></span>
+<span id="L434"><span class="dc">/-- **Theorem 3.3 (repaired SS-EulerCycle)**, the paper's formulation: every globally fair</span></span>
+<span id="L435"><span class="dc">execution reaches a valid output-stable configuration (exactly one leader, forever). -/</span></span>
+<span id="L436"><span class="kw">theorem</span> <span class="const token" data-verso-hover="9">repaired_solvesSSLE</span> [<span class="const token" data-verso-hover="237">Finite</span> RS] (hconn : G.<span class="const token" data-verso-hover="110">Connected</span>) (hdeg : ∀ v, G.<span class="const token" data-verso-hover="147">degree</span> v = <span class="nu">2</span> * k)</span>
+<span id="L437">    (hk : <span class="nu">1</span> ≤ k) (hR : ∀ a b, (R.<span class="const token" data-verso-hover="137">δ</span> a b).<span class="const token" data-verso-hover="138">Nonempty</span>) (hRS : <span class="const token" data-verso-hover="20">RingSpec</span>.{u} R) (r0 : RS) :</span>
+<span id="L438">    (<span class="const token" data-verso-hover="92">ssEuler</span> <span class="const token" data-verso-hover="56">true</span> k R).<span class="const token" data-verso-hover="16">SolvesSSLE</span> G (<span class="const token" data-verso-hover="234">EState.out</span> R) := <span class="kw">by</span></span>
+<span id="L439">  <span class="kw">have</span> := <span class="const token" data-verso-hover="239">EState.finite</span> (k := k) (RS := RS)</span>
+<span id="L440">  <span class="kw">have</span> hedge : ∃ u v, G.<span class="const token" data-verso-hover="91">Adj</span> u v := <span class="kw">by</span></span>
+<span id="L441">    <span class="kw">obtain</span> ⟨v⟩ := hconn.<span class="const token" data-verso-hover="171">nonempty</span></span>
+<span id="L442">    <span class="kw">have</span> : <span class="nu">0</span> &lt; G.<span class="const token" data-verso-hover="147">degree</span> v := <span class="kw">by</span> <span class="kw">rw</span> [hdeg v]; <span class="kw">omega</span></span>
+<span id="L443">    <span class="kw">obtain</span> ⟨w, hw⟩ := (G.<span class="const token" data-verso-hover="333">degree_pos_iff_exists_adj</span> v).<span class="const token" data-verso-hover="117">1</span> this</span>
+<span id="L444">    <span class="kw">exact</span> ⟨v, w, hw⟩</span>
+<span id="L445">  <span class="kw">exact</span> (<span class="const token" data-verso-hover="17">GProtocol.solvesSSLE_iff</span> hedge (<span class="const token" data-verso-hover="244">ssEuler_nonempty</span> <span class="const token" data-verso-hover="56">true</span> R hR) _).<span class="const token" data-verso-hover="133">2</span></span>
+<span id="L446">    (<span class="const token" data-verso-hover="28">repaired_selfStab</span> hconn hdeg hk hR hRS r0)</span>
+<span id="L447"></span>
+<span id="L448"><span class="kw">end</span> SSLERegular</span>
+<span id="L449"></span>
+</code></div>
+        <script>
+          window.versoHoversUrl = "PODC2020/SSLERegular/-hovers.json";</script>
+        <script src="static/lean/popper.js"></script>
+        <script src="static/lean/tippy.js"></script>
+        <script src="static/lean/marked.js"></script>
+        <script src="static/lean/highlighting.js"></script>
+        <script src="static/lean/lean.js"></script>
+        </article></main><footer class="site-footer"><div class="wrap">
+        Machine-checked formalizations of PODC papers in Lean 4. Generated with <a href="https://github.com/leanprover/verso">Verso</a> from the README files of <a href="https://github.com/vasnesterov/formal_podc">vasnesterov/formal_podc</a>.</div>
+      </footer></body>
+  </html>
+

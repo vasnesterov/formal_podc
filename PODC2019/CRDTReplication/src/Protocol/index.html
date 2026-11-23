@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="light dark">
+    <link rel="icon" href="data:,">
+    <title>CRDTReplication: Protocol.lean · Formal PODC</title><base href="../../../.././"><link rel="stylesheet" href="static/lean/verso-vars.css">
+    <link rel="stylesheet" href="static/lean/highlighting.css">
+    <link rel="stylesheet" href="static/lean/tippy-border.css">
+    <link rel="stylesheet" href="static/style.css">
+    <script defer="defer" src="static/site.js"></script>
+    </head>
+  <body>
+    <header class="site-header">
+      <div class="wrap">
+        <a class="brand" href=".">Formal PODC</a><nav class="top">
+          <a href=".">Search</a><a href="about/">About</a><a href="https://github.com/vasnesterov/formal_podc">GitHub</a></nav>
+        </div>
+      </header>
+    <main class="wrap"><article><nav class="breadcrumbs" aria-label="Breadcrumb">
+          <a href=".">Search</a><span class="sep">›</span><a href="PODC2019/">PODC 2019</a><span class="sep">›</span><a href="PODC2019/CRDTReplication/">CRDTReplication</a><span class="sep">›</span><a href="PODC2019/CRDTReplication/src/">Lean source</a><span class="sep">›</span><span aria-current="page">Protocol</span></nav>
+        <h1>
+          <code>Protocol.lean</code></h1>
+        <div class="paper-links">
+          <p>
+            Source of <a href="PODC2019/CRDTReplication/">Linearizable SMR of State-Based CRDTs without Logs — PODC 2019</a> · <a href="https://github.com/vasnesterov/formal_podc/blob/main/Papers/PODC2019/CRDTReplication/Protocol.lean">GitHub</a> · hover over a name for its type and documentation</p>
+          </div>
+        <div class="lean-code lean-src">
+          <code class="hl lean block" data-lean-context="Protocol"><span id="L1"><span class="kw">import</span> Papers.PODC2019.CRDTReplication.CRDT</span>
+<span id="L2"><span class="kw">import</span> Cslib.Computability.Distributed.MessagePassing.Async</span>
+<span id="L3"></span>
+<span id="L4"><span class="dc">/-!</span></span>
+<span id="L5"><span class="dc"># Algorithm 2: linearizable state machine replication of state-based CRDTs</span></span>
+<span id="L6"></span>
+<span id="L7"><span class="dc">The protocol of Section III-B as a CSLib asynchronous message-passing protocol</span></span>
+<span id="L8"><span class="dc">(`Cslib.AsyncMP.Protocol`): every process is both a proposer and an acceptor.</span></span>
+<span id="L9"></span>
+<span id="L10"><span class="dc">**Acceptor** (lines 27–49). Local variables: payload `s` and round `r = (rnr, rid)`, initially</span></span>
+<span id="L11"><span class="dc">`(s₀, (0, ⊥))`.</span></span>
+<span id="L12"><span class="dc">* `apply_update(u)` (called by the local proposer): `s ← u(s)`, `rid ← ⊥`.</span></span>
+<span id="L13"><span class="dc">* `MERGE(s')`: `s ← s ⊔ s'`, `rid ← ⊥`, reply `MERGED`.</span></span>
+<span id="L14"><span class="dc">* `PREPARE(r', s')`: `s ← s ⊔ s'`; an incremental prepare (`r'nr = ⊥`) gets the number</span></span>
+<span id="L15"><span class="dc">  `rnr + 1`; if `r'nr &gt; rnr` then `r ← r'` and reply `ACK(r, s)`.</span></span>
+<span id="L16"><span class="dc">* `VOTE(r', s')`: `s ← s ⊔ s'`; if `r' = r` reply `VOTED(s')`.</span></span>
+<span id="L17"></span>
+<span id="L18"><span class="dc">**Proposer** (lines 1–26).</span></span>
+<span id="L19"><span class="dc">* Update `u`: apply it on the local acceptor, send `MERGE(s)` to the other acceptors, respond</span></span>
+<span id="L20"><span class="dc">  once `MERGED` has been received from a quorum (the local acceptor counts as merged).</span></span>
+<span id="L21"><span class="dc">* Query `q`: `PREPARE((⊥, id), s₀)` to all acceptors. Once `ACK`s from (a superset of) a quorum</span></span>
+<span id="L22"><span class="dc">  are received, with `s'` the LUB of the received states:</span></span>
+<span id="L23"><span class="dc">  (a) if all received states are equal to `s'`, `s'` is *learned by consistent quorum*;</span></span>
+<span id="L24"><span class="dc">  (b) else if all received rounds are equal to `r`, send `VOTE(r, s')` to all acceptors;</span></span>
+<span id="L25"><span class="dc">  `s'` is *learned by vote* once `VOTED(s')` is received from a quorum (line 24);</span></span>
+<span id="L26"><span class="dc">  (c) else retry with the fixed prepare `PREPARE((max R + 1, new_id), s')`.</span></span>
+<span id="L27"><span class="dc">  The query returns `cmd_q` applied to the learned state.</span></span>
+<span id="L28"><span class="dc">* Retries after a `NACK` (Section III-B, "Retrying Requests") are modelled by the internal action</span></span>
+<span id="L29"><span class="dc">  `retry n`: at any time, a pending query may abandon its current attempt and start a new one,</span></span>
+<span id="L30"><span class="dc">  incremental (`n = none`) or fixed (`n = some k`), carrying the LUB of the payloads received.</span></span>
+<span id="L31"></span>
+<span id="L32"><span class="dc">Message ids: the attempt id `(p, k, j)` (proposer, index of the operation of `p`, attempt</span></span>
+<span id="L33"><span class="dc">counter) plays the role of the round ID `rid` and of the request id of the paper; the round of an</span></span>
+<span id="L34"><span class="dc">attempt is `(n, id)`. `VOTED` messages carry the round they answer.</span></span>
+<span id="L35"></span>
+<span id="L36"><span class="dc">**Variants** (`Variant`): `cons` is the test of line 13 (`sᵢ ≡ s'`; equality in the paper's</span></span>
+<span id="L37"><span class="dc">intended reading, `Variant.paper`), and `fix` adds our repair: an acceptor answers `VOTED` only</span></span>
+<span id="L38"><span class="dc">if, in addition, its payload before the merge is `⊑ s'` (`Variant.fixed`).</span></span>
+<span id="L39"></span>
+<span id="L40"><span class="dc">**Ghost state.** `learned k = some (s, v)`: the `k`-th operation of the process was a query that</span></span>
+<span id="L41"><span class="dc">learned `s` (`v = true`: by vote). It is written exactly when the query returns.</span></span>
+<span id="L42"><span class="dc">-/</span></span>
+<span id="L43"></span>
+<span id="L44"><span class="kw">namespace</span> Podc.CRDTReplication</span>
+<span id="L45"></span>
+<span id="L46"><span class="kw">open</span> Cslib.SharedMemory Cslib.AsyncMP</span>
+<span id="L47"></span>
+<span id="L48"><span class="kw">variable</span> (P : <span class="kw">Type</span>) (D : <span class="const token" data-verso-hover="12">CRDT</span>)</span>
+<span id="L49"></span>
+<span id="L50"><span class="dc">/-- Attempt (request / round) identifiers `(proposer, operation index, attempt counter)`. -/</span></span>
+<span id="L51"><span class="kw">abbrev</span> <span class="const token" data-verso-hover="160">Rid</span> := P × <span class="const token" data-verso-hover="245">ℕ</span> × <span class="const token" data-verso-hover="245">ℕ</span></span>
+<span id="L52"></span>
+<span id="L53"><span class="dc">/-- Messages of Algorithm 2. -/</span></span>
+<span id="L54"><span class="kw">inductive</span> <span class="const token" data-verso-hover="35">Msg</span> <span class="kw">where</span></span>
+<span id="L55">  <span class="dc">/-- `MERGE(s)` for the `k`-th operation of the sender. -/</span></span>
+<span id="L56">  | <span class="const token" data-verso-hover="169">merge</span> (k : <span class="const token" data-verso-hover="245">ℕ</span>) (s : D.<span class="const token" data-verso-hover="36">S</span>)</span>
+<span id="L57">  <span class="dc">/-- `MERGED` for the `k`-th operation of the receiver. -/</span></span>
+<span id="L58">  | <span class="const token" data-verso-hover="170">merged</span> (k : <span class="const token" data-verso-hover="245">ℕ</span>)</span>
+<span id="L59">  <span class="dc">/-- `PREPARE((n, i), s)`; `n = none` is an incremental prepare. -/</span></span>
+<span id="L60">  | <span class="const token" data-verso-hover="75">prepare</span> (i : <span class="const token" data-verso-hover="160">Rid</span> P) (n : <span class="const token" data-verso-hover="74">Option</span> <span class="const token" data-verso-hover="245">ℕ</span>) (s : D.<span class="const token" data-verso-hover="36">S</span>)</span>
+<span id="L61">  <span class="dc">/-- `ACK((n, i), s)`. -/</span></span>
+<span id="L62">  | <span class="const token" data-verso-hover="37">ack</span> (n : <span class="const token" data-verso-hover="245">ℕ</span>) (i : <span class="const token" data-verso-hover="160">Rid</span> P) (s : D.<span class="const token" data-verso-hover="36">S</span>)</span>
+<span id="L63">  <span class="dc">/-- `VOTE((n, i), s)`. -/</span></span>
+<span id="L64">  | <span class="const token" data-verso-hover="172">vote</span> (n : <span class="const token" data-verso-hover="245">ℕ</span>) (i : <span class="const token" data-verso-hover="160">Rid</span> P) (s : D.<span class="const token" data-verso-hover="36">S</span>)</span>
+<span id="L65">  <span class="dc">/-- `VOTED(s)` answering `VOTE((n, i), s)`. -/</span></span>
+<span id="L66">  | <span class="const token" data-verso-hover="38">voted</span> (n : <span class="const token" data-verso-hover="245">ℕ</span>) (i : <span class="const token" data-verso-hover="160">Rid</span> P) (s : D.<span class="const token" data-verso-hover="36">S</span>)</span>
+<span id="L67">  <span class="kw">deriving</span> <span class="const token" data-verso-hover="30">DecidableEq</span></span>
+<span id="L68"></span>
+<span id="L69"><span class="dc">/-- The control state of the proposer. -/</span></span>
+<span id="L70"><span class="kw">inductive</span> <span class="const token" data-verso-hover="533">Phase</span> <span class="kw">where</span></span>
+<span id="L71">  <span class="dc">/-- No pending operation. -/</span></span>
+<span id="L72">  | <span class="const token" data-verso-hover="457">idle</span></span>
+<span id="L73">  <span class="dc">/-- Pending update (the `k`-th operation), acceptors known to have merged. -/</span></span>
+<span id="L74">  | <span class="const token" data-verso-hover="478">upd</span> (k : <span class="const token" data-verso-hover="245">ℕ</span>) (merged : <span class="const token" data-verso-hover="32">Finset</span> P)</span>
+<span id="L75">  <span class="dc">/-- Pending query `q`, attempt `i`, waiting for `ACK`s (received: round number and state). -/</span></span>
+<span id="L76">  | <span class="const token" data-verso-hover="479">prep</span> (q : D.<span class="const token" data-verso-hover="117">Q</span>) (i : <span class="const token" data-verso-hover="160">Rid</span> P) (acks : P → <span class="const token" data-verso-hover="74">Option</span> (<span class="const token" data-verso-hover="245">ℕ</span> × D.<span class="const token" data-verso-hover="36">S</span>))</span>
+<span id="L77">  <span class="dc">/-- Pending query `q`, attempt `i`, proposed `VOTE((n, i), s)`, acceptors that voted. -/</span></span>
+<span id="L78">  | <span class="const token" data-verso-hover="480">vote</span> (q : D.<span class="const token" data-verso-hover="117">Q</span>) (i : <span class="const token" data-verso-hover="160">Rid</span> P) (n : <span class="const token" data-verso-hover="245">ℕ</span>) (s : D.<span class="const token" data-verso-hover="36">S</span>) (voted : <span class="const token" data-verso-hover="32">Finset</span> P)</span>
+<span id="L79"></span>
+<span id="L80"><span class="dc">/-- Local state of a process (acceptor part, proposer part, ghost). -/</span></span>
+<span id="L81"><span class="kw">structure</span> <span class="const token" data-verso-hover="40">Loc</span> <span class="kw">where</span></span>
+<span id="L82">  <span class="dc">/-- Acceptor payload `s`. -/</span></span>
+<span id="L83">  <span class="const token" data-verso-hover="44">s</span> : D.<span class="const token" data-verso-hover="36">S</span></span>
+<span id="L84">  <span class="dc">/-- Acceptor round number `rnr`. -/</span></span>
+<span id="L85">  <span class="const token" data-verso-hover="43">rnr</span> : <span class="const token" data-verso-hover="245">ℕ</span></span>
+<span id="L86">  <span class="dc">/-- Acceptor round id `rid` (`none` = `⊥`). -/</span></span>
+<span id="L87">  <span class="const token" data-verso-hover="47">rid</span> : <span class="const token" data-verso-hover="74">Option</span> (<span class="const token" data-verso-hover="160">Rid</span> P)</span>
+<span id="L88">  <span class="dc">/-- Number of operations invoked so far at this process. -/</span></span>
+<span id="L89">  <span class="const token" data-verso-hover="477">nOps</span> : <span class="const token" data-verso-hover="245">ℕ</span></span>
+<span id="L90">  <span class="dc">/-- Attempt counter (for `new_id()`). -/</span></span>
+<span id="L91">  <span class="const token" data-verso-hover="534">nAtt</span> : <span class="const token" data-verso-hover="245">ℕ</span></span>
+<span id="L92">  <span class="dc">/-- Proposer control state. -/</span></span>
+<span id="L93">  <span class="const token" data-verso-hover="456">phase</span> : <span class="const token" data-verso-hover="533">Phase</span> P D</span>
+<span id="L94">  <span class="dc">/-- Ghost: state learned by the `k`-th operation (if a query that returned), and whether it</span></span>
+<span id="L95"><span class="dc">  was learned by vote. -/</span></span>
+<span id="L96">  <span class="const token" data-verso-hover="179">learned</span> : <span class="const token" data-verso-hover="245">ℕ</span> → <span class="const token" data-verso-hover="74">Option</span> (D.<span class="const token" data-verso-hover="36">S</span> × <span class="const token" data-verso-hover="522">Bool</span>)</span>
+<span id="L97"></span>
+<span id="L98"><span class="dc">/-- Internal actions of the proposer. -/</span></span>
+<span id="L99"><span class="kw">inductive</span> <span class="const token" data-verso-hover="158">Act</span> <span class="kw">where</span></span>
+<span id="L100">  <span class="dc">/-- Act on the messages received so far (the "on receive … from a quorum" handlers). -/</span></span>
+<span id="L101">  | <span class="const token" data-verso-hover="13">advance</span></span>
+<span id="L102">  <span class="dc">/-- Abandon the current query attempt and retry (incremental if `none`). -/</span></span>
+<span id="L103">  | <span class="const token" data-verso-hover="535">retry</span> (n : <span class="const token" data-verso-hover="74">Option</span> <span class="const token" data-verso-hover="245">ℕ</span>)</span>
+<span id="L104"></span>
+<span id="L105"><span class="dc">/-- Variants of the protocol: `cons s' sᵢ` is the test `sᵢ ≡ s'` of line 13; `fix` enables the</span></span>
+<span id="L106"><span class="dc">repaired `VOTE` handler. -/</span></span>
+<span id="L107"><span class="kw">structure</span> <span class="const token" data-verso-hover="31">Variant</span> <span class="kw">where</span></span>
+<span id="L108">  <span class="dc">/-- The consistency test of line 13. -/</span></span>
+<span id="L109">  <span class="const token" data-verso-hover="93">cons</span> : D.<span class="const token" data-verso-hover="36">S</span> → D.<span class="const token" data-verso-hover="36">S</span> → <span class="const token" data-verso-hover="522">Bool</span></span>
+<span id="L110">  <span class="dc">/-- Whether acceptors vote only if their payload is below the proposal. -/</span></span>
+<span id="L111">  <span class="const token" data-verso-hover="52">fix</span> : <span class="const token" data-verso-hover="522">Bool</span></span>
+<span id="L112"></span>
+<span id="L113"><span class="kw">namespace</span> Variant</span>
+<span id="L114"></span>
+<span id="L115"><span class="kw">variable</span> {D}</span>
+<span id="L116"></span>
+<span id="L117"><span class="dc">/-- Algorithm 2 as written (with `≡` read as equality of payloads). -/</span></span>
+<span id="L118"><span class="kw">def</span> <span class="const token" data-verso-hover="155">paper</span> : <span class="const token" data-verso-hover="31">Variant</span> D := ⟨<span class="kw">fun</span> s t =&gt; <span class="const token" data-verso-hover="374">decide</span> (s = t), <span class="const token" data-verso-hover="180">false</span>⟩</span>
+<span id="L119"></span>
+<span id="L120"><span class="dc">/-- Algorithm 2 with the repaired `VOTE` handler. -/</span></span>
+<span id="L121"><span class="kw">def</span> <span class="const token" data-verso-hover="5">fixed</span> : <span class="const token" data-verso-hover="31">Variant</span> D := ⟨<span class="kw">fun</span> s t =&gt; <span class="const token" data-verso-hover="374">decide</span> (s = t), <span class="const token" data-verso-hover="53">true</span>⟩</span>
+<span id="L122"></span>
+<span id="L123"><span class="kw">end</span> Variant</span>
+<span id="L124"></span>
+<span id="L125"><span class="kw">variable</span> {P D}</span>
+<span id="L126"><span class="kw">variable</span> [<span class="const token" data-verso-hover="29">Fintype</span> P] [<span class="const token" data-verso-hover="30">DecidableEq</span> P]</span>
+<span id="L127"></span>
+<span id="L128"><span class="dc">/-- The acceptors from which an `ACK` was received. -/</span></span>
+<span id="L129"><span class="kw">def</span> <span class="const token" data-verso-hover="491">ackers</span> (acks : P → <span class="const token" data-verso-hover="74">Option</span> (<span class="const token" data-verso-hover="245">ℕ</span> × D.<span class="const token" data-verso-hover="36">S</span>)) : <span class="const token" data-verso-hover="32">Finset</span> P :=</span>
+<span id="L130">  <span class="const token" data-verso-hover="150">Finset.univ</span>.<span class="const token" data-verso-hover="152">filter</span> <span class="kw">fun</span> a =&gt; (acks a).<span class="const token" data-verso-hover="371">isSome</span></span>
+<span id="L131"></span>
+<span id="L132"><span class="dc">/-- The state received from `a` (`s₀` if none). -/</span></span>
+<span id="L133"><span class="kw">def</span> <span class="const token" data-verso-hover="494">ackState</span> (acks : P → <span class="const token" data-verso-hover="74">Option</span> (<span class="const token" data-verso-hover="245">ℕ</span> × D.<span class="const token" data-verso-hover="36">S</span>)) (a : P) : D.<span class="const token" data-verso-hover="36">S</span> :=</span>
+<span id="L134">  ((acks a).<span class="const token" data-verso-hover="509">map</span> <span class="const token" data-verso-hover="78">Prod.snd</span>).<span class="const token" data-verso-hover="82">getD</span> D.<span class="const token" data-verso-hover="115">s₀</span></span>
+<span id="L135"></span>
+<span id="L136"><span class="dc">/-- The round number received from `a` (`0` if none). -/</span></span>
+<span id="L137"><span class="kw">def</span> <span class="const token" data-verso-hover="493">ackNr</span> (acks : P → <span class="const token" data-verso-hover="74">Option</span> (<span class="const token" data-verso-hover="245">ℕ</span> × D.<span class="const token" data-verso-hover="36">S</span>)) (a : P) : <span class="const token" data-verso-hover="245">ℕ</span> :=</span>
+<span id="L138">  ((acks a).<span class="const token" data-verso-hover="509">map</span> <span class="const token" data-verso-hover="42">Prod.fst</span>).<span class="const token" data-verso-hover="82">getD</span> <span class="nu">0</span></span>
+<span id="L139"></span>
+<span id="L140"><span class="dc">/-- The LUB of the received states (line 12). -/</span></span>
+<span id="L141"><span class="kw">def</span> <span class="const token" data-verso-hover="496">lub</span> (acks : P → <span class="const token" data-verso-hover="74">Option</span> (<span class="const token" data-verso-hover="245">ℕ</span> × D.<span class="const token" data-verso-hover="36">S</span>)) : D.<span class="const token" data-verso-hover="36">S</span> :=</span>
+<span id="L142">  <span class="const token" data-verso-hover="150">Finset.univ</span>.<span class="const token" data-verso-hover="497">fold</span> (· ⊔ ·) D.<span class="const token" data-verso-hover="115">s₀</span> (<span class="const token" data-verso-hover="494">ackState</span> acks)</span>
+<span id="L143"></span>
+<span id="L144"><span class="dc">/-- The largest received round number. -/</span></span>
+<span id="L145"><span class="kw">def</span> <span class="const token" data-verso-hover="536">maxNr</span> (acks : P → <span class="const token" data-verso-hover="74">Option</span> (<span class="const token" data-verso-hover="245">ℕ</span> × D.<span class="const token" data-verso-hover="36">S</span>)) : <span class="const token" data-verso-hover="245">ℕ</span> :=</span>
+<span id="L146">  <span class="const token" data-verso-hover="150">Finset.univ</span>.<span class="const token" data-verso-hover="537">sup</span> (<span class="const token" data-verso-hover="493">ackNr</span> acks)</span>
+<span id="L147"></span>
+<span id="L148"><span class="dc">/-- `A` contains a quorum. -/</span></span>
+<span id="L149"><span class="kw">def</span> <span class="const token" data-verso-hover="272">HasQuorum</span> (QS : <span class="const token" data-verso-hover="32">Finset</span> (<span class="const token" data-verso-hover="32">Finset</span> P)) (A : <span class="const token" data-verso-hover="32">Finset</span> P) : <span class="kw">Prop</span> := ∃ Q ∈ QS, Q ⊆ A</span>
+<span id="L150"></span>
+<span id="L151"><span class="const token" data-verso-hover="538">instance</span> (QS : <span class="const token" data-verso-hover="32">Finset</span> (<span class="const token" data-verso-hover="32">Finset</span> P)) (A : <span class="const token" data-verso-hover="32">Finset</span> P) : <span class="const token" data-verso-hover="539">Decidable</span> (<span class="const token" data-verso-hover="272">HasQuorum</span> QS A) := <span class="kw">by</span></span>
+<span id="L152">  <span class="kw">unfold</span> <span class="const token" data-verso-hover="272">HasQuorum</span>; <span class="kw">infer_instance</span></span>
+<span id="L153"></span>
+<span id="L154"><span class="dc">/-- Send `m` to all processes. -/</span></span>
+<span id="L155"><span class="kw">def</span> <span class="const token" data-verso-hover="540">toAll</span> (m : <span class="const token" data-verso-hover="35">Msg</span> P D) : <span class="const token" data-verso-hover="34">Multiset</span> (P × <span class="const token" data-verso-hover="35">Msg</span> P D) := <span class="const token" data-verso-hover="150">Finset.univ</span>.<span class="const token" data-verso-hover="541">val</span>.<span class="const token" data-verso-hover="542">map</span> <span class="kw">fun</span> a =&gt; (a, m)</span>
+<span id="L156"></span>
+<span id="L157"><span class="dc">/-- Send `m` to all processes but `p`. -/</span></span>
+<span id="L158"><span class="kw">def</span> <span class="const token" data-verso-hover="543">toOthers</span> (p : P) (m : <span class="const token" data-verso-hover="35">Msg</span> P D) : <span class="const token" data-verso-hover="34">Multiset</span> (P × <span class="const token" data-verso-hover="35">Msg</span> P D) :=</span>
+<span id="L159">  (<span class="const token" data-verso-hover="150">Finset.univ</span>.<span class="const token" data-verso-hover="152">filter</span> (· ≠ p)).<span class="const token" data-verso-hover="541">val</span>.<span class="const token" data-verso-hover="542">map</span> <span class="kw">fun</span> a =&gt; (a, m)</span>
+<span id="L160"></span>
+<span id="L161"><span class="dc">/-- Start a new attempt of query `q` (the current operation of `p`) with `PREPARE((n, id), s)`. -/</span></span>
+<span id="L162"><span class="kw">def</span> <span class="const token" data-verso-hover="250">startAttempt</span> (p : P) (l : <span class="const token" data-verso-hover="40">Loc</span> P D) (q : D.<span class="const token" data-verso-hover="117">Q</span>) (n : <span class="const token" data-verso-hover="74">Option</span> <span class="const token" data-verso-hover="245">ℕ</span>) (s : D.<span class="const token" data-verso-hover="36">S</span>) :</span>
+<span id="L163">    <span class="const token" data-verso-hover="40">Loc</span> P D × <span class="const token" data-verso-hover="34">Multiset</span> (P × <span class="const token" data-verso-hover="35">Msg</span> P D) :=</span>
+<span id="L164">  <span class="kw">let</span> i : <span class="const token" data-verso-hover="160">Rid</span> P := (p, l.<span class="const token" data-verso-hover="477">nOps</span> - <span class="nu">1</span>, l.<span class="const token" data-verso-hover="534">nAtt</span>)</span>
+<span id="L165">  ({ l <span class="kw">with</span> <span class="const token" data-verso-hover="534">nAtt</span> := l.<span class="const token" data-verso-hover="534">nAtt</span> + <span class="nu">1</span>, <span class="const token" data-verso-hover="456">phase</span> := <span class="const token" data-verso-hover="479">.</span>prep q i <span class="kw">fun</span> _ =&gt; <span class="const token" data-verso-hover="168">none</span> }, <span class="const token" data-verso-hover="540">toAll</span> (<span class="const token" data-verso-hover="75">.</span>prepare i n s))</span>
+<span id="L166"></span>
+<span id="L167"><span class="dc">/-- Invocation of an operation (lines 1–4 and 7–10). -/</span></span>
+<span id="L168"><span class="kw">def</span> <span class="const token" data-verso-hover="249">invokeStep</span> (p : P) (o : D.<span class="const token" data-verso-hover="11">spec</span>.<span class="const token" data-verso-hover="140">Op</span>) (l : <span class="const token" data-verso-hover="40">Loc</span> P D) : <span class="const token" data-verso-hover="74">Option</span> (<span class="const token" data-verso-hover="40">Loc</span> P D × <span class="const token" data-verso-hover="34">Multiset</span> (P × <span class="const token" data-verso-hover="35">Msg</span> P D)) :=</span>
+<span id="L169">  <span class="kw">match</span> l.<span class="const token" data-verso-hover="456">phase</span> <span class="kw">with</span></span>
+<span id="L170">  | <span class="const token" data-verso-hover="457">.</span>idle =&gt; <span class="const token" data-verso-hover="48">some</span> &lt;| <span class="kw">match</span> o <span class="kw">with</span></span>
+<span id="L171">    | <span class="const token" data-verso-hover="133">.</span>upd u =&gt;</span>
+<span id="L172">      ({ l <span class="kw">with</span> <span class="const token" data-verso-hover="44">s</span> := D.<span class="const token" data-verso-hover="119">app</span> u l.<span class="const token" data-verso-hover="44">s</span>, <span class="const token" data-verso-hover="47">rid</span> := <span class="const token" data-verso-hover="168">none</span>, <span class="const token" data-verso-hover="477">nOps</span> := l.<span class="const token" data-verso-hover="477">nOps</span> + <span class="nu">1</span>,</span>
+<span id="L173">                <span class="const token" data-verso-hover="456">phase</span> := <span class="const token" data-verso-hover="478">.</span>upd l.<span class="const token" data-verso-hover="477">nOps</span> {p} }, <span class="const token" data-verso-hover="543">toOthers</span> p (<span class="const token" data-verso-hover="169">.</span>merge l.<span class="const token" data-verso-hover="477">nOps</span> (D.<span class="const token" data-verso-hover="119">app</span> u l.<span class="const token" data-verso-hover="44">s</span>)))</span>
+<span id="L174">    | <span class="const token" data-verso-hover="134">.</span>qry q =&gt; <span class="const token" data-verso-hover="250">startAttempt</span> p { l <span class="kw">with</span> <span class="const token" data-verso-hover="477">nOps</span> := l.<span class="const token" data-verso-hover="477">nOps</span> + <span class="nu">1</span> } q <span class="const token" data-verso-hover="168">none</span> D.<span class="const token" data-verso-hover="115">s₀</span></span>
+<span id="L175">  | _ =&gt; <span class="const token" data-verso-hover="168">none</span></span>
+<span id="L176"></span>
+<span id="L177"><span class="dc">/-- Reception of a message by `p` from `src` (acceptor handlers, lines 34–49; proposers record</span></span>
+<span id="L178"><span class="dc">the replies). -/</span></span>
+<span id="L179"><span class="kw">def</span> <span class="const token" data-verso-hover="252">receiveStep</span> (V : <span class="const token" data-verso-hover="31">Variant</span> D) (_p src : P) (m : <span class="const token" data-verso-hover="35">Msg</span> P D) (l : <span class="const token" data-verso-hover="40">Loc</span> P D) :</span>
+<span id="L180">    <span class="const token" data-verso-hover="40">Loc</span> P D × <span class="const token" data-verso-hover="34">Multiset</span> (P × <span class="const token" data-verso-hover="35">Msg</span> P D) :=</span>
+<span id="L181">  <span class="kw">match</span> m <span class="kw">with</span></span>
+<span id="L182">  | <span class="const token" data-verso-hover="169">.</span>merge k s' =&gt; ({ l <span class="kw">with</span> <span class="const token" data-verso-hover="44">s</span> := l.<span class="const token" data-verso-hover="44">s</span> ⊔ s', <span class="const token" data-verso-hover="47">rid</span> := <span class="const token" data-verso-hover="168">none</span> }, {(src, <span class="const token" data-verso-hover="170">.</span>merged k)})</span>
+<span id="L183">  | <span class="const token" data-verso-hover="75">.</span>prepare i n s' =&gt;</span>
+<span id="L184">    <span class="kw">if</span> l.<span class="const token" data-verso-hover="43">rnr</span> &lt; n.<span class="const token" data-verso-hover="82">getD</span> (l.<span class="const token" data-verso-hover="43">rnr</span> + <span class="nu">1</span>) <span class="kw">then</span></span>
+<span id="L185">      ({ l <span class="kw">with</span> <span class="const token" data-verso-hover="44">s</span> := l.<span class="const token" data-verso-hover="44">s</span> ⊔ s', <span class="const token" data-verso-hover="43">rnr</span> := n.<span class="const token" data-verso-hover="82">getD</span> (l.<span class="const token" data-verso-hover="43">rnr</span> + <span class="nu">1</span>), <span class="const token" data-verso-hover="47">rid</span> := <span class="const token" data-verso-hover="48">some</span> i },</span>
+<span id="L186">        {(src, <span class="const token" data-verso-hover="37">.</span>ack (n.<span class="const token" data-verso-hover="82">getD</span> (l.<span class="const token" data-verso-hover="43">rnr</span> + <span class="nu">1</span>)) i (l.<span class="const token" data-verso-hover="44">s</span> ⊔ s'))})</span>
+<span id="L187">    <span class="kw">else</span> ({ l <span class="kw">with</span> <span class="const token" data-verso-hover="44">s</span> := l.<span class="const token" data-verso-hover="44">s</span> ⊔ s' }, <span class="nu">0</span>)</span>
+<span id="L188">  | <span class="const token" data-verso-hover="172">.</span>vote n i s' =&gt;</span>
+<span id="L189">    <span class="kw">if</span> l.<span class="const token" data-verso-hover="43">rnr</span> = n ∧ l.<span class="const token" data-verso-hover="47">rid</span> = <span class="const token" data-verso-hover="48">some</span> i ∧ (V.<span class="const token" data-verso-hover="52">fix</span> = <span class="const token" data-verso-hover="53">true</span> → l.<span class="const token" data-verso-hover="44">s</span> ≤ s') <span class="kw">then</span></span>
+<span id="L190">      ({ l <span class="kw">with</span> <span class="const token" data-verso-hover="44">s</span> := l.<span class="const token" data-verso-hover="44">s</span> ⊔ s' }, {(src, <span class="const token" data-verso-hover="38">.</span>voted n i s')})</span>
+<span id="L191">    <span class="kw">else</span> ({ l <span class="kw">with</span> <span class="const token" data-verso-hover="44">s</span> := l.<span class="const token" data-verso-hover="44">s</span> ⊔ s' }, <span class="nu">0</span>)</span>
+<span id="L192">  | <span class="const token" data-verso-hover="170">.</span>merged k =&gt;</span>
+<span id="L193">    (<span class="kw">match</span> l.<span class="const token" data-verso-hover="456">phase</span> <span class="kw">with</span></span>
+<span id="L194">      | <span class="const token" data-verso-hover="478">.</span>upd k' M =&gt; <span class="kw">if</span> k = k' <span class="kw">then</span> { l <span class="kw">with</span> <span class="const token" data-verso-hover="456">phase</span> := <span class="const token" data-verso-hover="478">.</span>upd k' (<span class="const token" data-verso-hover="128">insert</span> src M) } <span class="kw">else</span> l</span>
+<span id="L195">      | _ =&gt; l, <span class="nu">0</span>)</span>
+<span id="L196">  | <span class="const token" data-verso-hover="37">.</span>ack n i s' =&gt;</span>
+<span id="L197">    (<span class="kw">match</span> l.<span class="const token" data-verso-hover="456">phase</span> <span class="kw">with</span></span>
+<span id="L198">      | <span class="const token" data-verso-hover="479">.</span>prep q i' acks =&gt;</span>
+<span id="L199">        <span class="kw">if</span> i = i' <span class="kw">then</span> { l <span class="kw">with</span> <span class="const token" data-verso-hover="456">phase</span> := <span class="const token" data-verso-hover="479">.</span>prep q i' (<span class="const token" data-verso-hover="483">Function.update</span> acks src (<span class="const token" data-verso-hover="48">some</span> (n, s'))) }</span>
+<span id="L200">        <span class="kw">else</span> l</span>
+<span id="L201">      | _ =&gt; l, <span class="nu">0</span>)</span>
+<span id="L202">  | <span class="const token" data-verso-hover="38">.</span>voted n i s =&gt;</span>
+<span id="L203">    (<span class="kw">match</span> l.<span class="const token" data-verso-hover="456">phase</span> <span class="kw">with</span></span>
+<span id="L204">      | <span class="const token" data-verso-hover="480">.</span>vote q i' n' s' M =&gt;</span>
+<span id="L205">        <span class="kw">if</span> i = i' ∧ n = n' ∧ s = s' <span class="kw">then</span> { l <span class="kw">with</span> <span class="const token" data-verso-hover="456">phase</span> := <span class="const token" data-verso-hover="480">.</span>vote q i' n' s' (<span class="const token" data-verso-hover="128">insert</span> src M) } <span class="kw">else</span> l</span>
+<span id="L206">      | _ =&gt; l, <span class="nu">0</span>)</span>
+<span id="L207"></span>
+<span id="L208"><span class="dc">/-- Internal actions of the proposer (lines 5–6, 11–26, and retries). -/</span></span>
+<span id="L209"><span class="kw">def</span> <span class="const token" data-verso-hover="258">internalStep</span> (V : <span class="const token" data-verso-hover="31">Variant</span> D) (QS : <span class="const token" data-verso-hover="32">Finset</span> (<span class="const token" data-verso-hover="32">Finset</span> P)) (p : P) (a : <span class="const token" data-verso-hover="158">Act</span>) (l : <span class="const token" data-verso-hover="40">Loc</span> P D) :</span>
+<span id="L210">    <span class="const token" data-verso-hover="74">Option</span> (<span class="const token" data-verso-hover="40">Loc</span> P D × <span class="const token" data-verso-hover="34">Multiset</span> (P × <span class="const token" data-verso-hover="35">Msg</span> P D) × <span class="const token" data-verso-hover="74">Option</span> (<span class="const token" data-verso-hover="135">CRDT.Res</span> D)) :=</span>
+<span id="L211">  <span class="kw">match</span> a, l.<span class="const token" data-verso-hover="456">phase</span> <span class="kw">with</span></span>
+<span id="L212">  | <span class="const token" data-verso-hover="13">.</span>advance, <span class="const token" data-verso-hover="478">.</span>upd _ M =&gt;</span>
+<span id="L213">    <span class="kw">if</span> <span class="const token" data-verso-hover="272">HasQuorum</span> QS M <span class="kw">then</span> <span class="const token" data-verso-hover="48">some</span> ({ l <span class="kw">with</span> <span class="const token" data-verso-hover="456">phase</span> := <span class="const token" data-verso-hover="457">.</span>idle }, <span class="nu">0</span>, <span class="const token" data-verso-hover="48">some</span> <span class="const token" data-verso-hover="136">.</span>done) <span class="kw">else</span> <span class="const token" data-verso-hover="168">none</span></span>
+<span id="L214">  | <span class="const token" data-verso-hover="13">.</span>advance, <span class="const token" data-verso-hover="479">.</span>prep q i acks =&gt;</span>
+<span id="L215">    <span class="kw">if</span> <span class="const token" data-verso-hover="272">HasQuorum</span> QS (<span class="const token" data-verso-hover="491">ackers</span> acks) <span class="kw">then</span></span>
+<span id="L216">      <span class="kw">if</span> ∀ a ∈ <span class="const token" data-verso-hover="491">ackers</span> acks, V.<span class="const token" data-verso-hover="93">cons</span> (<span class="const token" data-verso-hover="496">lub</span> acks) (<span class="const token" data-verso-hover="494">ackState</span> acks a) = <span class="const token" data-verso-hover="53">true</span> <span class="kw">then</span></span>
+<span id="L217">        <span class="const token" data-verso-hover="48">some</span> ({ l <span class="kw">with</span> <span class="const token" data-verso-hover="456">phase</span> := <span class="const token" data-verso-hover="457">.</span>idle,</span>
+<span id="L218">                       <span class="const token" data-verso-hover="179">learned</span> := <span class="const token" data-verso-hover="483">Function.update</span> l.<span class="const token" data-verso-hover="179">learned</span> i.<span class="const token" data-verso-hover="78">2</span><span class="nu">.</span><span class="const token" data-verso-hover="42">1</span> (<span class="const token" data-verso-hover="48">some</span> (<span class="const token" data-verso-hover="496">lub</span> acks, <span class="const token" data-verso-hover="180">false</span>)) },</span>
+<span id="L219">          <span class="nu">0</span>, <span class="const token" data-verso-hover="48">some</span> (<span class="const token" data-verso-hover="137">.</span>val (D.<span class="const token" data-verso-hover="121">query</span> q (<span class="const token" data-verso-hover="496">lub</span> acks))))</span>
+<span id="L220">      <span class="kw">else</span> <span class="kw">if</span> ∀ a ∈ <span class="const token" data-verso-hover="491">ackers</span> acks, <span class="const token" data-verso-hover="493">ackNr</span> acks a = <span class="const token" data-verso-hover="536">maxNr</span> acks <span class="kw">then</span></span>
+<span id="L221">        <span class="const token" data-verso-hover="48">some</span> ({ l <span class="kw">with</span> <span class="const token" data-verso-hover="456">phase</span> := <span class="const token" data-verso-hover="480">.</span>vote q i (<span class="const token" data-verso-hover="536">maxNr</span> acks) (<span class="const token" data-verso-hover="496">lub</span> acks) ∅ },</span>
+<span id="L222">          <span class="const token" data-verso-hover="540">toAll</span> (<span class="const token" data-verso-hover="172">.</span>vote (<span class="const token" data-verso-hover="536">maxNr</span> acks) i (<span class="const token" data-verso-hover="496">lub</span> acks)), <span class="const token" data-verso-hover="168">none</span>)</span>
+<span id="L223">      <span class="kw">else</span></span>
+<span id="L224">        <span class="kw">let</span> x := <span class="const token" data-verso-hover="250">startAttempt</span> p l q (<span class="const token" data-verso-hover="48">some</span> (<span class="const token" data-verso-hover="536">maxNr</span> acks + <span class="nu">1</span>)) (<span class="const token" data-verso-hover="496">lub</span> acks)</span>
+<span id="L225">        <span class="const token" data-verso-hover="48">some</span> (x.<span class="const token" data-verso-hover="42">1</span>, x.<span class="const token" data-verso-hover="78">2</span>, <span class="const token" data-verso-hover="168">none</span>)</span>
+<span id="L226">    <span class="kw">else</span> <span class="const token" data-verso-hover="168">none</span></span>
+<span id="L227">  | <span class="const token" data-verso-hover="13">.</span>advance, <span class="const token" data-verso-hover="480">.</span>vote q i _ s' M =&gt;</span>
+<span id="L228">    <span class="kw">if</span> <span class="const token" data-verso-hover="272">HasQuorum</span> QS M <span class="kw">then</span></span>
+<span id="L229">      <span class="const token" data-verso-hover="48">some</span> ({ l <span class="kw">with</span> <span class="const token" data-verso-hover="456">phase</span> := <span class="const token" data-verso-hover="457">.</span>idle, <span class="const token" data-verso-hover="179">learned</span> := <span class="const token" data-verso-hover="483">Function.update</span> l.<span class="const token" data-verso-hover="179">learned</span> i.<span class="const token" data-verso-hover="78">2</span><span class="nu">.</span><span class="const token" data-verso-hover="42">1</span> (<span class="const token" data-verso-hover="48">some</span> (s', <span class="const token" data-verso-hover="53">true</span>)) },</span>
+<span id="L230">        <span class="nu">0</span>, <span class="const token" data-verso-hover="48">some</span> (<span class="const token" data-verso-hover="137">.</span>val (D.<span class="const token" data-verso-hover="121">query</span> q s')))</span>
+<span id="L231">    <span class="kw">else</span> <span class="const token" data-verso-hover="168">none</span></span>
+<span id="L232">  | <span class="const token" data-verso-hover="535">.</span>retry n, <span class="const token" data-verso-hover="479">.</span>prep q _ acks =&gt;</span>
+<span id="L233">    <span class="kw">let</span> x := <span class="const token" data-verso-hover="250">startAttempt</span> p l q n (<span class="const token" data-verso-hover="496">lub</span> acks)</span>
+<span id="L234">    <span class="const token" data-verso-hover="48">some</span> (x.<span class="const token" data-verso-hover="42">1</span>, x.<span class="const token" data-verso-hover="78">2</span>, <span class="const token" data-verso-hover="168">none</span>)</span>
+<span id="L235">  | <span class="const token" data-verso-hover="535">.</span>retry n, <span class="const token" data-verso-hover="480">.</span>vote q _ _ s' _ =&gt;</span>
+<span id="L236">    <span class="kw">let</span> x := <span class="const token" data-verso-hover="250">startAttempt</span> p l q n s'</span>
+<span id="L237">    <span class="const token" data-verso-hover="48">some</span> (x.<span class="const token" data-verso-hover="42">1</span>, x.<span class="const token" data-verso-hover="78">2</span>, <span class="const token" data-verso-hover="168">none</span>)</span>
+<span id="L238">  | _, _ =&gt; <span class="const token" data-verso-hover="168">none</span></span>
+<span id="L239"></span>
+<span id="L240"><span class="dc">/-- The initial local state. -/</span></span>
+<span id="L241"><span class="kw">def</span> <span class="const token" data-verso-hover="102">initLoc</span> : <span class="const token" data-verso-hover="40">Loc</span> P D := ⟨D.<span class="const token" data-verso-hover="115">s₀</span>, <span class="nu">0</span>, <span class="const token" data-verso-hover="168">none</span>, <span class="nu">0</span>, <span class="nu">0</span>, <span class="const token" data-verso-hover="457">.</span>idle, <span class="kw">fun</span> _ =&gt; <span class="const token" data-verso-hover="168">none</span>⟩</span>
+<span id="L242"></span>
+<span id="L243"><span class="dc">/-- **Algorithm 2** (variant `V`, quorum system `QS`) as a CSLib asynchronous message-passing</span></span>
+<span id="L244"><span class="dc">implementation of the CRDT object `D.spec`. -/</span></span>
+<span id="L245"><span class="kw">def</span> <span class="const token" data-verso-hover="96">alg</span> (V : <span class="const token" data-verso-hover="31">Variant</span> D) (QS : <span class="const token" data-verso-hover="32">Finset</span> (<span class="const token" data-verso-hover="32">Finset</span> P)) :</span>
+<span id="L246">    <span class="const token" data-verso-hover="544">Protocol</span> P D.<span class="const token" data-verso-hover="11">spec</span> (<span class="const token" data-verso-hover="40">Loc</span> P D) (<span class="const token" data-verso-hover="35">Msg</span> P D) <span class="const token" data-verso-hover="158">Act</span> <span class="kw">where</span></span>
+<span id="L247">  <span class="const token" data-verso-hover="545">init</span> _ := <span class="const token" data-verso-hover="102">initLoc</span></span>
+<span id="L248">  <span class="const token" data-verso-hover="546">invoke</span> p o l := <span class="const token" data-verso-hover="249">invokeStep</span> p o l</span>
+<span id="L249">  <span class="const token" data-verso-hover="547">internal</span> p a l := <span class="const token" data-verso-hover="258">internalStep</span> V QS p a l</span>
+<span id="L250">  <span class="const token" data-verso-hover="548">receive</span> p src m l := <span class="const token" data-verso-hover="48">some</span> ((<span class="const token" data-verso-hover="252">receiveStep</span> V p src m l).<span class="const token" data-verso-hover="42">1</span>, (<span class="const token" data-verso-hover="252">receiveStep</span> V p src m l).<span class="const token" data-verso-hover="78">2</span>, <span class="const token" data-verso-hover="168">none</span>)</span>
+<span id="L251"></span>
+<span id="L252"><span class="dc">/-- A quorum system: any two quorums intersect. -/</span></span>
+<span id="L253"><span class="kw">def</span> <span class="const token" data-verso-hover="181">IsQuorumSystem</span> (QS : <span class="const token" data-verso-hover="32">Finset</span> (<span class="const token" data-verso-hover="32">Finset</span> P)) : <span class="kw">Prop</span> :=</span>
+<span id="L254">  ∀ Q₁ ∈ QS, ∀ Q₂ ∈ QS, (Q₁ ∩ Q₂).<span class="const token" data-verso-hover="549">Nonempty</span></span>
+<span id="L255"></span>
+<span id="L256"><span class="dc">/-- The state learned by the operation `x` in configuration `C` (if `x` is a query that has</span></span>
+<span id="L257"><span class="dc">returned). -/</span></span>
+<span id="L258"><span class="kw">def</span> <span class="const token" data-verso-hover="186">learnedOf</span> (C : <span class="const token" data-verso-hover="94">Config</span> P (<span class="const token" data-verso-hover="40">Loc</span> P D) (<span class="const token" data-verso-hover="35">Msg</span> P D)) (x : <span class="const token" data-verso-hover="191">OpId</span> P) : <span class="const token" data-verso-hover="74">Option</span> D.<span class="const token" data-verso-hover="36">S</span> :=</span>
+<span id="L259">  ((C.<span class="const token" data-verso-hover="99">loc</span> x.<span class="const token" data-verso-hover="42">1</span>).<span class="const token" data-verso-hover="179">learned</span> x.<span class="const token" data-verso-hover="78">2</span>).<span class="const token" data-verso-hover="509">map</span> <span class="const token" data-verso-hover="42">Prod.fst</span></span>
+<span id="L260"></span>
+<span id="L261"><span class="dc">/-- `s` is a learned state in `C` (learned by vote if `v = true`, by consistent quorum</span></span>
+<span id="L262"><span class="dc">otherwise). -/</span></span>
+<span id="L263"><span class="kw">def</span> <span class="const token" data-verso-hover="550">LearnedBy</span> (C : <span class="const token" data-verso-hover="94">Config</span> P (<span class="const token" data-verso-hover="40">Loc</span> P D) (<span class="const token" data-verso-hover="35">Msg</span> P D)) (s : D.<span class="const token" data-verso-hover="36">S</span>) (v : <span class="const token" data-verso-hover="522">Bool</span>) : <span class="kw">Prop</span> :=</span>
+<span id="L264">  ∃ x : <span class="const token" data-verso-hover="191">OpId</span> P, (C.<span class="const token" data-verso-hover="99">loc</span> x.<span class="const token" data-verso-hover="42">1</span>).<span class="const token" data-verso-hover="179">learned</span> x.<span class="const token" data-verso-hover="78">2</span> = <span class="const token" data-verso-hover="48">some</span> (s, v)</span>
+<span id="L265"></span>
+<span id="L266"><span class="dc">/-- `s` is a learned state in `C`. -/</span></span>
+<span id="L267"><span class="kw">def</span> <span class="const token" data-verso-hover="293">Learned</span> (C : <span class="const token" data-verso-hover="94">Config</span> P (<span class="const token" data-verso-hover="40">Loc</span> P D) (<span class="const token" data-verso-hover="35">Msg</span> P D)) (s : D.<span class="const token" data-verso-hover="36">S</span>) : <span class="kw">Prop</span> := ∃ x, <span class="const token" data-verso-hover="186">learnedOf</span> C x = <span class="const token" data-verso-hover="48">some</span> s</span>
+<span id="L268"></span>
+<span id="L269"><span class="kw">end</span> Podc.CRDTReplication</span>
+<span id="L270"></span>
+</code></div>
+        <script>
+          window.versoHoversUrl = "PODC2019/CRDTReplication/-hovers.json";</script>
+        <script src="static/lean/popper.js"></script>
+        <script src="static/lean/tippy.js"></script>
+        <script src="static/lean/marked.js"></script>
+        <script src="static/lean/highlighting.js"></script>
+        <script src="static/lean/lean.js"></script>
+        </article></main><footer class="site-footer"><div class="wrap">
+        Machine-checked formalizations of PODC papers in Lean 4. Generated with <a href="https://github.com/leanprover/verso">Verso</a> from the README files of <a href="https://github.com/vasnesterov/formal_podc">vasnesterov/formal_podc</a>.</div>
+      </footer></body>
+  </html>
+

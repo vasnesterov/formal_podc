@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="light dark">
+    <link rel="icon" href="data:,">
+    <title>ConcurrentDSU: Forest.lean · Formal PODC</title><base href="../../../.././"><link rel="stylesheet" href="static/lean/verso-vars.css">
+    <link rel="stylesheet" href="static/lean/highlighting.css">
+    <link rel="stylesheet" href="static/lean/tippy-border.css">
+    <link rel="stylesheet" href="static/style.css">
+    <script defer="defer" src="static/site.js"></script>
+    </head>
+  <body>
+    <header class="site-header">
+      <div class="wrap">
+        <a class="brand" href=".">Formal PODC</a><nav class="top">
+          <a href=".">Search</a><a href="about/">About</a><a href="https://github.com/vasnesterov/formal_podc">GitHub</a></nav>
+        </div>
+      </header>
+    <main class="wrap"><article><nav class="breadcrumbs" aria-label="Breadcrumb">
+          <a href=".">Search</a><span class="sep">›</span><a href="PODC2016/">PODC 2016</a><span class="sep">›</span><a href="PODC2016/ConcurrentDSU/">ConcurrentDSU</a><span class="sep">›</span><a href="PODC2016/ConcurrentDSU/src/">Lean source</a><span class="sep">›</span><span aria-current="page">Forest</span></nav>
+        <h1>
+          <code>Forest.lean</code></h1>
+        <div class="paper-links">
+          <p>
+            Source of <a href="PODC2016/ConcurrentDSU/">A Randomized Concurrent Algorithm for Disjoint Set Union — PODC 2016</a> · <a href="https://github.com/vasnesterov/formal_podc/blob/main/Papers/PODC2016/ConcurrentDSU/Forest.lean">GitHub</a> · hover over a name for its type and documentation</p>
+          </div>
+        <div class="lean-code lean-src">
+          <code class="hl lean block" data-lean-context="Forest"><span id="L1"><span class="kw">import</span> Papers.PODC2016.ConcurrentDSU.Defs</span>
+<span id="L2"></span>
+<span id="L3"><span class="dc">/-!</span></span>
+<span id="L4"><span class="dc"># Parent-pointer forests ordered by node ids</span></span>
+<span id="L5"></span>
+<span id="L6"><span class="dc">A parent function `m : E → E` is `Good` (w.r.t. the node ids `key`) if every node is a root</span></span>
+<span id="L7"><span class="dc">(`m a = a`) or has a parent of larger id (Lemma 3.1: "if x is not a root, x &lt; x.parent; if x is</span></span>
+<span id="L8"><span class="dc">a root, x = x.parent"). Then following parents always reaches a root: `rootOf m a` (iterate</span></span>
+<span id="L9"><span class="dc">`card E` times). Two nodes are in the same tree (`same m a b`) iff they have the same root.</span></span>
+<span id="L10"></span>
+<span id="L11"><span class="dc">The two kinds of successful `Cas` of the algorithm:</span></span>
+<span id="L12"><span class="dc">* `rootOf_update_split` — a `Find` replaces the parent of `u` by a node `w` of the same tree with</span></span>
+<span id="L13"><span class="dc">  larger id: roots are unchanged;</span></span>
+<span id="L14"><span class="dc">* `rootOf_update_link` — `Unite` makes the root `u` a child of a node `v` with larger id: the</span></span>
+<span id="L15"><span class="dc">  tree of `u` is attached to the tree of `v`.</span></span>
+<span id="L16"></span>
+<span id="L17"><span class="dc">`Legal m m'` collects what every memory change of the algorithm satisfies (used to show that</span></span>
+<span id="L18"><span class="dc">local invariants of the other processes are stable).</span></span>
+<span id="L19"><span class="dc">-/</span></span>
+<span id="L20"></span>
+<span id="L21"><span class="kw">set_option</span> <span class="const token" data-verso-hover="93">linter.unusedSectionVars</span> false</span>
+<span id="L22"></span>
+<span id="L23"><span class="kw">namespace</span> Podc.ConcurrentDSU</span>
+<span id="L24"></span>
+<span id="L25"><span class="kw">variable</span> {E : <span class="kw">Type</span>} [<span class="const token" data-verso-hover="106">Fintype</span> E] [<span class="const token" data-verso-hover="46">DecidableEq</span> E] (key : E → <span class="const token" data-verso-hover="51">ℕ</span>)</span>
+<span id="L26"></span>
+<span id="L27"><span class="cm">--</span><span class="cm"> CSLib candidate (this file: parent-pointer forests ordered by ids)</span></span>
+<span id="L28"><span class="dc">/-- Lemma 3.1 (shape): every node is a root or its parent has a larger id. -/</span></span>
+<span id="L29"><span class="kw">def</span> <span class="const token" data-verso-hover="121">Good</span> (m : E → E) : <span class="kw">Prop</span> := ∀ a, m a = a ∨ key a &lt; key (m a)</span>
+<span id="L30"></span>
+<span id="L31"><span class="dc">/-- The root of the tree of `a` (follow parent pointers `card E` times). -/</span></span>
+<span id="L32"><span class="kw">def</span> <span class="const token" data-verso-hover="25">rootOf</span> (m : E → E) (a : E) : E := m^[<span class="const token" data-verso-hover="211">Fintype.card</span> E] a</span>
+<span id="L33"></span>
+<span id="L34"><span class="dc">/-- `a` and `b` are in the same tree. -/</span></span>
+<span id="L35"><span class="kw">def</span> <span class="const token" data-verso-hover="108">same</span> (m : E → E) (a b : E) : <span class="kw">Prop</span> := <span class="const token" data-verso-hover="25">rootOf</span> m a = <span class="const token" data-verso-hover="25">rootOf</span> m b</span>
+<span id="L36"></span>
+<span id="L37"><span class="dc">/-- Number of nodes with a larger id than `a` (a measure decreasing along parent pointers). -/</span></span>
+<span id="L38"><span class="kw">def</span> <span class="const token" data-verso-hover="240">hgt</span> (a : E) : <span class="const token" data-verso-hover="51">ℕ</span> := (<span class="const token" data-verso-hover="258">Finset.univ</span>.<span class="const token" data-verso-hover="259">filter</span> (<span class="kw">fun</span> b =&gt; key a &lt; key b)).<span class="const token" data-verso-hover="260">card</span></span>
+<span id="L39"></span>
+<span id="L40"><span class="kw">variable</span> {key}</span>
+<span id="L41"></span>
+<span id="L42"><span class="kw">lemma</span> <span class="const token" data-verso-hover="244">hgt_lt</span> {a b : E} (h : key a &lt; key b) : <span class="const token" data-verso-hover="240">hgt</span> key b &lt; <span class="const token" data-verso-hover="240">hgt</span> key a := <span class="kw">by</span></span>
+<span id="L43">  <span class="kw">unfold</span> <span class="const token" data-verso-hover="240">hgt</span></span>
+<span id="L44">  <span class="kw">apply</span> <span class="const token" data-verso-hover="261">Finset.card_lt_card</span></span>
+<span id="L45">  <span class="kw">refine</span> <span class="const token" data-verso-hover="262">Finset.ssubset_iff_of_subset</span> ?_ |&gt;.<span class="const token" data-verso-hover="263">2</span> ⟨b, <span class="kw">by</span> <span class="kw">simp</span> [h], <span class="kw">by</span> <span class="kw">simp</span>⟩</span>
+<span id="L46">  <span class="kw">intro</span> c hc</span>
+<span id="L47">  <span class="kw">simp</span> only [<span class="const token" data-verso-hover="264">Finset.mem_filter</span>, <span class="const token" data-verso-hover="265">Finset.mem_univ</span>, <span class="const token" data-verso-hover="266">true_and</span>] <span class="kw">at</span> hc ⊢</span>
+<span id="L48">  <span class="kw">omega</span></span>
+<span id="L49"></span>
+<span id="L50"><span class="kw">lemma</span> <span class="const token" data-verso-hover="267">hgt_le_card</span> (a : E) : <span class="const token" data-verso-hover="240">hgt</span> key a ≤ <span class="const token" data-verso-hover="211">Fintype.card</span> E := <span class="kw">by</span></span>
+<span id="L51">  <span class="kw">unfold</span> <span class="const token" data-verso-hover="240">hgt</span></span>
+<span id="L52">  <span class="kw">exact</span> (<span class="const token" data-verso-hover="268">Finset.card_filter_le</span> _ _).<span class="const token" data-verso-hover="269">trans</span> (<span class="kw">by</span> <span class="kw">simp</span>)</span>
+<span id="L53"></span>
+<span id="L54"><span class="kw">section</span> Iter</span>
+<span id="L55"></span>
+<span id="L56"><span class="kw">variable</span> {m : E → E}</span>
+<span id="L57"></span>
+<span id="L58"><span class="kw">lemma</span> <span class="const token" data-verso-hover="270">key_le_iterate</span> (hg : <span class="const token" data-verso-hover="121">Good</span> key m) (a : E) (j : <span class="const token" data-verso-hover="51">ℕ</span>) : key a ≤ key (m^[j] a) := <span class="kw">by</span></span>
+<span id="L59">  <span class="kw">induction</span> j <span class="kw">with</span></span>
+<span id="L60">  | <span class="const token" data-verso-hover="271">zero</span> =&gt; <span class="kw">simp</span></span>
+<span id="L61">  | <span class="const token" data-verso-hover="272">succ</span> j ih =&gt;</span>
+<span id="L62">    <span class="kw">rw</span> [<span class="const token" data-verso-hover="273">Function.iterate_succ_apply'</span>]</span>
+<span id="L63">    <span class="kw">rcases</span> hg (m^[j] a) <span class="kw">with</span> h | h</span>
+<span id="L64">    · <span class="kw">rw</span> [h]; <span class="kw">exact</span> ih</span>
+<span id="L65">    · <span class="kw">omega</span></span>
+<span id="L66"></span>
+<span id="L67"><span class="dc">/-- Before the root is reached, ids strictly increase along the path. -/</span></span>
+<span id="L68"><span class="kw">lemma</span> <span class="const token" data-verso-hover="274">key_lt_iterate</span> (hg : <span class="const token" data-verso-hover="121">Good</span> key m) (a : E) (N : <span class="const token" data-verso-hover="51">ℕ</span>) (hN : m (m^[N] a) ≠ m^[N] a) :</span>
+<span id="L69">    ∀ i j, i &lt; j → j ≤ N + <span class="nu">1</span> → key (m^[i] a) &lt; key (m^[j] a) := <span class="kw">by</span></span>
+<span id="L70">  <span class="kw">have</span> hnf : ∀ i ≤ N, m (m^[i] a) ≠ m^[i] a := <span class="kw">by</span></span>
+<span id="L71">    <span class="kw">intro</span> i hi hfix</span>
+<span id="L72">    <span class="kw">apply</span> hN</span>
+<span id="L73">    <span class="kw">have</span> : m^[N] a = m^[N - i] (m^[i] a) := <span class="kw">by</span></span>
+<span id="L74">      <span class="kw">rw</span> [← <span class="const token" data-verso-hover="275">Function.iterate_add_apply</span>]; <span class="kw">congr</span> <span class="nu">1</span>; <span class="kw">omega</span></span>
+<span id="L75">    <span class="kw">rw</span> [this, <span class="const token" data-verso-hover="212">Function.iterate_fixed</span> hfix, hfix]</span>
+<span id="L76">  <span class="kw">intro</span> i j hij hj</span>
+<span id="L77">  <span class="kw">induction</span> j <span class="kw">with</span></span>
+<span id="L78">  | <span class="const token" data-verso-hover="271">zero</span> =&gt; <span class="kw">omega</span></span>
+<span id="L79">  | <span class="const token" data-verso-hover="272">succ</span> j ih =&gt;</span>
+<span id="L80">    <span class="kw">rw</span> [<span class="const token" data-verso-hover="273">Function.iterate_succ_apply'</span>]</span>
+<span id="L81">    <span class="kw">have</span> h1 : key (m^[j] a) &lt; key (m (m^[j] a)) := <span class="kw">by</span></span>
+<span id="L82">      <span class="kw">rcases</span> hg (m^[j] a) <span class="kw">with</span> h | h</span>
+<span id="L83">      · <span class="kw">exact</span> <span class="const token" data-verso-hover="228">absurd</span> h (hnf j (<span class="kw">by</span> <span class="kw">omega</span>))</span>
+<span id="L84">      · <span class="kw">exact</span> h</span>
+<span id="L85">    <span class="kw">rcases</span> <span class="const token" data-verso-hover="276">Nat.lt_or_ge</span> i j <span class="kw">with</span> h | h</span>
+<span id="L86">    · <span class="kw">exact</span> (ih h (<span class="kw">by</span> <span class="kw">omega</span>)).<span class="const token" data-verso-hover="277">trans</span> h1</span>
+<span id="L87">    · <span class="kw">have</span> : i = j := <span class="kw">by</span> <span class="kw">omega</span></span>
+<span id="L88">      <span class="kw">subst</span> this; <span class="kw">exact</span> h1</span>
+<span id="L89"></span>
+<span id="L90"><span class="dc">/-- After `card E` steps a root is reached. -/</span></span>
+<span id="L91"><span class="kw">lemma</span> <span class="const token" data-verso-hover="278">rootOf_fixed</span> (hg : <span class="const token" data-verso-hover="121">Good</span> key m) (a : E) : m (<span class="const token" data-verso-hover="25">rootOf</span> m a) = <span class="const token" data-verso-hover="25">rootOf</span> m a := <span class="kw">by</span></span>
+<span id="L92">  <span class="kw">by_contra</span> hN</span>
+<span id="L93">  <span class="kw">have</span> hlt := <span class="const token" data-verso-hover="274">key_lt_iterate</span> hg a (<span class="const token" data-verso-hover="211">Fintype.card</span> E) hN</span>
+<span id="L94">  <span class="kw">let</span> f : <span class="const token" data-verso-hover="252">Fin</span> (<span class="const token" data-verso-hover="211">Fintype.card</span> E + <span class="nu">1</span>) → E := <span class="kw">fun</span> i =&gt; m^[i.<span class="const token" data-verso-hover="253">1</span>] a</span>
+<span id="L95">  <span class="kw">have</span> hf : <span class="const token" data-verso-hover="141">Function.Injective</span> f := <span class="kw">by</span></span>
+<span id="L96">    <span class="kw">intro</span> i j hij</span>
+<span id="L97">    <span class="kw">simp</span> only [f] <span class="kw">at</span> hij</span>
+<span id="L98">    <span class="kw">rcases</span> <span class="const token" data-verso-hover="279">lt_trichotomy</span> i.<span class="const token" data-verso-hover="253">1</span> j.<span class="const token" data-verso-hover="253">1</span> <span class="kw">with</span> h | h | h</span>
+<span id="L99">    · <span class="kw">have</span> := hlt i.<span class="const token" data-verso-hover="253">1</span> j.<span class="const token" data-verso-hover="253">1</span> h (<span class="kw">by</span> <span class="kw">omega</span>); <span class="kw">rw</span> [hij] <span class="kw">at</span> this; <span class="kw">omega</span></span>
+<span id="L100">    · <span class="kw">exact</span> <span class="const token" data-verso-hover="280">Fin.ext</span> h</span>
+<span id="L101">    · <span class="kw">have</span> := hlt j.<span class="const token" data-verso-hover="253">1</span> i.<span class="const token" data-verso-hover="253">1</span> h (<span class="kw">by</span> <span class="kw">omega</span>); <span class="kw">rw</span> [hij] <span class="kw">at</span> this; <span class="kw">omega</span></span>
+<span id="L102">  <span class="kw">have</span> := <span class="const token" data-verso-hover="281">Fintype.card_le_of_injective</span> f hf</span>
+<span id="L103">  <span class="kw">simp</span> <span class="kw">at</span> this</span>
+<span id="L104"></span>
+<span id="L105"><span class="kw">lemma</span> <span class="const token" data-verso-hover="163">rootOf_of_fixed</span> {a : E} (ha : m a = a) : <span class="const token" data-verso-hover="25">rootOf</span> m a = a := <span class="const token" data-verso-hover="212">Function.iterate_fixed</span> ha _</span>
+<span id="L106"></span>
+<span id="L107"><span class="kw">lemma</span> <span class="const token" data-verso-hover="282">rootOf_eq_of_iterate</span> (hg : <span class="const token" data-verso-hover="121">Good</span> key m) {a r : E} {j : <span class="const token" data-verso-hover="51">ℕ</span>} (hj : m^[j] a = r)</span>
+<span id="L108">    (hr : m r = r) : <span class="const token" data-verso-hover="25">rootOf</span> m a = r := <span class="kw">by</span></span>
+<span id="L109">  <span class="kw">unfold</span> <span class="const token" data-verso-hover="25">rootOf</span></span>
+<span id="L110">  <span class="kw">rcases</span> <span class="const token" data-verso-hover="283">Nat.le_total</span> j (<span class="const token" data-verso-hover="211">Fintype.card</span> E) <span class="kw">with</span> h | h</span>
+<span id="L111">  · <span class="kw">have</span> : m^[<span class="const token" data-verso-hover="211">Fintype.card</span> E] a = m^[<span class="const token" data-verso-hover="211">Fintype.card</span> E - j] (m^[j] a) := <span class="kw">by</span></span>
+<span id="L112">      <span class="kw">rw</span> [← <span class="const token" data-verso-hover="275">Function.iterate_add_apply</span>]; <span class="kw">congr</span> <span class="nu">1</span>; <span class="kw">omega</span></span>
+<span id="L113">    <span class="kw">rw</span> [this, hj, <span class="const token" data-verso-hover="212">Function.iterate_fixed</span> hr]</span>
+<span id="L114">  · <span class="kw">have</span> : m^[j] a = m^[j - <span class="const token" data-verso-hover="211">Fintype.card</span> E] (m^[<span class="const token" data-verso-hover="211">Fintype.card</span> E] a) := <span class="kw">by</span></span>
+<span id="L115">      <span class="kw">rw</span> [← <span class="const token" data-verso-hover="275">Function.iterate_add_apply</span>]; <span class="kw">congr</span> <span class="nu">1</span>; <span class="kw">omega</span></span>
+<span id="L116">    <span class="kw">have</span> hf := <span class="const token" data-verso-hover="278">rootOf_fixed</span> hg a</span>
+<span id="L117">    <span class="kw">unfold</span> <span class="const token" data-verso-hover="25">rootOf</span> <span class="kw">at</span> hf</span>
+<span id="L118">    <span class="kw">rw</span> [this, <span class="const token" data-verso-hover="212">Function.iterate_fixed</span> hf] <span class="kw">at</span> hj</span>
+<span id="L119">    <span class="kw">exact</span> hj</span>
+<span id="L120"></span>
+<span id="L121"><span class="kw">lemma</span> <span class="const token" data-verso-hover="284">rootOf_apply</span> (hg : <span class="const token" data-verso-hover="121">Good</span> key m) (a : E) : <span class="const token" data-verso-hover="25">rootOf</span> m (m a) = <span class="const token" data-verso-hover="25">rootOf</span> m a := <span class="kw">by</span></span>
+<span id="L122">  <span class="kw">apply</span> <span class="const token" data-verso-hover="282">rootOf_eq_of_iterate</span> hg (j := <span class="const token" data-verso-hover="211">Fintype.card</span> E) _ (<span class="const token" data-verso-hover="278">rootOf_fixed</span> hg a)</span>
+<span id="L123">  <span class="kw">rw</span> [← <span class="const token" data-verso-hover="285">Function.iterate_succ_apply</span>, <span class="const token" data-verso-hover="273">Function.iterate_succ_apply'</span>]</span>
+<span id="L124">  <span class="kw">exact</span> <span class="const token" data-verso-hover="278">rootOf_fixed</span> hg a</span>
+<span id="L125"></span>
+<span id="L126"><span class="kw">lemma</span> <span class="const token" data-verso-hover="286">rootOf_rootOf</span> (hg : <span class="const token" data-verso-hover="121">Good</span> key m) (a : E) : <span class="const token" data-verso-hover="25">rootOf</span> m (<span class="const token" data-verso-hover="25">rootOf</span> m a) = <span class="const token" data-verso-hover="25">rootOf</span> m a :=</span>
+<span id="L127">  <span class="const token" data-verso-hover="163">rootOf_of_fixed</span> (<span class="const token" data-verso-hover="278">rootOf_fixed</span> hg a)</span>
+<span id="L128"></span>
+<span id="L129"><span class="kw">lemma</span> <span class="const token" data-verso-hover="164">key_le_rootOf</span> (hg : <span class="const token" data-verso-hover="121">Good</span> key m) (a : E) : key a ≤ key (<span class="const token" data-verso-hover="25">rootOf</span> m a) :=</span>
+<span id="L130">  <span class="const token" data-verso-hover="270">key_le_iterate</span> hg a _</span>
+<span id="L131"></span>
+<span id="L132"><span class="kw">lemma</span> <span class="const token" data-verso-hover="287">key_lt_rootOf</span> (hg : <span class="const token" data-verso-hover="121">Good</span> key m) {a : E} (ha : m a ≠ a) : key a &lt; key (<span class="const token" data-verso-hover="25">rootOf</span> m a) := <span class="kw">by</span></span>
+<span id="L133">  <span class="kw">rcases</span> hg a <span class="kw">with</span> h | h</span>
+<span id="L134">  · <span class="kw">exact</span> <span class="const token" data-verso-hover="228">absurd</span> h ha</span>
+<span id="L135">  · <span class="kw">rw</span> [← <span class="const token" data-verso-hover="284">rootOf_apply</span> hg a]; <span class="kw">exact</span> <span class="const token" data-verso-hover="288">lt_of_lt_of_le</span> h (<span class="const token" data-verso-hover="164">key_le_rootOf</span> hg _)</span>
+<span id="L136"></span>
+<span id="L137"><span class="kw">lemma</span> <span class="const token" data-verso-hover="289">rootOf_eq_self_iff</span> (hg : <span class="const token" data-verso-hover="121">Good</span> key m) {a : E} : <span class="const token" data-verso-hover="25">rootOf</span> m a = a ↔ m a = a := <span class="kw">by</span></span>
+<span id="L138">  <span class="kw">constructor</span></span>
+<span id="L139">  · <span class="kw">intro</span> h; <span class="kw">have</span> := <span class="const token" data-verso-hover="278">rootOf_fixed</span> hg a; <span class="kw">rwa</span> [h] <span class="kw">at</span> this</span>
+<span id="L140">  · <span class="kw">exact</span> <span class="const token" data-verso-hover="163">rootOf_of_fixed</span></span>
+<span id="L141"></span>
+<span id="L142"><span class="kw">lemma</span> <span class="const token" data-verso-hover="172">same_apply</span> (hg : <span class="const token" data-verso-hover="121">Good</span> key m) (a : E) : <span class="const token" data-verso-hover="108">same</span> m (m a) a := <span class="const token" data-verso-hover="284">rootOf_apply</span> hg a</span>
+<span id="L143"></span>
+<span id="L144"><span class="kw">lemma</span> <span class="const token" data-verso-hover="290">same_root</span> (hg : <span class="const token" data-verso-hover="121">Good</span> key m) (a : E) : <span class="const token" data-verso-hover="108">same</span> m (<span class="const token" data-verso-hover="25">rootOf</span> m a) a := <span class="const token" data-verso-hover="286">rootOf_rootOf</span> hg a</span>
+<span id="L145"></span>
+<span id="L146"><span class="dc">/-- Strong induction along increasing ids. -/</span></span>
+<span id="L147"><span class="kw">lemma</span> <span class="const token" data-verso-hover="291">induction_key</span> {Q : E → <span class="kw">Prop</span>} (h : ∀ a, (∀ b, key a &lt; key b → Q b) → Q a) (a : E) : Q a := <span class="kw">by</span></span>
+<span id="L148">  <span class="kw">induction</span> hn : <span class="const token" data-verso-hover="240">hgt</span> key a <span class="kw">using</span> <span class="const token" data-verso-hover="292">Nat.strong_induction_on</span> generalizing a <span class="kw">with</span></span>
+<span id="L149">  | _ n ih =&gt;</span>
+<span id="L150">    <span class="kw">apply</span> h</span>
+<span id="L151">    <span class="kw">intro</span> b hb</span>
+<span id="L152">    <span class="kw">exact</span> ih _ (hn ▸ <span class="const token" data-verso-hover="244">hgt_lt</span> hb) b <span class="const token" data-verso-hover="42">rfl</span></span>
+<span id="L153"></span>
+<span id="L154"><span class="kw">end</span> Iter</span>
+<span id="L155"></span>
+<span id="L156"><span class="dc">/-! ### The two kinds of successful `Cas` -/</span></span>
+<span id="L157"></span>
+<span id="L158"><span class="kw">section</span> Updates</span>
+<span id="L159"></span>
+<span id="L160"><span class="kw">variable</span> {m : E → E}</span>
+<span id="L161"></span>
+<span id="L162"><span class="kw">lemma</span> <span class="const token" data-verso-hover="293">good_update</span> (hg : <span class="const token" data-verso-hover="121">Good</span> key m) {u w : E} (hk : key u &lt; key w) :</span>
+<span id="L163">    <span class="const token" data-verso-hover="121">Good</span> key (<span class="const token" data-verso-hover="146">Function.update</span> m u w) := <span class="kw">by</span></span>
+<span id="L164">  <span class="kw">intro</span> a</span>
+<span id="L165">  <span class="kw">by_cases</span> ha : a = u</span>
+<span id="L166">  · <span class="kw">subst</span> ha; <span class="kw">right</span>; <span class="kw">simpa</span> <span class="kw">using</span> hk</span>
+<span id="L167">  · <span class="kw">simp</span> only [<span class="const token" data-verso-hover="152">Function.update_of_ne</span> ha]; <span class="kw">exact</span> hg a</span>
+<span id="L168"></span>
+<span id="L169"><span class="dc">/-- A `Find` changes the parent of `u` to a node `w` of the same tree with a larger id: all roots</span></span>
+<span id="L170"><span class="dc">stay the same. -/</span></span>
+<span id="L171"><span class="kw">lemma</span> <span class="const token" data-verso-hover="26">rootOf_update_split</span> (hg : <span class="const token" data-verso-hover="121">Good</span> key m) {u w : E} (hk : key u &lt; key w)</span>
+<span id="L172">    (hw : <span class="const token" data-verso-hover="25">rootOf</span> m w = <span class="const token" data-verso-hover="25">rootOf</span> m u) (a : E) :</span>
+<span id="L173">    <span class="const token" data-verso-hover="25">rootOf</span> (<span class="const token" data-verso-hover="146">Function.update</span> m u w) a = <span class="const token" data-verso-hover="25">rootOf</span> m a := <span class="kw">by</span></span>
+<span id="L174">  <span class="kw">have</span> hg' := <span class="const token" data-verso-hover="293">good_update</span> hg hk</span>
+<span id="L175">  <span class="kw">induction</span> a <span class="kw">using</span> <span class="const token" data-verso-hover="291">induction_key</span> (key := key) <span class="kw">with</span></span>
+<span id="L176">  | _ a ih =&gt;</span>
+<span id="L177">    <span class="kw">by_cases</span> ha : a = u</span>
+<span id="L178">    · <span class="kw">subst</span> ha</span>
+<span id="L179">      <span class="kw">rw</span> [← <span class="const token" data-verso-hover="284">rootOf_apply</span> hg', <span class="const token" data-verso-hover="153">Function.update_self</span>, ih w hk, hw]</span>
+<span id="L180">    · <span class="kw">by_cases</span> hf : m a = a</span>
+<span id="L181">      · <span class="kw">rw</span> [<span class="const token" data-verso-hover="163">rootOf_of_fixed</span> hf, <span class="const token" data-verso-hover="163">rootOf_of_fixed</span> (<span class="kw">by</span> <span class="kw">rwa</span> [<span class="const token" data-verso-hover="152">Function.update_of_ne</span> ha])]</span>
+<span id="L182">      · <span class="kw">have</span> hk' : key a &lt; key (m a) := (hg a).<span class="const token" data-verso-hover="173">resolve_left</span> hf</span>
+<span id="L183">        <span class="kw">rw</span> [← <span class="const token" data-verso-hover="284">rootOf_apply</span> hg', <span class="const token" data-verso-hover="152">Function.update_of_ne</span> ha, ih _ hk', <span class="const token" data-verso-hover="284">rootOf_apply</span> hg]</span>
+<span id="L184"></span>
+<span id="L185"><span class="dc">/-- `Unite` makes the root `u` a child of `v` (with a larger id): the nodes of the tree of `u`</span></span>
+<span id="L186"><span class="dc">get the root of `v`. -/</span></span>
+<span id="L187"><span class="kw">lemma</span> <span class="const token" data-verso-hover="27">rootOf_update_link</span> (hg : <span class="const token" data-verso-hover="121">Good</span> key m) {u v : E} (hu : m u = u) (hk : key u &lt; key v)</span>
+<span id="L188">    (a : E) :</span>
+<span id="L189">    <span class="const token" data-verso-hover="25">rootOf</span> (<span class="const token" data-verso-hover="146">Function.update</span> m u v) a = <span class="kw">if</span> <span class="const token" data-verso-hover="25">rootOf</span> m a = u <span class="kw">then</span> <span class="const token" data-verso-hover="25">rootOf</span> m v <span class="kw">else</span> <span class="const token" data-verso-hover="25">rootOf</span> m a := <span class="kw">by</span></span>
+<span id="L190">  <span class="kw">have</span> hg' := <span class="const token" data-verso-hover="293">good_update</span> hg hk</span>
+<span id="L191">  <span class="kw">have</span> hv : <span class="const token" data-verso-hover="25">rootOf</span> m v ≠ u := <span class="kw">by</span></span>
+<span id="L192">    <span class="kw">intro</span> h; <span class="kw">have</span> := <span class="const token" data-verso-hover="164">key_le_rootOf</span> hg v; <span class="kw">rw</span> [h] <span class="kw">at</span> this; <span class="kw">omega</span></span>
+<span id="L193">  <span class="kw">induction</span> a <span class="kw">using</span> <span class="const token" data-verso-hover="291">induction_key</span> (key := key) <span class="kw">with</span></span>
+<span id="L194">  | _ a ih =&gt;</span>
+<span id="L195">    <span class="kw">by_cases</span> ha : a = u</span>
+<span id="L196">    · <span class="kw">subst</span> ha</span>
+<span id="L197">      <span class="kw">rw</span> [← <span class="const token" data-verso-hover="284">rootOf_apply</span> hg', <span class="const token" data-verso-hover="153">Function.update_self</span>, ih v hk, <span class="const token" data-verso-hover="163">rootOf_of_fixed</span> hu]</span>
+<span id="L198">      <span class="kw">simp</span> [hv]</span>
+<span id="L199">    · <span class="kw">by_cases</span> hf : m a = a</span>
+<span id="L200">      · <span class="kw">rw</span> [<span class="const token" data-verso-hover="163">rootOf_of_fixed</span> hf, <span class="const token" data-verso-hover="163">rootOf_of_fixed</span> (<span class="kw">by</span> <span class="kw">rwa</span> [<span class="const token" data-verso-hover="152">Function.update_of_ne</span> ha])]</span>
+<span id="L201">        <span class="kw">simp</span> [ha]</span>
+<span id="L202">      · <span class="kw">have</span> hk' : key a &lt; key (m a) := (hg a).<span class="const token" data-verso-hover="173">resolve_left</span> hf</span>
+<span id="L203">        <span class="kw">rw</span> [← <span class="const token" data-verso-hover="284">rootOf_apply</span> hg', <span class="const token" data-verso-hover="152">Function.update_of_ne</span> ha, ih _ hk', <span class="const token" data-verso-hover="284">rootOf_apply</span> hg]</span>
+<span id="L204"></span>
+<span id="L205"><span class="dc">/-- After linking the root `u` (the root of `x`) below `v` (in the tree of `y`), "same tree" is</span></span>
+<span id="L206"><span class="dc">the old relation with the classes of `x` and `y` merged. -/</span></span>
+<span id="L207"><span class="kw">lemma</span> <span class="const token" data-verso-hover="168">same_update_link</span> (hg : <span class="const token" data-verso-hover="121">Good</span> key m) {u v x y : E} (hu : m u = u) (hk : key u &lt; key v)</span>
+<span id="L208">    (hx : <span class="const token" data-verso-hover="108">same</span> m u x) (hy : <span class="const token" data-verso-hover="108">same</span> m v y) (a b : E) :</span>
+<span id="L209">    <span class="const token" data-verso-hover="108">same</span> (<span class="const token" data-verso-hover="146">Function.update</span> m u v) a b ↔ <span class="const token" data-verso-hover="29">joinRel</span> (<span class="const token" data-verso-hover="108">same</span> m) x y a b := <span class="kw">by</span></span>
+<span id="L210">  <span class="kw">unfold</span> <span class="const token" data-verso-hover="108">same</span> <span class="const token" data-verso-hover="29">joinRel</span></span>
+<span id="L211">  <span class="kw">rw</span> [<span class="const token" data-verso-hover="27">rootOf_update_link</span> hg hu hk, <span class="const token" data-verso-hover="27">rootOf_update_link</span> hg hu hk]</span>
+<span id="L212">  beta_reduce</span>
+<span id="L213">  <span class="kw">have</span> hxu : <span class="const token" data-verso-hover="25">rootOf</span> m x = u := <span class="kw">by</span> <span class="kw">unfold</span> <span class="const token" data-verso-hover="108">same</span> <span class="kw">at</span> hx; <span class="kw">rw</span> [← hx, <span class="const token" data-verso-hover="163">rootOf_of_fixed</span> hu]</span>
+<span id="L214">  <span class="kw">have</span> hyv : <span class="const token" data-verso-hover="25">rootOf</span> m y = <span class="const token" data-verso-hover="25">rootOf</span> m v := hy.<span class="const token" data-verso-hover="294">symm</span></span>
+<span id="L215">  <span class="kw">have</span> hv : <span class="const token" data-verso-hover="25">rootOf</span> m v ≠ u := <span class="kw">by</span></span>
+<span id="L216">    <span class="kw">intro</span> h; <span class="kw">have</span> := <span class="const token" data-verso-hover="164">key_le_rootOf</span> hg v; <span class="kw">rw</span> [h] <span class="kw">at</span> this; <span class="kw">omega</span></span>
+<span id="L217">  <span class="kw">rw</span> [hxu, hyv]</span>
+<span id="L218">  <span class="kw">by_cases</span> ha : <span class="const token" data-verso-hover="25">rootOf</span> m a = u &lt;;&gt; <span class="kw">by_cases</span> hb : <span class="const token" data-verso-hover="25">rootOf</span> m b = u &lt;;&gt; <span class="kw">simp</span> only [ha, hb, <span class="const token" data-verso-hover="161">ite_true</span>,</span>
+<span id="L219">    <span class="const token" data-verso-hover="143">ite_false</span>] &lt;;&gt; <span class="kw">grind</span></span>
+<span id="L220"></span>
+<span id="L221"><span class="kw">end</span> Updates</span>
+<span id="L222"></span>
+<span id="L223"><span class="dc">/-! ### Legal memory changes -/</span></span>
+<span id="L224"></span>
+<span id="L225"><span class="dc">/-- What every memory change of the algorithm satisfies: the result is `Good`, trees only merge,</span></span>
+<span id="L226"><span class="dc">non-roots stay non-roots, and parents only move to larger ids. -/</span></span>
+<span id="L227"><span class="kw">structure</span> <span class="const token" data-verso-hover="127">Legal</span> (key : E → <span class="const token" data-verso-hover="51">ℕ</span>) (m m' : E → E) : <span class="kw">Prop</span> <span class="kw">where</span></span>
+<span id="L228">  <span class="const token" data-verso-hover="186">good</span> : <span class="const token" data-verso-hover="121">Good</span> key m'</span>
+<span id="L229">  <span class="const token" data-verso-hover="129">sameMono</span> : ∀ a b, <span class="const token" data-verso-hover="108">same</span> m a b → <span class="const token" data-verso-hover="108">same</span> m' a b</span>
+<span id="L230">  <span class="const token" data-verso-hover="295">root</span> : ∀ a, m' a = a → m a = a</span>
+<span id="L231">  <span class="const token" data-verso-hover="296">mono</span> : ∀ a, m' a = m a ∨ key (m a) &lt; key (m' a)</span>
+<span id="L232"></span>
+<span id="L233"><span class="kw">lemma</span> <span class="const token" data-verso-hover="160">Legal.refl</span> {m : E → E} (hg : <span class="const token" data-verso-hover="121">Good</span> key m) : <span class="const token" data-verso-hover="127">Legal</span> key m m :=</span>
+<span id="L234">  ⟨hg, <span class="kw">fun</span> _ _ h =&gt; h, <span class="kw">fun</span> _ h =&gt; h, <span class="kw">fun</span> _ =&gt; <span class="const token" data-verso-hover="128">Or.inl</span> <span class="const token" data-verso-hover="42">rfl</span>⟩</span>
+<span id="L235"></span>
+<span id="L236"><span class="kw">lemma</span> <span class="const token" data-verso-hover="174">Legal.split</span> {m : E → E} (hg : <span class="const token" data-verso-hover="121">Good</span> key m) {u v w : E} (hmu : m u = v) (hk : key v &lt; key w)</span>
+<span id="L237">    (hku : key u &lt; key w) (hw : <span class="const token" data-verso-hover="25">rootOf</span> m w = <span class="const token" data-verso-hover="25">rootOf</span> m v) :</span>
+<span id="L238">    <span class="const token" data-verso-hover="127">Legal</span> key m (<span class="const token" data-verso-hover="146">Function.update</span> m u w) <span class="kw">where</span></span>
+<span id="L239">  <span class="const token" data-verso-hover="186">good</span> := <span class="const token" data-verso-hover="293">good_update</span> hg hku</span>
+<span id="L240">  <span class="const token" data-verso-hover="129">sameMono</span> a b h := <span class="kw">by</span></span>
+<span id="L241">    <span class="kw">unfold</span> <span class="const token" data-verso-hover="108">same</span> <span class="kw">at</span> *</span>
+<span id="L242">    <span class="kw">rw</span> [<span class="const token" data-verso-hover="26">rootOf_update_split</span> hg hku (<span class="kw">by</span> <span class="kw">rw</span> [hw, ← hmu, <span class="const token" data-verso-hover="284">rootOf_apply</span> hg]),</span>
+<span id="L243">      <span class="const token" data-verso-hover="26">rootOf_update_split</span> hg hku (<span class="kw">by</span> <span class="kw">rw</span> [hw, ← hmu, <span class="const token" data-verso-hover="284">rootOf_apply</span> hg])]</span>
+<span id="L244">    <span class="kw">exact</span> h</span>
+<span id="L245">  <span class="const token" data-verso-hover="295">root</span> a h := <span class="kw">by</span></span>
+<span id="L246">    <span class="kw">by_cases</span> ha : a = u</span>
+<span id="L247">    · <span class="kw">subst</span> ha; <span class="kw">simp</span> only [<span class="const token" data-verso-hover="153">Function.update_self</span>] <span class="kw">at</span> h; <span class="kw">rw</span> [h] <span class="kw">at</span> hku; <span class="kw">omega</span></span>
+<span id="L248">    · <span class="kw">rwa</span> [<span class="const token" data-verso-hover="152">Function.update_of_ne</span> ha] <span class="kw">at</span> h</span>
+<span id="L249">  <span class="const token" data-verso-hover="296">mono</span> a := <span class="kw">by</span></span>
+<span id="L250">    <span class="kw">by_cases</span> ha : a = u</span>
+<span id="L251">    · <span class="kw">subst</span> ha; <span class="kw">right</span>; <span class="kw">simp</span> only [<span class="const token" data-verso-hover="153">Function.update_self</span>, hmu]; <span class="kw">exact</span> hk</span>
+<span id="L252">    · <span class="kw">left</span>; <span class="kw">simp</span> [<span class="const token" data-verso-hover="152">Function.update_of_ne</span> ha]</span>
+<span id="L253"></span>
+<span id="L254"><span class="kw">lemma</span> <span class="const token" data-verso-hover="167">Legal.link</span> {m : E → E} (hg : <span class="const token" data-verso-hover="121">Good</span> key m) {u v : E} (hu : m u = u) (hk : key u &lt; key v) :</span>
+<span id="L255">    <span class="const token" data-verso-hover="127">Legal</span> key m (<span class="const token" data-verso-hover="146">Function.update</span> m u v) <span class="kw">where</span></span>
+<span id="L256">  <span class="const token" data-verso-hover="186">good</span> := <span class="const token" data-verso-hover="293">good_update</span> hg hk</span>
+<span id="L257">  <span class="const token" data-verso-hover="129">sameMono</span> a b h := <span class="kw">by</span></span>
+<span id="L258">    <span class="kw">unfold</span> <span class="const token" data-verso-hover="108">same</span> <span class="kw">at</span> *</span>
+<span id="L259">    <span class="kw">rw</span> [<span class="const token" data-verso-hover="27">rootOf_update_link</span> hg hu hk, <span class="const token" data-verso-hover="27">rootOf_update_link</span> hg hu hk, h]</span>
+<span id="L260">  <span class="const token" data-verso-hover="295">root</span> a h := <span class="kw">by</span></span>
+<span id="L261">    <span class="kw">by_cases</span> ha : a = u</span>
+<span id="L262">    · <span class="kw">subst</span> ha; <span class="kw">simp</span> only [<span class="const token" data-verso-hover="153">Function.update_self</span>] <span class="kw">at</span> h; <span class="kw">rw</span> [h] <span class="kw">at</span> hk; <span class="kw">omega</span></span>
+<span id="L263">    · <span class="kw">rwa</span> [<span class="const token" data-verso-hover="152">Function.update_of_ne</span> ha] <span class="kw">at</span> h</span>
+<span id="L264">  <span class="const token" data-verso-hover="296">mono</span> a := <span class="kw">by</span></span>
+<span id="L265">    <span class="kw">by_cases</span> ha : a = u</span>
+<span id="L266">    · <span class="kw">subst</span> ha; <span class="kw">right</span>; <span class="kw">simp</span> only [<span class="const token" data-verso-hover="153">Function.update_self</span>, hu]; <span class="kw">exact</span> hk</span>
+<span id="L267">    · <span class="kw">left</span>; <span class="kw">simp</span> [<span class="const token" data-verso-hover="152">Function.update_of_ne</span> ha]</span>
+<span id="L268"></span>
+<span id="L269"><span class="kw">lemma</span> <span class="const token" data-verso-hover="139">Legal.nonroot</span> {m m' : E → E} (h : <span class="const token" data-verso-hover="127">Legal</span> key m m') {a : E} (ha : m a ≠ a) : m' a ≠ a :=</span>
+<span id="L270">  <span class="kw">fun</span> h' =&gt; ha (h.<span class="const token" data-verso-hover="295">root</span> a h')</span>
+<span id="L271"></span>
+<span id="L272"><span class="dc">/-- The memory potential: decreases with every change of a parent pointer. -/</span></span>
+<span id="L273"><span class="kw">def</span> <span class="const token" data-verso-hover="297">mpot</span> (key : E → <span class="const token" data-verso-hover="51">ℕ</span>) (m : E → E) : <span class="const token" data-verso-hover="51">ℕ</span> := ∑ a, <span class="const token" data-verso-hover="240">hgt</span> key (m a)</span>
+<span id="L274"></span>
+<span id="L275"><span class="kw">lemma</span> <span class="const token" data-verso-hover="298">mpot_lt</span> {m m' : E → E} (h : <span class="const token" data-verso-hover="127">Legal</span> key m m') (hne : m' ≠ m) : <span class="const token" data-verso-hover="297">mpot</span> key m' &lt; <span class="const token" data-verso-hover="297">mpot</span> key m := <span class="kw">by</span></span>
+<span id="L276">  <span class="kw">unfold</span> <span class="const token" data-verso-hover="297">mpot</span></span>
+<span id="L277">  <span class="kw">obtain</span> ⟨a, ha⟩ : ∃ a, m' a ≠ m a := <span class="kw">by</span></span>
+<span id="L278">    <span class="kw">by_contra</span> hc; push <span class="const token" data-verso-hover="299">Not</span> <span class="kw">at</span> hc; <span class="kw">exact</span> hne (<span class="const token" data-verso-hover="300">funext</span> hc)</span>
+<span id="L279">  <span class="kw">apply</span> <span class="const token" data-verso-hover="301">Finset.sum_lt_sum</span></span>
+<span id="L280">  · <span class="kw">intro</span> b _</span>
+<span id="L281">    <span class="kw">rcases</span> h.<span class="const token" data-verso-hover="296">mono</span> b <span class="kw">with</span> hb | hb</span>
+<span id="L282">    · <span class="kw">rw</span> [hb]</span>
+<span id="L283">    · <span class="kw">exact</span> (<span class="const token" data-verso-hover="244">hgt_lt</span> hb).<span class="const token" data-verso-hover="248">le</span></span>
+<span id="L284">  · <span class="kw">refine</span> ⟨a, <span class="const token" data-verso-hover="265">Finset.mem_univ</span> _, ?_⟩</span>
+<span id="L285">    <span class="kw">rcases</span> h.<span class="const token" data-verso-hover="296">mono</span> a <span class="kw">with</span> hb | hb</span>
+<span id="L286">    · <span class="kw">exact</span> <span class="const token" data-verso-hover="228">absurd</span> hb ha</span>
+<span id="L287">    · <span class="kw">exact</span> <span class="const token" data-verso-hover="244">hgt_lt</span> hb</span>
+<span id="L288"></span>
+<span id="L289"><span class="kw">lemma</span> <span class="const token" data-verso-hover="302">mpot_le</span> {m m' : E → E} (h : <span class="const token" data-verso-hover="127">Legal</span> key m m') : <span class="const token" data-verso-hover="297">mpot</span> key m' ≤ <span class="const token" data-verso-hover="297">mpot</span> key m := <span class="kw">by</span></span>
+<span id="L290">  <span class="kw">by_cases</span> hne : m' = m</span>
+<span id="L291">  · <span class="kw">rw</span> [hne]</span>
+<span id="L292">  · <span class="kw">exact</span> (<span class="const token" data-verso-hover="298">mpot_lt</span> h hne).<span class="const token" data-verso-hover="248">le</span></span>
+<span id="L293"></span>
+<span id="L294"><span class="kw">end</span> Podc.ConcurrentDSU</span>
+<span id="L295"></span>
+</code></div>
+        <script>
+          window.versoHoversUrl = "PODC2016/ConcurrentDSU/-hovers.json";</script>
+        <script src="static/lean/popper.js"></script>
+        <script src="static/lean/tippy.js"></script>
+        <script src="static/lean/marked.js"></script>
+        <script src="static/lean/highlighting.js"></script>
+        <script src="static/lean/lean.js"></script>
+        </article></main><footer class="site-footer"><div class="wrap">
+        Machine-checked formalizations of PODC papers in Lean 4. Generated with <a href="https://github.com/leanprover/verso">Verso</a> from the README files of <a href="https://github.com/vasnesterov/formal_podc">vasnesterov/formal_podc</a>.</div>
+      </footer></body>
+  </html>
+

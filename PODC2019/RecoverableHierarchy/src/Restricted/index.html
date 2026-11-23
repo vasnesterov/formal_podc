@@ -1,0 +1,407 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="light dark">
+    <link rel="icon" href="data:,">
+    <title>RecoverableHierarchy: Restricted.lean · Formal PODC</title><base href="../../../.././"><link rel="stylesheet" href="static/lean/verso-vars.css">
+    <link rel="stylesheet" href="static/lean/highlighting.css">
+    <link rel="stylesheet" href="static/lean/tippy-border.css">
+    <link rel="stylesheet" href="static/style.css">
+    <script defer="defer" src="static/site.js"></script>
+    </head>
+  <body>
+    <header class="site-header">
+      <div class="wrap">
+        <a class="brand" href=".">Formal PODC</a><nav class="top">
+          <a href=".">Search</a><a href="about/">About</a><a href="https://github.com/vasnesterov/formal_podc">GitHub</a></nav>
+        </div>
+      </header>
+    <main class="wrap"><article><nav class="breadcrumbs" aria-label="Breadcrumb">
+          <a href=".">Search</a><span class="sep">›</span><a href="PODC2019/">PODC 2019</a><span class="sep">›</span><a href="PODC2019/RecoverableHierarchy/">RecoverableHierarchy</a><span class="sep">›</span><a href="PODC2019/RecoverableHierarchy/src/">Lean source</a><span class="sep">›</span><span aria-current="page">Restricted</span></nav>
+        <h1>
+          <code>Restricted.lean</code></h1>
+        <div class="paper-links">
+          <p>
+            Source of <a href="PODC2019/RecoverableHierarchy/">The Recoverable Consensus Hierarchy — PODC 2019</a> · <a href="https://github.com/vasnesterov/formal_podc/blob/main/Papers/PODC2019/RecoverableHierarchy/Restricted.lean">GitHub</a> · hover over a name for its type and documentation</p>
+          </div>
+        <div class="lean-code lean-src">
+          <code class="hl lean block" data-lean-context="Restricted"><span id="L1"><span class="kw">import</span> Papers.PODC2019.RecoverableHierarchy.Defs</span>
+<span id="L2"></span>
+<span id="L3"><span class="dc">/-!</span></span>
+<span id="L4"><span class="dc"># The restricted failure model of Assumptions 1 and 2</span></span>
+<span id="L5"></span>
+<span id="L6"><span class="dc">The impossibility proofs of Theorems 3 and 6 restrict attention to executions in which only two</span></span>
+<span id="L7"><span class="dc">processes `a` (the paper's `p₁`) and `b` (`p₂`) take steps, `b` never crashes, and `a` crashes</span></span>
+<span id="L8"><span class="dc">**if and only if** its previous step was its first *triggering* operation on some object</span></span>
+<span id="L9"><span class="dc">(Assumption 1: the first access to a TAS object; Assumption 2: the first access to a consensus</span></span>
+<span id="L10"><span class="dc">object). Which operations trigger a crash is a parameter `trig`; the triggering objects lie in a</span></span>
+<span id="L11"><span class="dc">finite set `F`, so a restricted execution has at most `|F|` crashes.</span></span>
+<span id="L12"></span>
+<span id="L13"><span class="dc">In the restricted model every process has exactly one possible next move, so an execution is</span></span>
+<span id="L14"><span class="dc">determined by its *schedule* `σ : List Bool` (`false` = a move of `a`, `true` = a move of `b`).</span></span>
+<span id="L15"><span class="dc">We track the restricted state `RS`: the configuration, the set `trg` of objects on which `a` has</span></span>
+<span id="L16"><span class="dc">already applied a triggering operation, and a flag `pend` ("`a` must crash next").</span></span>
+<span id="L17"></span>
+<span id="L18"><span class="dc">* `Restr.mv`, `Restr.ev`, `Restr.rrun`, `Restr.evs`: moves, the underlying events of CSLib's</span></span>
+<span id="L19"><span class="dc">  model, runs (`rrun_c`: the configuration is CSLib's `run` of the underlying events);</span></span>
+<span id="L20"><span class="dc">* `Restr.numCrashes_E_le`: a restricted execution has at most `|F|` crashes;</span></span>
+<span id="L21"><span class="dc">* `Restr.RCorrect`: agreement (distinct processes), validity and recoverable wait-freedom on the</span></span>
+<span id="L22"><span class="dc">  restricted executions — what the paper's proofs use; `SolvesP.rcorrect` derives it from the</span></span>
+<span id="L23"><span class="dc">  paper's specification.</span></span>
+<span id="L24"><span class="dc">-/</span></span>
+<span id="L25"></span>
+<span id="L26"><span class="kw">namespace</span> Podc.RecoverableHierarchy</span>
+<span id="L27"></span>
+<span id="L28"><span class="kw">open</span> Cslib.SharedMemory Cslib.SharedMemory.Recoverable</span>
+<span id="L29"></span>
+<span id="L30"><span class="kw">set_option</span> <span class="const token" data-verso-hover="212">linter.unusedSectionVars</span> false</span>
+<span id="L31"></span>
+<span id="L32"><span class="kw">variable</span> {ι : <span class="kw">Type</span>} [<span class="const token" data-verso-hover="55">DecidableEq</span> ι] {T : ι → <span class="const token" data-verso-hover="43">ObjSpec</span>} {n : <span class="const token" data-verso-hover="185">ℕ</span>}</span>
+<span id="L33"></span>
+<span id="L34"><span class="dc">/-- The data of a restricted failure model: the two participating processes `a` (crashes) and</span></span>
+<span id="L35"><span class="dc">`b` (never crashes), the triggering operations, and a finite set `F` containing every object with</span></span>
+<span id="L36"><span class="dc">a triggering operation. -/</span></span>
+<span id="L37"><span class="kw">structure</span> <span class="const token" data-verso-hover="85">Restr</span> (A : <span class="const token" data-verso-hover="75">Alg</span> n T) <span class="kw">where</span></span>
+<span id="L38">  <span class="dc">/-- The process that crashes (the paper's `p₁`). -/</span></span>
+<span id="L39">  <span class="const token" data-verso-hover="86">a</span> : <span class="const token" data-verso-hover="41">Fin</span> n</span>
+<span id="L40">  <span class="dc">/-- The process that never crashes (the paper's `p₂`). -/</span></span>
+<span id="L41">  <span class="const token" data-verso-hover="87">b</span> : <span class="const token" data-verso-hover="41">Fin</span> n</span>
+<span id="L42">  <span class="const token" data-verso-hover="88">hab</span> : <span class="const token" data-verso-hover="86">a</span> ≠ <span class="const token" data-verso-hover="87">b</span></span>
+<span id="L43">  <span class="dc">/-- Operations whose first application to an object by `a` is followed by a crash of `a`. -/</span></span>
+<span id="L44">  <span class="const token" data-verso-hover="89">trig</span> : (i : ι) → (T i).<span class="const token" data-verso-hover="82">Op</span> → <span class="const token" data-verso-hover="12">Bool</span></span>
+<span id="L45">  <span class="dc">/-- The objects with triggering operations. -/</span></span>
+<span id="L46">  <span class="const token" data-verso-hover="90">F</span> : <span class="const token" data-verso-hover="624">Finset</span> ι</span>
+<span id="L47">  <span class="const token" data-verso-hover="91">hF</span> : ∀ i o, <span class="const token" data-verso-hover="89">trig</span> i o = <span class="const token" data-verso-hover="83">true</span> → i ∈ <span class="const token" data-verso-hover="90">F</span></span>
+<span id="L48"></span>
+<span id="L49"><span class="kw">variable</span> (A : <span class="const token" data-verso-hover="75">Alg</span> n T) <span class="kw">in</span></span>
+<span id="L50"><span class="dc">/-- Restricted states: configuration, objects already triggered by `a`, pending crash of `a`. -/</span></span>
+<span id="L51">@[<span class="kw">ext</span>] <span class="kw">structure</span> <span class="const token" data-verso-hover="145">RS</span> <span class="kw">where</span></span>
+<span id="L52">  <span class="const token" data-verso-hover="147">c</span> : <span class="const token" data-verso-hover="102">Cfg</span> A</span>
+<span id="L53">  <span class="const token" data-verso-hover="149">trg</span> : <span class="const token" data-verso-hover="624">Finset</span> ι</span>
+<span id="L54">  <span class="const token" data-verso-hover="151">pend</span> : <span class="const token" data-verso-hover="12">Bool</span></span>
+<span id="L55"></span>
+<span id="L56"><span class="kw">variable</span> {A : <span class="const token" data-verso-hover="75">Alg</span> n T}</span>
+<span id="L57"></span>
+<span id="L58"><span class="kw">variable</span> (A) <span class="kw">in</span></span>
+<span id="L59"><span class="dc">/-- The initial restricted state with inputs `x`. -/</span></span>
+<span id="L60"><span class="kw">def</span> <span class="const token" data-verso-hover="170">RS.init</span> (x : <span class="const token" data-verso-hover="41">Fin</span> n → <span class="const token" data-verso-hover="12">Bool</span>) : <span class="const token" data-verso-hover="145">RS</span> A := ⟨<span class="const token" data-verso-hover="172">initCfg</span> A x, ∅, <span class="const token" data-verso-hover="80">false</span>⟩</span>
+<span id="L61"></span>
+<span id="L62"><span class="kw">namespace</span> Restr</span>
+<span id="L63"></span>
+<span id="L64"><span class="kw">variable</span> (R : <span class="const token" data-verso-hover="85">Restr</span> A)</span>
+<span id="L65"></span>
+<span id="L66"><span class="dc">/-- The object on which `a`'s next step is a first triggering operation, if any. -/</span></span>
+<span id="L67"><span class="kw">def</span> <span class="const token" data-verso-hover="153">newTrig</span> (s : <span class="const token" data-verso-hover="145">RS</span> A) : <span class="const token" data-verso-hover="46">Option</span> ι :=</span>
+<span id="L68">  <span class="kw">match</span> A.<span class="const token" data-verso-hover="78">act</span> (s.<span class="const token" data-verso-hover="147">c</span>.<span class="const token" data-verso-hover="106">loc</span> R.<span class="const token" data-verso-hover="86">a</span>) <span class="kw">with</span></span>
+<span id="L69">  | <span class="const token" data-verso-hover="63">.</span>access i o _ =&gt; <span class="kw">if</span> R.<span class="const token" data-verso-hover="89">trig</span> i o = <span class="const token" data-verso-hover="83">true</span> ∧ i ∉ s.<span class="const token" data-verso-hover="149">trg</span> <span class="kw">then</span> <span class="const token" data-verso-hover="66">some</span> i <span class="kw">else</span> <span class="const token" data-verso-hover="47">none</span></span>
+<span id="L70">  | <span class="const token" data-verso-hover="73">.</span>out _ =&gt; <span class="const token" data-verso-hover="47">none</span></span>
+<span id="L71"></span>
+<span id="L72"><span class="dc">/-- The process moving in a move `m`. -/</span></span>
+<span id="L73"><span class="kw">def</span> <span class="const token" data-verso-hover="201">who</span> : <span class="const token" data-verso-hover="12">Bool</span> → <span class="const token" data-verso-hover="41">Fin</span> n</span>
+<span id="L74">  | <span class="const token" data-verso-hover="83">true</span> =&gt; R.<span class="const token" data-verso-hover="87">b</span></span>
+<span id="L75">  | <span class="const token" data-verso-hover="80">false</span> =&gt; R.<span class="const token" data-verso-hover="86">a</span></span>
+<span id="L76"></span>
+<span id="L77"><span class="dc">/-- The underlying event of the move `m` from `s`. -/</span></span>
+<span id="L78"><span class="kw">def</span> <span class="const token" data-verso-hover="625">ev</span> (s : <span class="const token" data-verso-hover="145">RS</span> A) : <span class="const token" data-verso-hover="12">Bool</span> → <span class="const token" data-verso-hover="281">Ev</span> n</span>
+<span id="L79">  | <span class="const token" data-verso-hover="83">true</span> =&gt; <span class="const token" data-verso-hover="200">.</span>step R.<span class="const token" data-verso-hover="87">b</span></span>
+<span id="L80">  | <span class="const token" data-verso-hover="80">false</span> =&gt; <span class="kw">if</span> s.<span class="const token" data-verso-hover="151">pend</span> <span class="kw">then</span> <span class="const token" data-verso-hover="143">.</span>crash R.<span class="const token" data-verso-hover="86">a</span> <span class="kw">else</span> <span class="const token" data-verso-hover="200">.</span>step R.<span class="const token" data-verso-hover="86">a</span></span>
+<span id="L81"></span>
+<span id="L82"><span class="dc">/-- The restricted state after the move `m`. -/</span></span>
+<span id="L83"><span class="kw">def</span> <span class="const token" data-verso-hover="156">mv</span> (s : <span class="const token" data-verso-hover="145">RS</span> A) : <span class="const token" data-verso-hover="12">Bool</span> → <span class="const token" data-verso-hover="145">RS</span> A</span>
+<span id="L84">  | <span class="const token" data-verso-hover="83">true</span> =&gt; { s <span class="kw">with</span> <span class="const token" data-verso-hover="147">c</span> := s.<span class="const token" data-verso-hover="147">c</span>.<span class="const token" data-verso-hover="107">stepP</span> R.<span class="const token" data-verso-hover="87">b</span> }</span>
+<span id="L85">  | <span class="const token" data-verso-hover="80">false</span> =&gt;</span>
+<span id="L86">    <span class="kw">if</span> s.<span class="const token" data-verso-hover="151">pend</span> <span class="kw">then</span> { s <span class="kw">with</span> <span class="const token" data-verso-hover="147">c</span> := s.<span class="const token" data-verso-hover="147">c</span>.<span class="const token" data-verso-hover="142">next</span> (<span class="const token" data-verso-hover="143">.</span>crash R.<span class="const token" data-verso-hover="86">a</span>), <span class="const token" data-verso-hover="151">pend</span> := <span class="const token" data-verso-hover="80">false</span> }</span>
+<span id="L87">    <span class="kw">else</span> <span class="kw">match</span> R.<span class="const token" data-verso-hover="153">newTrig</span> s <span class="kw">with</span></span>
+<span id="L88">      | <span class="const token" data-verso-hover="66">some</span> i =&gt; ⟨s.<span class="const token" data-verso-hover="147">c</span>.<span class="const token" data-verso-hover="107">stepP</span> R.<span class="const token" data-verso-hover="86">a</span>, <span class="const token" data-verso-hover="626">insert</span> i s.<span class="const token" data-verso-hover="149">trg</span>, <span class="const token" data-verso-hover="83">true</span>⟩</span>
+<span id="L89">      | <span class="const token" data-verso-hover="47">none</span> =&gt; { s <span class="kw">with</span> <span class="const token" data-verso-hover="147">c</span> := s.<span class="const token" data-verso-hover="147">c</span>.<span class="const token" data-verso-hover="107">stepP</span> R.<span class="const token" data-verso-hover="86">a</span> }</span>
+<span id="L90"></span>
+<span id="L91"><span class="kw">lemma</span> <span class="const token" data-verso-hover="627">mv_c</span> (s : <span class="const token" data-verso-hover="145">RS</span> A) (m : <span class="const token" data-verso-hover="12">Bool</span>) : (R.<span class="const token" data-verso-hover="156">mv</span> s m).<span class="const token" data-verso-hover="147">c</span> = s.<span class="const token" data-verso-hover="147">c</span>.<span class="const token" data-verso-hover="142">next</span> (R.<span class="const token" data-verso-hover="625">ev</span> s m) := <span class="kw">by</span></span>
+<span id="L92">  <span class="kw">cases</span> m</span>
+<span id="L93">  · <span class="kw">by_cases</span> h : s.<span class="const token" data-verso-hover="151">pend</span></span>
+<span id="L94">    · <span class="kw">simp</span> [<span class="const token" data-verso-hover="156">mv</span>, <span class="const token" data-verso-hover="625">ev</span>, h]</span>
+<span id="L95">    · <span class="kw">simp</span> only [<span class="const token" data-verso-hover="156">mv</span>, <span class="const token" data-verso-hover="625">ev</span>, h, <span class="const token" data-verso-hover="137">Bool.false_eq_true</span>, <span class="const token" data-verso-hover="364">ite_false</span>]</span>
+<span id="L96">      <span class="kw">cases</span> R.<span class="const token" data-verso-hover="153">newTrig</span> s &lt;;&gt; <span class="kw">rfl</span></span>
+<span id="L97">  · <span class="kw">rfl</span></span>
+<span id="L98"></span>
+<span id="L99"><span class="kw">lemma</span> <span class="const token" data-verso-hover="628">ev_proc</span> (s : <span class="const token" data-verso-hover="145">RS</span> A) (m : <span class="const token" data-verso-hover="12">Bool</span>) : (R.<span class="const token" data-verso-hover="625">ev</span> s m).<span class="const token" data-verso-hover="629">proc</span> = R.<span class="const token" data-verso-hover="201">who</span> m := <span class="kw">by</span></span>
+<span id="L100">  <span class="kw">cases</span> m</span>
+<span id="L101">  · <span class="kw">by_cases</span> h : s.<span class="const token" data-verso-hover="151">pend</span> &lt;;&gt; <span class="kw">simp</span> [<span class="const token" data-verso-hover="625">ev</span>, h, <span class="const token" data-verso-hover="201">who</span>]</span>
+<span id="L102">  · <span class="kw">rfl</span></span>
+<span id="L103"></span>
+<span id="L104">@[<span class="kw">simp</span>] <span class="kw">lemma</span> <span class="const token" data-verso-hover="162">mv_true</span> (s : <span class="const token" data-verso-hover="145">RS</span> A) : R.<span class="const token" data-verso-hover="156">mv</span> s <span class="const token" data-verso-hover="83">true</span> = { s <span class="kw">with</span> <span class="const token" data-verso-hover="147">c</span> := s.<span class="const token" data-verso-hover="147">c</span>.<span class="const token" data-verso-hover="107">stepP</span> R.<span class="const token" data-verso-hover="87">b</span> } := <span class="const token" data-verso-hover="104">rfl</span></span>
+<span id="L105"></span>
+<span id="L106">@[<span class="kw">simp</span>] <span class="kw">lemma</span> <span class="const token" data-verso-hover="630">ev_true</span> (s : <span class="const token" data-verso-hover="145">RS</span> A) : R.<span class="const token" data-verso-hover="625">ev</span> s <span class="const token" data-verso-hover="83">true</span> = <span class="const token" data-verso-hover="200">.</span>step R.<span class="const token" data-verso-hover="87">b</span> := <span class="const token" data-verso-hover="104">rfl</span></span>
+<span id="L107"></span>
+<span id="L108"><span class="kw">lemma</span> <span class="const token" data-verso-hover="157">mv_false_pend</span> (s : <span class="const token" data-verso-hover="145">RS</span> A) (h : s.<span class="const token" data-verso-hover="151">pend</span> = <span class="const token" data-verso-hover="83">true</span>) :</span>
+<span id="L109">    R.<span class="const token" data-verso-hover="156">mv</span> s <span class="const token" data-verso-hover="80">false</span> = { s <span class="kw">with</span> <span class="const token" data-verso-hover="147">c</span> := s.<span class="const token" data-verso-hover="147">c</span>.<span class="const token" data-verso-hover="142">next</span> (<span class="const token" data-verso-hover="143">.</span>crash R.<span class="const token" data-verso-hover="86">a</span>), <span class="const token" data-verso-hover="151">pend</span> := <span class="const token" data-verso-hover="80">false</span> } := <span class="kw">by</span></span>
+<span id="L110">  <span class="kw">simp</span> [<span class="const token" data-verso-hover="156">mv</span>, h]</span>
+<span id="L111"></span>
+<span id="L112"><span class="kw">lemma</span> <span class="const token" data-verso-hover="206">ev_false_pend</span> (s : <span class="const token" data-verso-hover="145">RS</span> A) (h : s.<span class="const token" data-verso-hover="151">pend</span> = <span class="const token" data-verso-hover="83">true</span>) : R.<span class="const token" data-verso-hover="625">ev</span> s <span class="const token" data-verso-hover="80">false</span> = <span class="const token" data-verso-hover="143">.</span>crash R.<span class="const token" data-verso-hover="86">a</span> := <span class="kw">by</span></span>
+<span id="L113">  <span class="kw">simp</span> [<span class="const token" data-verso-hover="625">ev</span>, h]</span>
+<span id="L114"></span>
+<span id="L115"><span class="kw">lemma</span> <span class="const token" data-verso-hover="207">ev_false_npend</span> (s : <span class="const token" data-verso-hover="145">RS</span> A) (h : s.<span class="const token" data-verso-hover="151">pend</span> = <span class="const token" data-verso-hover="80">false</span>) : R.<span class="const token" data-verso-hover="625">ev</span> s <span class="const token" data-verso-hover="80">false</span> = <span class="const token" data-verso-hover="200">.</span>step R.<span class="const token" data-verso-hover="86">a</span> := <span class="kw">by</span></span>
+<span id="L116">  <span class="kw">simp</span> [<span class="const token" data-verso-hover="625">ev</span>, h]</span>
+<span id="L117"></span>
+<span id="L118"><span class="kw">lemma</span> <span class="const token" data-verso-hover="160">mv_false_npend</span> (s : <span class="const token" data-verso-hover="145">RS</span> A) (h : s.<span class="const token" data-verso-hover="151">pend</span> = <span class="const token" data-verso-hover="80">false</span>) :</span>
+<span id="L119">    R.<span class="const token" data-verso-hover="156">mv</span> s <span class="const token" data-verso-hover="80">false</span> = <span class="kw">match</span> R.<span class="const token" data-verso-hover="153">newTrig</span> s <span class="kw">with</span></span>
+<span id="L120">      | <span class="const token" data-verso-hover="66">some</span> i =&gt; ⟨s.<span class="const token" data-verso-hover="147">c</span>.<span class="const token" data-verso-hover="107">stepP</span> R.<span class="const token" data-verso-hover="86">a</span>, <span class="const token" data-verso-hover="626">insert</span> i s.<span class="const token" data-verso-hover="149">trg</span>, <span class="const token" data-verso-hover="83">true</span>⟩</span>
+<span id="L121">      | <span class="const token" data-verso-hover="47">none</span> =&gt; { s <span class="kw">with</span> <span class="const token" data-verso-hover="147">c</span> := s.<span class="const token" data-verso-hover="147">c</span>.<span class="const token" data-verso-hover="107">stepP</span> R.<span class="const token" data-verso-hover="86">a</span> } := <span class="kw">by</span></span>
+<span id="L122">  <span class="kw">simp</span> [<span class="const token" data-verso-hover="156">mv</span>, h]</span>
+<span id="L123"></span>
+<span id="L124"><span class="dc">/-- Run a schedule. -/</span></span>
+<span id="L125"><span class="kw">def</span> <span class="const token" data-verso-hover="166">rrun</span> (s : <span class="const token" data-verso-hover="145">RS</span> A) (σ : <span class="const token" data-verso-hover="165">List</span> <span class="const token" data-verso-hover="12">Bool</span>) : <span class="const token" data-verso-hover="145">RS</span> A := σ.<span class="const token" data-verso-hover="309">foldl</span> R.<span class="const token" data-verso-hover="156">mv</span> s</span>
+<span id="L126"></span>
+<span id="L127"><span class="dc">/-- The underlying events of a schedule. -/</span></span>
+<span id="L128"><span class="kw">def</span> <span class="const token" data-verso-hover="631">evs</span> : <span class="const token" data-verso-hover="145">RS</span> A → <span class="const token" data-verso-hover="165">List</span> <span class="const token" data-verso-hover="12">Bool</span> → <span class="const token" data-verso-hover="165">List</span> (<span class="const token" data-verso-hover="281">Ev</span> n)</span>
+<span id="L129">  | _, [] =&gt; []</span>
+<span id="L130">  | s, m :: σ =&gt; R.<span class="const token" data-verso-hover="625">ev</span> s m :: <span class="const token" data-verso-hover="631">evs</span> (R.<span class="const token" data-verso-hover="156">mv</span> s m) σ</span>
+<span id="L131"></span>
+<span id="L132">@[<span class="kw">simp</span>] <span class="kw">lemma</span> <span class="const token" data-verso-hover="632">rrun_nil</span> (s : <span class="const token" data-verso-hover="145">RS</span> A) : R.<span class="const token" data-verso-hover="166">rrun</span> s [] = s := <span class="const token" data-verso-hover="104">rfl</span></span>
+<span id="L133">@[<span class="kw">simp</span>] <span class="kw">lemma</span> <span class="const token" data-verso-hover="633">rrun_cons</span> (s : <span class="const token" data-verso-hover="145">RS</span> A) (m : <span class="const token" data-verso-hover="12">Bool</span>) (σ : <span class="const token" data-verso-hover="165">List</span> <span class="const token" data-verso-hover="12">Bool</span>) :</span>
+<span id="L134">    R.<span class="const token" data-verso-hover="166">rrun</span> s (m :: σ) = R.<span class="const token" data-verso-hover="166">rrun</span> (R.<span class="const token" data-verso-hover="156">mv</span> s m) σ := <span class="const token" data-verso-hover="104">rfl</span></span>
+<span id="L135">@[<span class="kw">simp</span>] <span class="kw">lemma</span> <span class="const token" data-verso-hover="634">evs_nil</span> (s : <span class="const token" data-verso-hover="145">RS</span> A) : R.<span class="const token" data-verso-hover="631">evs</span> s [] = [] := <span class="const token" data-verso-hover="104">rfl</span></span>
+<span id="L136">@[<span class="kw">simp</span>] <span class="kw">lemma</span> <span class="const token" data-verso-hover="635">evs_cons</span> (s : <span class="const token" data-verso-hover="145">RS</span> A) (m : <span class="const token" data-verso-hover="12">Bool</span>) (σ : <span class="const token" data-verso-hover="165">List</span> <span class="const token" data-verso-hover="12">Bool</span>) :</span>
+<span id="L137">    R.<span class="const token" data-verso-hover="631">evs</span> s (m :: σ) = R.<span class="const token" data-verso-hover="625">ev</span> s m :: R.<span class="const token" data-verso-hover="631">evs</span> (R.<span class="const token" data-verso-hover="156">mv</span> s m) σ := <span class="const token" data-verso-hover="104">rfl</span></span>
+<span id="L138"></span>
+<span id="L139"><span class="kw">lemma</span> <span class="const token" data-verso-hover="190">rrun_append</span> (s : <span class="const token" data-verso-hover="145">RS</span> A) (σ τ : <span class="const token" data-verso-hover="165">List</span> <span class="const token" data-verso-hover="12">Bool</span>) :</span>
+<span id="L140">    R.<span class="const token" data-verso-hover="166">rrun</span> s (σ ++ τ) = R.<span class="const token" data-verso-hover="166">rrun</span> (R.<span class="const token" data-verso-hover="166">rrun</span> s σ) τ := <span class="kw">by</span></span>
+<span id="L141">  <span class="kw">simp</span> [<span class="const token" data-verso-hover="166">rrun</span>, <span class="const token" data-verso-hover="313">List.foldl_append</span>]</span>
+<span id="L142"></span>
+<span id="L143"><span class="kw">lemma</span> <span class="const token" data-verso-hover="636">evs_append</span> (s : <span class="const token" data-verso-hover="145">RS</span> A) (σ τ : <span class="const token" data-verso-hover="165">List</span> <span class="const token" data-verso-hover="12">Bool</span>) :</span>
+<span id="L144">    R.<span class="const token" data-verso-hover="631">evs</span> s (σ ++ τ) = R.<span class="const token" data-verso-hover="631">evs</span> s σ ++ R.<span class="const token" data-verso-hover="631">evs</span> (R.<span class="const token" data-verso-hover="166">rrun</span> s σ) τ := <span class="kw">by</span></span>
+<span id="L145">  <span class="kw">induction</span> σ generalizing s <span class="kw">with</span></span>
+<span id="L146">  | <span class="const token" data-verso-hover="167">nil</span> =&gt; <span class="kw">rfl</span></span>
+<span id="L147">  | <span class="const token" data-verso-hover="168">cons</span> m σ ih =&gt; <span class="kw">simp</span> [ih]</span>
+<span id="L148"></span>
+<span id="L149">@[<span class="kw">simp</span>] <span class="kw">lemma</span> <span class="const token" data-verso-hover="637">evs_length</span> (s : <span class="const token" data-verso-hover="145">RS</span> A) (σ : <span class="const token" data-verso-hover="165">List</span> <span class="const token" data-verso-hover="12">Bool</span>) : (R.<span class="const token" data-verso-hover="631">evs</span> s σ).<span class="const token" data-verso-hover="180">length</span> = σ.<span class="const token" data-verso-hover="180">length</span> := <span class="kw">by</span></span>
+<span id="L150">  <span class="kw">induction</span> σ generalizing s <span class="kw">with</span></span>
+<span id="L151">  | <span class="const token" data-verso-hover="167">nil</span> =&gt; <span class="kw">rfl</span></span>
+<span id="L152">  | <span class="const token" data-verso-hover="168">cons</span> m σ ih =&gt; <span class="kw">simp</span> [ih]</span>
+<span id="L153"></span>
+<span id="L154"><span class="kw">lemma</span> <span class="const token" data-verso-hover="638">rrun_c</span> (s : <span class="const token" data-verso-hover="145">RS</span> A) (σ : <span class="const token" data-verso-hover="165">List</span> <span class="const token" data-verso-hover="12">Bool</span>) : (R.<span class="const token" data-verso-hover="166">rrun</span> s σ).<span class="const token" data-verso-hover="147">c</span> = <span class="const token" data-verso-hover="292">run</span> s.<span class="const token" data-verso-hover="147">c</span> (R.<span class="const token" data-verso-hover="631">evs</span> s σ) := <span class="kw">by</span></span>
+<span id="L155">  <span class="kw">induction</span> σ generalizing s <span class="kw">with</span></span>
+<span id="L156">  | <span class="const token" data-verso-hover="167">nil</span> =&gt; <span class="kw">rfl</span></span>
+<span id="L157">  | <span class="const token" data-verso-hover="168">cons</span> m σ ih =&gt; <span class="kw">simp</span> [ih, <span class="const token" data-verso-hover="627">mv_c</span>]</span>
+<span id="L158"></span>
+<span id="L159"><span class="kw">lemma</span> <span class="const token" data-verso-hover="243">rrun_concat</span> (s : <span class="const token" data-verso-hover="145">RS</span> A) (σ : <span class="const token" data-verso-hover="165">List</span> <span class="const token" data-verso-hover="12">Bool</span>) (m : <span class="const token" data-verso-hover="12">Bool</span>) :</span>
+<span id="L160">    R.<span class="const token" data-verso-hover="166">rrun</span> s (σ ++ [m]) = R.<span class="const token" data-verso-hover="156">mv</span> (R.<span class="const token" data-verso-hover="166">rrun</span> s σ) m := <span class="kw">by</span></span>
+<span id="L161">  <span class="kw">simp</span> [<span class="const token" data-verso-hover="190">rrun_append</span>]</span>
+<span id="L162"></span>
+<span id="L163"><span class="kw">lemma</span> <span class="const token" data-verso-hover="639">evs_concat</span> (s : <span class="const token" data-verso-hover="145">RS</span> A) (σ : <span class="const token" data-verso-hover="165">List</span> <span class="const token" data-verso-hover="12">Bool</span>) (m : <span class="const token" data-verso-hover="12">Bool</span>) :</span>
+<span id="L164">    R.<span class="const token" data-verso-hover="631">evs</span> s (σ ++ [m]) = R.<span class="const token" data-verso-hover="631">evs</span> s σ ++ [R.<span class="const token" data-verso-hover="625">ev</span> (R.<span class="const token" data-verso-hover="166">rrun</span> s σ) m] := <span class="kw">by</span></span>
+<span id="L165">  <span class="kw">simp</span> [<span class="const token" data-verso-hover="636">evs_append</span>]</span>
+<span id="L166"></span>
+<span id="L167"><span class="kw">lemma</span> <span class="const token" data-verso-hover="183">evs_take</span> (s : <span class="const token" data-verso-hover="145">RS</span> A) (σ : <span class="const token" data-verso-hover="165">List</span> <span class="const token" data-verso-hover="12">Bool</span>) (k : <span class="const token" data-verso-hover="185">ℕ</span>) :</span>
+<span id="L168">    (R.<span class="const token" data-verso-hover="631">evs</span> s σ).<span class="const token" data-verso-hover="181">take</span> k = R.<span class="const token" data-verso-hover="631">evs</span> s (σ.<span class="const token" data-verso-hover="181">take</span> k) := <span class="kw">by</span></span>
+<span id="L169">  <span class="kw">induction</span> σ generalizing s k <span class="kw">with</span></span>
+<span id="L170">  | <span class="const token" data-verso-hover="167">nil</span> =&gt; <span class="kw">simp</span></span>
+<span id="L171">  | <span class="const token" data-verso-hover="168">cons</span> m σ ih =&gt;</span>
+<span id="L172">    <span class="kw">cases</span> k <span class="kw">with</span></span>
+<span id="L173">    | <span class="const token" data-verso-hover="327">zero</span> =&gt; <span class="kw">simp</span></span>
+<span id="L174">    | <span class="const token" data-verso-hover="328">succ</span> k =&gt; <span class="kw">simp</span> [ih]</span>
+<span id="L175"></span>
+<span id="L176"><span class="dc">/-- The events of `b`'s moves are steps of `b`; all events are by `a` or `b`. -/</span></span>
+<span id="L177"><span class="kw">lemma</span> <span class="const token" data-verso-hover="640">mem_evs_proc</span> (s : <span class="const token" data-verso-hover="145">RS</span> A) (σ : <span class="const token" data-verso-hover="165">List</span> <span class="const token" data-verso-hover="12">Bool</span>) (e : <span class="const token" data-verso-hover="281">Ev</span> n) (he : e ∈ R.<span class="const token" data-verso-hover="631">evs</span> s σ) :</span>
+<span id="L178">    ∃ m ∈ σ, e.<span class="const token" data-verso-hover="629">proc</span> = R.<span class="const token" data-verso-hover="201">who</span> m := <span class="kw">by</span></span>
+<span id="L179">  <span class="kw">induction</span> σ generalizing s <span class="kw">with</span></span>
+<span id="L180">  | <span class="const token" data-verso-hover="167">nil</span> =&gt; <span class="kw">simp</span> <span class="kw">at</span> he</span>
+<span id="L181">  | <span class="const token" data-verso-hover="168">cons</span> m σ ih =&gt;</span>
+<span id="L182">    <span class="kw">simp</span> only [<span class="const token" data-verso-hover="635">evs_cons</span>, <span class="const token" data-verso-hover="641">List.mem_cons</span>] <span class="kw">at</span> he</span>
+<span id="L183">    <span class="kw">rcases</span> he <span class="kw">with</span> <span class="kw">rfl</span> | he</span>
+<span id="L184">    · <span class="kw">exact</span> ⟨m, <span class="kw">by</span> <span class="kw">simp</span>, R.<span class="const token" data-verso-hover="628">ev_proc</span> s m⟩</span>
+<span id="L185">    · <span class="kw">obtain</span> ⟨m', hm', h⟩ := ih _ he</span>
+<span id="L186">      <span class="kw">exact</span> ⟨m', <span class="kw">by</span> <span class="kw">simp</span> [hm'], h⟩</span>
+<span id="L187"></span>
+<span id="L188"><span class="dc">/-- `b` never crashes in a restricted execution. -/</span></span>
+<span id="L189"><span class="kw">lemma</span> <span class="const token" data-verso-hover="642">crash_b_not_mem</span> (s : <span class="const token" data-verso-hover="145">RS</span> A) (σ : <span class="const token" data-verso-hover="165">List</span> <span class="const token" data-verso-hover="12">Bool</span>) : <span class="const token" data-verso-hover="143">Ev.crash</span> R.<span class="const token" data-verso-hover="87">b</span> ∉ R.<span class="const token" data-verso-hover="631">evs</span> s σ := <span class="kw">by</span></span>
+<span id="L190">  <span class="kw">induction</span> σ generalizing s <span class="kw">with</span></span>
+<span id="L191">  | <span class="const token" data-verso-hover="167">nil</span> =&gt; <span class="kw">simp</span></span>
+<span id="L192">  | <span class="const token" data-verso-hover="168">cons</span> m σ ih =&gt;</span>
+<span id="L193">    <span class="kw">simp</span> only [<span class="const token" data-verso-hover="635">evs_cons</span>, <span class="const token" data-verso-hover="641">List.mem_cons</span>, <span class="const token" data-verso-hover="643">not_or</span>]</span>
+<span id="L194">    <span class="kw">refine</span> ⟨?_, ih _⟩</span>
+<span id="L195">    <span class="kw">cases</span> m</span>
+<span id="L196">    · <span class="kw">by_cases</span> h : s.<span class="const token" data-verso-hover="151">pend</span></span>
+<span id="L197">      · <span class="kw">simp</span> only [<span class="const token" data-verso-hover="625">ev</span>, h, <span class="const token" data-verso-hover="644">ite_true</span>, <span class="const token" data-verso-hover="645">Ev.crash.injEq</span>]</span>
+<span id="L198">        <span class="kw">exact</span> <span class="kw">fun</span> h' =&gt; R.<span class="const token" data-verso-hover="88">hab</span> h'.<span class="const token" data-verso-hover="136">symm</span></span>
+<span id="L199">      · <span class="kw">simp</span> [<span class="const token" data-verso-hover="625">ev</span>, h]</span>
+<span id="L200">    · <span class="kw">simp</span> [<span class="const token" data-verso-hover="625">ev</span>]</span>
+<span id="L201"></span>
+<span id="L202"></span>
+<span id="L203"><span class="dc">/-- The restricted state after schedule `σ` from the initial state with inputs `x`. -/</span></span>
+<span id="L204"><span class="kw">abbrev</span> <span class="const token" data-verso-hover="174">S</span> (x : <span class="const token" data-verso-hover="41">Fin</span> n → <span class="const token" data-verso-hover="12">Bool</span>) (σ : <span class="const token" data-verso-hover="165">List</span> <span class="const token" data-verso-hover="12">Bool</span>) : <span class="const token" data-verso-hover="145">RS</span> A := R.<span class="const token" data-verso-hover="166">rrun</span> (<span class="const token" data-verso-hover="170">RS.init</span> A x) σ</span>
+<span id="L205"></span>
+<span id="L206"><span class="dc">/-- The underlying events of the schedule `σ` from the initial state with inputs `x`. -/</span></span>
+<span id="L207"><span class="kw">abbrev</span> <span class="const token" data-verso-hover="179">E</span> (x : <span class="const token" data-verso-hover="41">Fin</span> n → <span class="const token" data-verso-hover="12">Bool</span>) (σ : <span class="const token" data-verso-hover="165">List</span> <span class="const token" data-verso-hover="12">Bool</span>) : <span class="const token" data-verso-hover="165">List</span> (<span class="const token" data-verso-hover="281">Ev</span> n) := R.<span class="const token" data-verso-hover="631">evs</span> (<span class="const token" data-verso-hover="170">RS.init</span> A x) σ</span>
+<span id="L208"></span>
+<span id="L209"><span class="kw">lemma</span> <span class="const token" data-verso-hover="182">S_c</span> (x : <span class="const token" data-verso-hover="41">Fin</span> n → <span class="const token" data-verso-hover="12">Bool</span>) (σ : <span class="const token" data-verso-hover="165">List</span> <span class="const token" data-verso-hover="12">Bool</span>) : (R.<span class="const token" data-verso-hover="174">S</span> x σ).<span class="const token" data-verso-hover="147">c</span> = <span class="const token" data-verso-hover="292">run</span> (<span class="const token" data-verso-hover="172">initCfg</span> A x) (R.<span class="const token" data-verso-hover="179">E</span> x σ) :=</span>
+<span id="L210">  R.<span class="const token" data-verso-hover="638">rrun_c</span> (<span class="const token" data-verso-hover="170">RS.init</span> A x) σ</span>
+<span id="L211"></span>
+<span id="L212"><span class="dc">/-! ## Counting crashes -/</span></span>
+<span id="L213"></span>
+<span id="L214"><span class="kw">lemma</span> <span class="const token" data-verso-hover="161">newTrig_spec</span> {s : <span class="const token" data-verso-hover="145">RS</span> A} {i : ι} (h : R.<span class="const token" data-verso-hover="153">newTrig</span> s = <span class="const token" data-verso-hover="66">some</span> i) :</span>
+<span id="L215">    i ∉ s.<span class="const token" data-verso-hover="149">trg</span> ∧ i ∈ R.<span class="const token" data-verso-hover="90">F</span> := <span class="kw">by</span></span>
+<span id="L216">  <span class="kw">unfold</span> <span class="const token" data-verso-hover="153">newTrig</span> <span class="kw">at</span> h</span>
+<span id="L217">  <span class="kw">split</span> <span class="kw">at</span> h</span>
+<span id="L218">  · <span class="kw">rename_i</span> i' o k _</span>
+<span id="L219">    <span class="kw">split_ifs</span> <span class="kw">at</span> h <span class="kw">with</span> h'</span>
+<span id="L220">    <span class="kw">cases</span> h</span>
+<span id="L221">    <span class="kw">exact</span> ⟨h'.<span class="const token" data-verso-hover="176">2</span>, R.<span class="const token" data-verso-hover="91">hF</span> _ _ h'.<span class="const token" data-verso-hover="131">1</span>⟩</span>
+<span id="L222">  · <span class="kw">cases</span> h</span>
+<span id="L223"></span>
+<span id="L224"><span class="dc">/-- `1` if `a` must crash next. -/</span></span>
+<span id="L225"><span class="kw">def</span> <span class="const token" data-verso-hover="646">pb</span> (s : <span class="const token" data-verso-hover="145">RS</span> A) : <span class="const token" data-verso-hover="185">ℕ</span> := <span class="kw">if</span> s.<span class="const token" data-verso-hover="151">pend</span> <span class="kw">then</span> <span class="nu">1</span> <span class="kw">else</span> <span class="nu">0</span></span>
+<span id="L226"></span>
+<span id="L227"><span class="kw">lemma</span> <span class="const token" data-verso-hover="647">crash_count_one</span> (s : <span class="const token" data-verso-hover="145">RS</span> A) (m : <span class="const token" data-verso-hover="12">Bool</span>) :</span>
+<span id="L228">    <span class="const token" data-verso-hover="284">numCrashes</span> [R.<span class="const token" data-verso-hover="625">ev</span> s m] + <span class="const token" data-verso-hover="646">pb</span> (R.<span class="const token" data-verso-hover="156">mv</span> s m) + s.<span class="const token" data-verso-hover="149">trg</span>.<span class="const token" data-verso-hover="648">card</span> = (R.<span class="const token" data-verso-hover="156">mv</span> s m).<span class="const token" data-verso-hover="149">trg</span>.<span class="const token" data-verso-hover="648">card</span> + <span class="const token" data-verso-hover="646">pb</span> s := <span class="kw">by</span></span>
+<span id="L229">  <span class="kw">cases</span> m</span>
+<span id="L230">  · <span class="kw">by_cases</span> hp : s.<span class="const token" data-verso-hover="151">pend</span></span>
+<span id="L231">    · <span class="kw">rw</span> [R.<span class="const token" data-verso-hover="206">ev_false_pend</span> s hp, R.<span class="const token" data-verso-hover="157">mv_false_pend</span> s hp]</span>
+<span id="L232">      <span class="kw">simp</span> [<span class="const token" data-verso-hover="646">pb</span>, hp, <span class="const token" data-verso-hover="284">numCrashes</span>]; <span class="kw">omega</span></span>
+<span id="L233">    · <span class="kw">simp</span> only [<span class="const token" data-verso-hover="159">Bool.not_eq_true</span>] <span class="kw">at</span> hp</span>
+<span id="L234">      <span class="kw">rw</span> [R.<span class="const token" data-verso-hover="207">ev_false_npend</span> s hp, R.<span class="const token" data-verso-hover="160">mv_false_npend</span> s hp]</span>
+<span id="L235">      <span class="kw">rcases</span> hn : R.<span class="const token" data-verso-hover="153">newTrig</span> s <span class="kw">with</span> _ | i</span>
+<span id="L236">      · <span class="kw">simp</span> [<span class="const token" data-verso-hover="646">pb</span>, hp, <span class="const token" data-verso-hover="284">numCrashes</span>]</span>
+<span id="L237">      · <span class="kw">have</span> h1 := (R.<span class="const token" data-verso-hover="161">newTrig_spec</span> hn).<span class="const token" data-verso-hover="131">1</span></span>
+<span id="L238">        <span class="kw">simp</span> [<span class="const token" data-verso-hover="646">pb</span>, hp, <span class="const token" data-verso-hover="284">numCrashes</span>, <span class="const token" data-verso-hover="649">Finset.card_insert_of_notMem</span> h1]</span>
+<span id="L239">        <span class="kw">omega</span></span>
+<span id="L240">  · <span class="kw">rcases</span> s <span class="kw">with</span> ⟨c, trg, pend⟩</span>
+<span id="L241">    <span class="kw">cases</span> pend &lt;;&gt; (<span class="kw">simp</span> [<span class="const token" data-verso-hover="646">pb</span>, <span class="const token" data-verso-hover="284">numCrashes</span>, <span class="const token" data-verso-hover="625">ev</span>]; <span class="kw">try</span> <span class="kw">omega</span>)</span>
+<span id="L242"></span>
+<span id="L243"><span class="dc">/-- Crash accounting: every crash consumes a pending flag, every pending flag consumes a newly</span></span>
+<span id="L244"><span class="dc">triggered object. -/</span></span>
+<span id="L245"><span class="kw">lemma</span> <span class="const token" data-verso-hover="650">crash_count</span> (s : <span class="const token" data-verso-hover="145">RS</span> A) (σ : <span class="const token" data-verso-hover="165">List</span> <span class="const token" data-verso-hover="12">Bool</span>) :</span>
+<span id="L246">    <span class="const token" data-verso-hover="284">numCrashes</span> (R.<span class="const token" data-verso-hover="631">evs</span> s σ) + <span class="const token" data-verso-hover="646">pb</span> (R.<span class="const token" data-verso-hover="166">rrun</span> s σ) + s.<span class="const token" data-verso-hover="149">trg</span>.<span class="const token" data-verso-hover="648">card</span> = (R.<span class="const token" data-verso-hover="166">rrun</span> s σ).<span class="const token" data-verso-hover="149">trg</span>.<span class="const token" data-verso-hover="648">card</span> + <span class="const token" data-verso-hover="646">pb</span> s := <span class="kw">by</span></span>
+<span id="L247">  <span class="kw">induction</span> σ generalizing s <span class="kw">with</span></span>
+<span id="L248">  | <span class="const token" data-verso-hover="167">nil</span> =&gt; <span class="kw">simp</span>; <span class="kw">omega</span></span>
+<span id="L249">  | <span class="const token" data-verso-hover="168">cons</span> m σ ih =&gt;</span>
+<span id="L250">    <span class="kw">have</span> h1 := ih (R.<span class="const token" data-verso-hover="156">mv</span> s m)</span>
+<span id="L251">    <span class="kw">have</span> h2 := R.<span class="const token" data-verso-hover="647">crash_count_one</span> s m</span>
+<span id="L252">    <span class="kw">simp</span> only [<span class="const token" data-verso-hover="635">evs_cons</span>, <span class="const token" data-verso-hover="633">rrun_cons</span>]</span>
+<span id="L253">    <span class="kw">rw</span> [<span class="kw">show</span> R.<span class="const token" data-verso-hover="625">ev</span> s m :: R.<span class="const token" data-verso-hover="631">evs</span> (R.<span class="const token" data-verso-hover="156">mv</span> s m) σ = [R.<span class="const token" data-verso-hover="625">ev</span> s m] ++ R.<span class="const token" data-verso-hover="631">evs</span> (R.<span class="const token" data-verso-hover="156">mv</span> s m) σ <span class="kw">from</span> <span class="const token" data-verso-hover="104">rfl</span>,</span>
+<span id="L254">      <span class="const token" data-verso-hover="287">numCrashes_append</span>]</span>
+<span id="L255">    <span class="kw">omega</span></span>
+<span id="L256"></span>
+<span id="L257"><span class="kw">lemma</span> <span class="const token" data-verso-hover="651">trg_subset</span> (s : <span class="const token" data-verso-hover="145">RS</span> A) (hs : s.<span class="const token" data-verso-hover="149">trg</span> ⊆ R.<span class="const token" data-verso-hover="90">F</span>) (σ : <span class="const token" data-verso-hover="165">List</span> <span class="const token" data-verso-hover="12">Bool</span>) : (R.<span class="const token" data-verso-hover="166">rrun</span> s σ).<span class="const token" data-verso-hover="149">trg</span> ⊆ R.<span class="const token" data-verso-hover="90">F</span> := <span class="kw">by</span></span>
+<span id="L258">  <span class="kw">induction</span> σ generalizing s <span class="kw">with</span></span>
+<span id="L259">  | <span class="const token" data-verso-hover="167">nil</span> =&gt; <span class="kw">exact</span> hs</span>
+<span id="L260">  | <span class="const token" data-verso-hover="168">cons</span> m σ ih =&gt;</span>
+<span id="L261">    <span class="kw">apply</span> ih</span>
+<span id="L262">    <span class="kw">cases</span> m</span>
+<span id="L263">    · <span class="kw">by_cases</span> hp : s.<span class="const token" data-verso-hover="151">pend</span></span>
+<span id="L264">      · <span class="kw">simpa</span> [R.<span class="const token" data-verso-hover="157">mv_false_pend</span> s hp] <span class="kw">using</span> hs</span>
+<span id="L265">      · <span class="kw">simp</span> only [<span class="const token" data-verso-hover="159">Bool.not_eq_true</span>] <span class="kw">at</span> hp</span>
+<span id="L266">        <span class="kw">rw</span> [R.<span class="const token" data-verso-hover="160">mv_false_npend</span> s hp]</span>
+<span id="L267">        <span class="kw">rcases</span> hn : R.<span class="const token" data-verso-hover="153">newTrig</span> s <span class="kw">with</span> _ | i</span>
+<span id="L268">        · <span class="kw">simpa</span> <span class="kw">using</span> hs</span>
+<span id="L269">        · <span class="kw">simp</span> only</span>
+<span id="L270">          <span class="kw">exact</span> <span class="const token" data-verso-hover="652">Finset.insert_subset</span> (R.<span class="const token" data-verso-hover="161">newTrig_spec</span> hn).<span class="const token" data-verso-hover="176">2</span> hs</span>
+<span id="L271">    · <span class="kw">exact</span> hs</span>
+<span id="L272"></span>
+<span id="L273"><span class="dc">/-- A restricted execution has at most `|F|` crashes. -/</span></span>
+<span id="L274"><span class="kw">lemma</span> <span class="const token" data-verso-hover="653">numCrashes_E_le</span> (x : <span class="const token" data-verso-hover="41">Fin</span> n → <span class="const token" data-verso-hover="12">Bool</span>) (σ : <span class="const token" data-verso-hover="165">List</span> <span class="const token" data-verso-hover="12">Bool</span>) : <span class="const token" data-verso-hover="284">numCrashes</span> (R.<span class="const token" data-verso-hover="179">E</span> x σ) ≤ R.<span class="const token" data-verso-hover="90">F</span>.<span class="const token" data-verso-hover="648">card</span> := <span class="kw">by</span></span>
+<span id="L275">  <span class="kw">have</span> h := R.<span class="const token" data-verso-hover="650">crash_count</span> (<span class="const token" data-verso-hover="170">RS.init</span> A x) σ</span>
+<span id="L276">  <span class="kw">have</span> h2 := <span class="const token" data-verso-hover="654">Finset.card_le_card</span> (R.<span class="const token" data-verso-hover="651">trg_subset</span> (<span class="const token" data-verso-hover="170">RS.init</span> A x) (<span class="kw">by</span> <span class="kw">simp</span> [<span class="const token" data-verso-hover="170">RS.init</span>]) σ)</span>
+<span id="L277">  <span class="kw">have</span> e1 : (<span class="const token" data-verso-hover="170">RS.init</span> A x).<span class="const token" data-verso-hover="149">trg</span> = ∅ := <span class="const token" data-verso-hover="104">rfl</span></span>
+<span id="L278">  <span class="kw">have</span> e2 : <span class="const token" data-verso-hover="646">pb</span> (<span class="const token" data-verso-hover="170">RS.init</span> A x) = <span class="nu">0</span> := <span class="const token" data-verso-hover="104">rfl</span></span>
+<span id="L279">  <span class="kw">rw</span> [e1, e2, <span class="const token" data-verso-hover="655">Finset.card_empty</span>] <span class="kw">at</span> h</span>
+<span id="L280">  <span class="kw">have</span> : <span class="const token" data-verso-hover="646">pb</span> (R.<span class="const token" data-verso-hover="166">rrun</span> (<span class="const token" data-verso-hover="170">RS.init</span> A x) σ) ≥ <span class="nu">0</span> := <span class="const token" data-verso-hover="570">Nat.zero_le</span> _</span>
+<span id="L281">  <span class="kw">change</span> <span class="const token" data-verso-hover="284">numCrashes</span> (R.<span class="const token" data-verso-hover="631">evs</span> (<span class="const token" data-verso-hover="170">RS.init</span> A x) σ) ≤ _</span>
+<span id="L282">  <span class="kw">omega</span></span>
+<span id="L283"></span>
+<span id="L284"><span class="dc">/-! ## Infinite schedules -/</span></span>
+<span id="L285"></span>
+<span id="L286"><span class="dc">/-- The first `t` moves of an infinite schedule. -/</span></span>
+<span id="L287"><span class="kw">def</span> <span class="const token" data-verso-hover="205">bpre</span> (sch : <span class="const token" data-verso-hover="185">ℕ</span> → <span class="const token" data-verso-hover="12">Bool</span>) (t : <span class="const token" data-verso-hover="185">ℕ</span>) : <span class="const token" data-verso-hover="165">List</span> <span class="const token" data-verso-hover="12">Bool</span> := (<span class="const token" data-verso-hover="316">List.range</span> t).<span class="const token" data-verso-hover="317">map</span> sch</span>
+<span id="L288"></span>
+<span id="L289"><span class="kw">lemma</span> <span class="const token" data-verso-hover="656">bpre_succ</span> (sch : <span class="const token" data-verso-hover="185">ℕ</span> → <span class="const token" data-verso-hover="12">Bool</span>) (t : <span class="const token" data-verso-hover="185">ℕ</span>) : <span class="const token" data-verso-hover="205">bpre</span> sch (t + <span class="nu">1</span>) = <span class="const token" data-verso-hover="205">bpre</span> sch t ++ [sch t] := <span class="kw">by</span></span>
+<span id="L290">  <span class="kw">simp</span> [<span class="const token" data-verso-hover="205">bpre</span>, <span class="const token" data-verso-hover="325">List.range_succ</span>]</span>
+<span id="L291"></span>
+<span id="L292">@[<span class="kw">simp</span>] <span class="kw">lemma</span> <span class="const token" data-verso-hover="657">bpre_length</span> (sch : <span class="const token" data-verso-hover="185">ℕ</span> → <span class="const token" data-verso-hover="12">Bool</span>) (t : <span class="const token" data-verso-hover="185">ℕ</span>) : (<span class="const token" data-verso-hover="205">bpre</span> sch t).<span class="const token" data-verso-hover="180">length</span> = t := <span class="kw">by</span> <span class="kw">simp</span> [<span class="const token" data-verso-hover="205">bpre</span>]</span>
+<span id="L293"></span>
+<span id="L294"><span class="dc">/-- The underlying infinite event sequence of an infinite schedule. -/</span></span>
+<span id="L295"><span class="kw">def</span> <span class="const token" data-verso-hover="199">eInf</span> (x : <span class="const token" data-verso-hover="41">Fin</span> n → <span class="const token" data-verso-hover="12">Bool</span>) (sch : <span class="const token" data-verso-hover="185">ℕ</span> → <span class="const token" data-verso-hover="12">Bool</span>) (t : <span class="const token" data-verso-hover="185">ℕ</span>) : <span class="const token" data-verso-hover="281">Ev</span> n :=</span>
+<span id="L296">  R.<span class="const token" data-verso-hover="625">ev</span> (R.<span class="const token" data-verso-hover="174">S</span> x (<span class="const token" data-verso-hover="205">bpre</span> sch t)) (sch t)</span>
+<span id="L297"></span>
+<span id="L298"><span class="kw">lemma</span> <span class="const token" data-verso-hover="209">pre_eInf</span> (x : <span class="const token" data-verso-hover="41">Fin</span> n → <span class="const token" data-verso-hover="12">Bool</span>) (sch : <span class="const token" data-verso-hover="185">ℕ</span> → <span class="const token" data-verso-hover="12">Bool</span>) (t : <span class="const token" data-verso-hover="185">ℕ</span>) :</span>
+<span id="L299">    <span class="const token" data-verso-hover="298">pre</span> (R.<span class="const token" data-verso-hover="199">eInf</span> x sch) t = R.<span class="const token" data-verso-hover="179">E</span> x (<span class="const token" data-verso-hover="205">bpre</span> sch t) := <span class="kw">by</span></span>
+<span id="L300">  <span class="kw">induction</span> t <span class="kw">with</span></span>
+<span id="L301">  | <span class="const token" data-verso-hover="327">zero</span> =&gt; <span class="kw">rfl</span></span>
+<span id="L302">  | <span class="const token" data-verso-hover="328">succ</span> t ih =&gt; <span class="kw">rw</span> [<span class="const token" data-verso-hover="601">pre_succ</span>, ih, <span class="const token" data-verso-hover="656">bpre_succ</span>, <span class="const token" data-verso-hover="179">E</span>, <span class="const token" data-verso-hover="179">E</span>, R.<span class="const token" data-verso-hover="639">evs_concat</span>]; <span class="kw">rfl</span></span>
+<span id="L303"></span>
+<span id="L304"><span class="dc">/-- The infinite schedule `σ` followed by moves `m` forever. -/</span></span>
+<span id="L305"><span class="kw">def</span> <span class="const token" data-verso-hover="658">ext</span> (σ : <span class="const token" data-verso-hover="165">List</span> <span class="const token" data-verso-hover="12">Bool</span>) (m : <span class="const token" data-verso-hover="12">Bool</span>) (t : <span class="const token" data-verso-hover="185">ℕ</span>) : <span class="const token" data-verso-hover="12">Bool</span> := <span class="kw">if</span> h : t &lt; σ.<span class="const token" data-verso-hover="180">length</span> <span class="kw">then</span> σ[t] <span class="kw">else</span> m</span>
+<span id="L306"></span>
+<span id="L307"><span class="kw">lemma</span> <span class="const token" data-verso-hover="659">bpre_ext</span> (σ : <span class="const token" data-verso-hover="165">List</span> <span class="const token" data-verso-hover="12">Bool</span>) (m : <span class="const token" data-verso-hover="12">Bool</span>) (k : <span class="const token" data-verso-hover="185">ℕ</span>) :</span>
+<span id="L308">    <span class="const token" data-verso-hover="205">bpre</span> (<span class="const token" data-verso-hover="658">ext</span> σ m) (σ.<span class="const token" data-verso-hover="180">length</span> + k) = σ ++ <span class="const token" data-verso-hover="224">List.replicate</span> k m := <span class="kw">by</span></span>
+<span id="L309">  <span class="kw">induction</span> k <span class="kw">with</span></span>
+<span id="L310">  | <span class="const token" data-verso-hover="327">zero</span> =&gt;</span>
+<span id="L311">    <span class="kw">apply</span> <span class="const token" data-verso-hover="660">List.ext_getElem</span> (<span class="kw">by</span> <span class="kw">simp</span>)</span>
+<span id="L312">    <span class="kw">intro</span> i h1 h2</span>
+<span id="L313">    <span class="kw">simp</span> [<span class="const token" data-verso-hover="205">bpre</span>, <span class="const token" data-verso-hover="658">ext</span>, <span class="kw">show</span> i &lt; σ.<span class="const token" data-verso-hover="180">length</span> <span class="kw">by</span> <span class="kw">simpa</span> <span class="kw">using</span> h1]</span>
+<span id="L314">  | <span class="const token" data-verso-hover="328">succ</span> k ih =&gt;</span>
+<span id="L315">    <span class="kw">rw</span> [← <span class="const token" data-verso-hover="661">add_assoc</span>, <span class="const token" data-verso-hover="656">bpre_succ</span>, ih, <span class="const token" data-verso-hover="662">List.replicate_succ'</span>, ← <span class="const token" data-verso-hover="330">List.append_assoc</span>]</span>
+<span id="L316">    <span class="kw">simp</span> [<span class="const token" data-verso-hover="658">ext</span>]</span>
+<span id="L317"></span>
+<span id="L318"><span class="dc">/-! ## Correctness on restricted executions -/</span></span>
+<span id="L319"></span>
+<span id="L320"><span class="dc">/-- Correctness of `A` on the restricted executions: agreement between distinct processes,</span></span>
+<span id="L321"><span class="dc">validity, and recoverable wait-freedom for the two moving processes. These are exactly the</span></span>
+<span id="L322"><span class="dc">properties the proofs of Theorems 3 and 6 use. -/</span></span>
+<span id="L323"><span class="kw">structure</span> <span class="const token" data-verso-hover="32">RCorrect</span> : <span class="kw">Prop</span> <span class="kw">where</span></span>
+<span id="L324">  <span class="const token" data-verso-hover="194">agree</span> : ∀ x σ p q, p ≠ q → ∀ v w, <span class="const token" data-verso-hover="178">Outputs</span> (<span class="const token" data-verso-hover="172">initCfg</span> A x) (R.<span class="const token" data-verso-hover="179">E</span> x σ) p v →</span>
+<span id="L325">    <span class="const token" data-verso-hover="178">Outputs</span> (<span class="const token" data-verso-hover="172">initCfg</span> A x) (R.<span class="const token" data-verso-hover="179">E</span> x σ) q w → v = w</span>
+<span id="L326">  <span class="const token" data-verso-hover="196">valid</span> : ∀ x σ v, <span class="const token" data-verso-hover="294">Dec</span> (<span class="const token" data-verso-hover="172">initCfg</span> A x) (R.<span class="const token" data-verso-hover="179">E</span> x σ) v → ∃ p, x p = v</span>
+<span id="L327">  <span class="const token" data-verso-hover="198">prog</span> : ∀ x (sch : <span class="const token" data-verso-hover="185">ℕ</span> → <span class="const token" data-verso-hover="12">Bool</span>) (m : <span class="const token" data-verso-hover="12">Bool</span>) N, (∀ M, ∃ t ≥ M, sch t = m) →</span>
+<span id="L328">    (∀ t ≥ N, R.<span class="const token" data-verso-hover="199">eInf</span> x sch t ≠ <span class="const token" data-verso-hover="143">.</span>crash (R.<span class="const token" data-verso-hover="201">who</span> m)) →</span>
+<span id="L329">    ∃ t ≥ N, ∃ v, (R.<span class="const token" data-verso-hover="174">S</span> x (<span class="const token" data-verso-hover="205">bpre</span> sch t)).<span class="const token" data-verso-hover="147">c</span>.<span class="const token" data-verso-hover="117">Out</span> (R.<span class="const token" data-verso-hover="201">who</span> m) v</span>
+<span id="L330"></span>
+<span id="L331"><span class="kw">end</span> Restr</span>
+<span id="L332"></span>
+<span id="L333"><span class="dc">/-- The paper's specification on a set of executions containing all restricted executions</span></span>
+<span id="L334"><span class="dc">implies correctness on the restricted executions. -/</span></span>
+<span id="L335"><span class="kw">theorem</span> <span class="const token" data-verso-hover="33">SolvesP.rcorrect</span> {A : <span class="const token" data-verso-hover="75">Alg</span> n T} {Adm : <span class="const token" data-verso-hover="165">List</span> (<span class="const token" data-verso-hover="281">Ev</span> n) → <span class="kw">Prop</span>} (h : <span class="const token" data-verso-hover="13">SolvesP</span> A Adm)</span>
+<span id="L336">    (R : <span class="const token" data-verso-hover="85">Restr</span> A) (hAdm : ∀ x σ, Adm (R.<span class="const token" data-verso-hover="179">E</span> x σ)) : R.<span class="const token" data-verso-hover="32">RCorrect</span> <span class="kw">where</span></span>
+<span id="L337">  <span class="const token" data-verso-hover="194">agree</span> x σ p q hpq v w hv hw := h.<span class="const token" data-verso-hover="295">agree</span> x _ (hAdm x σ) p q hpq v w hv hw</span>
+<span id="L338">  <span class="const token" data-verso-hover="196">valid</span> x σ v hv := h.<span class="const token" data-verso-hover="296">valid</span> x _ (hAdm x σ) v hv</span>
+<span id="L339">  <span class="const token" data-verso-hover="198">prog</span> x sch m N hinf hN := <span class="kw">by</span></span>
+<span id="L340">    <span class="kw">have</span> hadm : ∀ t, Adm (<span class="const token" data-verso-hover="298">pre</span> (R.<span class="const token" data-verso-hover="199">eInf</span> x sch) t) := <span class="kw">fun</span> t =&gt; <span class="kw">by</span></span>
+<span id="L341">      <span class="kw">rw</span> [R.<span class="const token" data-verso-hover="209">pre_eInf</span>]; <span class="kw">exact</span> hAdm x _</span>
+<span id="L342">    <span class="kw">have</span> hsteps : ∀ M, ∃ t ≥ M, R.<span class="const token" data-verso-hover="199">eInf</span> x sch t = <span class="const token" data-verso-hover="200">.</span>step (R.<span class="const token" data-verso-hover="201">who</span> m) := <span class="kw">by</span></span>
+<span id="L343">      <span class="kw">intro</span> M</span>
+<span id="L344">      <span class="kw">obtain</span> ⟨t, ht, hm⟩ := hinf (<span class="const token" data-verso-hover="202">max</span> M N)</span>
+<span id="L345">      <span class="kw">refine</span> ⟨t, <span class="const token" data-verso-hover="203">le_of_max_le_left</span> ht, ?_⟩</span>
+<span id="L346">      <span class="kw">have</span> hN' := hN t (<span class="const token" data-verso-hover="204">le_of_max_le_right</span> ht)</span>
+<span id="L347">      <span class="kw">unfold</span> <span class="const token" data-verso-hover="199">Restr.eInf</span> <span class="kw">at</span> hN' ⊢</span>
+<span id="L348">      <span class="kw">rw</span> [hm] <span class="kw">at</span> hN' ⊢</span>
+<span id="L349">      <span class="kw">cases</span> m</span>
+<span id="L350">      · <span class="kw">by_cases</span> hp : (R.<span class="const token" data-verso-hover="174">S</span> x (<span class="const token" data-verso-hover="205">Restr.bpre</span> sch t)).<span class="const token" data-verso-hover="151">pend</span></span>
+<span id="L351">        · <span class="kw">exact</span> <span class="const token" data-verso-hover="171">absurd</span> (R.<span class="const token" data-verso-hover="206">ev_false_pend</span> _ hp) hN'</span>
+<span id="L352">        · <span class="kw">simp</span> only [<span class="const token" data-verso-hover="159">Bool.not_eq_true</span>] <span class="kw">at</span> hp</span>
+<span id="L353">          <span class="kw">exact</span> R.<span class="const token" data-verso-hover="207">ev_false_npend</span> _ hp</span>
+<span id="L354">      · <span class="kw">rfl</span></span>
+<span id="L355">    <span class="kw">obtain</span> ⟨t, ht, v, hv⟩ := h.<span class="const token" data-verso-hover="297">prog</span> x (R.<span class="const token" data-verso-hover="199">eInf</span> x sch) (R.<span class="const token" data-verso-hover="201">who</span> m) N hadm hsteps hN</span>
+<span id="L356">    <span class="kw">refine</span> ⟨t, ht, v, ?_⟩</span>
+<span id="L357">    <span class="kw">rwa</span> [R.<span class="const token" data-verso-hover="182">S_c</span>, ← R.<span class="const token" data-verso-hover="209">pre_eInf</span>]</span>
+<span id="L358"></span>
+<span id="L359"><span class="dc">/-- Restricted executions have at most `f` crashes if `|F| ≤ f`. -/</span></span>
+<span id="L360"><span class="kw">lemma</span> <span class="const token" data-verso-hover="663">Restr.atMost_E</span> {A : <span class="const token" data-verso-hover="75">Alg</span> n T} (R : <span class="const token" data-verso-hover="85">Restr</span> A) {f : <span class="const token" data-verso-hover="185">ℕ</span>} (hf : R.<span class="const token" data-verso-hover="90">F</span>.<span class="const token" data-verso-hover="648">card</span> ≤ f) (x : <span class="const token" data-verso-hover="41">Fin</span> n → <span class="const token" data-verso-hover="12">Bool</span>)</span>
+<span id="L361">    (σ : <span class="const token" data-verso-hover="165">List</span> <span class="const token" data-verso-hover="12">Bool</span>) : <span class="const token" data-verso-hover="210">AtMost</span> f (R.<span class="const token" data-verso-hover="179">E</span> x σ) :=</span>
+<span id="L362">  (R.<span class="const token" data-verso-hover="653">numCrashes_E_le</span> x σ).<span class="const token" data-verso-hover="539">trans</span> hf</span>
+<span id="L363"></span>
+<span id="L364"><span class="kw">end</span> Podc.RecoverableHierarchy</span>
+<span id="L365"></span>
+</code></div>
+        <script>
+          window.versoHoversUrl = "PODC2019/RecoverableHierarchy/-hovers.json";</script>
+        <script src="static/lean/popper.js"></script>
+        <script src="static/lean/tippy.js"></script>
+        <script src="static/lean/marked.js"></script>
+        <script src="static/lean/highlighting.js"></script>
+        <script src="static/lean/lean.js"></script>
+        </article></main><footer class="site-footer"><div class="wrap">
+        Machine-checked formalizations of PODC papers in Lean 4. Generated with <a href="https://github.com/leanprover/verso">Verso</a> from the README files of <a href="https://github.com/vasnesterov/formal_podc">vasnesterov/formal_podc</a>.</div>
+      </footer></body>
+  </html>
+

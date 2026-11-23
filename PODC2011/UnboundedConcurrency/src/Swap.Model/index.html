@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="light dark">
+    <link rel="icon" href="data:,">
+    <title>UnboundedConcurrency: Swap/Model.lean · Formal PODC</title><base href="../../../.././"><link rel="stylesheet" href="static/lean/verso-vars.css">
+    <link rel="stylesheet" href="static/lean/highlighting.css">
+    <link rel="stylesheet" href="static/lean/tippy-border.css">
+    <link rel="stylesheet" href="static/style.css">
+    <script defer="defer" src="static/site.js"></script>
+    </head>
+  <body>
+    <header class="site-header">
+      <div class="wrap">
+        <a class="brand" href=".">Formal PODC</a><nav class="top">
+          <a href=".">Search</a><a href="about/">About</a><a href="https://github.com/vasnesterov/formal_podc">GitHub</a></nav>
+        </div>
+      </header>
+    <main class="wrap"><article><nav class="breadcrumbs" aria-label="Breadcrumb">
+          <a href=".">Search</a><span class="sep">›</span><a href="PODC2011/">PODC 2011</a><span class="sep">›</span><a href="PODC2011/UnboundedConcurrency/">UnboundedConcurrency</a><span class="sep">›</span><a href="PODC2011/UnboundedConcurrency/src/">Lean source</a><span class="sep">›</span><span aria-current="page">Swap.Model</span></nav>
+        <h1>
+          <code>Swap/Model.lean</code></h1>
+        <div class="paper-links">
+          <p>
+            Source of <a href="PODC2011/UnboundedConcurrency/">Unbounded-Concurrency Objects — PODC 2011</a> · <a href="https://github.com/vasnesterov/formal_podc/blob/main/Papers/PODC2011/UnboundedConcurrency/Swap/Model.lean">GitHub</a> · hover over a name for its type and documentation</p>
+          </div>
+        <div class="lean-code lean-src">
+          <code class="hl lean block" data-lean-context="Swap.Model"><span id="L1"><span class="kw">import</span> Papers.PODC2011.UnboundedConcurrency.Swap.Tree</span>
+<span id="L2"><span class="kw">import</span> Podc.Computability.Distributed.SharedMemory.Arrival.Basic</span>
+<span id="L3"><span class="kw">import</span> Cslib.Computability.Distributed.SharedMemory.Objects.FetchAdd</span>
+<span id="L4"><span class="kw">import</span> Cslib.Computability.Distributed.SharedMemory.Objects.TestAndSet</span>
+<span id="L5"></span>
+<span id="L6"><span class="dc">/-!</span></span>
+<span id="L7"><span class="dc"># Algorithm 1 of Afek–Morrison–Wertheim (PODC 2011): unbounded-concurrency swap</span></span>
+<span id="L8"></span>
+<span id="L9"><span class="dc">The model is `Cslib.SharedMemory.Arrival`: asynchronous shared memory with infinitely many</span></span>
+<span id="L10"><span class="dc">processes `ℕ`, each a deterministic state machine whose every step is one atomic operation on one</span></span>
+<span id="L11"><span class="dc">base object (local computation is folded into the continuations). Every process performs exactly</span></span>
+<span id="L12"><span class="dc">**one** `swap(x p)` operation (in the unbounded-concurrency model of the paper every new invocation</span></span>
+<span id="L13"><span class="dc">is performed by a new process): its first step is the invocation, entering an output state</span></span>
+<span id="L14"><span class="dc">(`Act.out`) is the response. A schedule is a list (or sequence) of process ids; *unbounded</span></span>
+<span id="L15"><span class="dc">concurrency* means that every infinite schedule is admissible (`infArrival`).</span></span>
+<span id="L16"></span>
+<span id="L17"><span class="dc">Base objects (all atomic; the paper relies on [2], [10] for wait-free implementations of the</span></span>
+<span id="L18"><span class="dc">unbounded fetch-and-add and the unbounded snapshot from 2-consensus objects / registers, which we</span></span>
+<span id="L19"><span class="dc">do not formalize):</span></span>
+<span id="L20"></span>
+<span id="L21"><span class="dc">* `max_depth`: a fetch-and-add object over `ℕ`, initially `1` (`Obj.maxDepth`);</span></span>
+<span id="L22"><span class="dc">* `accessed`: an unbounded single-writer snapshot (`Obj.accessed`): cell `d` holds the last node</span></span>
+<span id="L23"><span class="dc">  posted by the process of depth `d` (`update_d(v)`), `scan` returns the whole array</span></span>
+<span id="L24"><span class="dc">  (a function `ℕ → Option Node`, `none` = never written);</span></span>
+<span id="L25"><span class="dc">* for every node `v` of the tree: an atomic register `v.reg` (`Obj.reg v`, values `Option V`,</span></span>
+<span id="L26"><span class="dc">  initially `none`) and a test-and-set object `v.tst` (`Obj.tst v`; the operation sets the bit and</span></span>
+<span id="L27"><span class="dc">  returns its old value, so the paper's `T&amp;S` "wins" iff it returns `false`).</span></span>
+<span id="L28"></span>
+<span id="L29"><span class="dc">The local states follow the pseudocode line by line (`Loc`). The output is `Option V`</span></span>
+<span id="L30"><span class="dc">(`none` = `⊥`).</span></span>
+<span id="L31"><span class="dc">-/</span></span>
+<span id="L32"></span>
+<span id="L33"><span class="kw">namespace</span> Podc.UnboundedConcurrency.Swap</span>
+<span id="L34"></span>
+<span id="L35"><span class="kw">open</span> Cslib.SharedMemory Cslib.SharedMemory.Arrival</span>
+<span id="L36"></span>
+<span id="L37"><span class="dc">/-- Operations of the unbounded snapshot object `accessed`. -/</span></span>
+<span id="L38"><span class="kw">inductive</span> <span class="const token" data-verso-hover="586">SnapOp</span> <span class="kw">where</span></span>
+<span id="L39">  <span class="dc">/-- `scan()`: returns the whole array. -/</span></span>
+<span id="L40">  | <span class="const token" data-verso-hover="587">scan</span></span>
+<span id="L41">  <span class="dc">/-- `update_d(v)`: writes `v` to cell `d`. -/</span></span>
+<span id="L42">  | <span class="const token" data-verso-hover="588">update</span> (d : <span class="const token" data-verso-hover="47">ℕ</span>) (v : <span class="const token" data-verso-hover="445">Node</span>)</span>
+<span id="L43"></span>
+<span id="L44"><span class="dc">/-- The unbounded snapshot object: an array `ℕ → Option Node`; `update` returns the old array</span></span>
+<span id="L45"><span class="dc">(a dummy response). -/</span></span>
+<span id="L46"><span class="kw">abbrev</span> <span class="const token" data-verso-hover="589">snapObj</span> : <span class="const token" data-verso-hover="44">ObjSpec</span> <span class="kw">where</span></span>
+<span id="L47">  <span class="const token" data-verso-hover="126">State</span> := <span class="const token" data-verso-hover="47">ℕ</span> → <span class="const token" data-verso-hover="72">Option</span> <span class="const token" data-verso-hover="445">Node</span></span>
+<span id="L48">  <span class="const token" data-verso-hover="246">Op</span> := <span class="const token" data-verso-hover="586">SnapOp</span></span>
+<span id="L49">  <span class="const token" data-verso-hover="247">Resp</span> := <span class="const token" data-verso-hover="47">ℕ</span> → <span class="const token" data-verso-hover="72">Option</span> <span class="const token" data-verso-hover="445">Node</span></span>
+<span id="L50">  <span class="const token" data-verso-hover="319">init</span> := <span class="kw">fun</span> _ =&gt; <span class="const token" data-verso-hover="35">none</span></span>
+<span id="L51">  <span class="const token" data-verso-hover="120">δ</span> s o := <span class="kw">match</span> o <span class="kw">with</span></span>
+<span id="L52">    | <span class="const token" data-verso-hover="587">.</span>scan =&gt; (s, s)</span>
+<span id="L53">    | <span class="const token" data-verso-hover="588">.</span>update d v =&gt; (<span class="const token" data-verso-hover="109">Function.update</span> s d (<span class="const token" data-verso-hover="83">some</span> v), s)</span>
+<span id="L54"></span>
+<span id="L55"><span class="dc">/-- The base objects of Algorithm 1. -/</span></span>
+<span id="L56"><span class="kw">inductive</span> <span class="const token" data-verso-hover="574">Obj</span> <span class="kw">where</span></span>
+<span id="L57">  <span class="dc">/-- The fetch-and-add object `max_depth`. -/</span></span>
+<span id="L58">  | <span class="const token" data-verso-hover="582">maxDepth</span></span>
+<span id="L59">  <span class="dc">/-- The snapshot object `accessed`. -/</span></span>
+<span id="L60">  | <span class="const token" data-verso-hover="8">accessed</span></span>
+<span id="L61">  <span class="dc">/-- The register `v.reg` of node `v`. -/</span></span>
+<span id="L62">  | <span class="const token" data-verso-hover="590">reg</span> (v : <span class="const token" data-verso-hover="445">Node</span>)</span>
+<span id="L63">  <span class="dc">/-- The test-and-set object `v.tst` of node `v`. -/</span></span>
+<span id="L64">  | <span class="const token" data-verso-hover="580">tst</span> (v : <span class="const token" data-verso-hover="445">Node</span>)</span>
+<span id="L65">  <span class="kw">deriving</span> <span class="const token" data-verso-hover="43">DecidableEq</span></span>
+<span id="L66"></span>
+<span id="L67"><span class="dc">/-- Sequential specifications of the base objects (`V` = values of the swap object). -/</span></span>
+<span id="L68"><span class="kw">abbrev</span> <span class="const token" data-verso-hover="581">T</span> (V : <span class="kw">Type</span>) : <span class="const token" data-verso-hover="574">Obj</span> → <span class="const token" data-verso-hover="44">ObjSpec</span></span>
+<span id="L69">  | <span class="const token" data-verso-hover="582">.</span>maxDepth =&gt; <span class="const token" data-verso-hover="591">faaObj</span> <span class="const token" data-verso-hover="47">ℕ</span></span>
+<span id="L70">  | <span class="const token" data-verso-hover="8">.</span>accessed =&gt; <span class="const token" data-verso-hover="589">snapObj</span></span>
+<span id="L71">  | <span class="const token" data-verso-hover="590">.</span>reg _ =&gt; <span class="const token" data-verso-hover="71">register</span> (<span class="const token" data-verso-hover="72">Option</span> V) <span class="const token" data-verso-hover="35">none</span></span>
+<span id="L72">  | <span class="const token" data-verso-hover="580">.</span>tst _ =&gt; <span class="const token" data-verso-hover="592">tasObj</span></span>
+<span id="L73"></span>
+<span id="L74"><span class="dc">/-- Local states of a process; the comments give the line of Algorithm 1 the process is about to</span></span>
+<span id="L75"><span class="dc">execute. `x` is the input value, `d` the depth (`depth`), `c` the node `cap`, `m` the value</span></span>
+<span id="L76"><span class="dc">`maxdepth` read in Line 7, `r` the node `ret`. -/</span></span>
+<span id="L77"><span class="kw">inductive</span> <span class="const token" data-verso-hover="434">Loc</span> (V : <span class="kw">Type</span>) <span class="kw">where</span></span>
+<span id="L78">  <span class="dc">/-- Line 1: `depth := F&amp;A(max_depth, 1)`. -/</span></span>
+<span id="L79">  | <span class="const token" data-verso-hover="435">start</span> (x : V)</span>
+<span id="L80">  <span class="dc">/-- Line 2: `cap := NextUnaccessedNodeAtDepth(depth)` (`scan` of `accessed`); `prev` is the</span></span>
+<span id="L81"><span class="dc">  previous value of `cap` (`none` in the first iteration). If no node is found, the process scans</span></span>
+<span id="L82"><span class="dc">  again (it is stuck); Lemma 1 shows that this never happens. -/</span></span>
+<span id="L83">  | <span class="const token" data-verso-hover="436">scan</span> (x : V) (d : <span class="const token" data-verso-hover="47">ℕ</span>) (prev : <span class="const token" data-verso-hover="72">Option</span> <span class="const token" data-verso-hover="445">Node</span>)</span>
+<span id="L84">  <span class="dc">/-- Line 3: `cap.reg := value`. -/</span></span>
+<span id="L85">  | <span class="const token" data-verso-hover="437">write</span> (x : V) (d : <span class="const token" data-verso-hover="47">ℕ</span>) (c : <span class="const token" data-verso-hover="445">Node</span>)</span>
+<span id="L86">  <span class="dc">/-- Line 4: `win := T&amp;S(cap.tst)`. -/</span></span>
+<span id="L87">  | <span class="const token" data-verso-hover="438">tas</span> (x : V) (d : <span class="const token" data-verso-hover="47">ℕ</span>) (c : <span class="const token" data-verso-hover="445">Node</span>)</span>
+<span id="L88">  <span class="dc">/-- Line 5: `update_depth(accessed, cap)`; then Line 6 (`until win`). -/</span></span>
+<span id="L89">  | <span class="const token" data-verso-hover="439">upd</span> (x : V) (d : <span class="const token" data-verso-hover="47">ℕ</span>) (c : <span class="const token" data-verso-hover="445">Node</span>) (win : <span class="const token" data-verso-hover="132">Bool</span>)</span>
+<span id="L90">  <span class="dc">/-- Line 7: `maxdepth := F&amp;A(max_depth, 0)`, then Lines 8–10 (local). -/</span></span>
+<span id="L91">  | <span class="const token" data-verso-hover="440">readMax</span> (d : <span class="const token" data-verso-hover="47">ℕ</span>) (c : <span class="const token" data-verso-hover="445">Node</span>)</span>
+<span id="L92">  <span class="dc">/-- Line 11: `T&amp;S(ret.tst)`; on a win continue with Lines 9–10 (local). -/</span></span>
+<span id="L93">  | <span class="const token" data-verso-hover="441">retTas</span> (d : <span class="const token" data-verso-hover="47">ℕ</span>) (c : <span class="const token" data-verso-hover="445">Node</span>) (m : <span class="const token" data-verso-hover="47">ℕ</span>) (r : <span class="const token" data-verso-hover="445">Node</span>)</span>
+<span id="L94">  <span class="dc">/-- Line 12: `return ret.reg`. -/</span></span>
+<span id="L95">  | <span class="const token" data-verso-hover="442">readReg</span> (d : <span class="const token" data-verso-hover="47">ℕ</span>) (c : <span class="const token" data-verso-hover="445">Node</span>) (m : <span class="const token" data-verso-hover="47">ℕ</span>) (r : <span class="const token" data-verso-hover="445">Node</span>)</span>
+<span id="L96">  <span class="dc">/-- Returned `o`; `r` is the node `ret` the value was read from (`none` if `⊥` was returned). -/</span></span>
+<span id="L97">  | <span class="const token" data-verso-hover="443">done</span> (d : <span class="const token" data-verso-hover="47">ℕ</span>) (c : <span class="const token" data-verso-hover="445">Node</span>) (m : <span class="const token" data-verso-hover="47">ℕ</span>) (r : <span class="const token" data-verso-hover="72">Option</span> <span class="const token" data-verso-hover="445">Node</span>) (o : <span class="const token" data-verso-hover="72">Option</span> V)</span>
+<span id="L98"></span>
+<span id="L99"><span class="kw">variable</span> {V : <span class="kw">Type</span>}</span>
+<span id="L100"></span>
+<span id="L101"><span class="dc">/-- Lines 9–10 after `ret := GetPrevNodeMaxDepth(·, maxdepth)`: return `⊥` if there is no</span></span>
+<span id="L102"><span class="dc">previous node, otherwise try to return from it (Line 11). -/</span></span>
+<span id="L103"><span class="kw">def</span> <span class="const token" data-verso-hover="505">afterPrev</span> (d : <span class="const token" data-verso-hover="47">ℕ</span>) (c : <span class="const token" data-verso-hover="445">Node</span>) (m : <span class="const token" data-verso-hover="47">ℕ</span>) : <span class="const token" data-verso-hover="72">Option</span> <span class="const token" data-verso-hover="445">Node</span> → <span class="const token" data-verso-hover="434">Loc</span> V</span>
+<span id="L104">  | <span class="const token" data-verso-hover="35">none</span> =&gt; <span class="const token" data-verso-hover="443">.</span>done d c m <span class="const token" data-verso-hover="35">none</span> <span class="const token" data-verso-hover="35">none</span></span>
+<span id="L105">  | <span class="const token" data-verso-hover="83">some</span> r =&gt; <span class="const token" data-verso-hover="441">.</span>retTas d c m r</span>
+<span id="L106"></span>
+<span id="L107"><span class="dc">/-- The next action of a process (Algorithm 1). -/</span></span>
+<span id="L108"><span class="kw">noncomputable</span> <span class="kw">def</span> <span class="const token" data-verso-hover="558">act</span> : <span class="const token" data-verso-hover="434">Loc</span> V → <span class="const token" data-verso-hover="80">Act</span> (<span class="const token" data-verso-hover="581">T</span> V) (<span class="const token" data-verso-hover="434">Loc</span> V) (<span class="const token" data-verso-hover="72">Option</span> V)</span>
+<span id="L109">  | <span class="const token" data-verso-hover="435">.</span>start x =&gt; <span class="const token" data-verso-hover="81">.</span>access <span class="const token" data-verso-hover="582">.</span>maxDepth (<span class="nu">1</span> : <span class="const token" data-verso-hover="47">ℕ</span>) <span class="kw">fun</span> d =&gt; <span class="const token" data-verso-hover="436">.</span>scan x d <span class="const token" data-verso-hover="35">none</span></span>
+<span id="L110">  | <span class="const token" data-verso-hover="436">.</span>scan x d p =&gt; <span class="const token" data-verso-hover="81">.</span>access <span class="const token" data-verso-hover="8">.</span>accessed <span class="const token" data-verso-hover="587">.</span>scan <span class="kw">fun</span> s =&gt;</span>
+<span id="L111">      <span class="kw">match</span> <span class="const token" data-verso-hover="544">next</span> d s <span class="kw">with</span></span>
+<span id="L112">      | <span class="const token" data-verso-hover="83">some</span> c =&gt; <span class="const token" data-verso-hover="437">.</span>write x d c</span>
+<span id="L113">      | <span class="const token" data-verso-hover="35">none</span> =&gt; <span class="const token" data-verso-hover="436">.</span>scan x d p</span>
+<span id="L114">  | <span class="const token" data-verso-hover="437">.</span>write x d c =&gt; <span class="const token" data-verso-hover="81">.</span>access (<span class="const token" data-verso-hover="590">.</span>reg c) (<span class="const token" data-verso-hover="89">.</span>write (<span class="const token" data-verso-hover="83">some</span> x)) <span class="kw">fun</span> _ =&gt; <span class="const token" data-verso-hover="438">.</span>tas x d c</span>
+<span id="L115">  | <span class="const token" data-verso-hover="438">.</span>tas x d c =&gt; <span class="const token" data-verso-hover="81">.</span>access (<span class="const token" data-verso-hover="580">.</span>tst c) <span class="const token" data-verso-hover="423">(</span>) <span class="kw">fun</span> b =&gt; <span class="const token" data-verso-hover="439">.</span>upd x d c (!b)</span>
+<span id="L116">  | <span class="const token" data-verso-hover="439">.</span>upd x d c w =&gt; <span class="const token" data-verso-hover="81">.</span>access <span class="const token" data-verso-hover="8">.</span>accessed (<span class="const token" data-verso-hover="588">.</span>update d c) <span class="kw">fun</span> _ =&gt;</span>
+<span id="L117">      <span class="kw">if</span> w <span class="kw">then</span> <span class="const token" data-verso-hover="440">.</span>readMax d c <span class="kw">else</span> <span class="const token" data-verso-hover="436">.</span>scan x d (<span class="const token" data-verso-hover="83">some</span> c)</span>
+<span id="L118">  | <span class="const token" data-verso-hover="440">.</span>readMax d c =&gt; <span class="const token" data-verso-hover="81">.</span>access <span class="const token" data-verso-hover="582">.</span>maxDepth (<span class="nu">0</span> : <span class="const token" data-verso-hover="47">ℕ</span>) <span class="kw">fun</span> m =&gt; <span class="const token" data-verso-hover="505">afterPrev</span> d c m (<span class="const token" data-verso-hover="504">prev</span> c m)</span>
+<span id="L119">  | <span class="const token" data-verso-hover="441">.</span>retTas d c m r =&gt; <span class="const token" data-verso-hover="81">.</span>access (<span class="const token" data-verso-hover="580">.</span>tst r) <span class="const token" data-verso-hover="423">(</span>) <span class="kw">fun</span> b =&gt;</span>
+<span id="L120">      <span class="kw">if</span> b <span class="kw">then</span> <span class="const token" data-verso-hover="442">.</span>readReg d c m r <span class="kw">else</span> <span class="const token" data-verso-hover="505">afterPrev</span> d c m (<span class="const token" data-verso-hover="504">prev</span> r m)</span>
+<span id="L121">  | <span class="const token" data-verso-hover="442">.</span>readReg d c m r =&gt; <span class="const token" data-verso-hover="81">.</span>access (<span class="const token" data-verso-hover="590">.</span>reg r) <span class="const token" data-verso-hover="82">.</span>read <span class="kw">fun</span> o =&gt; <span class="const token" data-verso-hover="443">.</span>done d c m (<span class="const token" data-verso-hover="83">some</span> r) o</span>
+<span id="L122">  | <span class="const token" data-verso-hover="443">.</span>done _ _ _ _ o =&gt; <span class="const token" data-verso-hover="90">.</span>out o</span>
+<span id="L123"></span>
+<span id="L124"><span class="dc">/-- Algorithm 1: processes `ℕ`, input `x p : V` (the argument of `swap`), output `Option V`</span></span>
+<span id="L125"><span class="dc">(`none` = `⊥`). -/</span></span>
+<span id="L126"><span class="kw">noncomputable</span> <span class="kw">def</span> <span class="const token" data-verso-hover="487">alg</span> (V : <span class="kw">Type</span>) : <span class="const token" data-verso-hover="46">Alg</span> (<span class="const token" data-verso-hover="581">T</span> V) <span class="const token" data-verso-hover="47">ℕ</span> V (<span class="const token" data-verso-hover="72">Option</span> V) <span class="kw">where</span></span>
+<span id="L127">  <span class="const token" data-verso-hover="92">L</span> := <span class="const token" data-verso-hover="434">Loc</span> V</span>
+<span id="L128">  <span class="const token" data-verso-hover="93">init</span> _ x := <span class="const token" data-verso-hover="435">.</span>start x</span>
+<span id="L129">  <span class="const token" data-verso-hover="94">act</span> := <span class="const token" data-verso-hover="558">act</span></span>
+<span id="L130">  <span class="const token" data-verso-hover="95">mem₀</span> i := <span class="kw">match</span> i <span class="kw">with</span></span>
+<span id="L131">    | <span class="const token" data-verso-hover="582">.</span>maxDepth =&gt; (<span class="nu">1</span> : <span class="const token" data-verso-hover="47">ℕ</span>)</span>
+<span id="L132">    | <span class="const token" data-verso-hover="8">.</span>accessed =&gt; <span class="kw">fun</span> _ =&gt; <span class="const token" data-verso-hover="35">none</span></span>
+<span id="L133">    | <span class="const token" data-verso-hover="590">.</span>reg _ =&gt; <span class="const token" data-verso-hover="35">none</span></span>
+<span id="L134">    | <span class="const token" data-verso-hover="580">.</span>tst _ =&gt; <span class="const token" data-verso-hover="134">false</span></span>
+<span id="L135"></span>
+<span id="L136"><span class="dc">/-- Configurations of Algorithm 1. -/</span></span>
+<span id="L137"><span class="kw">abbrev</span> <span class="const token" data-verso-hover="454">Config</span> (V : <span class="kw">Type</span>) := <span class="const token" data-verso-hover="98">Cfg</span> (<span class="const token" data-verso-hover="487">alg</span> V)</span>
+<span id="L138"></span>
+<span id="L139"><span class="kw">namespace</span> Cfg'</span>
+<span id="L140"></span>
+<span id="L141"><span class="dc">/-- The value of `max_depth`. -/</span></span>
+<span id="L142"><span class="kw">def</span> <span class="const token" data-verso-hover="460">D</span> (C : <span class="const token" data-verso-hover="454">Config</span> V) : <span class="const token" data-verso-hover="47">ℕ</span> := C.<span class="const token" data-verso-hover="100">mem</span> <span class="const token" data-verso-hover="582">.</span>maxDepth</span>
+<span id="L143"><span class="dc">/-- The array of `accessed`. -/</span></span>
+<span id="L144"><span class="kw">def</span> <span class="const token" data-verso-hover="455">S</span> (C : <span class="const token" data-verso-hover="454">Config</span> V) : <span class="const token" data-verso-hover="47">ℕ</span> → <span class="const token" data-verso-hover="72">Option</span> <span class="const token" data-verso-hover="445">Node</span> := C.<span class="const token" data-verso-hover="100">mem</span> <span class="const token" data-verso-hover="8">.</span>accessed</span>
+<span id="L145"><span class="dc">/-- The register `v.reg`. -/</span></span>
+<span id="L146"><span class="kw">def</span> <span class="const token" data-verso-hover="456">R</span> (C : <span class="const token" data-verso-hover="454">Config</span> V) (v : <span class="const token" data-verso-hover="445">Node</span>) : <span class="const token" data-verso-hover="72">Option</span> V := C.<span class="const token" data-verso-hover="100">mem</span> (<span class="const token" data-verso-hover="590">.</span>reg v)</span>
+<span id="L147"><span class="dc">/-- The test-and-set bit of `v.tst`. -/</span></span>
+<span id="L148"><span class="kw">def</span> <span class="const token" data-verso-hover="457">B</span> (C : <span class="const token" data-verso-hover="454">Config</span> V) (v : <span class="const token" data-verso-hover="445">Node</span>) : <span class="const token" data-verso-hover="132">Bool</span> := C.<span class="const token" data-verso-hover="100">mem</span> (<span class="const token" data-verso-hover="580">.</span>tst v)</span>
+<span id="L149"></span>
+<span id="L150"><span class="kw">end</span> Cfg'</span>
+<span id="L151"></span>
+<span id="L152"><span class="kw">open</span> Cfg'</span>
+<span id="L153"></span>
+<span id="L154"><span class="dc">/-! ### One step of each kind -/</span></span>
+<span id="L155"></span>
+<span id="L156"><span class="kw">section</span> Steps</span>
+<span id="L157"></span>
+<span id="L158"><span class="kw">variable</span> {C : <span class="const token" data-verso-hover="454">Config</span> V} {p : <span class="const token" data-verso-hover="47">ℕ</span>}</span>
+<span id="L159"></span>
+<span id="L160"><span class="kw">lemma</span> <span class="const token" data-verso-hover="498">step_start</span> {x : V} (h : C.<span class="const token" data-verso-hover="107">loc</span> p = <span class="const token" data-verso-hover="435">.</span>start x) :</span>
+<span id="L161">    (C.<span class="const token" data-verso-hover="108">step</span> p).<span class="const token" data-verso-hover="107">loc</span> p = (<span class="const token" data-verso-hover="436">.</span>scan x (<span class="const token" data-verso-hover="460">D</span> C) <span class="const token" data-verso-hover="35">none</span>) ∧</span>
+<span id="L162">      (∀ q, q ≠ p → (C.<span class="const token" data-verso-hover="108">step</span> p).<span class="const token" data-verso-hover="107">loc</span> q = C.<span class="const token" data-verso-hover="107">loc</span> q) ∧ <span class="const token" data-verso-hover="460">D</span> (C.<span class="const token" data-verso-hover="108">step</span> p) = <span class="const token" data-verso-hover="460">D</span> C + <span class="nu">1</span> ∧</span>
+<span id="L163">      <span class="const token" data-verso-hover="455">S</span> (C.<span class="const token" data-verso-hover="108">step</span> p) = <span class="const token" data-verso-hover="455">S</span> C ∧ <span class="const token" data-verso-hover="456">R</span> (C.<span class="const token" data-verso-hover="108">step</span> p) = <span class="const token" data-verso-hover="456">R</span> C ∧ <span class="const token" data-verso-hover="457">B</span> (C.<span class="const token" data-verso-hover="108">step</span> p) = <span class="const token" data-verso-hover="457">B</span> C := <span class="kw">by</span></span>
+<span id="L164">  <span class="kw">have</span> hact : (<span class="const token" data-verso-hover="487">alg</span> V).<span class="const token" data-verso-hover="94">act</span> (C.<span class="const token" data-verso-hover="107">loc</span> p) = <span class="const token" data-verso-hover="81">.</span>access <span class="const token" data-verso-hover="582">.</span>maxDepth (<span class="nu">1</span> : <span class="const token" data-verso-hover="47">ℕ</span>) <span class="kw">fun</span> d =&gt; <span class="const token" data-verso-hover="436">.</span>scan x d <span class="const token" data-verso-hover="35">none</span> := <span class="kw">by</span></span>
+<span id="L165">    <span class="kw">rw</span> [h]; <span class="kw">rfl</span></span>
+<span id="L166">  <span class="kw">rw</span> [<span class="const token" data-verso-hover="110">Cfg.step_of_access</span> hact]</span>
+<span id="L167">  <span class="kw">refine</span> ⟨<span class="const token" data-verso-hover="182">Function.update_self</span> _ _ _, <span class="kw">fun</span> q hq =&gt; <span class="const token" data-verso-hover="183">Function.update_of_ne</span> hq _ _, ?_, ?_, ?_, ?_⟩</span>
+<span id="L168">  · <span class="kw">simp</span> [<span class="const token" data-verso-hover="460">D</span>]</span>
+<span id="L169">  · <span class="kw">simp</span> [<span class="const token" data-verso-hover="455">S</span>]</span>
+<span id="L170">  · <span class="kw">funext</span> v; <span class="kw">simp</span> [<span class="const token" data-verso-hover="456">R</span>]</span>
+<span id="L171">  · <span class="kw">funext</span> v; <span class="kw">simp</span> [<span class="const token" data-verso-hover="457">B</span>]</span>
+<span id="L172"></span>
+<span id="L173"><span class="kw">lemma</span> <span class="const token" data-verso-hover="499">step_scan</span> {x : V} {d : <span class="const token" data-verso-hover="47">ℕ</span>} {pr : <span class="const token" data-verso-hover="72">Option</span> <span class="const token" data-verso-hover="445">Node</span>} (h : C.<span class="const token" data-verso-hover="107">loc</span> p = <span class="const token" data-verso-hover="436">.</span>scan x d pr) :</span>
+<span id="L174">    (C.<span class="const token" data-verso-hover="108">step</span> p).<span class="const token" data-verso-hover="107">loc</span> p = (<span class="kw">match</span> <span class="const token" data-verso-hover="544">next</span> d (<span class="const token" data-verso-hover="455">S</span> C) <span class="kw">with</span> | <span class="const token" data-verso-hover="83">some</span> c =&gt; <span class="const token" data-verso-hover="437">.</span>write x d c | <span class="const token" data-verso-hover="35">none</span> =&gt; <span class="const token" data-verso-hover="436">.</span>scan x d pr) ∧</span>
+<span id="L175">      (∀ q, q ≠ p → (C.<span class="const token" data-verso-hover="108">step</span> p).<span class="const token" data-verso-hover="107">loc</span> q = C.<span class="const token" data-verso-hover="107">loc</span> q) ∧</span>
+<span id="L176">      <span class="const token" data-verso-hover="460">D</span> (C.<span class="const token" data-verso-hover="108">step</span> p) = <span class="const token" data-verso-hover="460">D</span> C ∧ <span class="const token" data-verso-hover="455">S</span> (C.<span class="const token" data-verso-hover="108">step</span> p) = <span class="const token" data-verso-hover="455">S</span> C ∧ <span class="const token" data-verso-hover="456">R</span> (C.<span class="const token" data-verso-hover="108">step</span> p) = <span class="const token" data-verso-hover="456">R</span> C ∧ <span class="const token" data-verso-hover="457">B</span> (C.<span class="const token" data-verso-hover="108">step</span> p) = <span class="const token" data-verso-hover="457">B</span> C := <span class="kw">by</span></span>
+<span id="L177">  <span class="kw">have</span> hact : (<span class="const token" data-verso-hover="487">alg</span> V).<span class="const token" data-verso-hover="94">act</span> (C.<span class="const token" data-verso-hover="107">loc</span> p) = <span class="const token" data-verso-hover="81">.</span>access <span class="const token" data-verso-hover="8">.</span>accessed <span class="const token" data-verso-hover="587">.</span>scan <span class="kw">fun</span> s =&gt;</span>
+<span id="L178">      (<span class="kw">match</span> <span class="const token" data-verso-hover="544">next</span> d s <span class="kw">with</span> | <span class="const token" data-verso-hover="83">some</span> c =&gt; <span class="const token" data-verso-hover="437">.</span>write x d c | <span class="const token" data-verso-hover="35">none</span> =&gt; <span class="const token" data-verso-hover="436">.</span>scan x d pr) := <span class="kw">by</span></span>
+<span id="L179">    <span class="kw">rw</span> [h]; <span class="kw">rfl</span></span>
+<span id="L180">  <span class="kw">rw</span> [<span class="const token" data-verso-hover="110">Cfg.step_of_access</span> hact]</span>
+<span id="L181">  <span class="kw">refine</span> ⟨<span class="const token" data-verso-hover="182">Function.update_self</span> _ _ _, <span class="kw">fun</span> q hq =&gt; <span class="const token" data-verso-hover="183">Function.update_of_ne</span> hq _ _, ?_, ?_, ?_, ?_⟩</span>
+<span id="L182">  · <span class="kw">simp</span> [<span class="const token" data-verso-hover="460">D</span>]</span>
+<span id="L183">  · <span class="kw">simp</span> [<span class="const token" data-verso-hover="455">S</span>]</span>
+<span id="L184">  · <span class="kw">funext</span> v; <span class="kw">simp</span> [<span class="const token" data-verso-hover="456">R</span>]</span>
+<span id="L185">  · <span class="kw">funext</span> v; <span class="kw">simp</span> [<span class="const token" data-verso-hover="457">B</span>]</span>
+<span id="L186"></span>
+<span id="L187"><span class="kw">lemma</span> <span class="const token" data-verso-hover="500">step_write</span> {x : V} {d : <span class="const token" data-verso-hover="47">ℕ</span>} {c : <span class="const token" data-verso-hover="445">Node</span>} (h : C.<span class="const token" data-verso-hover="107">loc</span> p = <span class="const token" data-verso-hover="437">.</span>write x d c) :</span>
+<span id="L188">    (C.<span class="const token" data-verso-hover="108">step</span> p).<span class="const token" data-verso-hover="107">loc</span> p = (<span class="const token" data-verso-hover="438">.</span>tas x d c) ∧</span>
+<span id="L189">      (∀ q, q ≠ p → (C.<span class="const token" data-verso-hover="108">step</span> p).<span class="const token" data-verso-hover="107">loc</span> q = C.<span class="const token" data-verso-hover="107">loc</span> q) ∧</span>
+<span id="L190">      <span class="const token" data-verso-hover="460">D</span> (C.<span class="const token" data-verso-hover="108">step</span> p) = <span class="const token" data-verso-hover="460">D</span> C ∧ <span class="const token" data-verso-hover="455">S</span> (C.<span class="const token" data-verso-hover="108">step</span> p) = <span class="const token" data-verso-hover="455">S</span> C ∧</span>
+<span id="L191">      <span class="const token" data-verso-hover="456">R</span> (C.<span class="const token" data-verso-hover="108">step</span> p) = <span class="const token" data-verso-hover="109">Function.update</span> (<span class="const token" data-verso-hover="456">R</span> C) c (<span class="const token" data-verso-hover="83">some</span> x) ∧ <span class="const token" data-verso-hover="457">B</span> (C.<span class="const token" data-verso-hover="108">step</span> p) = <span class="const token" data-verso-hover="457">B</span> C := <span class="kw">by</span></span>
+<span id="L192">  <span class="kw">have</span> hact : (<span class="const token" data-verso-hover="487">alg</span> V).<span class="const token" data-verso-hover="94">act</span> (C.<span class="const token" data-verso-hover="107">loc</span> p) = <span class="const token" data-verso-hover="81">.</span>access (<span class="const token" data-verso-hover="590">.</span>reg c) (<span class="const token" data-verso-hover="89">.</span>write (<span class="const token" data-verso-hover="83">some</span> x)) <span class="kw">fun</span> _ =&gt; <span class="const token" data-verso-hover="438">.</span>tas x d c := <span class="kw">by</span></span>
+<span id="L193">    <span class="kw">rw</span> [h]; <span class="kw">rfl</span></span>
+<span id="L194">  <span class="kw">rw</span> [<span class="const token" data-verso-hover="110">Cfg.step_of_access</span> hact]</span>
+<span id="L195">  <span class="kw">refine</span> ⟨<span class="const token" data-verso-hover="182">Function.update_self</span> _ _ _, <span class="kw">fun</span> q hq =&gt; <span class="const token" data-verso-hover="183">Function.update_of_ne</span> hq _ _, ?_, ?_, ?_, ?_⟩</span>
+<span id="L196">  · <span class="kw">simp</span> [<span class="const token" data-verso-hover="460">D</span>]</span>
+<span id="L197">  · <span class="kw">simp</span> [<span class="const token" data-verso-hover="455">S</span>]</span>
+<span id="L198">  · <span class="kw">funext</span> v</span>
+<span id="L199">    <span class="kw">by_cases</span> hv : v = c</span>
+<span id="L200">    · <span class="kw">subst</span> hv; <span class="kw">simp</span> [<span class="const token" data-verso-hover="456">R</span>]</span>
+<span id="L201">    · <span class="kw">simp</span> [<span class="const token" data-verso-hover="456">R</span>, <span class="const token" data-verso-hover="183">Function.update_of_ne</span> hv,</span>
+<span id="L202">        <span class="const token" data-verso-hover="183">Function.update_of_ne</span> (<span class="kw">show</span> (<span class="const token" data-verso-hover="590">Obj.reg</span> v : <span class="const token" data-verso-hover="574">Obj</span>) ≠ <span class="const token" data-verso-hover="590">Obj.reg</span> c <span class="kw">by</span> <span class="kw">simpa</span> <span class="kw">using</span> hv)]</span>
+<span id="L203">  · <span class="kw">funext</span> v; <span class="kw">simp</span> [<span class="const token" data-verso-hover="457">B</span>]</span>
+<span id="L204"></span>
+<span id="L205"><span class="kw">lemma</span> <span class="const token" data-verso-hover="501">step_tas</span> {x : V} {d : <span class="const token" data-verso-hover="47">ℕ</span>} {c : <span class="const token" data-verso-hover="445">Node</span>} (h : C.<span class="const token" data-verso-hover="107">loc</span> p = <span class="const token" data-verso-hover="438">.</span>tas x d c) :</span>
+<span id="L206">    (C.<span class="const token" data-verso-hover="108">step</span> p).<span class="const token" data-verso-hover="107">loc</span> p = (<span class="const token" data-verso-hover="439">.</span>upd x d c (!<span class="const token" data-verso-hover="457">B</span> C c)) ∧</span>
+<span id="L207">      (∀ q, q ≠ p → (C.<span class="const token" data-verso-hover="108">step</span> p).<span class="const token" data-verso-hover="107">loc</span> q = C.<span class="const token" data-verso-hover="107">loc</span> q) ∧</span>
+<span id="L208">      <span class="const token" data-verso-hover="460">D</span> (C.<span class="const token" data-verso-hover="108">step</span> p) = <span class="const token" data-verso-hover="460">D</span> C ∧ <span class="const token" data-verso-hover="455">S</span> (C.<span class="const token" data-verso-hover="108">step</span> p) = <span class="const token" data-verso-hover="455">S</span> C ∧ <span class="const token" data-verso-hover="456">R</span> (C.<span class="const token" data-verso-hover="108">step</span> p) = <span class="const token" data-verso-hover="456">R</span> C ∧</span>
+<span id="L209">      <span class="const token" data-verso-hover="457">B</span> (C.<span class="const token" data-verso-hover="108">step</span> p) = <span class="const token" data-verso-hover="109">Function.update</span> (<span class="const token" data-verso-hover="457">B</span> C) c <span class="const token" data-verso-hover="133">true</span> := <span class="kw">by</span></span>
+<span id="L210">  <span class="kw">have</span> hact : (<span class="const token" data-verso-hover="487">alg</span> V).<span class="const token" data-verso-hover="94">act</span> (C.<span class="const token" data-verso-hover="107">loc</span> p) = <span class="const token" data-verso-hover="81">.</span>access (<span class="const token" data-verso-hover="580">.</span>tst c) <span class="const token" data-verso-hover="423">(</span>) <span class="kw">fun</span> b =&gt; <span class="const token" data-verso-hover="439">.</span>upd x d c (!b) := <span class="kw">by</span></span>
+<span id="L211">    <span class="kw">rw</span> [h]; <span class="kw">rfl</span></span>
+<span id="L212">  <span class="kw">rw</span> [<span class="const token" data-verso-hover="110">Cfg.step_of_access</span> hact]</span>
+<span id="L213">  <span class="kw">refine</span> ⟨<span class="const token" data-verso-hover="182">Function.update_self</span> _ _ _, <span class="kw">fun</span> q hq =&gt; <span class="const token" data-verso-hover="183">Function.update_of_ne</span> hq _ _, ?_, ?_, ?_, ?_⟩</span>
+<span id="L214">  · <span class="kw">simp</span> [<span class="const token" data-verso-hover="460">D</span>]</span>
+<span id="L215">  · <span class="kw">simp</span> [<span class="const token" data-verso-hover="455">S</span>]</span>
+<span id="L216">  · <span class="kw">funext</span> v; <span class="kw">simp</span> [<span class="const token" data-verso-hover="456">R</span>]</span>
+<span id="L217">  · <span class="kw">funext</span> v</span>
+<span id="L218">    <span class="kw">by_cases</span> hv : v = c</span>
+<span id="L219">    · <span class="kw">subst</span> hv; <span class="kw">simp</span> [<span class="const token" data-verso-hover="457">B</span>]</span>
+<span id="L220">    · <span class="kw">simp</span> [<span class="const token" data-verso-hover="457">B</span>, <span class="const token" data-verso-hover="183">Function.update_of_ne</span> hv,</span>
+<span id="L221">        <span class="const token" data-verso-hover="183">Function.update_of_ne</span> (<span class="kw">show</span> (<span class="const token" data-verso-hover="580">Obj.tst</span> v : <span class="const token" data-verso-hover="574">Obj</span>) ≠ <span class="const token" data-verso-hover="580">Obj.tst</span> c <span class="kw">by</span> <span class="kw">simpa</span> <span class="kw">using</span> hv)]</span>
+<span id="L222"></span>
+<span id="L223"><span class="kw">lemma</span> <span class="const token" data-verso-hover="502">step_upd</span> {x : V} {d : <span class="const token" data-verso-hover="47">ℕ</span>} {c : <span class="const token" data-verso-hover="445">Node</span>} {w : <span class="const token" data-verso-hover="132">Bool</span>} (h : C.<span class="const token" data-verso-hover="107">loc</span> p = <span class="const token" data-verso-hover="439">.</span>upd x d c w) :</span>
+<span id="L224">    (C.<span class="const token" data-verso-hover="108">step</span> p).<span class="const token" data-verso-hover="107">loc</span> p = (<span class="kw">if</span> w <span class="kw">then</span> <span class="const token" data-verso-hover="440">.</span>readMax d c <span class="kw">else</span> <span class="const token" data-verso-hover="436">.</span>scan x d (<span class="const token" data-verso-hover="83">some</span> c)) ∧</span>
+<span id="L225">      (∀ q, q ≠ p → (C.<span class="const token" data-verso-hover="108">step</span> p).<span class="const token" data-verso-hover="107">loc</span> q = C.<span class="const token" data-verso-hover="107">loc</span> q) ∧</span>
+<span id="L226">      <span class="const token" data-verso-hover="460">D</span> (C.<span class="const token" data-verso-hover="108">step</span> p) = <span class="const token" data-verso-hover="460">D</span> C ∧ <span class="const token" data-verso-hover="455">S</span> (C.<span class="const token" data-verso-hover="108">step</span> p) = <span class="const token" data-verso-hover="109">Function.update</span> (<span class="const token" data-verso-hover="455">S</span> C) d (<span class="const token" data-verso-hover="83">some</span> c) ∧</span>
+<span id="L227">      <span class="const token" data-verso-hover="456">R</span> (C.<span class="const token" data-verso-hover="108">step</span> p) = <span class="const token" data-verso-hover="456">R</span> C ∧ <span class="const token" data-verso-hover="457">B</span> (C.<span class="const token" data-verso-hover="108">step</span> p) = <span class="const token" data-verso-hover="457">B</span> C := <span class="kw">by</span></span>
+<span id="L228">  <span class="kw">have</span> hact : (<span class="const token" data-verso-hover="487">alg</span> V).<span class="const token" data-verso-hover="94">act</span> (C.<span class="const token" data-verso-hover="107">loc</span> p) = <span class="const token" data-verso-hover="81">.</span>access <span class="const token" data-verso-hover="8">.</span>accessed (<span class="const token" data-verso-hover="588">.</span>update d c) <span class="kw">fun</span> _ =&gt;</span>
+<span id="L229">      <span class="kw">if</span> w <span class="kw">then</span> <span class="const token" data-verso-hover="440">.</span>readMax d c <span class="kw">else</span> <span class="const token" data-verso-hover="436">.</span>scan x d (<span class="const token" data-verso-hover="83">some</span> c) := <span class="kw">by</span></span>
+<span id="L230">    <span class="kw">rw</span> [h]; <span class="kw">rfl</span></span>
+<span id="L231">  <span class="kw">rw</span> [<span class="const token" data-verso-hover="110">Cfg.step_of_access</span> hact]</span>
+<span id="L232">  <span class="kw">refine</span> ⟨<span class="const token" data-verso-hover="182">Function.update_self</span> _ _ _, <span class="kw">fun</span> q hq =&gt; <span class="const token" data-verso-hover="183">Function.update_of_ne</span> hq _ _, ?_, ?_, ?_, ?_⟩</span>
+<span id="L233">  · <span class="kw">simp</span> [<span class="const token" data-verso-hover="460">D</span>]</span>
+<span id="L234">  · <span class="kw">simp</span> [<span class="const token" data-verso-hover="455">S</span>]</span>
+<span id="L235">  · <span class="kw">funext</span> v; <span class="kw">simp</span> [<span class="const token" data-verso-hover="456">R</span>]</span>
+<span id="L236">  · <span class="kw">funext</span> v; <span class="kw">simp</span> [<span class="const token" data-verso-hover="457">B</span>]</span>
+<span id="L237"></span>
+<span id="L238"><span class="kw">lemma</span> <span class="const token" data-verso-hover="503">step_readMax</span> {d : <span class="const token" data-verso-hover="47">ℕ</span>} {c : <span class="const token" data-verso-hover="445">Node</span>} (h : C.<span class="const token" data-verso-hover="107">loc</span> p = <span class="const token" data-verso-hover="440">.</span>readMax d c) :</span>
+<span id="L239">    (C.<span class="const token" data-verso-hover="108">step</span> p).<span class="const token" data-verso-hover="107">loc</span> p = (<span class="const token" data-verso-hover="505">afterPrev</span> d c (<span class="const token" data-verso-hover="460">D</span> C) (<span class="const token" data-verso-hover="504">prev</span> c (<span class="const token" data-verso-hover="460">D</span> C))) ∧</span>
+<span id="L240">      (∀ q, q ≠ p → (C.<span class="const token" data-verso-hover="108">step</span> p).<span class="const token" data-verso-hover="107">loc</span> q = C.<span class="const token" data-verso-hover="107">loc</span> q) ∧</span>
+<span id="L241">      <span class="const token" data-verso-hover="460">D</span> (C.<span class="const token" data-verso-hover="108">step</span> p) = <span class="const token" data-verso-hover="460">D</span> C ∧ <span class="const token" data-verso-hover="455">S</span> (C.<span class="const token" data-verso-hover="108">step</span> p) = <span class="const token" data-verso-hover="455">S</span> C ∧ <span class="const token" data-verso-hover="456">R</span> (C.<span class="const token" data-verso-hover="108">step</span> p) = <span class="const token" data-verso-hover="456">R</span> C ∧ <span class="const token" data-verso-hover="457">B</span> (C.<span class="const token" data-verso-hover="108">step</span> p) = <span class="const token" data-verso-hover="457">B</span> C := <span class="kw">by</span></span>
+<span id="L242">  <span class="kw">have</span> hact : (<span class="const token" data-verso-hover="487">alg</span> V).<span class="const token" data-verso-hover="94">act</span> (C.<span class="const token" data-verso-hover="107">loc</span> p) = <span class="const token" data-verso-hover="81">.</span>access <span class="const token" data-verso-hover="582">.</span>maxDepth (<span class="nu">0</span> : <span class="const token" data-verso-hover="47">ℕ</span>) <span class="kw">fun</span> m =&gt;</span>
+<span id="L243">      <span class="const token" data-verso-hover="505">afterPrev</span> d c m (<span class="const token" data-verso-hover="504">prev</span> c m) := <span class="kw">by</span></span>
+<span id="L244">    <span class="kw">rw</span> [h]; <span class="kw">rfl</span></span>
+<span id="L245">  <span class="kw">rw</span> [<span class="const token" data-verso-hover="110">Cfg.step_of_access</span> hact]</span>
+<span id="L246">  <span class="kw">refine</span> ⟨<span class="const token" data-verso-hover="182">Function.update_self</span> _ _ _, <span class="kw">fun</span> q hq =&gt; <span class="const token" data-verso-hover="183">Function.update_of_ne</span> hq _ _, ?_, ?_, ?_, ?_⟩</span>
+<span id="L247">  · <span class="kw">simp</span> [<span class="const token" data-verso-hover="460">D</span>]</span>
+<span id="L248">  · <span class="kw">simp</span> [<span class="const token" data-verso-hover="455">S</span>]</span>
+<span id="L249">  · <span class="kw">funext</span> v; <span class="kw">simp</span> [<span class="const token" data-verso-hover="456">R</span>]</span>
+<span id="L250">  · <span class="kw">funext</span> v; <span class="kw">simp</span> [<span class="const token" data-verso-hover="457">B</span>]</span>
+<span id="L251"></span>
+<span id="L252"><span class="kw">lemma</span> <span class="const token" data-verso-hover="506">step_retTas</span> {d : <span class="const token" data-verso-hover="47">ℕ</span>} {c : <span class="const token" data-verso-hover="445">Node</span>} {m : <span class="const token" data-verso-hover="47">ℕ</span>} {r : <span class="const token" data-verso-hover="445">Node</span>} (h : C.<span class="const token" data-verso-hover="107">loc</span> p = <span class="const token" data-verso-hover="441">.</span>retTas d c m r) :</span>
+<span id="L253">    (C.<span class="const token" data-verso-hover="108">step</span> p).<span class="const token" data-verso-hover="107">loc</span> p = (<span class="kw">if</span> <span class="const token" data-verso-hover="457">B</span> C r <span class="kw">then</span> <span class="const token" data-verso-hover="442">.</span>readReg d c m r <span class="kw">else</span> <span class="const token" data-verso-hover="505">afterPrev</span> d c m (<span class="const token" data-verso-hover="504">prev</span> r m)) ∧</span>
+<span id="L254">      (∀ q, q ≠ p → (C.<span class="const token" data-verso-hover="108">step</span> p).<span class="const token" data-verso-hover="107">loc</span> q = C.<span class="const token" data-verso-hover="107">loc</span> q) ∧</span>
+<span id="L255">      <span class="const token" data-verso-hover="460">D</span> (C.<span class="const token" data-verso-hover="108">step</span> p) = <span class="const token" data-verso-hover="460">D</span> C ∧ <span class="const token" data-verso-hover="455">S</span> (C.<span class="const token" data-verso-hover="108">step</span> p) = <span class="const token" data-verso-hover="455">S</span> C ∧ <span class="const token" data-verso-hover="456">R</span> (C.<span class="const token" data-verso-hover="108">step</span> p) = <span class="const token" data-verso-hover="456">R</span> C ∧</span>
+<span id="L256">      <span class="const token" data-verso-hover="457">B</span> (C.<span class="const token" data-verso-hover="108">step</span> p) = <span class="const token" data-verso-hover="109">Function.update</span> (<span class="const token" data-verso-hover="457">B</span> C) r <span class="const token" data-verso-hover="133">true</span> := <span class="kw">by</span></span>
+<span id="L257">  <span class="kw">have</span> hact : (<span class="const token" data-verso-hover="487">alg</span> V).<span class="const token" data-verso-hover="94">act</span> (C.<span class="const token" data-verso-hover="107">loc</span> p) = <span class="const token" data-verso-hover="81">.</span>access (<span class="const token" data-verso-hover="580">.</span>tst r) <span class="const token" data-verso-hover="423">(</span>) <span class="kw">fun</span> b =&gt;</span>
+<span id="L258">      <span class="kw">if</span> b <span class="kw">then</span> <span class="const token" data-verso-hover="442">.</span>readReg d c m r <span class="kw">else</span> <span class="const token" data-verso-hover="505">afterPrev</span> d c m (<span class="const token" data-verso-hover="504">prev</span> r m) := <span class="kw">by</span></span>
+<span id="L259">    <span class="kw">rw</span> [h]; <span class="kw">rfl</span></span>
+<span id="L260">  <span class="kw">rw</span> [<span class="const token" data-verso-hover="110">Cfg.step_of_access</span> hact]</span>
+<span id="L261">  <span class="kw">refine</span> ⟨<span class="const token" data-verso-hover="182">Function.update_self</span> _ _ _, <span class="kw">fun</span> q hq =&gt; <span class="const token" data-verso-hover="183">Function.update_of_ne</span> hq _ _, ?_, ?_, ?_, ?_⟩</span>
+<span id="L262">  · <span class="kw">simp</span> [<span class="const token" data-verso-hover="460">D</span>]</span>
+<span id="L263">  · <span class="kw">simp</span> [<span class="const token" data-verso-hover="455">S</span>]</span>
+<span id="L264">  · <span class="kw">funext</span> v; <span class="kw">simp</span> [<span class="const token" data-verso-hover="456">R</span>]</span>
+<span id="L265">  · <span class="kw">funext</span> v</span>
+<span id="L266">    <span class="kw">by_cases</span> hv : v = r</span>
+<span id="L267">    · <span class="kw">subst</span> hv; <span class="kw">simp</span> [<span class="const token" data-verso-hover="457">B</span>]</span>
+<span id="L268">    · <span class="kw">simp</span> [<span class="const token" data-verso-hover="457">B</span>, <span class="const token" data-verso-hover="183">Function.update_of_ne</span> hv,</span>
+<span id="L269">        <span class="const token" data-verso-hover="183">Function.update_of_ne</span> (<span class="kw">show</span> (<span class="const token" data-verso-hover="580">Obj.tst</span> v : <span class="const token" data-verso-hover="574">Obj</span>) ≠ <span class="const token" data-verso-hover="580">Obj.tst</span> r <span class="kw">by</span> <span class="kw">simpa</span> <span class="kw">using</span> hv)]</span>
+<span id="L270"></span>
+<span id="L271"><span class="kw">lemma</span> <span class="const token" data-verso-hover="510">step_readReg</span> {d : <span class="const token" data-verso-hover="47">ℕ</span>} {c : <span class="const token" data-verso-hover="445">Node</span>} {m : <span class="const token" data-verso-hover="47">ℕ</span>} {r : <span class="const token" data-verso-hover="445">Node</span>} (h : C.<span class="const token" data-verso-hover="107">loc</span> p = <span class="const token" data-verso-hover="442">.</span>readReg d c m r) :</span>
+<span id="L272">    (C.<span class="const token" data-verso-hover="108">step</span> p).<span class="const token" data-verso-hover="107">loc</span> p = (<span class="const token" data-verso-hover="443">.</span>done d c m (<span class="const token" data-verso-hover="83">some</span> r) (<span class="const token" data-verso-hover="456">R</span> C r)) ∧</span>
+<span id="L273">      (∀ q, q ≠ p → (C.<span class="const token" data-verso-hover="108">step</span> p).<span class="const token" data-verso-hover="107">loc</span> q = C.<span class="const token" data-verso-hover="107">loc</span> q) ∧</span>
+<span id="L274">      <span class="const token" data-verso-hover="460">D</span> (C.<span class="const token" data-verso-hover="108">step</span> p) = <span class="const token" data-verso-hover="460">D</span> C ∧ <span class="const token" data-verso-hover="455">S</span> (C.<span class="const token" data-verso-hover="108">step</span> p) = <span class="const token" data-verso-hover="455">S</span> C ∧ <span class="const token" data-verso-hover="456">R</span> (C.<span class="const token" data-verso-hover="108">step</span> p) = <span class="const token" data-verso-hover="456">R</span> C ∧ <span class="const token" data-verso-hover="457">B</span> (C.<span class="const token" data-verso-hover="108">step</span> p) = <span class="const token" data-verso-hover="457">B</span> C := <span class="kw">by</span></span>
+<span id="L275">  <span class="kw">have</span> hact : (<span class="const token" data-verso-hover="487">alg</span> V).<span class="const token" data-verso-hover="94">act</span> (C.<span class="const token" data-verso-hover="107">loc</span> p) = <span class="const token" data-verso-hover="81">.</span>access (<span class="const token" data-verso-hover="590">.</span>reg r) <span class="const token" data-verso-hover="82">.</span>read <span class="kw">fun</span> o =&gt; <span class="const token" data-verso-hover="443">.</span>done d c m (<span class="const token" data-verso-hover="83">some</span> r) o := <span class="kw">by</span></span>
+<span id="L276">    <span class="kw">rw</span> [h]; <span class="kw">rfl</span></span>
+<span id="L277">  <span class="kw">rw</span> [<span class="const token" data-verso-hover="110">Cfg.step_of_access</span> hact]</span>
+<span id="L278">  <span class="kw">refine</span> ⟨<span class="const token" data-verso-hover="182">Function.update_self</span> _ _ _, <span class="kw">fun</span> q hq =&gt; <span class="const token" data-verso-hover="183">Function.update_of_ne</span> hq _ _, ?_, ?_, ?_, ?_⟩</span>
+<span id="L279">  · <span class="kw">simp</span> [<span class="const token" data-verso-hover="460">D</span>]</span>
+<span id="L280">  · <span class="kw">simp</span> [<span class="const token" data-verso-hover="455">S</span>]</span>
+<span id="L281">  · <span class="kw">funext</span> v</span>
+<span id="L282">    <span class="kw">by_cases</span> hv : v = r</span>
+<span id="L283">    · <span class="kw">subst</span> hv; <span class="kw">simp</span> [<span class="const token" data-verso-hover="456">R</span>]</span>
+<span id="L284">    · <span class="kw">simp</span> [<span class="const token" data-verso-hover="456">R</span>, <span class="const token" data-verso-hover="183">Function.update_of_ne</span> hv]</span>
+<span id="L285">  · <span class="kw">funext</span> v; <span class="kw">simp</span> [<span class="const token" data-verso-hover="457">B</span>]</span>
+<span id="L286"></span>
+<span id="L287"><span class="kw">lemma</span> <span class="const token" data-verso-hover="511">step_done</span> {d : <span class="const token" data-verso-hover="47">ℕ</span>} {c : <span class="const token" data-verso-hover="445">Node</span>} {m : <span class="const token" data-verso-hover="47">ℕ</span>} {r : <span class="const token" data-verso-hover="72">Option</span> <span class="const token" data-verso-hover="445">Node</span>} {o : <span class="const token" data-verso-hover="72">Option</span> V}</span>
+<span id="L288">    (h : C.<span class="const token" data-verso-hover="107">loc</span> p = <span class="const token" data-verso-hover="443">.</span>done d c m r o) : C.<span class="const token" data-verso-hover="108">step</span> p = C :=</span>
+<span id="L289">  <span class="const token" data-verso-hover="124">Cfg.step_of_out</span> (v := o) (<span class="kw">by</span> <span class="kw">unfold</span> <span class="const token" data-verso-hover="51">Cfg.Out</span>; <span class="kw">rw</span> [h]; <span class="kw">rfl</span>)</span>
+<span id="L290"></span>
+<span id="L291"><span class="kw">end</span> Steps</span>
+<span id="L292"></span>
+<span id="L293"><span class="kw">end</span> Podc.UnboundedConcurrency.Swap</span>
+<span id="L294"></span>
+</code></div>
+        <script>
+          window.versoHoversUrl = "PODC2011/UnboundedConcurrency/-hovers.json";</script>
+        <script src="static/lean/popper.js"></script>
+        <script src="static/lean/tippy.js"></script>
+        <script src="static/lean/marked.js"></script>
+        <script src="static/lean/highlighting.js"></script>
+        <script src="static/lean/lean.js"></script>
+        </article></main><footer class="site-footer"><div class="wrap">
+        Machine-checked formalizations of PODC papers in Lean 4. Generated with <a href="https://github.com/leanprover/verso">Verso</a> from the README files of <a href="https://github.com/vasnesterov/formal_podc">vasnesterov/formal_podc</a>.</div>
+      </footer></body>
+  </html>
+

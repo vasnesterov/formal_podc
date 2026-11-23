@@ -1,0 +1,420 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="light dark">
+    <link rel="icon" href="data:,">
+    <title>ConcurrentDSU: UnionForest.lean · Formal PODC</title><base href="../../../.././"><link rel="stylesheet" href="static/lean/verso-vars.css">
+    <link rel="stylesheet" href="static/lean/highlighting.css">
+    <link rel="stylesheet" href="static/lean/tippy-border.css">
+    <link rel="stylesheet" href="static/style.css">
+    <script defer="defer" src="static/site.js"></script>
+    </head>
+  <body>
+    <header class="site-header">
+      <div class="wrap">
+        <a class="brand" href=".">Formal PODC</a><nav class="top">
+          <a href=".">Search</a><a href="about/">About</a><a href="https://github.com/vasnesterov/formal_podc">GitHub</a></nav>
+        </div>
+      </header>
+    <main class="wrap"><article><nav class="breadcrumbs" aria-label="Breadcrumb">
+          <a href=".">Search</a><span class="sep">›</span><a href="PODC2016/">PODC 2016</a><span class="sep">›</span><a href="PODC2016/ConcurrentDSU/">ConcurrentDSU</a><span class="sep">›</span><a href="PODC2016/ConcurrentDSU/src/">Lean source</a><span class="sep">›</span><span aria-current="page">UnionForest</span></nav>
+        <h1>
+          <code>UnionForest.lean</code></h1>
+        <div class="paper-links">
+          <p>
+            Source of <a href="PODC2016/ConcurrentDSU/">A Randomized Concurrent Algorithm for Disjoint Set Union — PODC 2016</a> · <a href="https://github.com/vasnesterov/formal_podc/blob/main/Papers/PODC2016/ConcurrentDSU/UnionForest.lean">GitHub</a> · hover over a name for its type and documentation</p>
+          </div>
+        <div class="lean-code lean-src">
+          <code class="hl lean block" data-lean-context="UnionForest"><span id="L1"><span class="kw">import</span> Papers.PODC2016.ConcurrentDSU.Main</span>
+<span id="L2"></span>
+<span id="L3"><span class="dc">/-!</span></span>
+<span id="L4"><span class="dc"># Lemma 3.1 with the union forest</span></span>
+<span id="L5"></span>
+<span id="L6"><span class="dc">The *union forest* is "the forest constructed by the links done in `Unite`s, ignoring all parent</span></span>
+<span id="L7"><span class="dc">changes done by `Find`s". We compute it along an execution (`uf α`): a step that turns a root `a`</span></span>
+<span id="L8"><span class="dc">into a non-root with parent `b` (a successful link) sets `U a := b`; other steps leave `U`</span></span>
+<span id="L9"><span class="dc">unchanged.</span></span>
+<span id="L10"></span>
+<span id="L11"><span class="dc">`lemma_3_1_union`: after every execution,</span></span>
+<span id="L12"><span class="dc">* the union forest has the same roots as the actual forest, ids increase along its edges, and</span></span>
+<span id="L13"><span class="dc">  the actual parent of every node is an ancestor of it in the union forest;</span></span>
+<span id="L14"><span class="dc">* every step either leaves the parent pointers unchanged, or links a root `a` below a node `b`</span></span>
+<span id="L15"><span class="dc">  of another tree (and the union forest gets the edge `a → b`), or replaces the parent `v` of a</span></span>
+<span id="L16"><span class="dc">  non-root by a *proper ancestor of `v` in the union forest* (the union forest is unchanged).</span></span>
+<span id="L17"></span>
+<span id="L18"><span class="dc">This is Lemma 3.1 as stated in the paper.</span></span>
+<span id="L19"><span class="dc">-/</span></span>
+<span id="L20"></span>
+<span id="L21"><span class="kw">set_option</span> <span class="const token" data-verso-hover="93">linter.unusedSectionVars</span> false</span>
+<span id="L22"></span>
+<span id="L23"><span class="kw">namespace</span> Podc.ConcurrentDSU</span>
+<span id="L24"></span>
+<span id="L25"><span class="kw">open</span> Cslib.SharedMemory</span>
+<span id="L26"></span>
+<span id="L27"><span class="kw">variable</span> {E : <span class="kw">Type</span>} [<span class="const token" data-verso-hover="106">Fintype</span> E] [<span class="const token" data-verso-hover="46">DecidableEq</span> E] {P : <span class="kw">Type</span>} [<span class="const token" data-verso-hover="46">DecidableEq</span> P]</span>
+<span id="L28"><span class="kw">variable</span> {K : <span class="const token" data-verso-hover="48">FindKind</span>} {key : E → <span class="const token" data-verso-hover="51">ℕ</span>}</span>
+<span id="L29"></span>
+<span id="L30"><span class="dc">/-- `b` is an ancestor of `a` (or `a` itself) in the forest `U`. -/</span></span>
+<span id="L31"><span class="kw">def</span> <span class="const token" data-verso-hover="385">Reach</span> (U : E → E) (a b : E) : <span class="kw">Prop</span> := ∃ j, U^[j] a = b</span>
+<span id="L32"></span>
+<span id="L33"><span class="kw">lemma</span> <span class="const token" data-verso-hover="386">Reach.refl</span> (U : E → E) (a : E) : <span class="const token" data-verso-hover="385">Reach</span> U a a := ⟨<span class="nu">0</span>, <span class="const token" data-verso-hover="42">rfl</span>⟩</span>
+<span id="L34"></span>
+<span id="L35"><span class="kw">lemma</span> <span class="const token" data-verso-hover="387">Reach.trans</span> {U : E → E} {a b c : E} (h1 : <span class="const token" data-verso-hover="385">Reach</span> U a b) (h2 : <span class="const token" data-verso-hover="385">Reach</span> U b c) : <span class="const token" data-verso-hover="385">Reach</span> U a c := <span class="kw">by</span></span>
+<span id="L36">  <span class="kw">obtain</span> ⟨i, <span class="kw">rfl</span>⟩ := h1; <span class="kw">obtain</span> ⟨j, <span class="kw">rfl</span>⟩ := h2</span>
+<span id="L37">  <span class="kw">exact</span> ⟨j + i, <span class="kw">by</span> <span class="kw">rw</span> [<span class="const token" data-verso-hover="275">Function.iterate_add_apply</span>]⟩</span>
+<span id="L38"></span>
+<span id="L39"><span class="kw">lemma</span> <span class="const token" data-verso-hover="388">Reach.step</span> (U : E → E) (a : E) : <span class="const token" data-verso-hover="385">Reach</span> U a (U a) := ⟨<span class="nu">1</span>, <span class="const token" data-verso-hover="42">rfl</span>⟩</span>
+<span id="L40"></span>
+<span id="L41"><span class="dc">/-- Linking a root `u` keeps all ancestor relations. -/</span></span>
+<span id="L42"><span class="kw">lemma</span> <span class="const token" data-verso-hover="389">Reach.link</span> {U : E → E} {u b : E} (hu : U u = u) {x y : E} (h : <span class="const token" data-verso-hover="385">Reach</span> U x y) :</span>
+<span id="L43">    <span class="const token" data-verso-hover="385">Reach</span> (<span class="const token" data-verso-hover="146">Function.update</span> U u b) x y := <span class="kw">by</span></span>
+<span id="L44">  <span class="kw">obtain</span> ⟨j, hj⟩ := h</span>
+<span id="L45">  <span class="kw">induction</span> j generalizing x <span class="kw">with</span></span>
+<span id="L46">  | <span class="const token" data-verso-hover="271">zero</span> =&gt; <span class="kw">exact</span> ⟨<span class="nu">0</span>, hj⟩</span>
+<span id="L47">  | <span class="const token" data-verso-hover="272">succ</span> j ih =&gt;</span>
+<span id="L48">    <span class="kw">by_cases</span> hx : x = u</span>
+<span id="L49">    · <span class="kw">subst</span> hx</span>
+<span id="L50">      <span class="kw">rw</span> [<span class="const token" data-verso-hover="212">Function.iterate_fixed</span> hu] <span class="kw">at</span> hj</span>
+<span id="L51">      <span class="kw">subst</span> hj; <span class="kw">exact</span> <span class="const token" data-verso-hover="386">Reach.refl</span> _ _</span>
+<span id="L52">    · <span class="kw">rw</span> [<span class="const token" data-verso-hover="285">Function.iterate_succ_apply</span>] <span class="kw">at</span> hj</span>
+<span id="L53">      <span class="kw">obtain</span> ⟨i, hi⟩ := ih hj</span>
+<span id="L54">      <span class="kw">refine</span> ⟨i + <span class="nu">1</span>, ?_⟩</span>
+<span id="L55">      <span class="kw">rw</span> [<span class="const token" data-verso-hover="285">Function.iterate_succ_apply</span>, <span class="const token" data-verso-hover="152">Function.update_of_ne</span> hx]; <span class="kw">exact</span> hi</span>
+<span id="L56"></span>
+<span id="L57"><span class="dc">/-! ### The union forest along an execution -/</span></span>
+<span id="L58"></span>
+<span id="L59"><span class="kw">open</span> Classical <span class="kw">in</span></span>
+<span id="L60"><span class="dc">/-- The union-forest update of a step from `C` to `C'`: if a root `a` got a parent, add the edge</span></span>
+<span id="L61"><span class="dc">`a → C'.mem a`. -/</span></span>
+<span id="L62"><span class="kw">noncomputable</span> <span class="kw">def</span> <span class="const token" data-verso-hover="390">linkUpd</span> (C C' : <span class="const token" data-verso-hover="119">Config</span> (<span class="const token" data-verso-hover="30">dsu</span> E) (<span class="const token" data-verso-hover="45">Ptr</span> E) P (<span class="const token" data-verso-hover="69">Loc</span> E)) (U : E → E) : E → E :=</span>
+<span id="L63">  <span class="kw">if</span> h : ∃ a, C.<span class="const token" data-verso-hover="122">mem</span> a = a ∧ C'.<span class="const token" data-verso-hover="122">mem</span> a ≠ a <span class="kw">then</span> <span class="const token" data-verso-hover="146">Function.update</span> U h.<span class="const token" data-verso-hover="391">choose</span> (C'.<span class="const token" data-verso-hover="122">mem</span> h.<span class="const token" data-verso-hover="391">choose</span>) <span class="kw">else</span> U</span>
+<span id="L64"></span>
+<span id="L65"><span class="kw">variable</span> (K key) <span class="kw">in</span></span>
+<span id="L66"><span class="dc">/-- The union forest after running `α` from `C`, starting from `U`. -/</span></span>
+<span id="L67"><span class="kw">noncomputable</span> <span class="kw">def</span> <span class="const token" data-verso-hover="392">ufFrom</span> : <span class="const token" data-verso-hover="119">Config</span> (<span class="const token" data-verso-hover="30">dsu</span> E) (<span class="const token" data-verso-hover="45">Ptr</span> E) P (<span class="const token" data-verso-hover="69">Loc</span> E) → <span class="const token" data-verso-hover="188">List</span> (<span class="const token" data-verso-hover="179">Label</span> P (<span class="const token" data-verso-hover="30">dsu</span> E)) →</span>
+<span id="L68">    (E → E) → (E → E)</span>
+<span id="L69">  | _, [], U =&gt; U</span>
+<span id="L70">  | C, ℓ :: β, U =&gt;</span>
+<span id="L71">    <span class="kw">match</span> (<span class="const token" data-verso-hover="87">dsuImpl</span> K key P).<span class="const token" data-verso-hover="149">step</span> C ℓ <span class="kw">with</span></span>
+<span id="L72">    | <span class="const token" data-verso-hover="112">some</span> C' =&gt; <span class="const token" data-verso-hover="392">ufFrom</span> C' β (<span class="const token" data-verso-hover="390">linkUpd</span> C C' U)</span>
+<span id="L73">    | <span class="const token" data-verso-hover="111">none</span> =&gt; U</span>
+<span id="L74"></span>
+<span id="L75"><span class="kw">variable</span> (K key) <span class="kw">in</span></span>
+<span id="L76"><span class="dc">/-- The union forest after the execution `α`. -/</span></span>
+<span id="L77"><span class="kw">noncomputable</span> <span class="kw">def</span> <span class="const token" data-verso-hover="393">uf</span> (α : <span class="const token" data-verso-hover="188">List</span> (<span class="const token" data-verso-hover="179">Label</span> P (<span class="const token" data-verso-hover="30">dsu</span> E))) : E → E :=</span>
+<span id="L78">  <span class="const token" data-verso-hover="392">ufFrom</span> K key (<span class="const token" data-verso-hover="87">dsuImpl</span> K key P).<span class="const token" data-verso-hover="177">initCfg</span> α <span class="const token" data-verso-hover="376">id</span></span>
+<span id="L79"></span>
+<span id="L80"><span class="kw">lemma</span> <span class="const token" data-verso-hover="394">ufFrom_append</span> {C C₁ : <span class="const token" data-verso-hover="119">Config</span> (<span class="const token" data-verso-hover="30">dsu</span> E) (<span class="const token" data-verso-hover="45">Ptr</span> E) P (<span class="const token" data-verso-hover="69">Loc</span> E)} {α : <span class="const token" data-verso-hover="188">List</span> (<span class="const token" data-verso-hover="179">Label</span> P (<span class="const token" data-verso-hover="30">dsu</span> E))}</span>
+<span id="L81">    (h : (<span class="const token" data-verso-hover="87">dsuImpl</span> K key P).<span class="const token" data-verso-hover="190">runFrom</span> C α = <span class="const token" data-verso-hover="112">some</span> C₁) (β : <span class="const token" data-verso-hover="188">List</span> (<span class="const token" data-verso-hover="179">Label</span> P (<span class="const token" data-verso-hover="30">dsu</span> E))) (U : E → E) :</span>
+<span id="L82">    <span class="const token" data-verso-hover="392">ufFrom</span> K key C (α ++ β) U = <span class="const token" data-verso-hover="392">ufFrom</span> K key C₁ β (<span class="const token" data-verso-hover="392">ufFrom</span> K key C α U) := <span class="kw">by</span></span>
+<span id="L83">  <span class="kw">induction</span> α generalizing C U <span class="kw">with</span></span>
+<span id="L84">  | <span class="const token" data-verso-hover="191">nil</span> =&gt; <span class="kw">simp</span> only [<span class="const token" data-verso-hover="192">Impl.runFrom_nil</span>, <span class="const token" data-verso-hover="158">Option.some.injEq</span>] <span class="kw">at</span> h; <span class="kw">subst</span> h; <span class="kw">rfl</span></span>
+<span id="L85">  | <span class="const token" data-verso-hover="193">cons</span> ℓ α ih =&gt;</span>
+<span id="L86">    <span class="kw">simp</span> only [<span class="const token" data-verso-hover="194">Impl.runFrom_cons</span>] <span class="kw">at</span> h</span>
+<span id="L87">    <span class="kw">cases</span> hs : (<span class="const token" data-verso-hover="87">dsuImpl</span> K key P).<span class="const token" data-verso-hover="149">step</span> C ℓ <span class="kw">with</span></span>
+<span id="L88">    | <span class="const token" data-verso-hover="111">none</span> =&gt; <span class="kw">simp</span> [hs] <span class="kw">at</span> h</span>
+<span id="L89">    | <span class="const token" data-verso-hover="112">some</span> C' =&gt;</span>
+<span id="L90">      <span class="kw">rw</span> [hs] <span class="kw">at</span> h</span>
+<span id="L91">      <span class="kw">simp</span> only [<span class="const token" data-verso-hover="395">List.cons_append</span>, <span class="const token" data-verso-hover="392">ufFrom</span>, hs]</span>
+<span id="L92">      <span class="kw">exact</span> ih h _</span>
+<span id="L93"></span>
+<span id="L94"><span class="kw">lemma</span> <span class="const token" data-verso-hover="396">uf_append</span> {α : <span class="const token" data-verso-hover="188">List</span> (<span class="const token" data-verso-hover="179">Label</span> P (<span class="const token" data-verso-hover="30">dsu</span> E))} {C C' : <span class="const token" data-verso-hover="119">Config</span> (<span class="const token" data-verso-hover="30">dsu</span> E) (<span class="const token" data-verso-hover="45">Ptr</span> E) P (<span class="const token" data-verso-hover="69">Loc</span> E)}</span>
+<span id="L95">    (h : (<span class="const token" data-verso-hover="87">dsuImpl</span> K key P).<span class="const token" data-verso-hover="189">run</span> α = <span class="const token" data-verso-hover="112">some</span> C) {ℓ : <span class="const token" data-verso-hover="179">Label</span> P (<span class="const token" data-verso-hover="30">dsu</span> E)}</span>
+<span id="L96">    (hs : (<span class="const token" data-verso-hover="87">dsuImpl</span> K key P).<span class="const token" data-verso-hover="149">step</span> C ℓ = <span class="const token" data-verso-hover="112">some</span> C') :</span>
+<span id="L97">    <span class="const token" data-verso-hover="393">uf</span> K key (α ++ [ℓ]) = <span class="const token" data-verso-hover="390">linkUpd</span> C C' (<span class="const token" data-verso-hover="393">uf</span> K key α) := <span class="kw">by</span></span>
+<span id="L98">  <span class="kw">unfold</span> <span class="const token" data-verso-hover="393">uf</span></span>
+<span id="L99">  <span class="kw">rw</span> [<span class="const token" data-verso-hover="394">ufFrom_append</span> h]</span>
+<span id="L100">  <span class="kw">simp</span> only [<span class="const token" data-verso-hover="392">ufFrom</span>, hs]</span>
+<span id="L101"></span>
+<span id="L102"><span class="kw">lemma</span> <span class="const token" data-verso-hover="397">linkUpd_of_link</span> {C C' : <span class="const token" data-verso-hover="119">Config</span> (<span class="const token" data-verso-hover="30">dsu</span> E) (<span class="const token" data-verso-hover="45">Ptr</span> E) P (<span class="const token" data-verso-hover="69">Loc</span> E)} {U : E → E} {a b : E}</span>
+<span id="L103">    (ha : C.<span class="const token" data-verso-hover="122">mem</span> a = a) (hab : b ≠ a) (hm : C'.<span class="const token" data-verso-hover="122">mem</span> = <span class="const token" data-verso-hover="146">Function.update</span> C.<span class="const token" data-verso-hover="122">mem</span> a b) :</span>
+<span id="L104">    <span class="const token" data-verso-hover="390">linkUpd</span> C C' U = <span class="const token" data-verso-hover="146">Function.update</span> U a b := <span class="kw">by</span></span>
+<span id="L105">  <span class="kw">have</span> hex : ∃ a', C.<span class="const token" data-verso-hover="122">mem</span> a' = a' ∧ C'.<span class="const token" data-verso-hover="122">mem</span> a' ≠ a' := ⟨a, ha, <span class="kw">by</span> <span class="kw">simp</span> [hm, hab]⟩</span>
+<span id="L106">  <span class="kw">unfold</span> <span class="const token" data-verso-hover="390">linkUpd</span></span>
+<span id="L107">  <span class="kw">rw</span> [<span class="const token" data-verso-hover="398">dif_pos</span> hex]</span>
+<span id="L108">  <span class="kw">have</span> hc := hex.<span class="const token" data-verso-hover="399">choose_spec</span></span>
+<span id="L109">  <span class="kw">have</span> hm' := <span class="const token" data-verso-hover="400">congrFun</span> hm</span>
+<span id="L110">  <span class="kw">have</span> hch : hex.<span class="const token" data-verso-hover="391">choose</span> = a := <span class="kw">by</span></span>
+<span id="L111">    <span class="kw">by_contra</span> hne</span>
+<span id="L112">    <span class="kw">apply</span> hc.<span class="const token" data-verso-hover="138">2</span></span>
+<span id="L113">    <span class="kw">rw</span> [hm' hex.<span class="const token" data-verso-hover="391">choose</span>, <span class="const token" data-verso-hover="152">Function.update_of_ne</span> hne]; <span class="kw">exact</span> hc.<span class="const token" data-verso-hover="137">1</span></span>
+<span id="L114">  <span class="kw">rw</span> [hch, hm' a, <span class="const token" data-verso-hover="153">Function.update_self</span>]</span>
+<span id="L115"></span>
+<span id="L116"><span class="kw">lemma</span> <span class="const token" data-verso-hover="401">linkUpd_of_noroot</span> {C C' : <span class="const token" data-verso-hover="119">Config</span> (<span class="const token" data-verso-hover="30">dsu</span> E) (<span class="const token" data-verso-hover="45">Ptr</span> E) P (<span class="const token" data-verso-hover="69">Loc</span> E)} {U : E → E}</span>
+<span id="L117">    (h : ∀ a, C.<span class="const token" data-verso-hover="122">mem</span> a = a → C'.<span class="const token" data-verso-hover="122">mem</span> a = a) : <span class="const token" data-verso-hover="390">linkUpd</span> C C' U = U := <span class="kw">by</span></span>
+<span id="L118">  <span class="kw">unfold</span> <span class="const token" data-verso-hover="390">linkUpd</span></span>
+<span id="L119">  <span class="kw">rw</span> [<span class="const token" data-verso-hover="402">dite_cond_eq_false</span> (<span class="const token" data-verso-hover="403">eq_false</span> ?_)]</span>
+<span id="L120">  <span class="kw">rintro</span> ⟨a, h1, h2⟩</span>
+<span id="L121">  <span class="kw">exact</span> h2 (h a h1)</span>
+<span id="L122"></span>
+<span id="L123"><span class="dc">/-! ### Ghost invariant -/</span></span>
+<span id="L124"></span>
+<span id="L125"><span class="dc">/-- Ghost facts of a `Find` about the union forest: the `w` of a pending `Cas(u.parent, v, w)`</span></span>
+<span id="L126"><span class="dc">is an ancestor of `v` in the union forest. -/</span></span>
+<span id="L127"><span class="kw">def</span> <span class="const token" data-verso-hover="404">FG</span> (U : E → E) : <span class="const token" data-verso-hover="56">FS</span> E → <span class="kw">Prop</span></span>
+<span id="L128">  | <span class="const token" data-verso-hover="61">.</span>cas _ v w _ =&gt; <span class="const token" data-verso-hover="385">Reach</span> U v w</span>
+<span id="L129">  | _ =&gt; <span class="const token" data-verso-hover="117">True</span></span>
+<span id="L130"></span>
+<span id="L131"><span class="dc">/-- Ghost facts of a process. -/</span></span>
+<span id="L132"><span class="kw">def</span> <span class="const token" data-verso-hover="405">LG</span> (U : E → E) : <span class="const token" data-verso-hover="69">Loc</span> E → <span class="kw">Prop</span></span>
+<span id="L133">  | <span class="const token" data-verso-hover="71">.</span>fu _ fs _ =&gt; <span class="const token" data-verso-hover="404">FG</span> U fs</span>
+<span id="L134">  | <span class="const token" data-verso-hover="72">.</span>fv _ _ fs =&gt; <span class="const token" data-verso-hover="404">FG</span> U fs</span>
+<span id="L135">  | _ =&gt; <span class="const token" data-verso-hover="117">True</span></span>
+<span id="L136"></span>
+<span id="L137"><span class="dc">/-- The union-forest invariant. -/</span></span>
+<span id="L138"><span class="kw">structure</span> <span class="const token" data-verso-hover="406">UInv</span> (C : <span class="const token" data-verso-hover="119">Config</span> (<span class="const token" data-verso-hover="30">dsu</span> E) (<span class="const token" data-verso-hover="45">Ptr</span> E) P (<span class="const token" data-verso-hover="69">Loc</span> E)) (U : E → E) : <span class="kw">Prop</span> <span class="kw">where</span></span>
+<span id="L139">  <span class="const token" data-verso-hover="407">good</span> : <span class="const token" data-verso-hover="121">Good</span> key U</span>
+<span id="L140">  <span class="const token" data-verso-hover="408">reach</span> : ∀ x, <span class="const token" data-verso-hover="385">Reach</span> U x (C.<span class="const token" data-verso-hover="122">mem</span> x)</span>
+<span id="L141">  <span class="const token" data-verso-hover="409">root</span> : ∀ x, U x = x ↔ C.<span class="const token" data-verso-hover="122">mem</span> x = x</span>
+<span id="L142">  <span class="const token" data-verso-hover="410">ghost</span> : ∀ p, <span class="const token" data-verso-hover="405">LG</span> U (C.<span class="const token" data-verso-hover="125">loc</span> p)</span>
+<span id="L143"></span>
+<span id="L144"><span class="kw">lemma</span> <span class="const token" data-verso-hover="411">FG.link</span> {U : E → E} {u b : E} (hu : U u = u) {fs : <span class="const token" data-verso-hover="56">FS</span> E} (h : <span class="const token" data-verso-hover="404">FG</span> U fs) :</span>
+<span id="L145">    <span class="const token" data-verso-hover="404">FG</span> (<span class="const token" data-verso-hover="146">Function.update</span> U u b) fs := <span class="kw">by</span></span>
+<span id="L146">  <span class="kw">cases</span> fs &lt;;&gt; <span class="kw">first</span> | <span class="kw">trivial</span> | <span class="kw">exact</span> <span class="const token" data-verso-hover="389">Reach.link</span> hu h</span>
+<span id="L147"></span>
+<span id="L148"><span class="kw">lemma</span> <span class="const token" data-verso-hover="412">LG.link</span> {U : E → E} {u b : E} (hu : U u = u) {l : <span class="const token" data-verso-hover="69">Loc</span> E} (h : <span class="const token" data-verso-hover="405">LG</span> U l) :</span>
+<span id="L149">    <span class="const token" data-verso-hover="405">LG</span> (<span class="const token" data-verso-hover="146">Function.update</span> U u b) l := <span class="kw">by</span></span>
+<span id="L150">  <span class="kw">cases</span> l &lt;;&gt; <span class="kw">first</span> | <span class="kw">trivial</span> | <span class="kw">exact</span> <span class="const token" data-verso-hover="411">FG.link</span> hu h</span>
+<span id="L151"></span>
+<span id="L152"><span class="kw">lemma</span> <span class="const token" data-verso-hover="413">FG_start</span> (U : E → E) (v : E) : <span class="const token" data-verso-hover="404">FG</span> U (<span class="const token" data-verso-hover="65">FS.start</span> K v) := <span class="kw">by</span> <span class="kw">cases</span> K &lt;;&gt; <span class="kw">trivial</span></span>
+<span id="L153"></span>
+<span id="L154"><span class="dc">/-- Classification of a `Find` step with the union forest. -/</span></span>
+<span id="L155"><span class="kw">lemma</span> <span class="const token" data-verso-hover="414">fRes_union</span> {m : E → E} (hg : <span class="const token" data-verso-hover="121">Good</span> key m) {U : E → E} (hreach : ∀ x, <span class="const token" data-verso-hover="385">Reach</span> U x (m x))</span>
+<span id="L156">    {s : E} {fs : <span class="const token" data-verso-hover="56">FS</span> E} (hf : <span class="const token" data-verso-hover="303">FInv</span> K key m s fs) (hG : <span class="const token" data-verso-hover="404">FG</span> U fs) :</span>
+<span id="L157">    (∀ fs', (<span class="const token" data-verso-hover="312">fRes</span> K fs m).<span class="const token" data-verso-hover="147">1</span> = <span class="const token" data-verso-hover="68">.</span>inl fs' → <span class="const token" data-verso-hover="404">FG</span> U fs') ∧</span>
+<span id="L158">    ((<span class="const token" data-verso-hover="312">fRes</span> K fs m).<span class="const token" data-verso-hover="145">2</span> = m ∨</span>
+<span id="L159">      ∃ a w, m a ≠ a ∧ (<span class="const token" data-verso-hover="312">fRes</span> K fs m).<span class="const token" data-verso-hover="145">2</span> = <span class="const token" data-verso-hover="146">Function.update</span> m a w ∧ <span class="const token" data-verso-hover="385">Reach</span> U (m a) w ∧</span>
+<span id="L160">        w ≠ m a) := <span class="kw">by</span></span>
+<span id="L161">  <span class="kw">cases</span> fs <span class="kw">with</span></span>
+<span id="L162">  | <span class="const token" data-verso-hover="57">tst</span> u =&gt;</span>
+<span id="L163">    <span class="kw">refine</span> ⟨<span class="kw">fun</span> fs' h =&gt; ?_, <span class="const token" data-verso-hover="128">Or.inl</span> <span class="const token" data-verso-hover="42">rfl</span>⟩</span>
+<span id="L164">    <span class="kw">simp</span> only [<span class="const token" data-verso-hover="312">fRes</span>, <span class="const token" data-verso-hover="66">FS.next</span>] <span class="kw">at</span> h; <span class="kw">split_ifs</span> <span class="kw">at</span> h &lt;;&gt; <span class="kw">cases</span> h; <span class="kw">trivial</span></span>
+<span id="L165">  | <span class="const token" data-verso-hover="58">adv</span> u =&gt;</span>
+<span id="L166">    <span class="kw">refine</span> ⟨<span class="kw">fun</span> fs' h =&gt; ?_, <span class="const token" data-verso-hover="128">Or.inl</span> <span class="const token" data-verso-hover="42">rfl</span>⟩</span>
+<span id="L167">    <span class="kw">simp</span> only [<span class="const token" data-verso-hover="312">fRes</span>, <span class="const token" data-verso-hover="66">FS.next</span>, <span class="const token" data-verso-hover="415">Sum.inl.injEq</span>] <span class="kw">at</span> h; <span class="kw">subst</span> h; <span class="kw">trivial</span></span>
+<span id="L168">  | <span class="const token" data-verso-hover="59">rdP</span> u i =&gt;</span>
+<span id="L169">    <span class="kw">refine</span> ⟨<span class="kw">fun</span> fs' h =&gt; ?_, <span class="const token" data-verso-hover="128">Or.inl</span> <span class="const token" data-verso-hover="42">rfl</span>⟩</span>
+<span id="L170">    <span class="kw">simp</span> only [<span class="const token" data-verso-hover="312">fRes</span>, <span class="const token" data-verso-hover="66">FS.next</span>, <span class="const token" data-verso-hover="415">Sum.inl.injEq</span>] <span class="kw">at</span> h; <span class="kw">subst</span> h; <span class="kw">trivial</span></span>
+<span id="L171">  | <span class="const token" data-verso-hover="60">rdG</span> u v i =&gt;</span>
+<span id="L172">    <span class="kw">refine</span> ⟨<span class="kw">fun</span> fs' h =&gt; ?_, <span class="const token" data-verso-hover="128">Or.inl</span> <span class="const token" data-verso-hover="42">rfl</span>⟩</span>
+<span id="L173">    <span class="kw">simp</span> only [<span class="const token" data-verso-hover="312">fRes</span>, <span class="const token" data-verso-hover="66">FS.next</span>] <span class="kw">at</span> h; <span class="kw">split_ifs</span> <span class="kw">at</span> h &lt;;&gt; <span class="kw">cases</span> h</span>
+<span id="L174">    <span class="kw">exact</span> hreach v</span>
+<span id="L175">  | <span class="const token" data-verso-hover="61">cas</span> u v w i =&gt;</span>
+<span id="L176">    <span class="kw">obtain</span> ⟨h1, h2, h3, h4, h5, h6, h7, h8⟩ := hf</span>
+<span id="L177">    <span class="kw">refine</span> ⟨<span class="kw">fun</span> fs' h =&gt; ?_, ?_⟩</span>
+<span id="L178">    · <span class="kw">simp</span> only [<span class="const token" data-verso-hover="312">fRes</span>, <span class="const token" data-verso-hover="66">FS.next</span>] <span class="kw">at</span> h; <span class="kw">split_ifs</span> <span class="kw">at</span> h &lt;;&gt; <span class="kw">cases</span> h &lt;;&gt; <span class="kw">trivial</span></span>
+<span id="L179">    · <span class="kw">have</span> hres : (<span class="const token" data-verso-hover="312">fRes</span> K (<span class="const token" data-verso-hover="61">.</span>cas u v w i) m).<span class="const token" data-verso-hover="145">2</span> = <span class="kw">if</span> m u = v <span class="kw">then</span> <span class="const token" data-verso-hover="146">Function.update</span> m u w <span class="kw">else</span> m :=</span>
+<span id="L180">        <span class="const token" data-verso-hover="42">rfl</span></span>
+<span id="L181">      <span class="kw">rw</span> [hres]</span>
+<span id="L182">      <span class="kw">split_ifs</span> <span class="kw">with</span> hmu</span>
+<span id="L183">      · <span class="kw">right</span></span>
+<span id="L184">        <span class="kw">refine</span> ⟨u, w, ?_, <span class="const token" data-verso-hover="42">rfl</span>, ?_, ?_⟩</span>
+<span id="L185">        rotate_left</span>
+<span id="L186">        · <span class="kw">rw</span> [hmu]; <span class="kw">exact</span> hG</span>
+<span id="L187">        · <span class="kw">rw</span> [hmu]; <span class="kw">intro</span> h; <span class="kw">rw</span> [h] <span class="kw">at</span> h5; <span class="kw">omega</span></span>
+<span id="L188">        <span class="kw">intro</span> hu; <span class="kw">rw</span> [hu] <span class="kw">at</span> hmu; <span class="kw">subst</span> hmu</span>
+<span id="L189">        <span class="kw">unfold</span> <span class="const token" data-verso-hover="108">same</span> <span class="kw">at</span> h4 h3</span>
+<span id="L190">        <span class="kw">have</span> hr : <span class="const token" data-verso-hover="25">rootOf</span> m w = u := <span class="kw">by</span> <span class="kw">rw</span> [h4, <span class="const token" data-verso-hover="163">rootOf_of_fixed</span> hu]</span>
+<span id="L191">        <span class="kw">have</span> := <span class="const token" data-verso-hover="164">key_le_rootOf</span> hg w</span>
+<span id="L192">        <span class="kw">rw</span> [hr] <span class="kw">at</span> this; <span class="kw">omega</span></span>
+<span id="L193">      · <span class="kw">exact</span> <span class="const token" data-verso-hover="128">Or.inl</span> <span class="const token" data-verso-hover="42">rfl</span></span>
+<span id="L194"></span>
+<span id="L195"><span class="kw">lemma</span> <span class="const token" data-verso-hover="416">Reach.key_le</span> {U : E → E} (hU : <span class="const token" data-verso-hover="121">Good</span> key U) {x y : E} (h : <span class="const token" data-verso-hover="385">Reach</span> U x y) : key x ≤ key y := <span class="kw">by</span></span>
+<span id="L196">  <span class="kw">obtain</span> ⟨j, <span class="kw">rfl</span>⟩ := h; <span class="kw">exact</span> <span class="const token" data-verso-hover="270">key_le_iterate</span> hU x j</span>
+<span id="L197"></span>
+<span id="L198"><span class="dc">/-- Classification of a step of a process with the union forest. -/</span></span>
+<span id="L199"><span class="kw">lemma</span> <span class="const token" data-verso-hover="417">tauRes_union</span> (hkey : <span class="const token" data-verso-hover="141">Function.Injective</span> key) {m U : E → E} (hg : <span class="const token" data-verso-hover="121">Good</span> key m)</span>
+<span id="L200">    (hreach : ∀ x, <span class="const token" data-verso-hover="385">Reach</span> U x (m x)) {o : <span class="const token" data-verso-hover="28">DSUOp</span> E} {l l' : <span class="const token" data-verso-hover="69">Loc</span> E} {m' : E → E}</span>
+<span id="L201">    (hl : <span class="const token" data-verso-hover="304">LocInv</span> K key m (<span class="const token" data-verso-hover="112">some</span> o) l) (hG : <span class="const token" data-verso-hover="405">LG</span> U l) (h : <span class="const token" data-verso-hover="314">tauRes</span> K key l m = <span class="const token" data-verso-hover="112">some</span> (l', m')) :</span>
+<span id="L202">    (m' = m ∧ <span class="const token" data-verso-hover="405">LG</span> U l') ∨</span>
+<span id="L203">    (∃ a b, m a = a ∧ key a &lt; key b ∧ <span class="const token" data-verso-hover="25">rootOf</span> m b ≠ a ∧ m' = <span class="const token" data-verso-hover="146">Function.update</span> m a b ∧</span>
+<span id="L204">      l' = <span class="const token" data-verso-hover="75">.</span>done <span class="const token" data-verso-hover="6">true</span>) ∨</span>
+<span id="L205">    (∃ a w, m a ≠ a ∧ m' = <span class="const token" data-verso-hover="146">Function.update</span> m a w ∧ <span class="const token" data-verso-hover="385">Reach</span> U (m a) w ∧ w ≠ m a ∧ <span class="const token" data-verso-hover="405">LG</span> U l') := <span class="kw">by</span></span>
+<span id="L206">  <span class="kw">have</span> hroot : ∀ {a b : E}, key a &lt; key b → <span class="const token" data-verso-hover="25">rootOf</span> m b ≠ a := <span class="kw">fun</span> {a b} hk hr =&gt; <span class="kw">by</span></span>
+<span id="L207">    <span class="kw">have</span> := <span class="const token" data-verso-hover="164">key_le_rootOf</span> hg b; <span class="kw">rw</span> [hr] <span class="kw">at</span> this; <span class="kw">omega</span></span>
+<span id="L208">  <span class="kw">cases</span> l <span class="kw">with</span></span>
+<span id="L209">  | <span class="const token" data-verso-hover="70">idle</span> =&gt; <span class="kw">exact</span> hl.<span class="const token" data-verso-hover="155">elim</span></span>
+<span id="L210">  | <span class="const token" data-verso-hover="75">done</span> r =&gt; <span class="kw">simp</span> [<span class="const token" data-verso-hover="314">tauRes</span>, <span class="const token" data-verso-hover="84">act</span>] <span class="kw">at</span> h</span>
+<span id="L211">  | <span class="const token" data-verso-hover="71">fu</span> b fs v =&gt;</span>
+<span id="L212">    <span class="kw">simp</span> only [<span class="const token" data-verso-hover="314">tauRes</span>, <span class="const token" data-verso-hover="84">act</span>, <span class="const token" data-verso-hover="315">tauRes_liftF</span>, <span class="const token" data-verso-hover="158">Option.some.injEq</span>, <span class="const token" data-verso-hover="159">Prod.mk.injEq</span>] <span class="kw">at</span> h</span>
+<span id="L213">    <span class="kw">obtain</span> ⟨<span class="kw">rfl</span>, <span class="kw">rfl</span>⟩ := h</span>
+<span id="L214">    <span class="kw">obtain</span> ⟨hfs, hcase⟩ := <span class="const token" data-verso-hover="414">fRes_union</span> hg hreach hl.<span class="const token" data-verso-hover="138">2</span><span class="nu">.</span><span class="const token" data-verso-hover="137">1</span> hG</span>
+<span id="L215">    <span class="kw">have</span> hl' : <span class="const token" data-verso-hover="405">LG</span> U (<span class="const token" data-verso-hover="77">contU</span> K b v (<span class="const token" data-verso-hover="312">fRes</span> K fs m).<span class="const token" data-verso-hover="147">1</span>) := <span class="kw">by</span></span>
+<span id="L216">      <span class="kw">cases</span> hc : (<span class="const token" data-verso-hover="312">fRes</span> K fs m).<span class="const token" data-verso-hover="147">1</span> <span class="kw">with</span></span>
+<span id="L217">      | <span class="const token" data-verso-hover="68">inl</span> fs' =&gt; <span class="kw">exact</span> hfs fs' hc</span>
+<span id="L218">      | <span class="const token" data-verso-hover="67">inr</span> r =&gt; <span class="kw">exact</span> <span class="const token" data-verso-hover="413">FG_start</span> U v</span>
+<span id="L219">    <span class="kw">rcases</span> hcase <span class="kw">with</span> h1 | ⟨a, w, h1, h2, h3, h4⟩</span>
+<span id="L220">    · <span class="kw">exact</span> <span class="const token" data-verso-hover="128">Or.inl</span> ⟨h1, hl'⟩</span>
+<span id="L221">    · <span class="kw">exact</span> <span class="const token" data-verso-hover="130">Or.inr</span> (<span class="const token" data-verso-hover="130">Or.inr</span> ⟨a, w, h1, h2, h3, h4, hl'⟩)</span>
+<span id="L222">  | <span class="const token" data-verso-hover="72">fv</span> b u fs =&gt;</span>
+<span id="L223">    <span class="kw">simp</span> only [<span class="const token" data-verso-hover="314">tauRes</span>, <span class="const token" data-verso-hover="84">act</span>, <span class="const token" data-verso-hover="315">tauRes_liftF</span>, <span class="const token" data-verso-hover="158">Option.some.injEq</span>, <span class="const token" data-verso-hover="159">Prod.mk.injEq</span>] <span class="kw">at</span> h</span>
+<span id="L224">    <span class="kw">obtain</span> ⟨<span class="kw">rfl</span>, <span class="kw">rfl</span>⟩ := h</span>
+<span id="L225">    <span class="kw">obtain</span> ⟨hfs, hcase⟩ := <span class="const token" data-verso-hover="414">fRes_union</span> hg hreach hl.<span class="const token" data-verso-hover="138">2</span><span class="nu">.</span><span class="const token" data-verso-hover="138">2</span> hG</span>
+<span id="L226">    <span class="kw">have</span> hl' : <span class="const token" data-verso-hover="405">LG</span> U (<span class="const token" data-verso-hover="78">contV</span> b u (<span class="const token" data-verso-hover="312">fRes</span> K fs m).<span class="const token" data-verso-hover="147">1</span>) := <span class="kw">by</span></span>
+<span id="L227">      <span class="kw">cases</span> hc : (<span class="const token" data-verso-hover="312">fRes</span> K fs m).<span class="const token" data-verso-hover="147">1</span> <span class="kw">with</span></span>
+<span id="L228">      | <span class="const token" data-verso-hover="68">inl</span> fs' =&gt; <span class="kw">exact</span> hfs fs' hc</span>
+<span id="L229">      | <span class="const token" data-verso-hover="67">inr</span> r =&gt; <span class="kw">simp</span> only [<span class="const token" data-verso-hover="78">contV</span>]; <span class="kw">split_ifs</span> &lt;;&gt; <span class="kw">trivial</span></span>
+<span id="L230">    <span class="kw">rcases</span> hcase <span class="kw">with</span> h1 | ⟨a, w, h1, h2, h3, h4⟩</span>
+<span id="L231">    · <span class="kw">exact</span> <span class="const token" data-verso-hover="128">Or.inl</span> ⟨h1, hl'⟩</span>
+<span id="L232">    · <span class="kw">exact</span> <span class="const token" data-verso-hover="130">Or.inr</span> (<span class="const token" data-verso-hover="130">Or.inr</span> ⟨a, w, h1, h2, h3, h4, hl'⟩)</span>
+<span id="L233">  | <span class="const token" data-verso-hover="73">chk</span> u v =&gt;</span>
+<span id="L234">    <span class="kw">simp</span> only [<span class="const token" data-verso-hover="314">tauRes</span>, <span class="const token" data-verso-hover="84">act</span>, <span class="const token" data-verso-hover="156">ptr_read</span>, <span class="const token" data-verso-hover="157">Function.update_eq_self</span>, <span class="const token" data-verso-hover="158">Option.some.injEq</span>,</span>
+<span id="L235">      <span class="const token" data-verso-hover="159">Prod.mk.injEq</span>] <span class="kw">at</span> h</span>
+<span id="L236">    <span class="kw">obtain</span> ⟨<span class="kw">rfl</span>, <span class="kw">rfl</span>⟩ := h</span>
+<span id="L237">    <span class="kw">left</span>; <span class="kw">refine</span> ⟨<span class="const token" data-verso-hover="42">rfl</span>, ?_⟩</span>
+<span id="L238">    <span class="kw">split_ifs</span></span>
+<span id="L239">    · <span class="kw">trivial</span></span>
+<span id="L240">    · <span class="kw">exact</span> <span class="const token" data-verso-hover="413">FG_start</span> U u</span>
+<span id="L241">  | <span class="const token" data-verso-hover="74">lnk</span> u v =&gt;</span>
+<span id="L242">    <span class="kw">have</span> hk : key u ≠ key v := <span class="kw">fun</span> h =&gt; hl.<span class="const token" data-verso-hover="138">2</span><span class="nu">.</span><span class="const token" data-verso-hover="138">2</span><span class="nu">.</span><span class="const token" data-verso-hover="138">2</span> (hkey h)</span>
+<span id="L243">    <span class="kw">by_cases</span> hlt : key u &lt; key v</span>
+<span id="L244">    · <span class="kw">simp</span> only [<span class="const token" data-verso-hover="314">tauRes</span>, <span class="const token" data-verso-hover="84">act</span>, hlt, <span class="const token" data-verso-hover="161">ite_true</span>, <span class="const token" data-verso-hover="158">Option.some.injEq</span>, <span class="const token" data-verso-hover="159">Prod.mk.injEq</span>] <span class="kw">at</span> h</span>
+<span id="L245">      <span class="kw">obtain</span> ⟨<span class="kw">rfl</span>, <span class="kw">rfl</span>⟩ := h</span>
+<span id="L246">      <span class="kw">by_cases</span> hr : m u = u</span>
+<span id="L247">      · <span class="kw">simp</span> only [hr, <span class="const token" data-verso-hover="161">ite_true</span>]</span>
+<span id="L248">        <span class="kw">exact</span> <span class="const token" data-verso-hover="130">Or.inr</span> (<span class="const token" data-verso-hover="128">Or.inl</span> ⟨u, v, hr, hlt, hroot hlt, <span class="const token" data-verso-hover="42">rfl</span>, <span class="kw">by</span> <span class="kw">simp</span>⟩)</span>
+<span id="L249">      · <span class="kw">simp</span> only [hr, <span class="const token" data-verso-hover="143">ite_false</span>, <span class="const token" data-verso-hover="157">Function.update_eq_self</span>]</span>
+<span id="L250">        <span class="kw">exact</span> <span class="const token" data-verso-hover="128">Or.inl</span> ⟨<span class="kw">by</span> <span class="kw">simp</span>, <span class="const token" data-verso-hover="413">FG_start</span> U u⟩</span>
+<span id="L251">    · <span class="kw">have</span> hlt' : key v &lt; key u := <span class="kw">by</span> <span class="kw">omega</span></span>
+<span id="L252">      <span class="kw">simp</span> only [<span class="const token" data-verso-hover="314">tauRes</span>, <span class="const token" data-verso-hover="84">act</span>, hlt, <span class="const token" data-verso-hover="143">ite_false</span>, <span class="const token" data-verso-hover="158">Option.some.injEq</span>, <span class="const token" data-verso-hover="159">Prod.mk.injEq</span>] <span class="kw">at</span> h</span>
+<span id="L253">      <span class="kw">obtain</span> ⟨<span class="kw">rfl</span>, <span class="kw">rfl</span>⟩ := h</span>
+<span id="L254">      <span class="kw">by_cases</span> hr : m v = v</span>
+<span id="L255">      · <span class="kw">simp</span> only [hr, <span class="const token" data-verso-hover="161">ite_true</span>]</span>
+<span id="L256">        <span class="kw">exact</span> <span class="const token" data-verso-hover="130">Or.inr</span> (<span class="const token" data-verso-hover="128">Or.inl</span> ⟨v, u, hr, hlt', hroot hlt', <span class="const token" data-verso-hover="42">rfl</span>, <span class="kw">by</span> <span class="kw">simp</span>⟩)</span>
+<span id="L257">      · <span class="kw">simp</span> only [hr, <span class="const token" data-verso-hover="143">ite_false</span>, <span class="const token" data-verso-hover="157">Function.update_eq_self</span>]</span>
+<span id="L258">        <span class="kw">exact</span> <span class="const token" data-verso-hover="128">Or.inl</span> ⟨<span class="kw">by</span> <span class="kw">simp</span>, <span class="const token" data-verso-hover="413">FG_start</span> U u⟩</span>
+<span id="L259"></span>
+<span id="L260"><span class="kw">lemma</span> <span class="const token" data-verso-hover="418">uinv_init</span> : <span class="const token" data-verso-hover="406">UInv</span> (key := key) ((<span class="const token" data-verso-hover="87">dsuImpl</span> K key P).<span class="const token" data-verso-hover="177">initCfg</span>) <span class="const token" data-verso-hover="376">id</span> :=</span>
+<span id="L261">  ⟨<span class="kw">fun</span> _ =&gt; <span class="const token" data-verso-hover="128">Or.inl</span> <span class="const token" data-verso-hover="42">rfl</span>, <span class="kw">fun</span> _ =&gt; <span class="const token" data-verso-hover="386">Reach.refl</span> _ _, <span class="kw">fun</span> _ =&gt; <span class="const token" data-verso-hover="419">Iff.rfl</span>, <span class="kw">fun</span> _ =&gt; <span class="const token" data-verso-hover="162">trivial</span>⟩</span>
+<span id="L262"></span>
+<span id="L263"><span class="dc">/-- The three kinds of steps, with the corresponding change of the union forest. -/</span></span>
+<span id="L264"><span class="kw">def</span> <span class="const token" data-verso-hover="420">UStep</span> (key : E → <span class="const token" data-verso-hover="51">ℕ</span>) (m m' U U' : E → E) : <span class="kw">Prop</span> :=</span>
+<span id="L265">  (m' = m ∧ U' = U) ∨</span>
+<span id="L266">  (∃ a b, m a = a ∧ key a &lt; key b ∧ <span class="const token" data-verso-hover="25">rootOf</span> m b ≠ a ∧ m' = <span class="const token" data-verso-hover="146">Function.update</span> m a b ∧</span>
+<span id="L267">    U' = <span class="const token" data-verso-hover="146">Function.update</span> U a b) ∨</span>
+<span id="L268">  (∃ a w, m a ≠ a ∧ m' = <span class="const token" data-verso-hover="146">Function.update</span> m a w ∧ <span class="const token" data-verso-hover="385">Reach</span> U (m a) w ∧ w ≠ m a ∧ U' = U)</span>
+<span id="L269"></span>
+<span id="L270"><span class="kw">theorem</span> <span class="const token" data-verso-hover="421">uinv_step</span> (hkey : <span class="const token" data-verso-hover="141">Function.Injective</span> key) {C C' : <span class="const token" data-verso-hover="119">Config</span> (<span class="const token" data-verso-hover="30">dsu</span> E) (<span class="const token" data-verso-hover="45">Ptr</span> E) P (<span class="const token" data-verso-hover="69">Loc</span> E)}</span>
+<span id="L271">    {U : E → E} {ℓ : <span class="const token" data-verso-hover="179">Label</span> P (<span class="const token" data-verso-hover="30">dsu</span> E)} (hI : <span class="const token" data-verso-hover="305">LInv</span> K key C) (hU : <span class="const token" data-verso-hover="406">UInv</span> (key := key) C U)</span>
+<span id="L272">    (h : (<span class="const token" data-verso-hover="87">dsuImpl</span> K key P).<span class="const token" data-verso-hover="149">step</span> C ℓ = <span class="const token" data-verso-hover="112">some</span> C') :</span>
+<span id="L273">    <span class="const token" data-verso-hover="406">UInv</span> (key := key) C' (<span class="const token" data-verso-hover="390">linkUpd</span> C C' U) ∧ <span class="const token" data-verso-hover="420">UStep</span> key C.<span class="const token" data-verso-hover="122">mem</span> C'.<span class="const token" data-verso-hover="122">mem</span> U (<span class="const token" data-verso-hover="390">linkUpd</span> C C' U) := <span class="kw">by</span></span>
+<span id="L274">  <span class="kw">have</span> hnoroot : C'.<span class="const token" data-verso-hover="122">mem</span> = C.<span class="const token" data-verso-hover="122">mem</span> → <span class="const token" data-verso-hover="390">linkUpd</span> C C' U = U := <span class="kw">fun</span> hm =&gt;</span>
+<span id="L275">    <span class="const token" data-verso-hover="401">linkUpd_of_noroot</span> (<span class="kw">fun</span> a ha =&gt; <span class="kw">by</span> <span class="kw">rw</span> [hm]; <span class="kw">exact</span> ha)</span>
+<span id="L276">  <span class="kw">cases</span> ℓ <span class="kw">with</span></span>
+<span id="L277">  | <span class="const token" data-verso-hover="180">inv</span> p o =&gt;</span>
+<span id="L278">    <span class="kw">obtain</span> ⟨-, -, -, hloc, hmem⟩ := <span class="const token" data-verso-hover="181">Impl.step_inv</span> h</span>
+<span id="L279">    <span class="kw">rw</span> [hnoroot hmem]</span>
+<span id="L280">    <span class="kw">refine</span> ⟨⟨hU.<span class="const token" data-verso-hover="407">good</span>, <span class="kw">fun</span> x =&gt; <span class="kw">by</span> <span class="kw">rw</span> [hmem]; <span class="kw">exact</span> hU.<span class="const token" data-verso-hover="408">reach</span> x, <span class="kw">fun</span> x =&gt; <span class="kw">by</span> <span class="kw">rw</span> [hmem]; <span class="kw">exact</span> hU.<span class="const token" data-verso-hover="409">root</span> x,</span>
+<span id="L281">      <span class="kw">fun</span> q =&gt; ?_⟩, <span class="const token" data-verso-hover="128">Or.inl</span> ⟨hmem, <span class="const token" data-verso-hover="42">rfl</span>⟩⟩</span>
+<span id="L282">    <span class="kw">rw</span> [hloc]</span>
+<span id="L283">    <span class="kw">by_cases</span> hq : q = p</span>
+<span id="L284">    · <span class="kw">subst</span> hq; <span class="kw">simp</span> only [<span class="const token" data-verso-hover="153">Function.update_self</span>]</span>
+<span id="L285">      <span class="kw">cases</span> o &lt;;&gt; <span class="kw">exact</span> <span class="const token" data-verso-hover="413">FG_start</span> U _</span>
+<span id="L286">    · <span class="kw">rw</span> [<span class="const token" data-verso-hover="152">Function.update_of_ne</span> hq]; <span class="kw">exact</span> hU.<span class="const token" data-verso-hover="410">ghost</span> q</span>
+<span id="L287">  | <span class="const token" data-verso-hover="182">ret</span> p r =&gt;</span>
+<span id="L288">    <span class="kw">obtain</span> ⟨-, -, hmem, l, hact, hloc⟩ := <span class="const token" data-verso-hover="183">Impl.step_ret</span> h</span>
+<span id="L289">    <span class="kw">rw</span> [hnoroot hmem]</span>
+<span id="L290">    <span class="kw">refine</span> ⟨⟨hU.<span class="const token" data-verso-hover="407">good</span>, <span class="kw">fun</span> x =&gt; <span class="kw">by</span> <span class="kw">rw</span> [hmem]; <span class="kw">exact</span> hU.<span class="const token" data-verso-hover="408">reach</span> x, <span class="kw">fun</span> x =&gt; <span class="kw">by</span> <span class="kw">rw</span> [hmem]; <span class="kw">exact</span> hU.<span class="const token" data-verso-hover="409">root</span> x,</span>
+<span id="L291">      <span class="kw">fun</span> q =&gt; ?_⟩, <span class="const token" data-verso-hover="128">Or.inl</span> ⟨hmem, <span class="const token" data-verso-hover="42">rfl</span>⟩⟩</span>
+<span id="L292">    <span class="kw">rw</span> [hloc]</span>
+<span id="L293">    <span class="kw">by_cases</span> hq : q = p</span>
+<span id="L294">    · <span class="kw">subst</span> hq; <span class="kw">simp</span> only [<span class="const token" data-verso-hover="153">Function.update_self</span>]</span>
+<span id="L295">      <span class="kw">have</span> hact' : <span class="const token" data-verso-hover="84">act</span> K key (C.<span class="const token" data-verso-hover="125">loc</span> q) = <span class="const token" data-verso-hover="85">.</span>ret r l := hact</span>
+<span id="L296">      <span class="kw">rcases</span> <span class="const token" data-verso-hover="372">act_ret_cases</span> hact' <span class="kw">with</span> h1 | h1 &lt;;&gt; <span class="kw">rw</span> [h1] <span class="kw">at</span> hact' &lt;;&gt; <span class="kw">simp</span> only [<span class="const token" data-verso-hover="84">act</span>] <span class="kw">at</span> hact' &lt;;&gt;</span>
+<span id="L297">        <span class="kw">cases</span> hact' &lt;;&gt; <span class="kw">trivial</span></span>
+<span id="L298">    · <span class="kw">rw</span> [<span class="const token" data-verso-hover="152">Function.update_of_ne</span> hq]; <span class="kw">exact</span> hU.<span class="const token" data-verso-hover="410">ghost</span> q</span>
+<span id="L299">  | <span class="const token" data-verso-hover="150">tau</span> p =&gt;</span>
+<span id="L300">    <span class="kw">obtain</span> ⟨hp, hres, hpend, hother⟩ := <span class="const token" data-verso-hover="316">step_tau_tauRes</span> h</span>
+<span id="L301">    <span class="kw">obtain</span> ⟨o, ho⟩ := <span class="const token" data-verso-hover="184">Option.ne_none_iff_exists'</span>.<span class="const token" data-verso-hover="185">1</span> hp</span>
+<span id="L302">    <span class="kw">have</span> hl := hI.<span class="const token" data-verso-hover="307">loc</span> p</span>
+<span id="L303">    <span class="kw">rw</span> [ho] <span class="kw">at</span> hl</span>
+<span id="L304">    <span class="kw">rcases</span> <span class="const token" data-verso-hover="417">tauRes_union</span> hkey hI.<span class="const token" data-verso-hover="306">good</span> hU.<span class="const token" data-verso-hover="408">reach</span> hl (hU.<span class="const token" data-verso-hover="410">ghost</span> p) hres <span class="kw">with</span></span>
+<span id="L305">      ⟨hm, hG⟩ | ⟨a, b, ha, hab, hb, hm, hdone⟩ | ⟨a, w, ha, hm, hw, hwa, hG⟩</span>
+<span id="L306">    · <span class="kw">rw</span> [hnoroot hm]</span>
+<span id="L307">      <span class="kw">refine</span> ⟨⟨hU.<span class="const token" data-verso-hover="407">good</span>, <span class="kw">fun</span> x =&gt; <span class="kw">by</span> <span class="kw">rw</span> [hm]; <span class="kw">exact</span> hU.<span class="const token" data-verso-hover="408">reach</span> x, <span class="kw">fun</span> x =&gt; <span class="kw">by</span> <span class="kw">rw</span> [hm]; <span class="kw">exact</span> hU.<span class="const token" data-verso-hover="409">root</span> x,</span>
+<span id="L308">        <span class="kw">fun</span> q =&gt; ?_⟩, <span class="const token" data-verso-hover="128">Or.inl</span> ⟨hm, <span class="const token" data-verso-hover="42">rfl</span>⟩⟩</span>
+<span id="L309">      <span class="kw">by_cases</span> hq : q = p</span>
+<span id="L310">      · <span class="kw">subst</span> hq; <span class="kw">exact</span> hG</span>
+<span id="L311">      · <span class="kw">rw</span> [hother q hq]; <span class="kw">exact</span> hU.<span class="const token" data-verso-hover="410">ghost</span> q</span>
+<span id="L312">    · <span class="kw">have</span> hba : b ≠ a := <span class="kw">fun</span> h' =&gt; <span class="kw">by</span> <span class="kw">rw</span> [h'] <span class="kw">at</span> hab; <span class="kw">omega</span></span>
+<span id="L313">      <span class="kw">have</span> hUa : U a = a := (hU.<span class="const token" data-verso-hover="409">root</span> a).<span class="const token" data-verso-hover="263">2</span> ha</span>
+<span id="L314">      <span class="kw">rw</span> [<span class="const token" data-verso-hover="397">linkUpd_of_link</span> ha hba hm]</span>
+<span id="L315">      <span class="kw">have</span> hm' := <span class="const token" data-verso-hover="400">congrFun</span> hm</span>
+<span id="L316">      <span class="kw">refine</span> ⟨⟨<span class="const token" data-verso-hover="293">good_update</span> hU.<span class="const token" data-verso-hover="407">good</span> hab, <span class="kw">fun</span> x =&gt; ?_, <span class="kw">fun</span> x =&gt; ?_, <span class="kw">fun</span> q =&gt; ?_⟩,</span>
+<span id="L317">        <span class="const token" data-verso-hover="130">Or.inr</span> (<span class="const token" data-verso-hover="128">Or.inl</span> ⟨a, b, ha, hab, hb, hm, <span class="const token" data-verso-hover="42">rfl</span>⟩)⟩</span>
+<span id="L318">      · <span class="kw">by_cases</span> hx : x = a</span>
+<span id="L319">        · <span class="kw">subst</span> hx; <span class="kw">rw</span> [hm' x, <span class="const token" data-verso-hover="153">Function.update_self</span>]</span>
+<span id="L320">          <span class="kw">exact</span> ⟨<span class="nu">1</span>, <span class="kw">by</span> <span class="kw">simp</span>⟩</span>
+<span id="L321">        · <span class="kw">rw</span> [hm' x, <span class="const token" data-verso-hover="152">Function.update_of_ne</span> hx]; <span class="kw">exact</span> <span class="const token" data-verso-hover="389">Reach.link</span> hUa (hU.<span class="const token" data-verso-hover="408">reach</span> x)</span>
+<span id="L322">      · <span class="kw">by_cases</span> hx : x = a</span>
+<span id="L323">        · <span class="kw">subst</span> hx; <span class="kw">rw</span> [hm' x, <span class="const token" data-verso-hover="153">Function.update_self</span>, <span class="const token" data-verso-hover="153">Function.update_self</span>]</span>
+<span id="L324">        · <span class="kw">rw</span> [hm' x, <span class="const token" data-verso-hover="152">Function.update_of_ne</span> hx, <span class="const token" data-verso-hover="152">Function.update_of_ne</span> hx]; <span class="kw">exact</span> hU.<span class="const token" data-verso-hover="409">root</span> x</span>
+<span id="L325">      · <span class="kw">by_cases</span> hq : q = p</span>
+<span id="L326">        · <span class="kw">subst</span> hq</span>
+<span id="L327">          <span class="kw">rw</span> [hdone]; <span class="kw">trivial</span></span>
+<span id="L328">        · <span class="kw">rw</span> [hother q hq]; <span class="kw">exact</span> <span class="const token" data-verso-hover="412">LG.link</span> hUa (hU.<span class="const token" data-verso-hover="410">ghost</span> q)</span>
+<span id="L329">    · <span class="kw">have</span> hUma : <span class="const token" data-verso-hover="385">Reach</span> U a (C.<span class="const token" data-verso-hover="122">mem</span> a) := hU.<span class="const token" data-verso-hover="408">reach</span> a</span>
+<span id="L330">      <span class="kw">have</span> hka : key a &lt; key (C.<span class="const token" data-verso-hover="122">mem</span> a) := (hI.<span class="const token" data-verso-hover="306">good</span> a).<span class="const token" data-verso-hover="173">resolve_left</span> ha</span>
+<span id="L331">      <span class="kw">have</span> hwa' : w ≠ a := <span class="kw">fun</span> h' =&gt; <span class="kw">by</span></span>
+<span id="L332">        <span class="kw">have</span> := hw.<span class="const token" data-verso-hover="416">key_le</span> hU.<span class="const token" data-verso-hover="407">good</span>; <span class="kw">rw</span> [h'] <span class="kw">at</span> this; <span class="kw">omega</span></span>
+<span id="L333">      <span class="kw">have</span> hm' := <span class="const token" data-verso-hover="400">congrFun</span> hm</span>
+<span id="L334">      <span class="kw">have</span> hno : <span class="const token" data-verso-hover="390">linkUpd</span> C C' U = U := <span class="const token" data-verso-hover="401">linkUpd_of_noroot</span> (<span class="kw">fun</span> x hx =&gt; <span class="kw">by</span></span>
+<span id="L335">        <span class="kw">by_cases</span> hxa : x = a</span>
+<span id="L336">        · <span class="kw">subst</span> hxa; <span class="kw">exact</span> <span class="const token" data-verso-hover="228">absurd</span> hx ha</span>
+<span id="L337">        · <span class="kw">rw</span> [hm' x, <span class="const token" data-verso-hover="152">Function.update_of_ne</span> hxa]; <span class="kw">exact</span> hx)</span>
+<span id="L338">      <span class="kw">rw</span> [hno]</span>
+<span id="L339">      <span class="kw">refine</span> ⟨⟨hU.<span class="const token" data-verso-hover="407">good</span>, <span class="kw">fun</span> x =&gt; ?_, <span class="kw">fun</span> x =&gt; ?_, <span class="kw">fun</span> q =&gt; ?_⟩,</span>
+<span id="L340">        <span class="const token" data-verso-hover="130">Or.inr</span> (<span class="const token" data-verso-hover="130">Or.inr</span> ⟨a, w, ha, hm, hw, hwa, <span class="const token" data-verso-hover="42">rfl</span>⟩)⟩</span>
+<span id="L341">      · <span class="kw">by_cases</span> hx : x = a</span>
+<span id="L342">        · <span class="kw">subst</span> hx; <span class="kw">rw</span> [hm' x, <span class="const token" data-verso-hover="153">Function.update_self</span>]; <span class="kw">exact</span> hUma.<span class="const token" data-verso-hover="387">trans</span> hw</span>
+<span id="L343">        · <span class="kw">rw</span> [hm' x, <span class="const token" data-verso-hover="152">Function.update_of_ne</span> hx]; <span class="kw">exact</span> hU.<span class="const token" data-verso-hover="408">reach</span> x</span>
+<span id="L344">      · <span class="kw">by_cases</span> hx : x = a</span>
+<span id="L345">        · <span class="kw">subst</span> hx; <span class="kw">rw</span> [hm' x, <span class="const token" data-verso-hover="153">Function.update_self</span>]</span>
+<span id="L346">          <span class="kw">exact</span> ⟨<span class="kw">fun</span> h' =&gt; <span class="const token" data-verso-hover="228">absurd</span> ((hU.<span class="const token" data-verso-hover="409">root</span> x).<span class="const token" data-verso-hover="185">1</span> h') ha, <span class="kw">fun</span> h' =&gt; <span class="const token" data-verso-hover="228">absurd</span> h' hwa'⟩</span>
+<span id="L347">        · <span class="kw">rw</span> [hm' x, <span class="const token" data-verso-hover="152">Function.update_of_ne</span> hx]; <span class="kw">exact</span> hU.<span class="const token" data-verso-hover="409">root</span> x</span>
+<span id="L348">      · <span class="kw">by_cases</span> hq : q = p</span>
+<span id="L349">        · <span class="kw">subst</span> hq; <span class="kw">exact</span> hG</span>
+<span id="L350">        · <span class="kw">rw</span> [hother q hq]; <span class="kw">exact</span> hU.<span class="const token" data-verso-hover="410">ghost</span> q</span>
+<span id="L351"></span>
+<span id="L352"><span class="kw">theorem</span> <span class="const token" data-verso-hover="422">uinv_of_run</span> (hkey : <span class="const token" data-verso-hover="141">Function.Injective</span> key) {α : <span class="const token" data-verso-hover="188">List</span> (<span class="const token" data-verso-hover="179">Label</span> P (<span class="const token" data-verso-hover="30">dsu</span> E))}</span>
+<span id="L353">    {C : <span class="const token" data-verso-hover="119">Config</span> (<span class="const token" data-verso-hover="30">dsu</span> E) (<span class="const token" data-verso-hover="45">Ptr</span> E) P (<span class="const token" data-verso-hover="69">Loc</span> E)} (h : (<span class="const token" data-verso-hover="87">dsuImpl</span> K key P).<span class="const token" data-verso-hover="189">run</span> α = <span class="const token" data-verso-hover="112">some</span> C) :</span>
+<span id="L354">    <span class="const token" data-verso-hover="406">UInv</span> (key := key) C (<span class="const token" data-verso-hover="393">uf</span> K key α) := <span class="kw">by</span></span>
+<span id="L355">  <span class="kw">refine</span> <span class="const token" data-verso-hover="218">Impl.run_induction</span> (Q := <span class="kw">fun</span> α C =&gt; <span class="const token" data-verso-hover="406">UInv</span> (key := key) C (<span class="const token" data-verso-hover="393">uf</span> K key α)) <span class="const token" data-verso-hover="418">uinv_init</span> ?_ h</span>
+<span id="L356">  <span class="kw">intro</span> α C₀ ℓ C hα ih h</span>
+<span id="L357">  <span class="kw">rw</span> [<span class="const token" data-verso-hover="396">uf_append</span> hα h]</span>
+<span id="L358">  <span class="kw">exact</span> (<span class="const token" data-verso-hover="421">uinv_step</span> hkey (<span class="const token" data-verso-hover="322">linv_of_run</span> hkey hα) ih h).<span class="const token" data-verso-hover="137">1</span></span>
+<span id="L359"></span>
+<span id="L360"><span class="dc">/-- **Lemma 3.1 (with the union forest).** After every execution `α`, the union forest</span></span>
+<span id="L361"><span class="dc">`U = uf α` (the links done so far) has the same roots as the parent forest, ids increase along</span></span>
+<span id="L362"><span class="dc">its edges, and the parent of every node is an ancestor of the node in `U`. Every step either</span></span>
+<span id="L363"><span class="dc">leaves the parent pointers (and `U`) unchanged, or links a root `a` below a node `b` with a larger</span></span>
+<span id="L364"><span class="dc">id in another tree (and `U` gets the edge `a → b`), or replaces the parent of a non-root `a` by a</span></span>
+<span id="L365"><span class="dc">proper ancestor in `U` of its old parent (and `U` is unchanged). -/</span></span>
+<span id="L366"><span class="kw">theorem</span> <span class="const token" data-verso-hover="2">lemma_3_1_union</span> (hkey : <span class="const token" data-verso-hover="141">Function.Injective</span> key) {α : <span class="const token" data-verso-hover="188">List</span> (<span class="const token" data-verso-hover="179">Label</span> P (<span class="const token" data-verso-hover="30">dsu</span> E))}</span>
+<span id="L367">    {C : <span class="const token" data-verso-hover="119">Config</span> (<span class="const token" data-verso-hover="30">dsu</span> E) (<span class="const token" data-verso-hover="45">Ptr</span> E) P (<span class="const token" data-verso-hover="69">Loc</span> E)} (h : (<span class="const token" data-verso-hover="87">dsuImpl</span> K key P).<span class="const token" data-verso-hover="189">run</span> α = <span class="const token" data-verso-hover="112">some</span> C) :</span>
+<span id="L368">    <span class="const token" data-verso-hover="121">Good</span> key (<span class="const token" data-verso-hover="393">uf</span> K key α) ∧ (∀ x, <span class="const token" data-verso-hover="385">Reach</span> (<span class="const token" data-verso-hover="393">uf</span> K key α) x (C.<span class="const token" data-verso-hover="122">mem</span> x)) ∧</span>
+<span id="L369">    (∀ x, <span class="const token" data-verso-hover="393">uf</span> K key α x = x ↔ C.<span class="const token" data-verso-hover="122">mem</span> x = x) ∧</span>
+<span id="L370">    ∀ ℓ C', (<span class="const token" data-verso-hover="87">dsuImpl</span> K key P).<span class="const token" data-verso-hover="149">step</span> C ℓ = <span class="const token" data-verso-hover="112">some</span> C' →</span>
+<span id="L371">      <span class="const token" data-verso-hover="420">UStep</span> key C.<span class="const token" data-verso-hover="122">mem</span> C'.<span class="const token" data-verso-hover="122">mem</span> (<span class="const token" data-verso-hover="393">uf</span> K key α) (<span class="const token" data-verso-hover="393">uf</span> K key (α ++ [ℓ])) := <span class="kw">by</span></span>
+<span id="L372">  <span class="kw">have</span> hU := <span class="const token" data-verso-hover="422">uinv_of_run</span> hkey h</span>
+<span id="L373">  <span class="kw">refine</span> ⟨hU.<span class="const token" data-verso-hover="407">good</span>, hU.<span class="const token" data-verso-hover="408">reach</span>, hU.<span class="const token" data-verso-hover="409">root</span>, <span class="kw">fun</span> ℓ C' hs =&gt; ?_⟩</span>
+<span id="L374">  <span class="kw">rw</span> [<span class="const token" data-verso-hover="396">uf_append</span> h hs]</span>
+<span id="L375">  <span class="kw">exact</span> (<span class="const token" data-verso-hover="421">uinv_step</span> hkey (<span class="const token" data-verso-hover="322">linv_of_run</span> hkey h) hU hs).<span class="const token" data-verso-hover="138">2</span></span>
+<span id="L376"></span>
+<span id="L377"><span class="kw">end</span> Podc.ConcurrentDSU</span>
+<span id="L378"></span>
+</code></div>
+        <script>
+          window.versoHoversUrl = "PODC2016/ConcurrentDSU/-hovers.json";</script>
+        <script src="static/lean/popper.js"></script>
+        <script src="static/lean/tippy.js"></script>
+        <script src="static/lean/marked.js"></script>
+        <script src="static/lean/highlighting.js"></script>
+        <script src="static/lean/lean.js"></script>
+        </article></main><footer class="site-footer"><div class="wrap">
+        Machine-checked formalizations of PODC papers in Lean 4. Generated with <a href="https://github.com/leanprover/verso">Verso</a> from the README files of <a href="https://github.com/vasnesterov/formal_podc">vasnesterov/formal_podc</a>.</div>
+      </footer></body>
+  </html>
+

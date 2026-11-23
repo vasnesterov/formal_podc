@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="light dark">
+    <link rel="icon" href="data:,">
+    <title>ConcurrentSketches: ParSketch.lean · Formal PODC</title><base href="../../../.././"><link rel="stylesheet" href="static/lean/verso-vars.css">
+    <link rel="stylesheet" href="static/lean/highlighting.css">
+    <link rel="stylesheet" href="static/lean/tippy-border.css">
+    <link rel="stylesheet" href="static/style.css">
+    <script defer="defer" src="static/site.js"></script>
+    </head>
+  <body>
+    <header class="site-header">
+      <div class="wrap">
+        <a class="brand" href=".">Formal PODC</a><nav class="top">
+          <a href=".">Search</a><a href="about/">About</a><a href="https://github.com/vasnesterov/formal_podc">GitHub</a></nav>
+        </div>
+      </header>
+    <main class="wrap"><article><nav class="breadcrumbs" aria-label="Breadcrumb">
+          <a href=".">Search</a><span class="sep">›</span><a href="PODC2019/">PODC 2019</a><span class="sep">›</span><a href="PODC2019/ConcurrentSketches/">ConcurrentSketches</a><span class="sep">›</span><a href="PODC2019/ConcurrentSketches/src/">Lean source</a><span class="sep">›</span><span aria-current="page">ParSketch</span></nav>
+        <h1>
+          <code>ParSketch.lean</code></h1>
+        <div class="paper-links">
+          <p>
+            Source of <a href="PODC2019/ConcurrentSketches/">Fast Concurrent Data Sketches — PODC 2019</a> · <a href="https://github.com/vasnesterov/formal_podc/blob/main/Papers/PODC2019/ConcurrentSketches/ParSketch.lean">GitHub</a> · hover over a name for its type and documentation</p>
+          </div>
+        <div class="lean-code lean-src">
+          <code class="hl lean block" data-lean-context="ParSketch"><span id="L1"><span class="kw">import</span> Papers.PODC2019.ConcurrentSketches.Objects</span>
+<span id="L2"></span>
+<span id="L3"><span class="dc">/-!</span></span>
+<span id="L4"><span class="dc"># Fast Concurrent Data Sketches (PODC 2019): the algorithm `ParSketch`</span></span>
+<span id="L5"></span>
+<span id="L6"><span class="dc">The unoptimised generic concurrent algorithm `ParSketch` (Algorithm 2 of the PODC version</span></span>
+<span id="L7"><span class="dc">without the gray lines; left column of Algorithm 3 of the full version):</span></span>
+<span id="L8"></span>
+<span id="L9"><span class="dc">```</span></span>
+<span id="L10"><span class="dc">variables: composable sketch globalS (init empty); constant b;</span></span>
+<span id="L11"><span class="dc">  for each update thread t_i: sketch localS_i (init empty), counter_i (init 0),</span></span>
+<span id="L12"><span class="dc">  hint_i (init 1), atomic prop_i (init 1)</span></span>
+<span id="L13"></span>
+<span id="L14"><span class="dc">propagator (t₀):  while true: for all t_i with prop_i = 0:</span></span>
+<span id="L15"><span class="dc">    globalS.merge(localS_i); localS_i ← empty sketch; prop_i ← globalS.calcHint()</span></span>
+<span id="L16"><span class="dc">query(arg):       localCopy ← globalS.snapshot(); return localCopy.query(arg)</span></span>
+<span id="L17"><span class="dc">update_i(a):      if ¬shouldAdd(hint_i, a) then return</span></span>
+<span id="L18"><span class="dc">                  counter_i ← counter_i + 1; localS_i.update(a)</span></span>
+<span id="L19"><span class="dc">                  if counter_i = b then</span></span>
+<span id="L20"><span class="dc">                    prop_i ← 0; wait until prop_i ≠ 0; hint_i ← prop_i; counter_i ← 0</span></span>
+<span id="L21"><span class="dc">```</span></span>
+<span id="L22"></span>
+<span id="L23"><span class="dc">Modelling choices (see `differencies.md`):</span></span>
+<span id="L24"><span class="dc">* the paper's initial value `1` of `hint_i` and `prop_i` is a parameter `hint₀ : S.Hint`;</span></span>
+<span id="L25"><span class="dc">* the propagator scans the threads round-robin (`pCheck j` reads `prop_j`; "for all `t_i` with</span></span>
+<span id="L26"><span class="dc">  `prop_i = 0`"); it is started by the (never-returning) operation `propagate`;</span></span>
+<span id="L27"><span class="dc">* `globalS.merge(localS_i)` is split into reading `localS_i` and merging the value read into</span></span>
+<span id="L28"><span class="dc">  `globalS` (only `t₀` accesses `localS_i` at that time);</span></span>
+<span id="L29"><span class="dc">* `hint_i ← prop_i` uses the value read by the last iteration of the wait loop;</span></span>
+<span id="L30"><span class="dc">* `shouldAdd(hint_i, a)` (a local computation) is evaluated when `update_i(a)` is invoked.</span></span>
+<span id="L31"><span class="dc">-/</span></span>
+<span id="L32"></span>
+<span id="L33"><span class="kw">namespace</span> Podc.ConcurrentSketches</span>
+<span id="L34"></span>
+<span id="L35"><span class="kw">open</span> Cslib.SharedMemory</span>
+<span id="L36"></span>
+<span id="L37"><span class="kw">variable</span> (S : <span class="const token" data-verso-hover="12">Composable</span>) (N : <span class="const token" data-verso-hover="30">ℕ</span>) (Q : <span class="kw">Type</span>)</span>
+<span id="L38"></span>
+<span id="L39"><span class="dc">/-- Base objects of `ParSketch`. -/</span></span>
+<span id="L40"><span class="kw">inductive</span> <span class="const token" data-verso-hover="504">PObj</span> (N : <span class="const token" data-verso-hover="30">ℕ</span>) <span class="kw">where</span></span>
+<span id="L41">  | <span class="const token" data-verso-hover="505">glob</span></span>
+<span id="L42">  | <span class="const token" data-verso-hover="506">loc</span> (i : <span class="const token" data-verso-hover="275">Fin</span> N)</span>
+<span id="L43">  | <span class="const token" data-verso-hover="507">prop</span> (i : <span class="const token" data-verso-hover="275">Fin</span> N)</span>
+<span id="L44">  <span class="kw">deriving</span> <span class="const token" data-verso-hover="223">DecidableEq</span></span>
+<span id="L45"></span>
+<span id="L46"><span class="dc">/-- Specifications of the base objects of `ParSketch`. -/</span></span>
+<span id="L47"><span class="kw">abbrev</span> <span class="const token" data-verso-hover="508">pobjs</span> : <span class="const token" data-verso-hover="504">PObj</span> N → <span class="const token" data-verso-hover="233">ObjSpec</span></span>
+<span id="L48">  | <span class="const token" data-verso-hover="505">.</span>glob =&gt; <span class="const token" data-verso-hover="298">globObj</span> S</span>
+<span id="L49">  | <span class="const token" data-verso-hover="506">.</span>loc _ =&gt; <span class="const token" data-verso-hover="301">locObj</span> S</span>
+<span id="L50">  | <span class="const token" data-verso-hover="507">.</span>prop _ =&gt; <span class="const token" data-verso-hover="302">regObj</span> (<span class="const token" data-verso-hover="310">Option</span> S.<span class="const token" data-verso-hover="43">Hint</span>) <span class="const token" data-verso-hover="11">none</span></span>
+<span id="L51"></span>
+<span id="L52"><span class="dc">/-- Local states (program counters with local variables) of all processes of `ParSketch`. -/</span></span>
+<span id="L53"><span class="kw">inductive</span> <span class="const token" data-verso-hover="509">PLoc</span> <span class="kw">where</span></span>
+<span id="L54">  <span class="dc">/-- Update thread, idle (`counter = c`, `hint = h`). -/</span></span>
+<span id="L55">  | <span class="const token" data-verso-hover="510">uIdle</span> (c : <span class="const token" data-verso-hover="30">ℕ</span>) (h : S.<span class="const token" data-verso-hover="43">Hint</span>)</span>
+<span id="L56">  <span class="dc">/-- Update thread, about to execute `localS_i.update(a)` (counter already `c + 1`). -/</span></span>
+<span id="L57">  | <span class="const token" data-verso-hover="511">uApply</span> (a : S.<span class="const token" data-verso-hover="31">Elem</span>) (c : <span class="const token" data-verso-hover="30">ℕ</span>) (h : S.<span class="const token" data-verso-hover="43">Hint</span>)</span>
+<span id="L58">  <span class="dc">/-- Update thread, about to signal `prop_i ← 0`. -/</span></span>
+<span id="L59">  | <span class="const token" data-verso-hover="512">uSignal</span> (h : S.<span class="const token" data-verso-hover="43">Hint</span>)</span>
+<span id="L60">  <span class="dc">/-- Update thread, waiting until `prop_i ≠ 0`. -/</span></span>
+<span id="L61">  | <span class="const token" data-verso-hover="513">uWait</span> (h : S.<span class="const token" data-verso-hover="43">Hint</span>)</span>
+<span id="L62">  <span class="dc">/-- Update thread, about to return. -/</span></span>
+<span id="L63">  | <span class="const token" data-verso-hover="514">uRet</span> (c : <span class="const token" data-verso-hover="30">ℕ</span>) (h : S.<span class="const token" data-verso-hover="43">Hint</span>)</span>
+<span id="L64">  <span class="dc">/-- Propagator, not started. -/</span></span>
+<span id="L65">  | <span class="const token" data-verso-hover="515">pIdle</span></span>
+<span id="L66">  <span class="dc">/-- Propagator, about to read `prop_j`. -/</span></span>
+<span id="L67">  | <span class="const token" data-verso-hover="516">pCheck</span> (j : <span class="const token" data-verso-hover="275">Fin</span> N)</span>
+<span id="L68">  <span class="dc">/-- Propagator, about to read `localS_j`. -/</span></span>
+<span id="L69">  | <span class="const token" data-verso-hover="517">pRead</span> (j : <span class="const token" data-verso-hover="275">Fin</span> N)</span>
+<span id="L70">  <span class="dc">/-- Propagator, about to merge the value `s` read from `localS_j` into `globalS`. -/</span></span>
+<span id="L71">  | <span class="const token" data-verso-hover="518">pMerge</span> (j : <span class="const token" data-verso-hover="275">Fin</span> N) (s : S.<span class="const token" data-verso-hover="29">State</span>)</span>
+<span id="L72">  <span class="dc">/-- Propagator, about to reset `localS_j`. -/</span></span>
+<span id="L73">  | <span class="const token" data-verso-hover="519">pReset</span> (j : <span class="const token" data-verso-hover="275">Fin</span> N)</span>
+<span id="L74">  <span class="dc">/-- Propagator, about to compute `globalS.calcHint()`. -/</span></span>
+<span id="L75">  | <span class="const token" data-verso-hover="520">pHint</span> (j : <span class="const token" data-verso-hover="275">Fin</span> N)</span>
+<span id="L76">  <span class="dc">/-- Propagator, about to write the hint `h` to `prop_j`. -/</span></span>
+<span id="L77">  | <span class="const token" data-verso-hover="521">pSignal</span> (j : <span class="const token" data-verso-hover="275">Fin</span> N) (h : S.<span class="const token" data-verso-hover="43">Hint</span>)</span>
+<span id="L78">  <span class="dc">/-- Query thread, idle. -/</span></span>
+<span id="L79">  | <span class="const token" data-verso-hover="522">qIdle</span></span>
+<span id="L80">  <span class="dc">/-- Query thread, about to take a snapshot of `globalS` for `query(q)`. -/</span></span>
+<span id="L81">  | <span class="const token" data-verso-hover="523">qSnap</span> (q : S.<span class="const token" data-verso-hover="33">Arg</span>)</span>
+<span id="L82">  <span class="dc">/-- Query thread, about to return `v`. -/</span></span>
+<span id="L83">  | <span class="const token" data-verso-hover="524">qRet</span> (v : S.<span class="const token" data-verso-hover="34">Val</span>)</span>
+<span id="L84"></span>
+<span id="L85"><span class="kw">variable</span> {S N Q}</span>
+<span id="L86"></span>
+<span id="L87"><span class="dc">/-- The initial local states. -/</span></span>
+<span id="L88"><span class="kw">def</span> <span class="const token" data-verso-hover="75">PLoc.init</span> (hint₀ : S.<span class="const token" data-verso-hover="43">Hint</span>) : <span class="const token" data-verso-hover="86">Proc</span> N Q → <span class="const token" data-verso-hover="509">PLoc</span> S N</span>
+<span id="L89">  | <span class="const token" data-verso-hover="57">.</span>upd _ =&gt; <span class="const token" data-verso-hover="510">.</span>uIdle <span class="nu">0</span> hint₀</span>
+<span id="L90">  | <span class="const token" data-verso-hover="276">.</span>prop =&gt; <span class="const token" data-verso-hover="515">.</span>pIdle</span>
+<span id="L91">  | <span class="const token" data-verso-hover="62">.</span>qry _ =&gt; <span class="const token" data-verso-hover="522">.</span>qIdle</span>
+<span id="L92"></span>
+<span id="L93"><span class="kw">variable</span> [<span class="const token" data-verso-hover="224">NeZero</span> N]</span>
+<span id="L94"></span>
+<span id="L95"><span class="dc">/-- Invocations. -/</span></span>
+<span id="L96"><span class="kw">def</span> <span class="const token" data-verso-hover="72">PLoc.invoke</span> : <span class="const token" data-verso-hover="86">Proc</span> N Q → <span class="const token" data-verso-hover="509">PLoc</span> S N → <span class="const token" data-verso-hover="277">SkOp</span> S.<span class="const token" data-verso-hover="87">toSketch</span> → <span class="const token" data-verso-hover="509">PLoc</span> S N</span>
+<span id="L97">  | <span class="const token" data-verso-hover="57">.</span>upd _, <span class="const token" data-verso-hover="510">.</span>uIdle c h, <span class="const token" data-verso-hover="58">.</span>update a =&gt; <span class="kw">if</span> S.<span class="const token" data-verso-hover="24">shouldAdd</span> h a <span class="kw">then</span> <span class="const token" data-verso-hover="511">.</span>uApply a c h <span class="kw">else</span> <span class="const token" data-verso-hover="514">.</span>uRet c h</span>
+<span id="L98">  | <span class="const token" data-verso-hover="276">.</span>prop, <span class="const token" data-verso-hover="515">.</span>pIdle, <span class="const token" data-verso-hover="10">.</span>propagate =&gt; <span class="const token" data-verso-hover="516">.</span>pCheck <span class="nu">0</span></span>
+<span id="L99">  | <span class="const token" data-verso-hover="62">.</span>qry _, <span class="const token" data-verso-hover="522">.</span>qIdle, <span class="const token" data-verso-hover="63">.</span>query q =&gt; <span class="const token" data-verso-hover="523">.</span>qSnap q</span>
+<span id="L100">  | _, l, _ =&gt; l</span>
+<span id="L101"></span>
+<span id="L102"><span class="dc">/-- The next action of a process. -/</span></span>
+<span id="L103"><span class="kw">def</span> <span class="const token" data-verso-hover="73">PLoc.act</span> (b : <span class="const token" data-verso-hover="30">ℕ</span>) : <span class="const token" data-verso-hover="86">Proc</span> N Q → <span class="const token" data-verso-hover="509">PLoc</span> S N → <span class="const token" data-verso-hover="333">Action</span> (<span class="const token" data-verso-hover="334">seqObj</span> S.<span class="const token" data-verso-hover="87">toSketch</span>) (<span class="const token" data-verso-hover="508">pobjs</span> S N) (<span class="const token" data-verso-hover="509">PLoc</span> S N)</span>
+<span id="L104">  | <span class="const token" data-verso-hover="57">.</span>upd i, <span class="const token" data-verso-hover="511">.</span>uApply a c h =&gt;</span>
+<span id="L105">      <span class="const token" data-verso-hover="240">.</span>access (<span class="const token" data-verso-hover="506">.</span>loc i) (<span class="const token" data-verso-hover="289">LOp.update</span> a) <span class="kw">fun</span> _ =&gt; <span class="kw">if</span> c + <span class="nu">1</span> = b <span class="kw">then</span> <span class="const token" data-verso-hover="512">.</span>uSignal h <span class="kw">else</span> <span class="const token" data-verso-hover="514">.</span>uRet (c + <span class="nu">1</span>) h</span>
+<span id="L106">  | <span class="const token" data-verso-hover="57">.</span>upd i, <span class="const token" data-verso-hover="512">.</span>uSignal h =&gt; <span class="const token" data-verso-hover="240">.</span>access (<span class="const token" data-verso-hover="507">.</span>prop i) (<span class="const token" data-verso-hover="297">ROp.write</span> <span class="const token" data-verso-hover="11">none</span>) <span class="kw">fun</span> _ =&gt; <span class="const token" data-verso-hover="513">.</span>uWait h</span>
+<span id="L107">  | <span class="const token" data-verso-hover="57">.</span>upd i, <span class="const token" data-verso-hover="513">.</span>uWait h =&gt; <span class="const token" data-verso-hover="240">.</span>access (<span class="const token" data-verso-hover="507">.</span>prop i) <span class="const token" data-verso-hover="296">ROp.read</span> <span class="kw">fun</span> r =&gt;</span>
+<span id="L108">      <span class="kw">match</span> r <span class="kw">with</span></span>
+<span id="L109">      | <span class="const token" data-verso-hover="11">none</span> =&gt; <span class="const token" data-verso-hover="513">.</span>uWait h</span>
+<span id="L110">      | <span class="const token" data-verso-hover="115">some</span> h' =&gt; <span class="const token" data-verso-hover="514">.</span>uRet <span class="nu">0</span> h'</span>
+<span id="L111">  | <span class="const token" data-verso-hover="57">.</span>upd _, <span class="const token" data-verso-hover="514">.</span>uRet c h =&gt; <span class="const token" data-verso-hover="248">.</span>ret <span class="const token" data-verso-hover="61">.</span>ack (<span class="const token" data-verso-hover="510">.</span>uIdle c h)</span>
+<span id="L112">  | <span class="const token" data-verso-hover="276">.</span>prop, <span class="const token" data-verso-hover="516">.</span>pCheck j =&gt; <span class="const token" data-verso-hover="240">.</span>access (<span class="const token" data-verso-hover="507">.</span>prop j) <span class="const token" data-verso-hover="296">ROp.read</span> <span class="kw">fun</span> r =&gt;</span>
+<span id="L113">      <span class="kw">match</span> r <span class="kw">with</span></span>
+<span id="L114">      | <span class="const token" data-verso-hover="11">none</span> =&gt; <span class="const token" data-verso-hover="517">.</span>pRead j</span>
+<span id="L115">      | <span class="const token" data-verso-hover="115">some</span> _ =&gt; <span class="const token" data-verso-hover="516">.</span>pCheck (j + <span class="nu">1</span>)</span>
+<span id="L116">  | <span class="const token" data-verso-hover="276">.</span>prop, <span class="const token" data-verso-hover="517">.</span>pRead j =&gt; <span class="const token" data-verso-hover="240">.</span>access (<span class="const token" data-verso-hover="506">.</span>loc j) <span class="const token" data-verso-hover="290">LOp.read</span> <span class="kw">fun</span> r =&gt;</span>
+<span id="L117">      <span class="kw">match</span> r <span class="kw">with</span></span>
+<span id="L118">      | <span class="const token" data-verso-hover="294">.</span>state s =&gt; <span class="const token" data-verso-hover="518">.</span>pMerge j s</span>
+<span id="L119">      | <span class="const token" data-verso-hover="293">.</span>unit =&gt; <span class="const token" data-verso-hover="516">.</span>pCheck j</span>
+<span id="L120">  | <span class="const token" data-verso-hover="276">.</span>prop, <span class="const token" data-verso-hover="518">.</span>pMerge j s =&gt; <span class="const token" data-verso-hover="240">.</span>access <span class="const token" data-verso-hover="505">.</span>glob (<span class="const token" data-verso-hover="281">GOp.merge</span> s) <span class="kw">fun</span> _ =&gt; <span class="const token" data-verso-hover="519">.</span>pReset j</span>
+<span id="L121">  | <span class="const token" data-verso-hover="276">.</span>prop, <span class="const token" data-verso-hover="519">.</span>pReset j =&gt; <span class="const token" data-verso-hover="240">.</span>access (<span class="const token" data-verso-hover="506">.</span>loc j) <span class="const token" data-verso-hover="291">LOp.reset</span> <span class="kw">fun</span> _ =&gt; <span class="const token" data-verso-hover="520">.</span>pHint j</span>
+<span id="L122">  | <span class="const token" data-verso-hover="276">.</span>prop, <span class="const token" data-verso-hover="520">.</span>pHint j =&gt; <span class="const token" data-verso-hover="240">.</span>access <span class="const token" data-verso-hover="505">.</span>glob <span class="const token" data-verso-hover="283">GOp.calcHint</span> <span class="kw">fun</span> r =&gt;</span>
+<span id="L123">      <span class="kw">match</span> r <span class="kw">with</span></span>
+<span id="L124">      | <span class="const token" data-verso-hover="287">.</span>hint h =&gt; <span class="const token" data-verso-hover="521">.</span>pSignal j h</span>
+<span id="L125">      | _ =&gt; <span class="const token" data-verso-hover="516">.</span>pCheck j</span>
+<span id="L126">  | <span class="const token" data-verso-hover="276">.</span>prop, <span class="const token" data-verso-hover="521">.</span>pSignal j h =&gt; <span class="const token" data-verso-hover="240">.</span>access (<span class="const token" data-verso-hover="507">.</span>prop j) (<span class="const token" data-verso-hover="297">ROp.write</span> (<span class="const token" data-verso-hover="115">some</span> h)) <span class="kw">fun</span> _ =&gt; <span class="const token" data-verso-hover="516">.</span>pCheck (j + <span class="nu">1</span>)</span>
+<span id="L127">  | <span class="const token" data-verso-hover="62">.</span>qry _, <span class="const token" data-verso-hover="523">.</span>qSnap q =&gt; <span class="const token" data-verso-hover="240">.</span>access <span class="const token" data-verso-hover="505">.</span>glob <span class="const token" data-verso-hover="282">GOp.snapshot</span> <span class="kw">fun</span> r =&gt;</span>
+<span id="L128">      <span class="kw">match</span> r <span class="kw">with</span></span>
+<span id="L129">      | <span class="const token" data-verso-hover="286">.</span>snap x =&gt; <span class="const token" data-verso-hover="524">.</span>qRet (S.<span class="const token" data-verso-hover="42">snapQuery</span> x q)</span>
+<span id="L130">      | _ =&gt; <span class="const token" data-verso-hover="522">.</span>qIdle</span>
+<span id="L131">  | <span class="const token" data-verso-hover="62">.</span>qry _, <span class="const token" data-verso-hover="524">.</span>qRet v =&gt; <span class="const token" data-verso-hover="248">.</span>ret (<span class="const token" data-verso-hover="65">.</span>val v) <span class="const token" data-verso-hover="522">.</span>qIdle</span>
+<span id="L132">  | _, l =&gt; <span class="const token" data-verso-hover="248">.</span>ret <span class="const token" data-verso-hover="61">.</span>ack l</span>
+<span id="L133"></span>
+<span id="L134"><span class="kw">variable</span> (S N Q) <span class="kw">in</span></span>
+<span id="L135"><span class="dc">/-- **`ParSketch`** with buffer size `b` and initial hint `hint₀` (the paper's `1`). -/</span></span>
+<span id="L136"><span class="kw">def</span> <span class="const token" data-verso-hover="67">parSketch</span> (b : <span class="const token" data-verso-hover="30">ℕ</span>) (hint₀ : S.<span class="const token" data-verso-hover="43">Hint</span>) :</span>
+<span id="L137">    <span class="const token" data-verso-hover="25">Impl</span> (<span class="const token" data-verso-hover="334">seqObj</span> S.<span class="const token" data-verso-hover="87">toSketch</span>) (<span class="const token" data-verso-hover="508">pobjs</span> S N) (<span class="const token" data-verso-hover="86">Proc</span> N Q) (<span class="const token" data-verso-hover="509">PLoc</span> S N) <span class="kw">where</span></span>
+<span id="L138">  <span class="const token" data-verso-hover="335">memInit</span></span>
+<span id="L139">    | <span class="const token" data-verso-hover="505">.</span>glob =&gt; S.<span class="const token" data-verso-hover="35">init</span></span>
+<span id="L140">    | <span class="const token" data-verso-hover="506">.</span>loc _ =&gt; S.<span class="const token" data-verso-hover="35">init</span></span>
+<span id="L141">    | <span class="const token" data-verso-hover="507">.</span>prop _ =&gt; <span class="const token" data-verso-hover="115">some</span> hint₀</span>
+<span id="L142">  <span class="const token" data-verso-hover="336">locInit</span> := <span class="const token" data-verso-hover="75">PLoc.init</span> hint₀</span>
+<span id="L143">  <span class="const token" data-verso-hover="337">invoke</span> := <span class="const token" data-verso-hover="72">PLoc.invoke</span></span>
+<span id="L144">  <span class="const token" data-verso-hover="238">act</span> := <span class="const token" data-verso-hover="73">PLoc.act</span> b</span>
+<span id="L145">  <span class="const token" data-verso-hover="338">allowed</span> := <span class="const token" data-verso-hover="76">Proc.allowed</span></span>
+<span id="L146"></span>
+<span id="L147"><span class="kw">end</span> Podc.ConcurrentSketches</span>
+<span id="L148"></span>
+</code></div>
+        <script>
+          window.versoHoversUrl = "PODC2019/ConcurrentSketches/-hovers.json";</script>
+        <script src="static/lean/popper.js"></script>
+        <script src="static/lean/tippy.js"></script>
+        <script src="static/lean/marked.js"></script>
+        <script src="static/lean/highlighting.js"></script>
+        <script src="static/lean/lean.js"></script>
+        </article></main><footer class="site-footer"><div class="wrap">
+        Machine-checked formalizations of PODC papers in Lean 4. Generated with <a href="https://github.com/leanprover/verso">Verso</a> from the README files of <a href="https://github.com/vasnesterov/formal_podc">vasnesterov/formal_podc</a>.</div>
+      </footer></body>
+  </html>
+

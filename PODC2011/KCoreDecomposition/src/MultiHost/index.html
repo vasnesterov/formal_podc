@@ -1,0 +1,822 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="light dark">
+    <link rel="icon" href="data:,">
+    <title>KCoreDecomposition: MultiHost.lean · Formal PODC</title><base href="../../../.././"><link rel="stylesheet" href="static/lean/verso-vars.css">
+    <link rel="stylesheet" href="static/lean/highlighting.css">
+    <link rel="stylesheet" href="static/lean/tippy-border.css">
+    <link rel="stylesheet" href="static/style.css">
+    <script defer="defer" src="static/site.js"></script>
+    </head>
+  <body>
+    <header class="site-header">
+      <div class="wrap">
+        <a class="brand" href=".">Formal PODC</a><nav class="top">
+          <a href=".">Search</a><a href="about/">About</a><a href="https://github.com/vasnesterov/formal_podc">GitHub</a></nav>
+        </div>
+      </header>
+    <main class="wrap"><article><nav class="breadcrumbs" aria-label="Breadcrumb">
+          <a href=".">Search</a><span class="sep">›</span><a href="PODC2011/">PODC 2011</a><span class="sep">›</span><a href="PODC2011/KCoreDecomposition/">KCoreDecomposition</a><span class="sep">›</span><a href="PODC2011/KCoreDecomposition/src/">Lean source</a><span class="sep">›</span><span aria-current="page">MultiHost</span></nav>
+        <h1>
+          <code>MultiHost.lean</code></h1>
+        <div class="paper-links">
+          <p>
+            Source of <a href="PODC2011/KCoreDecomposition/">Distributed k-Core Decomposition — PODC 2011</a> · <a href="https://github.com/vasnesterov/formal_podc/blob/main/Papers/PODC2011/KCoreDecomposition/MultiHost.lean">GitHub</a> · hover over a name for its type and documentation</p>
+          </div>
+        <div class="lean-code lean-src">
+          <code class="hl lean block" data-lean-context="MultiHost"><span id="L1"><span class="kw">import</span> Papers.PODC2011.KCoreDecomposition.Trajectory</span>
+<span id="L2"></span>
+<span id="L3"><span class="dc">/-!</span></span>
+<span id="L4"><span class="dc"># One host, multiple nodes (§3.2, Algorithms 3 and 4) in synchronous rounds</span></span>
+<span id="L5"></span>
+<span id="L6"><span class="dc">Montresor, De Pellegrini, Miorandi, *Distributed k-Core Decomposition*, PODC 2011</span></span>
+<span id="L7"><span class="dc">(arXiv 1103.5320v2), §3.2. The paper proves safety and liveness only for the one-to-one version</span></span>
+<span id="L8"><span class="dc">and says (§4) that "the results can be easily extended to the one-to-many case". Here we do this</span></span>
+<span id="L9"><span class="dc">extension for the synchronous round model of §4.2, and prove in addition that the one-to-many</span></span>
+<span id="L10"><span class="dc">version is never slower (in rounds) than the one-to-one version.</span></span>
+<span id="L11"></span>
+<span id="L12"><span class="dc">## Model</span></span>
+<span id="L13"></span>
+<span id="L14"><span class="dc">* A finite set of hosts `H` and an assignment `h : V → H`; host `x` is responsible for</span></span>
+<span id="L15"><span class="dc">  `own h x = {u | h u = x}` (the paper's `V(x)`).</span></span>
+<span id="L16"><span class="dc">* Host state `HostState` (Algorithm 3): `est : V → ℕ∞` (`⊤` = `+∞`; one entry per node, entries of</span></span>
+<span id="L17"><span class="dc">  nodes that are neither own nodes nor neighbours of own nodes are never read) and</span></span>
+<span id="L18"><span class="dc">  `changed : V → Bool`.</span></span>
+<span id="L19"><span class="dc">* `improveEstimate G L s` is Algorithm 4: passes over the list `L` of own nodes (an **arbitrary</span></span>
+<span id="L20"><span class="dc">  order**, duplicates allowed) doing `k ← computeIndex(est, u, est[u]); if k &lt; est[u] then</span></span>
+<span id="L21"><span class="dc">  est[u] ← k, changed[u] ← true`, repeated until a pass changes nothing. It is defined by</span></span>
+<span id="L22"><span class="dc">  well-founded recursion (the measure `pot` decreases at each pass that changes something);</span></span>
+<span id="L23"><span class="dc">  `improvePass_improveEstimate`: the last pass changes nothing (termination of the `while` loop).</span></span>
+<span id="L24"><span class="dc">* `improveEstimate_isGreatest`: the result is the **greatest** vector below the input that is</span></span>
+<span id="L25"><span class="dc">  quiescent on `L` (`Quiescent`: no own node can improve its estimate). Hence it does not depend on</span></span>
+<span id="L26"><span class="dc">  the order of `L` (`improveEstimate_congr`) and processing messages one at a time with an</span></span>
+<span id="L27"><span class="dc">  `improveEstimate` after each one (as in Algorithm 3) gives the same state as processing them all</span></span>
+<span id="L28"><span class="dc">  and calling `improveEstimate` once (`receiveSeq_improveEstimate`).</span></span>
+<span id="L29"><span class="dc">* Messages are sets `S` of pairs `(v, k)`; receiving `S` performs</span></span>
+<span id="L30"><span class="dc">  `foreach (v, k) ∈ S: if k &lt; est[v] then est[v] ← k`, i.e. `est[v] ← min(est[v], min_{(v,k)∈S} k)`</span></span>
+<span id="L31"><span class="dc">  (`receive`).</span></span>
+<span id="L32"><span class="dc">* Synchronous rounds (`run G h ord r` is the global state at the end of round `r + 1`):</span></span>
+<span id="L33"><span class="dc">  - round 1: `est[v] = d(v)` for own `v`, `+∞` otherwise; `improveEstimate`; send all own estimates</span></span>
+<span id="L34"><span class="dc">    (`allMsg`); reset `changed`;</span></span>
+<span id="L35"><span class="dc">  - round `r + 2`: receive all sets sent in round `r + 1` by the **other** hosts (broadcast policy</span></span>
+<span id="L36"><span class="dc">    of Algorithm 3; only the senders' own nodes appear in them), `improveEstimate`, send</span></span>
+<span id="L37"><span class="dc">    `S = {(u, est[u]) : u own, changed[u]}` (`changedMsg`; `S = ∅` means nothing is sent), reset</span></span>
+<span id="L38"><span class="dc">    `changed`. All messages of a round are processed and then `improveEstimate` is called once;</span></span>
+<span id="L39"><span class="dc">    `run_succ_host_eq_receiveSeq` shows this is the same as Algorithm 3's per-message handler, for</span></span>
+<span id="L40"><span class="dc">    every order of the messages.</span></span>
+<span id="L41"><span class="dc">  - The pass order of host `x` is `ord x`, any list whose members are exactly the own nodes</span></span>
+<span id="L42"><span class="dc">    (`hord`); `run_congr_ord`: the run does not depend on it.</span></span>
+<span id="L43"><span class="dc">  No failures, reliable channels. Algorithm 5 (point-to-point policy) is not modelled; as printed</span></span>
+<span id="L44"><span class="dc">  it sends all boundary estimates to every neighbour host in every round, without testing</span></span>
+<span id="L45"><span class="dc">  `changed[u]` and without resetting it, so it never becomes silent.</span></span>
+<span id="L46"></span>
+<span id="L47"><span class="dc">The run is a total deterministic function of `(G, h, ord)`, so the theorems below are about actual</span></span>
+<span id="L48"><span class="dc">executions and are not vacuous.</span></span>
+<span id="L49"></span>
+<span id="L50"><span class="dc">## Results</span></span>
+<span id="L51"></span>
+<span id="L52"><span class="dc">* `safety` (Theorem 2): every entry of `est` at every host in every round is `≥ k(v)`;</span></span>
+<span id="L53"><span class="dc">  `safety_sent`: so is every value in every message; `ownEst_ne_top`: own estimates are finite.</span></span>
+<span id="L54"><span class="dc">* `ownEst_le_traj` (speed comparison): the estimate of `u` at its host at the end of round `s + 1`</span></span>
+<span id="L55"><span class="dc">  is `≤ traj G s u`, the estimate of the one-to-one algorithm at the end of round `s + 1`</span></span>
+<span id="L56"><span class="dc">  (`Run.run_spec`). Hence `liveness`: from round `stab G + 1` on (the round at which the one-to-one</span></span>
+<span id="L57"><span class="dc">  version is correct), every host knows the exact coreness of its own nodes.</span></span>
+<span id="L58"><span class="dc">* `est_eq_coreness`, `sent_eq_empty`, `theorem_3_multiHost` (Theorem 3): from round `stab G + 2` on</span></span>
+<span id="L59"><span class="dc">  every entry of every host is the coreness and no host sends anything.</span></span>
+<span id="L60"><span class="dc">-/</span></span>
+<span id="L61"></span>
+<span id="L62"><span class="kw">open</span> Finset</span>
+<span id="L63"></span>
+<span id="L64"><span class="kw">set_option</span> <span class="const token" data-verso-hover="43">linter.unusedSectionVars</span> false</span>
+<span id="L65"></span>
+<span id="L66"><span class="kw">namespace</span> KCoreDecomposition</span>
+<span id="L67"></span>
+<span id="L68"><span class="kw">namespace</span> MultiHost</span>
+<span id="L69"></span>
+<span id="L70"><span class="kw">variable</span> {V : <span class="kw">Type</span>*} [<span class="const token" data-verso-hover="44">Fintype</span> V] [<span class="const token" data-verso-hover="45">DecidableEq</span> V] (G : <span class="const token" data-verso-hover="42">SimpleGraph</span> V) [<span class="const token" data-verso-hover="46">DecidableRel</span> G.<span class="const token" data-verso-hover="47">Adj</span>]</span>
+<span id="L71"></span>
+<span id="L72"><span class="dc">/-! ### Host state and Algorithm 4 -/</span></span>
+<span id="L73"></span>
+<span id="L74"><span class="dc">/-- The variables of a host in Algorithm 3. -/</span></span>
+<span id="L75">@[<span class="kw">ext</span>] <span class="kw">structure</span> <span class="const token" data-verso-hover="304">HostState</span> (V : <span class="kw">Type</span>*) <span class="kw">where</span></span>
+<span id="L76">  <span class="dc">/-- `est[v]`: the most up-to-date estimate of the coreness of `v` (`⊤` = `+∞`) -/</span></span>
+<span id="L77">  <span class="const token" data-verso-hover="305">est</span> : V → <span class="const token" data-verso-hover="52">ℕ</span>∞</span>
+<span id="L78">  <span class="dc">/-- `changed[v]`: the estimate of the own node `v` changed since the last broadcast -/</span></span>
+<span id="L79">  <span class="const token" data-verso-hover="306">changed</span> : V → <span class="const token" data-verso-hover="54">Bool</span></span>
+<span id="L80"></span>
+<span id="L81"><span class="dc">/-- `computeIndex(est, u, est[u])`, the value computed in the loop body of Algorithm 4. -/</span></span>
+<span id="L82"><span class="kw">noncomputable</span> <span class="kw">def</span> <span class="const token" data-verso-hover="307">newEst</span> (e : V → <span class="const token" data-verso-hover="52">ℕ</span>∞) (u : V) : <span class="const token" data-verso-hover="50">ℕ</span> := <span class="const token" data-verso-hover="12">computeIndex</span> G e u (e u).<span class="const token" data-verso-hover="273">toNat</span></span>
+<span id="L83"></span>
+<span id="L84"><span class="dc">/-- The body of the `foreach` loop of Algorithm 4, for node `u`:</span></span>
+<span id="L85"><span class="dc">`k ← computeIndex(est, u, est[u]); if k &lt; est[u] then est[u] ← k; changed[u] ← true`. -/</span></span>
+<span id="L86"><span class="kw">noncomputable</span> <span class="kw">def</span> <span class="const token" data-verso-hover="308">updateNode</span> (s : <span class="const token" data-verso-hover="304">HostState</span> V) (u : V) : <span class="const token" data-verso-hover="304">HostState</span> V :=</span>
+<span id="L87">  <span class="kw">if</span> (<span class="const token" data-verso-hover="307">newEst</span> G s.<span class="const token" data-verso-hover="305">est</span> u : <span class="const token" data-verso-hover="52">ℕ</span>∞) &lt; s.<span class="const token" data-verso-hover="305">est</span> u <span class="kw">then</span></span>
+<span id="L88">    ⟨<span class="const token" data-verso-hover="61">Function.update</span> s.<span class="const token" data-verso-hover="305">est</span> u (<span class="const token" data-verso-hover="307">newEst</span> G s.<span class="const token" data-verso-hover="305">est</span> u), <span class="const token" data-verso-hover="61">Function.update</span> s.<span class="const token" data-verso-hover="306">changed</span> u <span class="const token" data-verso-hover="62">true</span>⟩</span>
+<span id="L89">  <span class="kw">else</span> s</span>
+<span id="L90"></span>
+<span id="L91"><span class="dc">/-- One pass of the `while` loop of Algorithm 4 over the own nodes, in the order `L`. -/</span></span>
+<span id="L92"><span class="kw">noncomputable</span> <span class="kw">def</span> <span class="const token" data-verso-hover="309">improvePass</span> (L : <span class="const token" data-verso-hover="78">List</span> V) (s : <span class="const token" data-verso-hover="304">HostState</span> V) : <span class="const token" data-verso-hover="304">HostState</span> V :=</span>
+<span id="L93">  L.<span class="const token" data-verso-hover="79">foldl</span> (<span class="const token" data-verso-hover="308">updateNode</span> G) s</span>
+<span id="L94"></span>
+<span id="L95"><span class="dc">/-- The vector `p` is quiescent on `L`: no node of `L` can lower its estimate. -/</span></span>
+<span id="L96"><span class="kw">def</span> <span class="const token" data-verso-hover="310">Quiescent</span> (L : <span class="const token" data-verso-hover="78">List</span> V) (p : V → <span class="const token" data-verso-hover="52">ℕ</span>∞) : <span class="kw">Prop</span> := ∀ u ∈ L, p u ≤ <span class="const token" data-verso-hover="307">newEst</span> G p u</span>
+<span id="L97"></span>
+<span id="L98"><span class="dc">/-- Termination measure for Algorithm 4. -/</span></span>
+<span id="L99"><span class="kw">def</span> <span class="const token" data-verso-hover="311">potTerm</span> (x : <span class="const token" data-verso-hover="52">ℕ</span>∞) : <span class="const token" data-verso-hover="50">ℕ</span> := x.<span class="const token" data-verso-hover="273">toNat</span> + <span class="kw">if</span> x = ⊤ <span class="kw">then</span> <span class="nu">1</span> <span class="kw">else</span> <span class="nu">0</span></span>
+<span id="L100"></span>
+<span id="L101"><span class="dc">/-- Termination measure for Algorithm 4: it decreases at every pass that changes something. -/</span></span>
+<span id="L102"><span class="kw">def</span> <span class="const token" data-verso-hover="312">pot</span> (e : V → <span class="const token" data-verso-hover="52">ℕ</span>∞) : <span class="const token" data-verso-hover="50">ℕ</span> := ∑ v, <span class="const token" data-verso-hover="311">potTerm</span> (e v)</span>
+<span id="L103"></span>
+<span id="L104"><span class="kw">theorem</span> <span class="const token" data-verso-hover="313">newEst_le_toNat</span> (e : V → <span class="const token" data-verso-hover="52">ℕ</span>∞) (u : V) : <span class="const token" data-verso-hover="307">newEst</span> G e u ≤ (e u).<span class="const token" data-verso-hover="273">toNat</span> :=</span>
+<span id="L105">  <span class="const token" data-verso-hover="74">computeIndex_le</span> _ _ _</span>
+<span id="L106"></span>
+<span id="L107"><span class="kw">theorem</span> <span class="const token" data-verso-hover="314">potTerm_lt</span> {k : <span class="const token" data-verso-hover="50">ℕ</span>} {x : <span class="const token" data-verso-hover="52">ℕ</span>∞} (hk : k ≤ x.<span class="const token" data-verso-hover="273">toNat</span>) (hlt : (k : <span class="const token" data-verso-hover="52">ℕ</span>∞) &lt; x) :</span>
+<span id="L108">    <span class="const token" data-verso-hover="311">potTerm</span> (k : <span class="const token" data-verso-hover="52">ℕ</span>∞) &lt; <span class="const token" data-verso-hover="311">potTerm</span> x := <span class="kw">by</span></span>
+<span id="L109">  <span class="kw">induction</span> x <span class="kw">using</span> <span class="const token" data-verso-hover="315">ENat.recTopCoe</span> <span class="kw">with</span></span>
+<span id="L110">  | top =&gt; <span class="kw">simp</span> only [<span class="const token" data-verso-hover="316">ENat.toNat_top</span>, <span class="const token" data-verso-hover="317">nonpos_iff_eq_zero</span>] <span class="kw">at</span> hk; <span class="kw">subst</span> hk; <span class="kw">simp</span> [<span class="const token" data-verso-hover="311">potTerm</span>]</span>
+<span id="L111">  | coe n =&gt; <span class="kw">simp</span> only [<span class="const token" data-verso-hover="311">potTerm</span>, <span class="const token" data-verso-hover="279">ENat.toNat_natCast</span>, <span class="const token" data-verso-hover="281">ENat.natCast_ne_top</span>, ↓<span class="const token" data-verso-hover="132">reduceIte</span>,</span>
+<span id="L112">      <span class="const token" data-verso-hover="318">Nat.cast_lt</span>, <span class="const token" data-verso-hover="319">add_zero</span>] <span class="kw">at</span> hk hlt ⊢; <span class="kw">omega</span></span>
+<span id="L113"></span>
+<span id="L114"><span class="kw">theorem</span> <span class="const token" data-verso-hover="320">updateNode_eq_or_lt</span> (s : <span class="const token" data-verso-hover="304">HostState</span> V) (u : V) :</span>
+<span id="L115">    <span class="const token" data-verso-hover="308">updateNode</span> G s u = s ∨ <span class="const token" data-verso-hover="312">pot</span> (<span class="const token" data-verso-hover="308">updateNode</span> G s u).<span class="const token" data-verso-hover="305">est</span> &lt; <span class="const token" data-verso-hover="312">pot</span> s.<span class="const token" data-verso-hover="305">est</span> := <span class="kw">by</span></span>
+<span id="L116">  <span class="kw">unfold</span> <span class="const token" data-verso-hover="308">updateNode</span></span>
+<span id="L117">  <span class="kw">split_ifs</span> <span class="kw">with</span> hlt</span>
+<span id="L118">  · <span class="kw">right</span></span>
+<span id="L119">    <span class="kw">show</span> ∑ v, <span class="const token" data-verso-hover="311">potTerm</span> (<span class="const token" data-verso-hover="61">Function.update</span> s.<span class="const token" data-verso-hover="305">est</span> u (<span class="const token" data-verso-hover="307">newEst</span> G s.<span class="const token" data-verso-hover="305">est</span> u : <span class="const token" data-verso-hover="52">ℕ</span>∞) v) &lt; ∑ v, <span class="const token" data-verso-hover="311">potTerm</span> (s.<span class="const token" data-verso-hover="305">est</span> v)</span>
+<span id="L120">    <span class="kw">have</span> key := <span class="const token" data-verso-hover="314">potTerm_lt</span> (<span class="const token" data-verso-hover="313">newEst_le_toNat</span> G s.<span class="const token" data-verso-hover="305">est</span> u) hlt</span>
+<span id="L121">    <span class="kw">apply</span> <span class="const token" data-verso-hover="321">Finset.sum_lt_sum</span></span>
+<span id="L122">    · <span class="kw">intro</span> v _</span>
+<span id="L123">      <span class="kw">rcases</span> <span class="const token" data-verso-hover="322">eq_or_ne</span> v u <span class="kw">with</span> <span class="kw">rfl</span> | hne</span>
+<span id="L124">      · <span class="kw">rw</span> [<span class="const token" data-verso-hover="133">Function.update_self</span>]; <span class="kw">exact</span> key.<span class="const token" data-verso-hover="65">le</span></span>
+<span id="L125">      · <span class="kw">rw</span> [<span class="const token" data-verso-hover="323">Function.update_of_ne</span> hne]</span>
+<span id="L126">    · <span class="kw">exact</span> ⟨u, <span class="const token" data-verso-hover="156">mem_univ</span> _, <span class="kw">by</span> <span class="kw">rw</span> [<span class="const token" data-verso-hover="133">Function.update_self</span>]; <span class="kw">exact</span> key⟩</span>
+<span id="L127">  · <span class="kw">left</span>; <span class="kw">rfl</span></span>
+<span id="L128"></span>
+<span id="L129"><span class="kw">theorem</span> <span class="const token" data-verso-hover="324">updateNode_est_le</span> (s : <span class="const token" data-verso-hover="304">HostState</span> V) (u v : V) : (<span class="const token" data-verso-hover="308">updateNode</span> G s u).<span class="const token" data-verso-hover="305">est</span> v ≤ s.<span class="const token" data-verso-hover="305">est</span> v := <span class="kw">by</span></span>
+<span id="L130">  <span class="kw">unfold</span> <span class="const token" data-verso-hover="308">updateNode</span></span>
+<span id="L131">  <span class="kw">split_ifs</span> <span class="kw">with</span> hlt</span>
+<span id="L132">  · <span class="kw">rcases</span> <span class="const token" data-verso-hover="322">eq_or_ne</span> v u <span class="kw">with</span> <span class="kw">rfl</span> | hne</span>
+<span id="L133">    · <span class="kw">simpa</span> <span class="kw">using</span> hlt.<span class="const token" data-verso-hover="65">le</span></span>
+<span id="L134">    · <span class="kw">simp</span> [<span class="const token" data-verso-hover="323">Function.update_of_ne</span> hne]</span>
+<span id="L135">  · <span class="kw">exact</span> <span class="const token" data-verso-hover="66">le_rfl</span></span>
+<span id="L136"></span>
+<span id="L137"><span class="kw">theorem</span> <span class="const token" data-verso-hover="325">updateNode_est_of_ne</span> (s : <span class="const token" data-verso-hover="304">HostState</span> V) {u v : V} (hne : v ≠ u) :</span>
+<span id="L138">    (<span class="const token" data-verso-hover="308">updateNode</span> G s u).<span class="const token" data-verso-hover="305">est</span> v = s.<span class="const token" data-verso-hover="305">est</span> v := <span class="kw">by</span></span>
+<span id="L139">  <span class="kw">unfold</span> <span class="const token" data-verso-hover="308">updateNode</span>; <span class="kw">split_ifs</span> &lt;;&gt; <span class="kw">simp</span> [<span class="const token" data-verso-hover="323">Function.update_of_ne</span> hne]</span>
+<span id="L140"></span>
+<span id="L141"><span class="kw">theorem</span> <span class="const token" data-verso-hover="326">updateNode_changed</span> (s : <span class="const token" data-verso-hover="304">HostState</span> V) (u v : V) :</span>
+<span id="L142">    (<span class="const token" data-verso-hover="308">updateNode</span> G s u).<span class="const token" data-verso-hover="306">changed</span> v =</span>
+<span id="L143">      (s.<span class="const token" data-verso-hover="306">changed</span> v || <span class="const token" data-verso-hover="327">decide</span> ((<span class="const token" data-verso-hover="308">updateNode</span> G s u).<span class="const token" data-verso-hover="305">est</span> v ≠ s.<span class="const token" data-verso-hover="305">est</span> v)) := <span class="kw">by</span></span>
+<span id="L144">  <span class="kw">unfold</span> <span class="const token" data-verso-hover="308">updateNode</span></span>
+<span id="L145">  <span class="kw">split_ifs</span> <span class="kw">with</span> hlt</span>
+<span id="L146">  · <span class="kw">rcases</span> <span class="const token" data-verso-hover="322">eq_or_ne</span> v u <span class="kw">with</span> <span class="kw">rfl</span> | hne</span>
+<span id="L147">    · <span class="kw">simp</span> [hlt.<span class="const token" data-verso-hover="328">ne</span>]</span>
+<span id="L148">    · <span class="kw">simp</span> [<span class="const token" data-verso-hover="323">Function.update_of_ne</span> hne]</span>
+<span id="L149">  · <span class="kw">simp</span></span>
+<span id="L150"></span>
+<span id="L151"><span class="kw">theorem</span> <span class="const token" data-verso-hover="329">updateNode_eq_self_iff</span> (s : <span class="const token" data-verso-hover="304">HostState</span> V) (u : V) :</span>
+<span id="L152">    <span class="const token" data-verso-hover="308">updateNode</span> G s u = s ↔ s.<span class="const token" data-verso-hover="305">est</span> u ≤ <span class="const token" data-verso-hover="307">newEst</span> G s.<span class="const token" data-verso-hover="305">est</span> u := <span class="kw">by</span></span>
+<span id="L153">  <span class="kw">unfold</span> <span class="const token" data-verso-hover="308">updateNode</span></span>
+<span id="L154">  <span class="kw">split_ifs</span> <span class="kw">with</span> hlt</span>
+<span id="L155">  · <span class="kw">refine</span> <span class="const token" data-verso-hover="330">iff_of_false</span> (<span class="kw">fun</span> h =&gt; ?_) (<span class="const token" data-verso-hover="286">not_le</span>.<span class="const token" data-verso-hover="137">2</span> hlt)</span>
+<span id="L156">    <span class="kw">have</span> := <span class="const token" data-verso-hover="331">congrArg</span> (<span class="kw">fun</span> t : <span class="const token" data-verso-hover="304">HostState</span> V =&gt; t.<span class="const token" data-verso-hover="305">est</span> u) h</span>
+<span id="L157">    <span class="kw">simp</span> only [<span class="const token" data-verso-hover="133">Function.update_self</span>] <span class="kw">at</span> this</span>
+<span id="L158">    <span class="kw">exact</span> hlt.<span class="const token" data-verso-hover="328">ne</span> this</span>
+<span id="L159">  · <span class="kw">exact</span> <span class="const token" data-verso-hover="332">iff_of_true</span> <span class="const token" data-verso-hover="70">rfl</span> (<span class="const token" data-verso-hover="72">not_lt</span>.<span class="const token" data-verso-hover="73">1</span> hlt)</span>
+<span id="L160"></span>
+<span id="L161"><span class="kw">theorem</span> <span class="const token" data-verso-hover="333">updateNode_eq_of_est_eq</span> (s : <span class="const token" data-verso-hover="304">HostState</span> V) (u : V) (h : (<span class="const token" data-verso-hover="308">updateNode</span> G s u).<span class="const token" data-verso-hover="305">est</span> = s.<span class="const token" data-verso-hover="305">est</span>) :</span>
+<span id="L162">    <span class="const token" data-verso-hover="308">updateNode</span> G s u = s := <span class="kw">by</span></span>
+<span id="L163">  <span class="kw">by_contra</span> hne</span>
+<span id="L164">  <span class="kw">have</span> hlt := <span class="const token" data-verso-hover="286">not_le</span>.<span class="const token" data-verso-hover="73">1</span> ((<span class="const token" data-verso-hover="329">updateNode_eq_self_iff</span> G s u).<span class="const token" data-verso-hover="334">not</span>.<span class="const token" data-verso-hover="73">1</span> hne)</span>
+<span id="L165">  <span class="kw">have</span> := <span class="const token" data-verso-hover="335">congrFun</span> h u</span>
+<span id="L166">  <span class="kw">unfold</span> <span class="const token" data-verso-hover="308">updateNode</span> <span class="kw">at</span> this</span>
+<span id="L167">  <span class="kw">simp</span> only [hlt, ↓<span class="const token" data-verso-hover="132">reduceIte</span>, <span class="const token" data-verso-hover="133">Function.update_self</span>] <span class="kw">at</span> this</span>
+<span id="L168">  <span class="kw">exact</span> hlt.<span class="const token" data-verso-hover="328">ne</span> this</span>
+<span id="L169"></span>
+<span id="L170"><span class="kw">theorem</span> <span class="const token" data-verso-hover="336">updateNode_max</span> {p : V → <span class="const token" data-verso-hover="52">ℕ</span>∞} {s : <span class="const token" data-verso-hover="304">HostState</span> V} {u : V} (hp : ∀ v, p v ≤ s.<span class="const token" data-verso-hover="305">est</span> v)</span>
+<span id="L171">    (hfin : s.<span class="const token" data-verso-hover="305">est</span> u ≠ ⊤) (hq : p u ≤ <span class="const token" data-verso-hover="307">newEst</span> G p u) (v : V) : p v ≤ (<span class="const token" data-verso-hover="308">updateNode</span> G s u).<span class="const token" data-verso-hover="305">est</span> v := <span class="kw">by</span></span>
+<span id="L172">  <span class="kw">unfold</span> <span class="const token" data-verso-hover="308">updateNode</span></span>
+<span id="L173">  <span class="kw">split_ifs</span> <span class="kw">with</span> hlt</span>
+<span id="L174">  · <span class="kw">rcases</span> <span class="const token" data-verso-hover="322">eq_or_ne</span> v u <span class="kw">with</span> <span class="kw">rfl</span> | hne</span>
+<span id="L175">    · <span class="kw">simp</span> only [<span class="const token" data-verso-hover="133">Function.update_self</span>]</span>
+<span id="L176">      <span class="kw">exact</span> hq.<span class="const token" data-verso-hover="83">trans</span> (<span class="const token" data-verso-hover="263">Nat.cast_le</span>.<span class="const token" data-verso-hover="137">2</span></span>
+<span id="L177">        (<span class="const token" data-verso-hover="289">computeIndex_mono</span> (<span class="kw">fun</span> w _ =&gt; hp w) (<span class="const token" data-verso-hover="337">ENat.toNat_le_toNat</span> (hp _) hfin)))</span>
+<span id="L178">    · <span class="kw">simp</span> only [<span class="const token" data-verso-hover="323">Function.update_of_ne</span> hne]; <span class="kw">exact</span> hp v</span>
+<span id="L179">  · <span class="kw">exact</span> hp v</span>
+<span id="L180"></span>
+<span id="L181"><span class="dc">/-- Bookkeeping of the `changed` flags along two successive decreases. -/</span></span>
+<span id="L182"><span class="kw">theorem</span> <span class="const token" data-verso-hover="338">changed_trans</span> {c : <span class="const token" data-verso-hover="54">Bool</span>} {a b d : <span class="const token" data-verso-hover="52">ℕ</span>∞} (hab : a ≤ b) (hbd : b ≤ d) :</span>
+<span id="L183">    ((c || <span class="const token" data-verso-hover="327">decide</span> (b ≠ d)) || <span class="const token" data-verso-hover="327">decide</span> (a ≠ b)) = (c || <span class="const token" data-verso-hover="327">decide</span> (a ≠ d)) := <span class="kw">by</span></span>
+<span id="L184">  <span class="kw">by_cases</span> h : b = d</span>
+<span id="L185">  · <span class="kw">subst</span> h; <span class="kw">simp</span></span>
+<span id="L186">  · <span class="kw">have</span> : a ≠ d := <span class="kw">fun</span> h' =&gt; h (<span class="const token" data-verso-hover="71">le_antisymm</span> hbd (h'.<span class="const token" data-verso-hover="339">symm</span>.<span class="const token" data-verso-hover="259">le</span>.<span class="const token" data-verso-hover="83">trans</span> hab))</span>
+<span id="L187">    <span class="kw">simp</span> [h, this]</span>
+<span id="L188"></span>
+<span id="L189"><span class="dc">/-! #### One pass -/</span></span>
+<span id="L190"></span>
+<span id="L191">@[<span class="kw">simp</span>] <span class="kw">theorem</span> <span class="const token" data-verso-hover="340">improvePass_nil</span> (s : <span class="const token" data-verso-hover="304">HostState</span> V) : <span class="const token" data-verso-hover="309">improvePass</span> G [] s = s := <span class="const token" data-verso-hover="70">rfl</span></span>
+<span id="L192"></span>
+<span id="L193">@[<span class="kw">simp</span>] <span class="kw">theorem</span> <span class="const token" data-verso-hover="341">improvePass_cons</span> (u : V) (L : <span class="const token" data-verso-hover="78">List</span> V) (s : <span class="const token" data-verso-hover="304">HostState</span> V) :</span>
+<span id="L194">    <span class="const token" data-verso-hover="309">improvePass</span> G (u :: L) s = <span class="const token" data-verso-hover="309">improvePass</span> G L (<span class="const token" data-verso-hover="308">updateNode</span> G s u) := <span class="const token" data-verso-hover="70">rfl</span></span>
+<span id="L195"></span>
+<span id="L196"><span class="kw">theorem</span> <span class="const token" data-verso-hover="342">improvePass_eq_or_lt</span> (L : <span class="const token" data-verso-hover="78">List</span> V) (s : <span class="const token" data-verso-hover="304">HostState</span> V) :</span>
+<span id="L197">    <span class="const token" data-verso-hover="309">improvePass</span> G L s = s ∨ <span class="const token" data-verso-hover="312">pot</span> (<span class="const token" data-verso-hover="309">improvePass</span> G L s).<span class="const token" data-verso-hover="305">est</span> &lt; <span class="const token" data-verso-hover="312">pot</span> s.<span class="const token" data-verso-hover="305">est</span> := <span class="kw">by</span></span>
+<span id="L198">  <span class="kw">induction</span> L generalizing s <span class="kw">with</span></span>
+<span id="L199">  | <span class="const token" data-verso-hover="80">nil</span> =&gt; <span class="kw">exact</span> <span class="const token" data-verso-hover="75">Or.inl</span> <span class="const token" data-verso-hover="70">rfl</span></span>
+<span id="L200">  | <span class="const token" data-verso-hover="81">cons</span> u L ih =&gt;</span>
+<span id="L201">    <span class="kw">rw</span> [<span class="const token" data-verso-hover="341">improvePass_cons</span>]</span>
+<span id="L202">    <span class="kw">rcases</span> <span class="const token" data-verso-hover="320">updateNode_eq_or_lt</span> G s u <span class="kw">with</span> h | h</span>
+<span id="L203">    · <span class="kw">rw</span> [h]; <span class="kw">exact</span> ih s</span>
+<span id="L204">    · <span class="kw">rcases</span> ih (<span class="const token" data-verso-hover="308">updateNode</span> G s u) <span class="kw">with</span> h' | h'</span>
+<span id="L205">      · <span class="kw">right</span>; <span class="kw">rw</span> [h']; <span class="kw">exact</span> h</span>
+<span id="L206">      · <span class="kw">exact</span> <span class="const token" data-verso-hover="69">Or.inr</span> (h'.<span class="const token" data-verso-hover="343">trans</span> h)</span>
+<span id="L207"></span>
+<span id="L208"><span class="kw">theorem</span> <span class="const token" data-verso-hover="344">improvePass_est_le</span> (L : <span class="const token" data-verso-hover="78">List</span> V) (s : <span class="const token" data-verso-hover="304">HostState</span> V) (v : V) :</span>
+<span id="L209">    (<span class="const token" data-verso-hover="309">improvePass</span> G L s).<span class="const token" data-verso-hover="305">est</span> v ≤ s.<span class="const token" data-verso-hover="305">est</span> v := <span class="kw">by</span></span>
+<span id="L210">  <span class="kw">induction</span> L generalizing s <span class="kw">with</span></span>
+<span id="L211">  | <span class="const token" data-verso-hover="80">nil</span> =&gt; <span class="kw">exact</span> <span class="const token" data-verso-hover="66">le_rfl</span></span>
+<span id="L212">  | <span class="const token" data-verso-hover="81">cons</span> u L ih =&gt; <span class="kw">exact</span> (ih _).<span class="const token" data-verso-hover="83">trans</span> (<span class="const token" data-verso-hover="324">updateNode_est_le</span> G s u v)</span>
+<span id="L213"></span>
+<span id="L214"><span class="kw">theorem</span> <span class="const token" data-verso-hover="345">improvePass_est_of_not_mem</span> {L : <span class="const token" data-verso-hover="78">List</span> V} {v : V} (hv : v ∉ L) (s : <span class="const token" data-verso-hover="304">HostState</span> V) :</span>
+<span id="L215">    (<span class="const token" data-verso-hover="309">improvePass</span> G L s).<span class="const token" data-verso-hover="305">est</span> v = s.<span class="const token" data-verso-hover="305">est</span> v := <span class="kw">by</span></span>
+<span id="L216">  <span class="kw">induction</span> L generalizing s <span class="kw">with</span></span>
+<span id="L217">  | <span class="const token" data-verso-hover="80">nil</span> =&gt; <span class="kw">rfl</span></span>
+<span id="L218">  | <span class="const token" data-verso-hover="81">cons</span> u L ih =&gt;</span>
+<span id="L219">    <span class="kw">rw</span> [<span class="const token" data-verso-hover="92">List.mem_cons</span>, <span class="const token" data-verso-hover="346">not_or</span>] <span class="kw">at</span> hv</span>
+<span id="L220">    <span class="kw">rw</span> [<span class="const token" data-verso-hover="341">improvePass_cons</span>, ih hv.<span class="const token" data-verso-hover="182">2</span>, <span class="const token" data-verso-hover="325">updateNode_est_of_ne</span> G s hv.<span class="const token" data-verso-hover="186">1</span>]</span>
+<span id="L221"></span>
+<span id="L222"><span class="kw">theorem</span> <span class="const token" data-verso-hover="347">improvePass_max</span> {p : V → <span class="const token" data-verso-hover="52">ℕ</span>∞} (L : <span class="const token" data-verso-hover="78">List</span> V) (hq : <span class="const token" data-verso-hover="310">Quiescent</span> G L p) (s : <span class="const token" data-verso-hover="304">HostState</span> V)</span>
+<span id="L223">    (hp : ∀ v, p v ≤ s.<span class="const token" data-verso-hover="305">est</span> v) (hfin : ∀ u ∈ L, s.<span class="const token" data-verso-hover="305">est</span> u ≠ ⊤) (v : V) :</span>
+<span id="L224">    p v ≤ (<span class="const token" data-verso-hover="309">improvePass</span> G L s).<span class="const token" data-verso-hover="305">est</span> v := <span class="kw">by</span></span>
+<span id="L225">  <span class="kw">induction</span> L generalizing s <span class="kw">with</span></span>
+<span id="L226">  | <span class="const token" data-verso-hover="80">nil</span> =&gt; <span class="kw">exact</span> hp v</span>
+<span id="L227">  | <span class="const token" data-verso-hover="81">cons</span> u L ih =&gt;</span>
+<span id="L228">    <span class="kw">exact</span> ih (<span class="kw">fun</span> w hw =&gt; hq w (<span class="const token" data-verso-hover="87">List.mem_cons_of_mem</span> _ hw)) _</span>
+<span id="L229">      (<span class="const token" data-verso-hover="336">updateNode_max</span> G hp (hfin u (<span class="kw">by</span> <span class="kw">simp</span>)) (hq u (<span class="kw">by</span> <span class="kw">simp</span>)))</span>
+<span id="L230">      (<span class="kw">fun</span> w hw =&gt; <span class="const token" data-verso-hover="280">ne_top_of_le_ne_top</span> (hfin w (<span class="const token" data-verso-hover="87">List.mem_cons_of_mem</span> _ hw))</span>
+<span id="L231">        (<span class="const token" data-verso-hover="324">updateNode_est_le</span> G s u w))</span>
+<span id="L232"></span>
+<span id="L233"><span class="kw">theorem</span> <span class="const token" data-verso-hover="348">improvePass_changed</span> (L : <span class="const token" data-verso-hover="78">List</span> V) (s : <span class="const token" data-verso-hover="304">HostState</span> V) (v : V) :</span>
+<span id="L234">    (<span class="const token" data-verso-hover="309">improvePass</span> G L s).<span class="const token" data-verso-hover="306">changed</span> v =</span>
+<span id="L235">      (s.<span class="const token" data-verso-hover="306">changed</span> v || <span class="const token" data-verso-hover="327">decide</span> ((<span class="const token" data-verso-hover="309">improvePass</span> G L s).<span class="const token" data-verso-hover="305">est</span> v ≠ s.<span class="const token" data-verso-hover="305">est</span> v)) := <span class="kw">by</span></span>
+<span id="L236">  <span class="kw">induction</span> L generalizing s <span class="kw">with</span></span>
+<span id="L237">  | <span class="const token" data-verso-hover="80">nil</span> =&gt; <span class="kw">simp</span></span>
+<span id="L238">  | <span class="const token" data-verso-hover="81">cons</span> u L ih =&gt;</span>
+<span id="L239">    <span class="kw">rw</span> [<span class="const token" data-verso-hover="341">improvePass_cons</span>, ih, <span class="const token" data-verso-hover="326">updateNode_changed</span>]</span>
+<span id="L240">    <span class="kw">exact</span> <span class="const token" data-verso-hover="338">changed_trans</span> (<span class="const token" data-verso-hover="344">improvePass_est_le</span> G L _ v) (<span class="const token" data-verso-hover="324">updateNode_est_le</span> G s u v)</span>
+<span id="L241"></span>
+<span id="L242"><span class="kw">theorem</span> <span class="const token" data-verso-hover="349">improvePass_quiescent</span> (L : <span class="const token" data-verso-hover="78">List</span> V) (s : <span class="const token" data-verso-hover="304">HostState</span> V) (h : <span class="const token" data-verso-hover="309">improvePass</span> G L s = s) :</span>
+<span id="L243">    <span class="const token" data-verso-hover="310">Quiescent</span> G L s.<span class="const token" data-verso-hover="305">est</span> := <span class="kw">by</span></span>
+<span id="L244">  <span class="kw">induction</span> L generalizing s <span class="kw">with</span></span>
+<span id="L245">  | <span class="const token" data-verso-hover="80">nil</span> =&gt; <span class="kw">intro</span> u hu; <span class="kw">simp</span> <span class="kw">at</span> hu</span>
+<span id="L246">  | <span class="const token" data-verso-hover="81">cons</span> u L ih =&gt;</span>
+<span id="L247">    <span class="kw">rw</span> [<span class="const token" data-verso-hover="341">improvePass_cons</span>] <span class="kw">at</span> h</span>
+<span id="L248">    <span class="kw">have</span> hs : <span class="const token" data-verso-hover="308">updateNode</span> G s u = s := <span class="kw">by</span></span>
+<span id="L249">      <span class="kw">apply</span> <span class="const token" data-verso-hover="333">updateNode_eq_of_est_eq</span></span>
+<span id="L250">      <span class="kw">funext</span> v</span>
+<span id="L251">      <span class="kw">refine</span> <span class="const token" data-verso-hover="71">le_antisymm</span> (<span class="const token" data-verso-hover="324">updateNode_est_le</span> G s u v) ?_</span>
+<span id="L252">      <span class="kw">calc</span> s.<span class="const token" data-verso-hover="305">est</span> v = (<span class="const token" data-verso-hover="309">improvePass</span> G L (<span class="const token" data-verso-hover="308">updateNode</span> G s u)).<span class="const token" data-verso-hover="305">est</span> v := <span class="kw">by</span> <span class="kw">rw</span> [h]</span>
+<span id="L253">        _ ≤ _ := <span class="const token" data-verso-hover="344">improvePass_est_le</span> G L _ v</span>
+<span id="L254">    <span class="kw">rw</span> [hs] <span class="kw">at</span> h</span>
+<span id="L255">    <span class="kw">intro</span> w hw</span>
+<span id="L256">    <span class="kw">rcases</span> <span class="const token" data-verso-hover="92">List.mem_cons</span>.<span class="const token" data-verso-hover="73">1</span> hw <span class="kw">with</span> hw' | hw'</span>
+<span id="L257">    · <span class="kw">rw</span> [hw']; <span class="kw">exact</span> (<span class="const token" data-verso-hover="329">updateNode_eq_self_iff</span> G s u).<span class="const token" data-verso-hover="73">1</span> hs</span>
+<span id="L258">    · <span class="kw">exact</span> ih s h w hw'</span>
+<span id="L259"></span>
+<span id="L260"><span class="kw">theorem</span> <span class="const token" data-verso-hover="350">improvePass_of_quiescent</span> (L : <span class="const token" data-verso-hover="78">List</span> V) (s : <span class="const token" data-verso-hover="304">HostState</span> V) (h : <span class="const token" data-verso-hover="310">Quiescent</span> G L s.<span class="const token" data-verso-hover="305">est</span>) :</span>
+<span id="L261">    <span class="const token" data-verso-hover="309">improvePass</span> G L s = s := <span class="kw">by</span></span>
+<span id="L262">  <span class="kw">induction</span> L <span class="kw">with</span></span>
+<span id="L263">  | <span class="const token" data-verso-hover="80">nil</span> =&gt; <span class="kw">rfl</span></span>
+<span id="L264">  | <span class="const token" data-verso-hover="81">cons</span> u L ih =&gt;</span>
+<span id="L265">    <span class="kw">rw</span> [<span class="const token" data-verso-hover="341">improvePass_cons</span>, (<span class="const token" data-verso-hover="329">updateNode_eq_self_iff</span> G s u).<span class="const token" data-verso-hover="137">2</span> (h u (<span class="kw">by</span> <span class="kw">simp</span>))]</span>
+<span id="L266">    <span class="kw">exact</span> ih <span class="kw">fun</span> w hw =&gt; h w (<span class="kw">by</span> <span class="kw">simp</span> [hw])</span>
+<span id="L267"></span>
+<span id="L268"><span class="dc">/-! #### Algorithm 4: `improveEstimate` -/</span></span>
+<span id="L269"></span>
+<span id="L270"><span class="kw">open</span> Classical <span class="kw">in</span></span>
+<span id="L271"><span class="dc">/-- **Algorithm 4**, `improveEstimate`: repeat passes over the own nodes `L` (`again ← true` iff a</span></span>
+<span id="L272"><span class="dc">pass changed something, i.e. iff the state changed) until a pass changes nothing. Terminates</span></span>
+<span id="L273"><span class="dc">because `pot` decreases at every changing pass. -/</span></span>
+<span id="L274"><span class="kw">noncomputable</span> <span class="kw">def</span> <span class="const token" data-verso-hover="13">improveEstimate</span> (L : <span class="const token" data-verso-hover="78">List</span> V) (s : <span class="const token" data-verso-hover="304">HostState</span> V) : <span class="const token" data-verso-hover="304">HostState</span> V :=</span>
+<span id="L275">  <span class="kw">if</span> _h : <span class="const token" data-verso-hover="309">improvePass</span> G L s = s <span class="kw">then</span> s <span class="kw">else</span> <span class="const token" data-verso-hover="13">improveEstimate</span> L (<span class="const token" data-verso-hover="309">improvePass</span> G L s)</span>
+<span id="L276"><span class="kw">termination_by</span> <span class="const token" data-verso-hover="312">pot</span> s.<span class="const token" data-verso-hover="305">est</span></span>
+<span id="L277"><span class="kw">decreasing_by</span> <span class="kw">exact</span> (<span class="const token" data-verso-hover="342">improvePass_eq_or_lt</span> G L s).<span class="const token" data-verso-hover="351">resolve_left</span> _h</span>
+<span id="L278"></span>
+<span id="L279"><span class="kw">theorem</span> <span class="const token" data-verso-hover="352">improveEstimate_of_eq</span> {L : <span class="const token" data-verso-hover="78">List</span> V} {s : <span class="const token" data-verso-hover="304">HostState</span> V} (h : <span class="const token" data-verso-hover="309">improvePass</span> G L s = s) :</span>
+<span id="L280">    <span class="const token" data-verso-hover="13">improveEstimate</span> G L s = s := <span class="kw">by</span></span>
+<span id="L281">  <span class="kw">rw</span> [<span class="const token" data-verso-hover="13">improveEstimate</span>]; <span class="kw">simp</span> [h]</span>
+<span id="L282"></span>
+<span id="L283"><span class="kw">theorem</span> <span class="const token" data-verso-hover="353">improveEstimate_of_ne</span> {L : <span class="const token" data-verso-hover="78">List</span> V} {s : <span class="const token" data-verso-hover="304">HostState</span> V} (h : <span class="const token" data-verso-hover="309">improvePass</span> G L s ≠ s) :</span>
+<span id="L284">    <span class="const token" data-verso-hover="13">improveEstimate</span> G L s = <span class="const token" data-verso-hover="13">improveEstimate</span> G L (<span class="const token" data-verso-hover="309">improvePass</span> G L s) := <span class="kw">by</span></span>
+<span id="L285">  <span class="kw">rw</span> [<span class="const token" data-verso-hover="13">improveEstimate</span>]; <span class="kw">simp</span> [h]</span>
+<span id="L286"></span>
+<span id="L287"><span class="dc">/-- Induction principle following the loop of Algorithm 4. -/</span></span>
+<span id="L288"><span class="kw">theorem</span> <span class="const token" data-verso-hover="354">improveEstimate_induction</span> (L : <span class="const token" data-verso-hover="78">List</span> V) {motive : <span class="const token" data-verso-hover="304">HostState</span> V → <span class="kw">Prop</span>}</span>
+<span id="L289">    (base : ∀ s, <span class="const token" data-verso-hover="309">improvePass</span> G L s = s → motive s)</span>
+<span id="L290">    (step : ∀ s, <span class="const token" data-verso-hover="309">improvePass</span> G L s ≠ s → motive (<span class="const token" data-verso-hover="309">improvePass</span> G L s) → motive s)</span>
+<span id="L291">    (s : <span class="const token" data-verso-hover="304">HostState</span> V) : motive s := <span class="kw">by</span></span>
+<span id="L292">  <span class="kw">induction</span> hn : <span class="const token" data-verso-hover="312">pot</span> s.<span class="const token" data-verso-hover="305">est</span> <span class="kw">using</span> <span class="const token" data-verso-hover="355">Nat.strong_induction_on</span> generalizing s <span class="kw">with</span></span>
+<span id="L293">  | _ n ih =&gt;</span>
+<span id="L294">    <span class="kw">by_cases</span> h : <span class="const token" data-verso-hover="309">improvePass</span> G L s = s</span>
+<span id="L295">    · <span class="kw">exact</span> base s h</span>
+<span id="L296">    · <span class="kw">exact</span> step s h (ih _ (hn ▸ (<span class="const token" data-verso-hover="342">improvePass_eq_or_lt</span> G L s).<span class="const token" data-verso-hover="351">resolve_left</span> h) _ <span class="const token" data-verso-hover="70">rfl</span>)</span>
+<span id="L297"></span>
+<span id="L298"><span class="dc">/-- **Termination of Algorithm 4**: the loop stops at a state where a further pass changes</span></span>
+<span id="L299"><span class="dc">nothing. -/</span></span>
+<span id="L300"><span class="kw">theorem</span> <span class="const token" data-verso-hover="356">improvePass_improveEstimate</span> (L : <span class="const token" data-verso-hover="78">List</span> V) (s : <span class="const token" data-verso-hover="304">HostState</span> V) :</span>
+<span id="L301">    <span class="const token" data-verso-hover="309">improvePass</span> G L (<span class="const token" data-verso-hover="13">improveEstimate</span> G L s) = <span class="const token" data-verso-hover="13">improveEstimate</span> G L s := <span class="kw">by</span></span>
+<span id="L302">  <span class="kw">refine</span> <span class="const token" data-verso-hover="354">improveEstimate_induction</span> G L (motive := <span class="kw">fun</span> s =&gt;</span>
+<span id="L303">    <span class="const token" data-verso-hover="309">improvePass</span> G L (<span class="const token" data-verso-hover="13">improveEstimate</span> G L s) = <span class="const token" data-verso-hover="13">improveEstimate</span> G L s) ?_ ?_ s</span>
+<span id="L304">  · <span class="kw">intro</span> s h; <span class="kw">rw</span> [<span class="const token" data-verso-hover="352">improveEstimate_of_eq</span> G h, h]</span>
+<span id="L305">  · <span class="kw">intro</span> s h ih; <span class="kw">rw</span> [<span class="const token" data-verso-hover="353">improveEstimate_of_ne</span> G h]; <span class="kw">exact</span> ih</span>
+<span id="L306"></span>
+<span id="L307"><span class="kw">theorem</span> <span class="const token" data-verso-hover="357">improveEstimate_quiescent</span> (L : <span class="const token" data-verso-hover="78">List</span> V) (s : <span class="const token" data-verso-hover="304">HostState</span> V) :</span>
+<span id="L308">    <span class="const token" data-verso-hover="310">Quiescent</span> G L (<span class="const token" data-verso-hover="13">improveEstimate</span> G L s).<span class="const token" data-verso-hover="305">est</span> :=</span>
+<span id="L309">  <span class="const token" data-verso-hover="349">improvePass_quiescent</span> G L _ (<span class="const token" data-verso-hover="356">improvePass_improveEstimate</span> G L s)</span>
+<span id="L310"></span>
+<span id="L311"><span class="kw">theorem</span> <span class="const token" data-verso-hover="358">improveEstimate_est_le</span> (L : <span class="const token" data-verso-hover="78">List</span> V) (s : <span class="const token" data-verso-hover="304">HostState</span> V) (v : V) :</span>
+<span id="L312">    (<span class="const token" data-verso-hover="13">improveEstimate</span> G L s).<span class="const token" data-verso-hover="305">est</span> v ≤ s.<span class="const token" data-verso-hover="305">est</span> v := <span class="kw">by</span></span>
+<span id="L313">  <span class="kw">refine</span> <span class="const token" data-verso-hover="354">improveEstimate_induction</span> G L</span>
+<span id="L314">    (motive := <span class="kw">fun</span> s =&gt; (<span class="const token" data-verso-hover="13">improveEstimate</span> G L s).<span class="const token" data-verso-hover="305">est</span> v ≤ s.<span class="const token" data-verso-hover="305">est</span> v) ?_ ?_ s</span>
+<span id="L315">  · <span class="kw">intro</span> s h; <span class="kw">rw</span> [<span class="const token" data-verso-hover="352">improveEstimate_of_eq</span> G h]</span>
+<span id="L316">  · <span class="kw">intro</span> s h ih; <span class="kw">rw</span> [<span class="const token" data-verso-hover="353">improveEstimate_of_ne</span> G h]; <span class="kw">exact</span> ih.<span class="const token" data-verso-hover="83">trans</span> (<span class="const token" data-verso-hover="344">improvePass_est_le</span> G L s v)</span>
+<span id="L317"></span>
+<span id="L318"><span class="kw">theorem</span> <span class="const token" data-verso-hover="359">improveEstimate_est_of_not_mem</span> {L : <span class="const token" data-verso-hover="78">List</span> V} {v : V} (hv : v ∉ L) (s : <span class="const token" data-verso-hover="304">HostState</span> V) :</span>
+<span id="L319">    (<span class="const token" data-verso-hover="13">improveEstimate</span> G L s).<span class="const token" data-verso-hover="305">est</span> v = s.<span class="const token" data-verso-hover="305">est</span> v := <span class="kw">by</span></span>
+<span id="L320">  <span class="kw">refine</span> <span class="const token" data-verso-hover="354">improveEstimate_induction</span> G L</span>
+<span id="L321">    (motive := <span class="kw">fun</span> s =&gt; (<span class="const token" data-verso-hover="13">improveEstimate</span> G L s).<span class="const token" data-verso-hover="305">est</span> v = s.<span class="const token" data-verso-hover="305">est</span> v) ?_ ?_ s</span>
+<span id="L322">  · <span class="kw">intro</span> s h; <span class="kw">rw</span> [<span class="const token" data-verso-hover="352">improveEstimate_of_eq</span> G h]</span>
+<span id="L323">  · <span class="kw">intro</span> s h ih; <span class="kw">rw</span> [<span class="const token" data-verso-hover="353">improveEstimate_of_ne</span> G h, ih, <span class="const token" data-verso-hover="345">improvePass_est_of_not_mem</span> G hv]</span>
+<span id="L324"></span>
+<span id="L325"><span class="kw">theorem</span> <span class="const token" data-verso-hover="360">improveEstimate_max</span> {L : <span class="const token" data-verso-hover="78">List</span> V} {p : V → <span class="const token" data-verso-hover="52">ℕ</span>∞} (hq : <span class="const token" data-verso-hover="310">Quiescent</span> G L p) (s : <span class="const token" data-verso-hover="304">HostState</span> V)</span>
+<span id="L326">    (hp : ∀ v, p v ≤ s.<span class="const token" data-verso-hover="305">est</span> v) (hfin : ∀ u ∈ L, s.<span class="const token" data-verso-hover="305">est</span> u ≠ ⊤) (v : V) :</span>
+<span id="L327">    p v ≤ (<span class="const token" data-verso-hover="13">improveEstimate</span> G L s).<span class="const token" data-verso-hover="305">est</span> v := <span class="kw">by</span></span>
+<span id="L328">  <span class="kw">refine</span> <span class="const token" data-verso-hover="354">improveEstimate_induction</span> G L (motive := <span class="kw">fun</span> s =&gt; (∀ v, p v ≤ s.<span class="const token" data-verso-hover="305">est</span> v) →</span>
+<span id="L329">    (∀ u ∈ L, s.<span class="const token" data-verso-hover="305">est</span> u ≠ ⊤) → p v ≤ (<span class="const token" data-verso-hover="13">improveEstimate</span> G L s).<span class="const token" data-verso-hover="305">est</span> v) ?_ ?_ s hp hfin</span>
+<span id="L330">  · <span class="kw">intro</span> s h hp _; <span class="kw">rw</span> [<span class="const token" data-verso-hover="352">improveEstimate_of_eq</span> G h]; <span class="kw">exact</span> hp v</span>
+<span id="L331">  · <span class="kw">intro</span> s h ih hp hfin</span>
+<span id="L332">    <span class="kw">rw</span> [<span class="const token" data-verso-hover="353">improveEstimate_of_ne</span> G h]</span>
+<span id="L333">    <span class="kw">exact</span> ih (<span class="const token" data-verso-hover="347">improvePass_max</span> G L hq s hp hfin)</span>
+<span id="L334">      (<span class="kw">fun</span> u hu =&gt; <span class="const token" data-verso-hover="280">ne_top_of_le_ne_top</span> (hfin u hu) (<span class="const token" data-verso-hover="344">improvePass_est_le</span> G L s u))</span>
+<span id="L335"></span>
+<span id="L336"><span class="kw">theorem</span> <span class="const token" data-verso-hover="361">improveEstimate_changed</span> (L : <span class="const token" data-verso-hover="78">List</span> V) (s : <span class="const token" data-verso-hover="304">HostState</span> V) (v : V) :</span>
+<span id="L337">    (<span class="const token" data-verso-hover="13">improveEstimate</span> G L s).<span class="const token" data-verso-hover="306">changed</span> v =</span>
+<span id="L338">      (s.<span class="const token" data-verso-hover="306">changed</span> v || <span class="const token" data-verso-hover="327">decide</span> ((<span class="const token" data-verso-hover="13">improveEstimate</span> G L s).<span class="const token" data-verso-hover="305">est</span> v ≠ s.<span class="const token" data-verso-hover="305">est</span> v)) := <span class="kw">by</span></span>
+<span id="L339">  <span class="kw">refine</span> <span class="const token" data-verso-hover="354">improveEstimate_induction</span> G L (motive := <span class="kw">fun</span> s =&gt; (<span class="const token" data-verso-hover="13">improveEstimate</span> G L s).<span class="const token" data-verso-hover="306">changed</span> v =</span>
+<span id="L340">      (s.<span class="const token" data-verso-hover="306">changed</span> v || <span class="const token" data-verso-hover="327">decide</span> ((<span class="const token" data-verso-hover="13">improveEstimate</span> G L s).<span class="const token" data-verso-hover="305">est</span> v ≠ s.<span class="const token" data-verso-hover="305">est</span> v))) ?_ ?_ s</span>
+<span id="L341">  · <span class="kw">intro</span> s h; <span class="kw">rw</span> [<span class="const token" data-verso-hover="352">improveEstimate_of_eq</span> G h]; <span class="kw">simp</span></span>
+<span id="L342">  · <span class="kw">intro</span> s h ih</span>
+<span id="L343">    <span class="kw">rw</span> [<span class="const token" data-verso-hover="353">improveEstimate_of_ne</span> G h, ih, <span class="const token" data-verso-hover="348">improvePass_changed</span>]</span>
+<span id="L344">    <span class="kw">exact</span> <span class="const token" data-verso-hover="338">changed_trans</span> (<span class="const token" data-verso-hover="358">improveEstimate_est_le</span> G L _ v) (<span class="const token" data-verso-hover="344">improvePass_est_le</span> G L s v)</span>
+<span id="L345"></span>
+<span id="L346"><span class="kw">theorem</span> <span class="const token" data-verso-hover="362">improveEstimate_est_ne_top</span> (L : <span class="const token" data-verso-hover="78">List</span> V) {s : <span class="const token" data-verso-hover="304">HostState</span> V} {v : V} (h : s.<span class="const token" data-verso-hover="305">est</span> v ≠ ⊤) :</span>
+<span id="L347">    (<span class="const token" data-verso-hover="13">improveEstimate</span> G L s).<span class="const token" data-verso-hover="305">est</span> v ≠ ⊤ :=</span>
+<span id="L348">  <span class="const token" data-verso-hover="280">ne_top_of_le_ne_top</span> h (<span class="const token" data-verso-hover="358">improveEstimate_est_le</span> G L s v)</span>
+<span id="L349"></span>
+<span id="L350"><span class="dc">/-- **Characterization of Algorithm 4.** If the own estimates are finite, `improveEstimate`</span></span>
+<span id="L351"><span class="dc">returns the greatest vector below its input that is quiescent on the own nodes (in particular the</span></span>
+<span id="L352"><span class="dc">result does not depend on the order of the passes). -/</span></span>
+<span id="L353"><span class="kw">theorem</span> <span class="const token" data-verso-hover="40">improveEstimate_isGreatest</span> (L : <span class="const token" data-verso-hover="78">List</span> V) (s : <span class="const token" data-verso-hover="304">HostState</span> V) (hfin : ∀ u ∈ L, s.<span class="const token" data-verso-hover="305">est</span> u ≠ ⊤) :</span>
+<span id="L354">    <span class="const token" data-verso-hover="363">IsGreatest</span> {p : V → <span class="const token" data-verso-hover="52">ℕ</span>∞ | p ≤ s.<span class="const token" data-verso-hover="305">est</span> ∧ <span class="const token" data-verso-hover="310">Quiescent</span> G L p} (<span class="const token" data-verso-hover="13">improveEstimate</span> G L s).<span class="const token" data-verso-hover="305">est</span> :=</span>
+<span id="L355">  ⟨⟨<span class="kw">fun</span> v =&gt; <span class="const token" data-verso-hover="358">improveEstimate_est_le</span> G L s v, <span class="const token" data-verso-hover="357">improveEstimate_quiescent</span> G L s⟩,</span>
+<span id="L356">    <span class="kw">fun</span> _ hp v =&gt; <span class="const token" data-verso-hover="360">improveEstimate_max</span> G hp.<span class="const token" data-verso-hover="182">2</span> s hp.<span class="const token" data-verso-hover="186">1</span> hfin v⟩</span>
+<span id="L357"></span>
+<span id="L358"><span class="kw">theorem</span> <span class="const token" data-verso-hover="364">improveEstimate_of_quiescent</span> {L : <span class="const token" data-verso-hover="78">List</span> V} {s : <span class="const token" data-verso-hover="304">HostState</span> V} (h : <span class="const token" data-verso-hover="310">Quiescent</span> G L s.<span class="const token" data-verso-hover="305">est</span>) :</span>
+<span id="L359">    <span class="const token" data-verso-hover="13">improveEstimate</span> G L s = s :=</span>
+<span id="L360">  <span class="const token" data-verso-hover="352">improveEstimate_of_eq</span> G (<span class="const token" data-verso-hover="350">improvePass_of_quiescent</span> G L s h)</span>
+<span id="L361"></span>
+<span id="L362"><span class="kw">theorem</span> <span class="const token" data-verso-hover="365">quiescent_congr</span> {L L' : <span class="const token" data-verso-hover="78">List</span> V} (h : ∀ u, u ∈ L ↔ u ∈ L') {p : V → <span class="const token" data-verso-hover="52">ℕ</span>∞} :</span>
+<span id="L363">    <span class="const token" data-verso-hover="310">Quiescent</span> G L p ↔ <span class="const token" data-verso-hover="310">Quiescent</span> G L' p := <span class="kw">by</span></span>
+<span id="L364">  <span class="kw">simp</span> [<span class="const token" data-verso-hover="310">Quiescent</span>, h]</span>
+<span id="L365"></span>
+<span id="L366"><span class="dc">/-- The result of Algorithm 4 does not depend on the order in which the own nodes are visited. -/</span></span>
+<span id="L367"><span class="kw">theorem</span> <span class="const token" data-verso-hover="366">improveEstimate_congr</span> {L L' : <span class="const token" data-verso-hover="78">List</span> V} (h : ∀ u, u ∈ L ↔ u ∈ L') (s : <span class="const token" data-verso-hover="304">HostState</span> V)</span>
+<span id="L368">    (hfin : ∀ u ∈ L, s.<span class="const token" data-verso-hover="305">est</span> u ≠ ⊤) : <span class="const token" data-verso-hover="13">improveEstimate</span> G L s = <span class="const token" data-verso-hover="13">improveEstimate</span> G L' s := <span class="kw">by</span></span>
+<span id="L369">  <span class="kw">have</span> hfin' : ∀ u ∈ L', s.<span class="const token" data-verso-hover="305">est</span> u ≠ ⊤ := <span class="kw">fun</span> u hu =&gt; hfin u ((h u).<span class="const token" data-verso-hover="137">2</span> hu)</span>
+<span id="L370">  <span class="kw">have</span> hest : (<span class="const token" data-verso-hover="13">improveEstimate</span> G L s).<span class="const token" data-verso-hover="305">est</span> = (<span class="const token" data-verso-hover="13">improveEstimate</span> G L' s).<span class="const token" data-verso-hover="305">est</span> := <span class="const token" data-verso-hover="367">funext</span> <span class="kw">fun</span> v =&gt;</span>
+<span id="L371">    <span class="const token" data-verso-hover="71">le_antisymm</span></span>
+<span id="L372">      (<span class="const token" data-verso-hover="360">improveEstimate_max</span> G ((<span class="const token" data-verso-hover="365">quiescent_congr</span> G h).<span class="const token" data-verso-hover="73">1</span> (<span class="const token" data-verso-hover="357">improveEstimate_quiescent</span> G L s)) s</span>
+<span id="L373">        (<span class="const token" data-verso-hover="358">improveEstimate_est_le</span> G L s) hfin' v)</span>
+<span id="L374">      (<span class="const token" data-verso-hover="360">improveEstimate_max</span> G ((<span class="const token" data-verso-hover="365">quiescent_congr</span> G h).<span class="const token" data-verso-hover="137">2</span> (<span class="const token" data-verso-hover="357">improveEstimate_quiescent</span> G L' s)) s</span>
+<span id="L375">        (<span class="const token" data-verso-hover="358">improveEstimate_est_le</span> G L' s) hfin v)</span>
+<span id="L376">  <span class="kw">exact</span> <span class="const token" data-verso-hover="368">HostState.ext</span> hest (<span class="const token" data-verso-hover="367">funext</span> <span class="kw">fun</span> v =&gt; <span class="kw">by</span></span>
+<span id="L377">    <span class="kw">rw</span> [<span class="const token" data-verso-hover="361">improveEstimate_changed</span>, <span class="const token" data-verso-hover="361">improveEstimate_changed</span>, hest])</span>
+<span id="L378"></span>
+<span id="L379"><span class="dc">/-- The true corenesses are quiescent (Theorem 1). -/</span></span>
+<span id="L380"><span class="kw">theorem</span> <span class="const token" data-verso-hover="369">quiescent_coreness</span> (L : <span class="const token" data-verso-hover="78">List</span> V) : <span class="const token" data-verso-hover="310">Quiescent</span> G L (<span class="kw">fun</span> v =&gt; (<span class="const token" data-verso-hover="11">coreness</span> G v : <span class="const token" data-verso-hover="52">ℕ</span>∞)) := <span class="kw">by</span></span>
+<span id="L381">  <span class="kw">intro</span> u _</span>
+<span id="L382">  <span class="kw">have</span> h := <span class="const token" data-verso-hover="335">congrFun</span> (<span class="const token" data-verso-hover="370">step_coreness</span> (G := G)) u</span>
+<span id="L383">  <span class="kw">simp</span> only [<span class="const token" data-verso-hover="307">newEst</span>, <span class="const token" data-verso-hover="279">ENat.toNat_natCast</span>]</span>
+<span id="L384">  <span class="kw">exact</span> <span class="const token" data-verso-hover="263">Nat.cast_le</span>.<span class="const token" data-verso-hover="137">2</span> h.<span class="const token" data-verso-hover="339">symm</span>.<span class="const token" data-verso-hover="259">le</span></span>
+<span id="L385"></span>
+<span id="L386"><span class="dc">/-! ### Messages -/</span></span>
+<span id="L387"></span>
+<span id="L388"><span class="dc">/-- The value that the set `S` of pairs carries for `v` (`⊤` if `v` does not occur). -/</span></span>
+<span id="L389"><span class="kw">noncomputable</span> <span class="kw">def</span> <span class="const token" data-verso-hover="371">msgVal</span> (S : <span class="const token" data-verso-hover="217">Finset</span> (V × <span class="const token" data-verso-hover="52">ℕ</span>∞)) (v : V) : <span class="const token" data-verso-hover="52">ℕ</span>∞ := (S.<span class="const token" data-verso-hover="221">filter</span> <span class="kw">fun</span> p =&gt; p.<span class="const token" data-verso-hover="60">1</span> = v).<span class="const token" data-verso-hover="372">inf</span> <span class="const token" data-verso-hover="59">Prod.snd</span></span>
+<span id="L390"></span>
+<span id="L391"><span class="dc">/-- `on receive ⟨S⟩: foreach (v, k) ∈ S do if k &lt; est[v] then est[v] ← k` (Algorithm 3). -/</span></span>
+<span id="L392"><span class="kw">noncomputable</span> <span class="kw">def</span> <span class="const token" data-verso-hover="373">receive</span> (S : <span class="const token" data-verso-hover="217">Finset</span> (V × <span class="const token" data-verso-hover="52">ℕ</span>∞)) (s : <span class="const token" data-verso-hover="304">HostState</span> V) : <span class="const token" data-verso-hover="304">HostState</span> V :=</span>
+<span id="L393">  ⟨<span class="kw">fun</span> v =&gt; <span class="const token" data-verso-hover="86">min</span> (s.<span class="const token" data-verso-hover="305">est</span> v) (<span class="const token" data-verso-hover="371">msgVal</span> S v), s.<span class="const token" data-verso-hover="306">changed</span>⟩</span>
+<span id="L394"></span>
+<span id="L395"><span class="kw">theorem</span> <span class="const token" data-verso-hover="374">msgVal_union</span> (S T : <span class="const token" data-verso-hover="217">Finset</span> (V × <span class="const token" data-verso-hover="52">ℕ</span>∞)) (v : V) :</span>
+<span id="L396">    <span class="const token" data-verso-hover="371">msgVal</span> (S ∪ T) v = <span class="const token" data-verso-hover="86">min</span> (<span class="const token" data-verso-hover="371">msgVal</span> S v) (<span class="const token" data-verso-hover="371">msgVal</span> T v) := <span class="kw">by</span></span>
+<span id="L397">  <span class="kw">simp</span> [<span class="const token" data-verso-hover="371">msgVal</span>, <span class="const token" data-verso-hover="375">filter_union</span>, <span class="const token" data-verso-hover="376">inf_union</span>]</span>
+<span id="L398"></span>
+<span id="L399"><span class="kw">theorem</span> <span class="const token" data-verso-hover="377">receive_empty</span> (s : <span class="const token" data-verso-hover="304">HostState</span> V) : <span class="const token" data-verso-hover="373">receive</span> ∅ s = s :=</span>
+<span id="L400">  <span class="const token" data-verso-hover="368">HostState.ext</span> (<span class="const token" data-verso-hover="367">funext</span> <span class="kw">fun</span> v =&gt; <span class="kw">by</span> <span class="kw">simp</span> [<span class="const token" data-verso-hover="373">receive</span>, <span class="const token" data-verso-hover="371">msgVal</span>]) <span class="const token" data-verso-hover="70">rfl</span></span>
+<span id="L401"></span>
+<span id="L402"><span class="kw">theorem</span> <span class="const token" data-verso-hover="378">receive_receive</span> (S T : <span class="const token" data-verso-hover="217">Finset</span> (V × <span class="const token" data-verso-hover="52">ℕ</span>∞)) (s : <span class="const token" data-verso-hover="304">HostState</span> V) :</span>
+<span id="L403">    <span class="const token" data-verso-hover="373">receive</span> T (<span class="const token" data-verso-hover="373">receive</span> S s) = <span class="const token" data-verso-hover="373">receive</span> (S ∪ T) s :=</span>
+<span id="L404">  <span class="const token" data-verso-hover="368">HostState.ext</span> (<span class="const token" data-verso-hover="367">funext</span> <span class="kw">fun</span> v =&gt; <span class="kw">by</span> <span class="kw">simp</span> [<span class="const token" data-verso-hover="373">receive</span>, <span class="const token" data-verso-hover="374">msgVal_union</span>, <span class="const token" data-verso-hover="95">min_assoc</span>]) <span class="const token" data-verso-hover="70">rfl</span></span>
+<span id="L405"></span>
+<span id="L406"><span class="kw">theorem</span> <span class="const token" data-verso-hover="379">msgVal_eq_top</span> {S : <span class="const token" data-verso-hover="217">Finset</span> (V × <span class="const token" data-verso-hover="52">ℕ</span>∞)} {v : V} (hS : ∀ p ∈ S, p.<span class="const token" data-verso-hover="60">1</span> ≠ v) : <span class="const token" data-verso-hover="371">msgVal</span> S v = ⊤ := <span class="kw">by</span></span>
+<span id="L407">  <span class="kw">rw</span> [<span class="const token" data-verso-hover="371">msgVal</span>, <span class="const token" data-verso-hover="380">Finset.inf_eq_top_iff</span>]</span>
+<span id="L408">  <span class="kw">intro</span> p hp</span>
+<span id="L409">  <span class="kw">exact</span> <span class="const token" data-verso-hover="189">absurd</span> (<span class="const token" data-verso-hover="235">mem_filter</span>.<span class="const token" data-verso-hover="73">1</span> hp).<span class="const token" data-verso-hover="182">2</span> (hS p (<span class="const token" data-verso-hover="235">mem_filter</span>.<span class="const token" data-verso-hover="73">1</span> hp).<span class="const token" data-verso-hover="186">1</span>)</span>
+<span id="L410"></span>
+<span id="L411"><span class="kw">theorem</span> <span class="const token" data-verso-hover="381">msgVal_image</span> (A : <span class="const token" data-verso-hover="217">Finset</span> V) (e : V → <span class="const token" data-verso-hover="52">ℕ</span>∞) (v : V) :</span>
+<span id="L412">    <span class="const token" data-verso-hover="371">msgVal</span> (A.<span class="const token" data-verso-hover="382">image</span> <span class="kw">fun</span> u =&gt; (u, e u)) v = <span class="kw">if</span> v ∈ A <span class="kw">then</span> e v <span class="kw">else</span> ⊤ := <span class="kw">by</span></span>
+<span id="L413">  <span class="kw">split_ifs</span> <span class="kw">with</span> hv</span>
+<span id="L414">  · <span class="kw">unfold</span> <span class="const token" data-verso-hover="371">msgVal</span></span>
+<span id="L415">    <span class="kw">refine</span> <span class="const token" data-verso-hover="71">le_antisymm</span> (<span class="const token" data-verso-hover="383">Finset.inf_le</span> (f := <span class="const token" data-verso-hover="59">Prod.snd</span>) (b := (v, e v)) (<span class="kw">by</span> <span class="kw">simp</span> [hv]))</span>
+<span id="L416">      (<span class="const token" data-verso-hover="384">Finset.le_inf</span> <span class="kw">fun</span> p hp =&gt; ?_)</span>
+<span id="L417">    <span class="kw">simp</span> only [<span class="const token" data-verso-hover="235">mem_filter</span>, <span class="const token" data-verso-hover="385">mem_image</span>] <span class="kw">at</span> hp</span>
+<span id="L418">    <span class="kw">obtain</span> ⟨⟨u, _, <span class="kw">rfl</span>⟩, <span class="kw">rfl</span>⟩ := hp</span>
+<span id="L419">    <span class="kw">exact</span> <span class="const token" data-verso-hover="66">le_rfl</span></span>
+<span id="L420">  · <span class="kw">refine</span> <span class="const token" data-verso-hover="379">msgVal_eq_top</span> <span class="kw">fun</span> p hp hpv =&gt; ?_</span>
+<span id="L421">    <span class="kw">obtain</span> ⟨u, hu, <span class="kw">rfl</span>⟩ := <span class="const token" data-verso-hover="385">mem_image</span>.<span class="const token" data-verso-hover="73">1</span> hp</span>
+<span id="L422">    <span class="kw">simp</span> only <span class="kw">at</span> hpv</span>
+<span id="L423">    <span class="kw">subst</span> hpv</span>
+<span id="L424">    <span class="kw">exact</span> hv hu</span>
+<span id="L425"></span>
+<span id="L426"><span class="dc">/-- Processing messages one at a time, calling `improveEstimate` after each one, as the handler</span></span>
+<span id="L427"><span class="dc">`on receive` of Algorithm 3 does. -/</span></span>
+<span id="L428"><span class="kw">noncomputable</span> <span class="kw">def</span> <span class="const token" data-verso-hover="386">receiveSeq</span> (L : <span class="const token" data-verso-hover="78">List</span> V) : <span class="const token" data-verso-hover="78">List</span> (<span class="const token" data-verso-hover="217">Finset</span> (V × <span class="const token" data-verso-hover="52">ℕ</span>∞)) → <span class="const token" data-verso-hover="304">HostState</span> V → <span class="const token" data-verso-hover="304">HostState</span> V</span>
+<span id="L429">  | [], s =&gt; s</span>
+<span id="L430">  | S :: ms, s =&gt; <span class="const token" data-verso-hover="386">receiveSeq</span> L ms (<span class="const token" data-verso-hover="13">improveEstimate</span> G L (<span class="const token" data-verso-hover="373">receive</span> S s))</span>
+<span id="L431"></span>
+<span id="L432"><span class="dc">/-- Receiving a message after `improveEstimate` and improving again is the same as receiving it</span></span>
+<span id="L433"><span class="dc">first and improving once (for messages that do not concern own nodes). -/</span></span>
+<span id="L434"><span class="kw">theorem</span> <span class="const token" data-verso-hover="387">improveEstimate_receive_improveEstimate</span> {L : <span class="const token" data-verso-hover="78">List</span> V} {S : <span class="const token" data-verso-hover="217">Finset</span> (V × <span class="const token" data-verso-hover="52">ℕ</span>∞)}</span>
+<span id="L435">    {s : <span class="const token" data-verso-hover="304">HostState</span> V} (hfin : ∀ u ∈ L, s.<span class="const token" data-verso-hover="305">est</span> u ≠ ⊤) (hS : ∀ u ∈ L, <span class="const token" data-verso-hover="371">msgVal</span> S u = ⊤) :</span>
+<span id="L436">    <span class="const token" data-verso-hover="13">improveEstimate</span> G L (<span class="const token" data-verso-hover="373">receive</span> S (<span class="const token" data-verso-hover="13">improveEstimate</span> G L s)) =</span>
+<span id="L437">      <span class="const token" data-verso-hover="13">improveEstimate</span> G L (<span class="const token" data-verso-hover="373">receive</span> S s) := <span class="kw">by</span></span>
+<span id="L438">  <span class="kw">have</span> hfinA : ∀ u ∈ L, (<span class="const token" data-verso-hover="373">receive</span> S (<span class="const token" data-verso-hover="13">improveEstimate</span> G L s)).<span class="const token" data-verso-hover="305">est</span> u ≠ ⊤ := <span class="kw">fun</span> u hu =&gt;</span>
+<span id="L439">    <span class="const token" data-verso-hover="280">ne_top_of_le_ne_top</span> (<span class="const token" data-verso-hover="362">improveEstimate_est_ne_top</span> G L (hfin u hu)) (<span class="const token" data-verso-hover="284">min_le_left</span> _ _)</span>
+<span id="L440">  <span class="kw">have</span> hfinB : ∀ u ∈ L, (<span class="const token" data-verso-hover="373">receive</span> S s).<span class="const token" data-verso-hover="305">est</span> u ≠ ⊤ := <span class="kw">fun</span> u hu =&gt;</span>
+<span id="L441">    <span class="const token" data-verso-hover="280">ne_top_of_le_ne_top</span> (hfin u hu) (<span class="const token" data-verso-hover="284">min_le_left</span> _ _)</span>
+<span id="L442">  <span class="kw">have</span> hAB : ∀ v, (<span class="const token" data-verso-hover="13">improveEstimate</span> G L (<span class="const token" data-verso-hover="373">receive</span> S (<span class="const token" data-verso-hover="13">improveEstimate</span> G L s))).<span class="const token" data-verso-hover="305">est</span> v ≤</span>
+<span id="L443">      (<span class="const token" data-verso-hover="13">improveEstimate</span> G L (<span class="const token" data-verso-hover="373">receive</span> S s)).<span class="const token" data-verso-hover="305">est</span> v :=</span>
+<span id="L444">    <span class="const token" data-verso-hover="360">improveEstimate_max</span> G (<span class="const token" data-verso-hover="357">improveEstimate_quiescent</span> G L _) _</span>
+<span id="L445">      (<span class="kw">fun</span> v =&gt; (<span class="const token" data-verso-hover="358">improveEstimate_est_le</span> G L _ v).<span class="const token" data-verso-hover="83">trans</span></span>
+<span id="L446">        (<span class="const token" data-verso-hover="388">min_le_min_right</span> _ (<span class="const token" data-verso-hover="358">improveEstimate_est_le</span> G L s v))) hfinB</span>
+<span id="L447">  <span class="kw">have</span> hBI : ∀ v, (<span class="const token" data-verso-hover="13">improveEstimate</span> G L (<span class="const token" data-verso-hover="373">receive</span> S s)).<span class="const token" data-verso-hover="305">est</span> v ≤ (<span class="const token" data-verso-hover="13">improveEstimate</span> G L s).<span class="const token" data-verso-hover="305">est</span> v :=</span>
+<span id="L448">    <span class="const token" data-verso-hover="360">improveEstimate_max</span> G (<span class="const token" data-verso-hover="357">improveEstimate_quiescent</span> G L _) s</span>
+<span id="L449">      (<span class="kw">fun</span> w =&gt; (<span class="const token" data-verso-hover="358">improveEstimate_est_le</span> G L (<span class="const token" data-verso-hover="373">receive</span> S s) w).<span class="const token" data-verso-hover="83">trans</span> (<span class="const token" data-verso-hover="284">min_le_left</span> _ _)) hfin</span>
+<span id="L450">  <span class="kw">have</span> hBA : ∀ v, (<span class="const token" data-verso-hover="13">improveEstimate</span> G L (<span class="const token" data-verso-hover="373">receive</span> S s)).<span class="const token" data-verso-hover="305">est</span> v ≤</span>
+<span id="L451">      (<span class="const token" data-verso-hover="13">improveEstimate</span> G L (<span class="const token" data-verso-hover="373">receive</span> S (<span class="const token" data-verso-hover="13">improveEstimate</span> G L s))).<span class="const token" data-verso-hover="305">est</span> v :=</span>
+<span id="L452">    <span class="const token" data-verso-hover="360">improveEstimate_max</span> G (<span class="const token" data-verso-hover="357">improveEstimate_quiescent</span> G L _) _ (<span class="kw">fun</span> v =&gt;</span>
+<span id="L453">      <span class="const token" data-verso-hover="162">le_min</span> (hBI v) ((<span class="const token" data-verso-hover="358">improveEstimate_est_le</span> G L (<span class="const token" data-verso-hover="373">receive</span> S s) v).<span class="const token" data-verso-hover="83">trans</span> (<span class="const token" data-verso-hover="134">min_le_right</span> _ _))) hfinA</span>
+<span id="L454">  <span class="kw">have</span> hest : (<span class="const token" data-verso-hover="13">improveEstimate</span> G L (<span class="const token" data-verso-hover="373">receive</span> S (<span class="const token" data-verso-hover="13">improveEstimate</span> G L s))).<span class="const token" data-verso-hover="305">est</span> =</span>
+<span id="L455">      (<span class="const token" data-verso-hover="13">improveEstimate</span> G L (<span class="const token" data-verso-hover="373">receive</span> S s)).<span class="const token" data-verso-hover="305">est</span> := <span class="const token" data-verso-hover="367">funext</span> <span class="kw">fun</span> v =&gt; <span class="const token" data-verso-hover="71">le_antisymm</span> (hAB v) (hBA v)</span>
+<span id="L456">  <span class="kw">refine</span> <span class="const token" data-verso-hover="368">HostState.ext</span> hest (<span class="const token" data-verso-hover="367">funext</span> <span class="kw">fun</span> v =&gt; ?_)</span>
+<span id="L457">  <span class="kw">rw</span> [<span class="const token" data-verso-hover="361">improveEstimate_changed</span> G L _ v, <span class="const token" data-verso-hover="361">improveEstimate_changed</span> G L _ v, hest]</span>
+<span id="L458">  <span class="kw">simp</span> only [<span class="const token" data-verso-hover="373">receive</span>]</span>
+<span id="L459">  <span class="kw">rw</span> [<span class="const token" data-verso-hover="361">improveEstimate_changed</span> G L s v]</span>
+<span id="L460">  <span class="kw">by_cases</span> hv : v ∈ L</span>
+<span id="L461">  · <span class="kw">simp</span> only [hS v hv, <span class="const token" data-verso-hover="153">le_top</span>, <span class="const token" data-verso-hover="101">min_eq_left</span>]</span>
+<span id="L462">    <span class="kw">exact</span> <span class="const token" data-verso-hover="338">changed_trans</span> (hBI v) (<span class="const token" data-verso-hover="358">improveEstimate_est_le</span> G L s v)</span>
+<span id="L463">  · <span class="kw">simp</span> only [<span class="const token" data-verso-hover="359">improveEstimate_est_of_not_mem</span> G hv s, <span class="const token" data-verso-hover="389">ne_eq</span>, <span class="const token" data-verso-hover="390">not_true_eq_false</span>, <span class="const token" data-verso-hover="391">decide_false</span>,</span>
+<span id="L464">      <span class="const token" data-verso-hover="392">Bool.or_false</span>]</span>
+<span id="L465">    <span class="kw">all_goals</span> (<span class="kw">try</span> <span class="kw">congr</span> <span class="nu">1</span>)</span>
+<span id="L466"></span>
+<span id="L467"><span class="dc">/-- **Per-message processing (Algorithm 3) = batch processing.** -/</span></span>
+<span id="L468"><span class="kw">theorem</span> <span class="const token" data-verso-hover="393">receiveSeq_improveEstimate</span> (L : <span class="const token" data-verso-hover="78">List</span> V) :</span>
+<span id="L469">    ∀ (ms : <span class="const token" data-verso-hover="78">List</span> (<span class="const token" data-verso-hover="217">Finset</span> (V × <span class="const token" data-verso-hover="52">ℕ</span>∞))) (s : <span class="const token" data-verso-hover="304">HostState</span> V), (∀ u ∈ L, s.<span class="const token" data-verso-hover="305">est</span> u ≠ ⊤) →</span>
+<span id="L470">      (∀ S ∈ ms, ∀ u ∈ L, <span class="const token" data-verso-hover="371">msgVal</span> S u = ⊤) →</span>
+<span id="L471">      <span class="const token" data-verso-hover="386">receiveSeq</span> G L ms (<span class="const token" data-verso-hover="13">improveEstimate</span> G L s) =</span>
+<span id="L472">        <span class="const token" data-verso-hover="13">improveEstimate</span> G L (<span class="const token" data-verso-hover="373">receive</span> (ms.<span class="const token" data-verso-hover="394">foldr</span> (· ∪ ·) ∅) s)</span>
+<span id="L473">  | [], s, _, _ =&gt; <span class="kw">by</span> <span class="kw">simp</span> [<span class="const token" data-verso-hover="386">receiveSeq</span>, <span class="const token" data-verso-hover="377">receive_empty</span>]</span>
+<span id="L474">  | S :: ms, s, hfin, hms =&gt; <span class="kw">by</span></span>
+<span id="L475">    <span class="kw">rw</span> [<span class="const token" data-verso-hover="386">receiveSeq</span>, <span class="const token" data-verso-hover="387">improveEstimate_receive_improveEstimate</span> G hfin (hms S (<span class="kw">by</span> <span class="kw">simp</span>)),</span>
+<span id="L476">      <span class="const token" data-verso-hover="393">receiveSeq_improveEstimate</span> L ms _</span>
+<span id="L477">        (<span class="kw">fun</span> u hu =&gt; <span class="const token" data-verso-hover="280">ne_top_of_le_ne_top</span> (hfin u hu) (<span class="const token" data-verso-hover="284">min_le_left</span> _ _))</span>
+<span id="L478">        (<span class="kw">fun</span> T hT =&gt; hms T (<span class="kw">by</span> <span class="kw">simp</span> [hT])),</span>
+<span id="L479">      <span class="const token" data-verso-hover="378">receive_receive</span>, <span class="const token" data-verso-hover="395">List.foldr_cons</span>]</span>
+<span id="L480"></span>
+<span id="L481"><span class="dc">/-! ### Synchronous rounds -/</span></span>
+<span id="L482"></span>
+<span id="L483"><span class="kw">variable</span> {H : <span class="kw">Type</span>*} [<span class="const token" data-verso-hover="44">Fintype</span> H] [<span class="const token" data-verso-hover="45">DecidableEq</span> H] (h : V → H) (ord : H → <span class="const token" data-verso-hover="78">List</span> V)</span>
+<span id="L484"></span>
+<span id="L485"><span class="dc">/-- `V(x)`: the nodes host `x` is responsible for. -/</span></span>
+<span id="L486"><span class="kw">def</span> <span class="const token" data-verso-hover="396">own</span> (x : H) : <span class="const token" data-verso-hover="217">Finset</span> V := <span class="const token" data-verso-hover="220">univ</span>.<span class="const token" data-verso-hover="221">filter</span> <span class="kw">fun</span> v =&gt; h v = x</span>
+<span id="L487"></span>
+<span id="L488"><span class="dc">/-- Initialization of Algorithm 3: `est[v] = d(v)` for own nodes, `+∞` otherwise. -/</span></span>
+<span id="L489"><span class="kw">def</span> <span class="const token" data-verso-hover="397">initState</span> (x : H) : <span class="const token" data-verso-hover="304">HostState</span> V :=</span>
+<span id="L490">  ⟨<span class="kw">fun</span> v =&gt; <span class="kw">if</span> h v = x <span class="kw">then</span> (G.<span class="const token" data-verso-hover="56">degree</span> v : <span class="const token" data-verso-hover="52">ℕ</span>∞) <span class="kw">else</span> ⊤, <span class="kw">fun</span> _ =&gt; <span class="const token" data-verso-hover="57">false</span>⟩</span>
+<span id="L491"></span>
+<span id="L492"><span class="dc">/-- Round 1 message: `S = {(u, est[u]) : u ∈ V(x)}`. -/</span></span>
+<span id="L493"><span class="kw">def</span> <span class="const token" data-verso-hover="398">allMsg</span> (x : H) (s : <span class="const token" data-verso-hover="304">HostState</span> V) : <span class="const token" data-verso-hover="217">Finset</span> (V × <span class="const token" data-verso-hover="52">ℕ</span>∞) := (<span class="const token" data-verso-hover="396">own</span> h x).<span class="const token" data-verso-hover="382">image</span> <span class="kw">fun</span> u =&gt; (u, s.<span class="const token" data-verso-hover="305">est</span> u)</span>
+<span id="L494"></span>
+<span id="L495"><span class="dc">/-- Periodic message: `S = {(u, est[u]) : u ∈ V(x), changed[u]}`. -/</span></span>
+<span id="L496"><span class="kw">def</span> <span class="const token" data-verso-hover="399">changedMsg</span> (x : H) (s : <span class="const token" data-verso-hover="304">HostState</span> V) : <span class="const token" data-verso-hover="217">Finset</span> (V × <span class="const token" data-verso-hover="52">ℕ</span>∞) :=</span>
+<span id="L497">  ((<span class="const token" data-verso-hover="396">own</span> h x).<span class="const token" data-verso-hover="221">filter</span> <span class="kw">fun</span> u =&gt; s.<span class="const token" data-verso-hover="306">changed</span> u = <span class="const token" data-verso-hover="62">true</span>).<span class="const token" data-verso-hover="382">image</span> <span class="kw">fun</span> u =&gt; (u, s.<span class="const token" data-verso-hover="305">est</span> u)</span>
+<span id="L498"></span>
+<span id="L499"><span class="dc">/-- `foreach u ∈ V(x) do changed[u] ← false`. -/</span></span>
+<span id="L500"><span class="kw">def</span> <span class="const token" data-verso-hover="400">resetChanged</span> (s : <span class="const token" data-verso-hover="304">HostState</span> V) : <span class="const token" data-verso-hover="304">HostState</span> V := ⟨s.<span class="const token" data-verso-hover="305">est</span>, <span class="kw">fun</span> _ =&gt; <span class="const token" data-verso-hover="57">false</span>⟩</span>
+<span id="L501"></span>
+<span id="L502"><span class="dc">/-- Global state at the end of a round. -/</span></span>
+<span id="L503"><span class="kw">structure</span> <span class="const token" data-verso-hover="401">GlobalState</span> (H V : <span class="kw">Type</span>*) <span class="kw">where</span></span>
+<span id="L504">  <span class="dc">/-- local states of the hosts -/</span></span>
+<span id="L505">  <span class="const token" data-verso-hover="402">host</span> : H → <span class="const token" data-verso-hover="304">HostState</span> V</span>
+<span id="L506">  <span class="dc">/-- the set sent by each host in this round (`∅` = nothing sent) -/</span></span>
+<span id="L507">  <span class="const token" data-verso-hover="403">sent</span> : H → <span class="const token" data-verso-hover="217">Finset</span> (V × <span class="const token" data-verso-hover="52">ℕ</span>∞)</span>
+<span id="L508"></span>
+<span id="L509"><span class="dc">/-- All the pairs host `x` receives in the next round (from all other hosts). -/</span></span>
+<span id="L510"><span class="kw">def</span> <span class="const token" data-verso-hover="404">inbox</span> (g : <span class="const token" data-verso-hover="401">GlobalState</span> H V) (x : H) : <span class="const token" data-verso-hover="217">Finset</span> (V × <span class="const token" data-verso-hover="52">ℕ</span>∞) :=</span>
+<span id="L511">  (<span class="const token" data-verso-hover="220">univ</span>.<span class="const token" data-verso-hover="221">filter</span> <span class="kw">fun</span> y =&gt; y ≠ x).<span class="const token" data-verso-hover="405">biUnion</span> g.<span class="const token" data-verso-hover="403">sent</span></span>
+<span id="L512"></span>
+<span id="L513"><span class="dc">/-- Host `x` in round `r + 2`, before resetting `changed`: receive, then `improveEstimate`. -/</span></span>
+<span id="L514"><span class="kw">noncomputable</span> <span class="kw">def</span> <span class="const token" data-verso-hover="406">roundHost</span> (g : <span class="const token" data-verso-hover="401">GlobalState</span> H V) (x : H) : <span class="const token" data-verso-hover="304">HostState</span> V :=</span>
+<span id="L515">  <span class="const token" data-verso-hover="13">improveEstimate</span> G (ord x) (<span class="const token" data-verso-hover="373">receive</span> (<span class="const token" data-verso-hover="404">inbox</span> g x) (g.<span class="const token" data-verso-hover="402">host</span> x))</span>
+<span id="L516"></span>
+<span id="L517"><span class="dc">/-- The synchronous run: `run G h ord r` is the global state at the end of round `r + 1`. -/</span></span>
+<span id="L518"><span class="kw">noncomputable</span> <span class="kw">def</span> <span class="const token" data-verso-hover="407">run</span> : <span class="const token" data-verso-hover="50">ℕ</span> → <span class="const token" data-verso-hover="401">GlobalState</span> H V</span>
+<span id="L519">  | <span class="nu">0</span> =&gt; ⟨<span class="kw">fun</span> x =&gt; <span class="const token" data-verso-hover="400">resetChanged</span> (<span class="const token" data-verso-hover="13">improveEstimate</span> G (ord x) (<span class="const token" data-verso-hover="397">initState</span> G h x)),</span>
+<span id="L520">          <span class="kw">fun</span> x =&gt; <span class="const token" data-verso-hover="398">allMsg</span> h x (<span class="const token" data-verso-hover="13">improveEstimate</span> G (ord x) (<span class="const token" data-verso-hover="397">initState</span> G h x))⟩</span>
+<span id="L521">  | r + <span class="nu">1</span> =&gt; ⟨<span class="kw">fun</span> x =&gt; <span class="const token" data-verso-hover="400">resetChanged</span> (<span class="const token" data-verso-hover="406">roundHost</span> G ord (<span class="const token" data-verso-hover="407">run</span> r) x),</span>
+<span id="L522">              <span class="kw">fun</span> x =&gt; <span class="const token" data-verso-hover="399">changedMsg</span> h x (<span class="const token" data-verso-hover="406">roundHost</span> G ord (<span class="const token" data-verso-hover="407">run</span> r) x)⟩</span>
+<span id="L523"></span>
+<span id="L524"><span class="dc">/-- The estimate of `v` at its own host at the end of round `r + 1`. -/</span></span>
+<span id="L525"><span class="kw">noncomputable</span> <span class="kw">def</span> <span class="const token" data-verso-hover="408">ownEst</span> (r : <span class="const token" data-verso-hover="50">ℕ</span>) (v : V) : <span class="const token" data-verso-hover="52">ℕ</span>∞ := ((<span class="const token" data-verso-hover="407">run</span> G h ord r).<span class="const token" data-verso-hover="402">host</span> (h v)).<span class="const token" data-verso-hover="305">est</span> v</span>
+<span id="L526"></span>
+<span id="L527"><span class="kw">variable</span> {G h ord}</span>
+<span id="L528"></span>
+<span id="L529"><span class="kw">theorem</span> <span class="const token" data-verso-hover="409">msgVal_biUnion</span> (T : <span class="const token" data-verso-hover="217">Finset</span> H) (f : H → <span class="const token" data-verso-hover="217">Finset</span> (V × <span class="const token" data-verso-hover="52">ℕ</span>∞)) (v : V) :</span>
+<span id="L530">    <span class="const token" data-verso-hover="371">msgVal</span> (T.<span class="const token" data-verso-hover="405">biUnion</span> f) v = T.<span class="const token" data-verso-hover="372">inf</span> <span class="kw">fun</span> y =&gt; <span class="const token" data-verso-hover="371">msgVal</span> (f y) v := <span class="kw">by</span></span>
+<span id="L531">  <span class="kw">simp</span> only [<span class="const token" data-verso-hover="371">msgVal</span>, <span class="const token" data-verso-hover="410">filter_biUnion</span>, <span class="const token" data-verso-hover="411">inf_biUnion</span>]</span>
+<span id="L532"></span>
+<span id="L533"><span class="kw">theorem</span> <span class="const token" data-verso-hover="412">msgVal_inbox</span> (g : <span class="const token" data-verso-hover="401">GlobalState</span> H V) (hg : ∀ y, ∀ p ∈ g.<span class="const token" data-verso-hover="403">sent</span> y, h p.<span class="const token" data-verso-hover="60">1</span> = y) (x : H) (v : V) :</span>
+<span id="L534">    <span class="const token" data-verso-hover="371">msgVal</span> (<span class="const token" data-verso-hover="404">inbox</span> g x) v = <span class="kw">if</span> h v = x <span class="kw">then</span> ⊤ <span class="kw">else</span> <span class="const token" data-verso-hover="371">msgVal</span> (g.<span class="const token" data-verso-hover="403">sent</span> (h v)) v := <span class="kw">by</span></span>
+<span id="L535">  <span class="kw">rw</span> [<span class="const token" data-verso-hover="404">inbox</span>, <span class="const token" data-verso-hover="409">msgVal_biUnion</span>]</span>
+<span id="L536">  <span class="kw">have</span> htop : ∀ y, y ≠ h v → <span class="const token" data-verso-hover="371">msgVal</span> (g.<span class="const token" data-verso-hover="403">sent</span> y) v = ⊤ := <span class="kw">fun</span> y hy =&gt;</span>
+<span id="L537">    <span class="const token" data-verso-hover="379">msgVal_eq_top</span> <span class="kw">fun</span> p hp hpv =&gt; hy (<span class="kw">by</span> <span class="kw">rw</span> [← hg y p hp, hpv])</span>
+<span id="L538">  <span class="kw">split_ifs</span> <span class="kw">with</span> hx</span>
+<span id="L539">  · <span class="kw">exact</span> (<span class="const token" data-verso-hover="380">Finset.inf_eq_top_iff</span> _ _).<span class="const token" data-verso-hover="137">2</span> <span class="kw">fun</span> y hy =&gt; htop y (<span class="kw">by</span> <span class="kw">rw</span> [hx]; <span class="kw">exact</span> (<span class="const token" data-verso-hover="235">mem_filter</span>.<span class="const token" data-verso-hover="73">1</span> hy).<span class="const token" data-verso-hover="182">2</span>)</span>
+<span id="L540">  · <span class="kw">refine</span> <span class="const token" data-verso-hover="71">le_antisymm</span> (<span class="const token" data-verso-hover="383">Finset.inf_le</span> (<span class="const token" data-verso-hover="235">mem_filter</span>.<span class="const token" data-verso-hover="137">2</span> ⟨<span class="const token" data-verso-hover="156">mem_univ</span> _, hx⟩))</span>
+<span id="L541">      (<span class="const token" data-verso-hover="384">Finset.le_inf</span> <span class="kw">fun</span> y _ =&gt; ?_)</span>
+<span id="L542">    <span class="kw">by_cases</span> hy : y = h v</span>
+<span id="L543">    · <span class="kw">subst</span> hy; <span class="kw">exact</span> <span class="const token" data-verso-hover="66">le_rfl</span></span>
+<span id="L544">    · <span class="kw">rw</span> [htop y hy]; <span class="kw">exact</span> <span class="const token" data-verso-hover="153">le_top</span></span>
+<span id="L545"></span>
+<span id="L546"><span class="kw">theorem</span> <span class="const token" data-verso-hover="413">sent_mem</span> (r : <span class="const token" data-verso-hover="50">ℕ</span>) (x : H) : ∀ p ∈ (<span class="const token" data-verso-hover="407">run</span> G h ord r).<span class="const token" data-verso-hover="403">sent</span> x, h p.<span class="const token" data-verso-hover="60">1</span> = x := <span class="kw">by</span></span>
+<span id="L547">  <span class="kw">cases</span> r <span class="kw">with</span></span>
+<span id="L548">  | <span class="const token" data-verso-hover="200">zero</span> =&gt;</span>
+<span id="L549">    <span class="kw">intro</span> p hp</span>
+<span id="L550">    <span class="kw">simp</span> only [<span class="const token" data-verso-hover="407">run</span>, <span class="const token" data-verso-hover="398">allMsg</span>, <span class="const token" data-verso-hover="385">mem_image</span>] <span class="kw">at</span> hp</span>
+<span id="L551">    <span class="kw">obtain</span> ⟨u, hu, <span class="kw">rfl</span>⟩ := hp</span>
+<span id="L552">    <span class="kw">simpa</span> [<span class="const token" data-verso-hover="396">own</span>] <span class="kw">using</span> hu</span>
+<span id="L553">  | <span class="const token" data-verso-hover="188">succ</span> r =&gt;</span>
+<span id="L554">    <span class="kw">intro</span> p hp</span>
+<span id="L555">    <span class="kw">simp</span> only [<span class="const token" data-verso-hover="407">run</span>, <span class="const token" data-verso-hover="399">changedMsg</span>, <span class="const token" data-verso-hover="385">mem_image</span>, <span class="const token" data-verso-hover="235">mem_filter</span>] <span class="kw">at</span> hp</span>
+<span id="L556">    <span class="kw">obtain</span> ⟨u, hu, <span class="kw">rfl</span>⟩ := hp</span>
+<span id="L557">    <span class="kw">simpa</span> [<span class="const token" data-verso-hover="396">own</span>] <span class="kw">using</span> hu.<span class="const token" data-verso-hover="186">1</span></span>
+<span id="L558"></span>
+<span id="L559"><span class="kw">theorem</span> <span class="const token" data-verso-hover="414">host_changed</span> (r : <span class="const token" data-verso-hover="50">ℕ</span>) (x : H) : ((<span class="const token" data-verso-hover="407">run</span> G h ord r).<span class="const token" data-verso-hover="402">host</span> x).<span class="const token" data-verso-hover="306">changed</span> = <span class="kw">fun</span> _ =&gt; <span class="const token" data-verso-hover="57">false</span> := <span class="kw">by</span></span>
+<span id="L560">  <span class="kw">cases</span> r &lt;;&gt; <span class="kw">rfl</span></span>
+<span id="L561"></span>
+<span id="L562"><span class="kw">theorem</span> <span class="const token" data-verso-hover="415">not_mem_ord</span> (hord : ∀ x u, u ∈ ord x ↔ h u = x) {x : H} {v : V} (hv : h v ≠ x) :</span>
+<span id="L563">    v ∉ ord x := <span class="kw">fun</span> hm =&gt; hv ((hord x v).<span class="const token" data-verso-hover="73">1</span> hm)</span>
+<span id="L564"></span>
+<span id="L565"><span class="kw">theorem</span> <span class="const token" data-verso-hover="416">receive_inbox_eq</span> {r : <span class="const token" data-verso-hover="50">ℕ</span>}</span>
+<span id="L566">    (hinv : ∀ x v, h v ≠ x →</span>
+<span id="L567">      <span class="const token" data-verso-hover="86">min</span> (((<span class="const token" data-verso-hover="407">run</span> G h ord r).<span class="const token" data-verso-hover="402">host</span> x).<span class="const token" data-verso-hover="305">est</span> v) (<span class="const token" data-verso-hover="371">msgVal</span> ((<span class="const token" data-verso-hover="407">run</span> G h ord r).<span class="const token" data-verso-hover="403">sent</span> (h v)) v) =</span>
+<span id="L568">        <span class="const token" data-verso-hover="408">ownEst</span> G h ord r v) (x : H) :</span>
+<span id="L569">    <span class="const token" data-verso-hover="373">receive</span> (<span class="const token" data-verso-hover="404">inbox</span> (<span class="const token" data-verso-hover="407">run</span> G h ord r) x) ((<span class="const token" data-verso-hover="407">run</span> G h ord r).<span class="const token" data-verso-hover="402">host</span> x) =</span>
+<span id="L570">      ⟨<span class="const token" data-verso-hover="408">ownEst</span> G h ord r, <span class="kw">fun</span> _ =&gt; <span class="const token" data-verso-hover="57">false</span>⟩ := <span class="kw">by</span></span>
+<span id="L571">  <span class="kw">refine</span> <span class="const token" data-verso-hover="368">HostState.ext</span> (<span class="const token" data-verso-hover="367">funext</span> <span class="kw">fun</span> v =&gt; ?_) (<span class="const token" data-verso-hover="414">host_changed</span> r x)</span>
+<span id="L572">  <span class="kw">simp</span> only [<span class="const token" data-verso-hover="373">receive</span>]</span>
+<span id="L573">  <span class="kw">rw</span> [<span class="const token" data-verso-hover="412">msgVal_inbox</span> _ (<span class="const token" data-verso-hover="413">sent_mem</span> r) x v]</span>
+<span id="L574">  <span class="kw">split_ifs</span> <span class="kw">with</span> hv</span>
+<span id="L575">  · <span class="kw">subst</span> hv; <span class="kw">simp</span> [<span class="const token" data-verso-hover="408">ownEst</span>]</span>
+<span id="L576">  · <span class="kw">exact</span> hinv x v hv</span>
+<span id="L577"></span>
+<span id="L578"><span class="dc">/-- **Knowledge invariant.** At the end of every round, for a node `v` of another host, what</span></span>
+<span id="L579"><span class="dc">host `x` knows about `v`, combined with what the owner of `v` has just sent, is the owner's current</span></span>
+<span id="L580"><span class="dc">estimate of `v`. -/</span></span>
+<span id="L581"><span class="kw">theorem</span> <span class="const token" data-verso-hover="417">knowledge</span> (hord : ∀ x u, u ∈ ord x ↔ h u = x) :</span>
+<span id="L582">    ∀ r x v, h v ≠ x →</span>
+<span id="L583">      <span class="const token" data-verso-hover="86">min</span> (((<span class="const token" data-verso-hover="407">run</span> G h ord r).<span class="const token" data-verso-hover="402">host</span> x).<span class="const token" data-verso-hover="305">est</span> v) (<span class="const token" data-verso-hover="371">msgVal</span> ((<span class="const token" data-verso-hover="407">run</span> G h ord r).<span class="const token" data-verso-hover="403">sent</span> (h v)) v) =</span>
+<span id="L584">        <span class="const token" data-verso-hover="408">ownEst</span> G h ord r v</span>
+<span id="L585">  | <span class="nu">0</span>, x, v, hv =&gt; <span class="kw">by</span></span>
+<span id="L586">    <span class="kw">simp</span> only [<span class="const token" data-verso-hover="407">run</span>, <span class="const token" data-verso-hover="408">ownEst</span>, <span class="const token" data-verso-hover="400">resetChanged</span>, <span class="const token" data-verso-hover="398">allMsg</span>]</span>
+<span id="L587">    <span class="kw">rw</span> [<span class="const token" data-verso-hover="381">msgVal_image</span>, <span class="const token" data-verso-hover="359">improveEstimate_est_of_not_mem</span> G (<span class="const token" data-verso-hover="415">not_mem_ord</span> hord hv)]</span>
+<span id="L588">    <span class="kw">simp</span> [<span class="const token" data-verso-hover="397">initState</span>, hv, <span class="const token" data-verso-hover="396">own</span>]</span>
+<span id="L589">  | r + <span class="nu">1</span>, x, v, hv =&gt; <span class="kw">by</span></span>
+<span id="L590">    <span class="kw">have</span> hrec := <span class="const token" data-verso-hover="416">receive_inbox_eq</span> (<span class="const token" data-verso-hover="417">knowledge</span> hord r)</span>
+<span id="L591">    <span class="kw">simp</span> only [<span class="const token" data-verso-hover="407">run</span>, <span class="const token" data-verso-hover="408">ownEst</span>, <span class="const token" data-verso-hover="400">resetChanged</span>, <span class="const token" data-verso-hover="399">changedMsg</span>, <span class="const token" data-verso-hover="406">roundHost</span>, hrec]</span>
+<span id="L592">    <span class="kw">rw</span> [<span class="const token" data-verso-hover="381">msgVal_image</span>, <span class="const token" data-verso-hover="359">improveEstimate_est_of_not_mem</span> G (<span class="const token" data-verso-hover="415">not_mem_ord</span> hord hv)]</span>
+<span id="L593">    <span class="kw">have</span> hle := <span class="const token" data-verso-hover="358">improveEstimate_est_le</span> G (ord (h v)) ⟨<span class="const token" data-verso-hover="408">ownEst</span> G h ord r, <span class="kw">fun</span> _ =&gt; <span class="const token" data-verso-hover="57">false</span>⟩ v</span>
+<span id="L594">    <span class="kw">have</span> hch := <span class="const token" data-verso-hover="361">improveEstimate_changed</span> G (ord (h v)) ⟨<span class="const token" data-verso-hover="408">ownEst</span> G h ord r, <span class="kw">fun</span> _ =&gt; <span class="const token" data-verso-hover="57">false</span>⟩ v</span>
+<span id="L595">    <span class="kw">simp</span> only <span class="kw">at</span> hle hch ⊢</span>
+<span id="L596">    <span class="kw">split_ifs</span> <span class="kw">with</span> hmem</span>
+<span id="L597">    · <span class="kw">exact</span> <span class="const token" data-verso-hover="100">min_eq_right</span> hle</span>
+<span id="L598">    · <span class="kw">have</span> hc : (<span class="const token" data-verso-hover="13">improveEstimate</span> G (ord (h v)) ⟨<span class="const token" data-verso-hover="408">ownEst</span> G h ord r, <span class="kw">fun</span> _ =&gt; <span class="const token" data-verso-hover="57">false</span>⟩).<span class="const token" data-verso-hover="306">changed</span> v =</span>
+<span id="L599">          <span class="const token" data-verso-hover="57">false</span> := <span class="kw">by</span> <span class="kw">simpa</span> [<span class="const token" data-verso-hover="396">own</span>] <span class="kw">using</span> hmem</span>
+<span id="L600">      <span class="kw">rw</span> [hch] <span class="kw">at</span> hc</span>
+<span id="L601">      <span class="kw">simp</span> only [<span class="const token" data-verso-hover="418">Bool.false_or</span>, <span class="const token" data-verso-hover="419">decide_eq_false_iff_not</span>, <span class="const token" data-verso-hover="420">not_not</span>] <span class="kw">at</span> hc</span>
+<span id="L602">      <span class="kw">rw</span> [hc]; <span class="kw">simp</span></span>
+<span id="L603"></span>
+<span id="L604"><span class="dc">/-- After receiving in round `r + 2`, every host knows exactly the estimates `ownEst r` of all</span></span>
+<span id="L605"><span class="dc">nodes. -/</span></span>
+<span id="L606"><span class="kw">theorem</span> <span class="const token" data-verso-hover="421">receive_inbox</span> (hord : ∀ x u, u ∈ ord x ↔ h u = x) (r : <span class="const token" data-verso-hover="50">ℕ</span>) (x : H) :</span>
+<span id="L607">    <span class="const token" data-verso-hover="373">receive</span> (<span class="const token" data-verso-hover="404">inbox</span> (<span class="const token" data-verso-hover="407">run</span> G h ord r) x) ((<span class="const token" data-verso-hover="407">run</span> G h ord r).<span class="const token" data-verso-hover="402">host</span> x) =</span>
+<span id="L608">      ⟨<span class="const token" data-verso-hover="408">ownEst</span> G h ord r, <span class="kw">fun</span> _ =&gt; <span class="const token" data-verso-hover="57">false</span>⟩ :=</span>
+<span id="L609">  <span class="const token" data-verso-hover="416">receive_inbox_eq</span> (<span class="const token" data-verso-hover="417">knowledge</span> hord r) x</span>
+<span id="L610"></span>
+<span id="L611"><span class="kw">theorem</span> <span class="const token" data-verso-hover="422">run_succ_host</span> (hord : ∀ x u, u ∈ ord x ↔ h u = x) (r : <span class="const token" data-verso-hover="50">ℕ</span>) (x : H) :</span>
+<span id="L612">    (<span class="const token" data-verso-hover="407">run</span> G h ord (r + <span class="nu">1</span>)).<span class="const token" data-verso-hover="402">host</span> x =</span>
+<span id="L613">      <span class="const token" data-verso-hover="400">resetChanged</span> (<span class="const token" data-verso-hover="13">improveEstimate</span> G (ord x) ⟨<span class="const token" data-verso-hover="408">ownEst</span> G h ord r, <span class="kw">fun</span> _ =&gt; <span class="const token" data-verso-hover="57">false</span>⟩) := <span class="kw">by</span></span>
+<span id="L614">  <span class="kw">simp</span> only [<span class="const token" data-verso-hover="407">run</span>, <span class="const token" data-verso-hover="406">roundHost</span>, <span class="const token" data-verso-hover="421">receive_inbox</span> hord r x]</span>
+<span id="L615"></span>
+<span id="L616"><span class="kw">theorem</span> <span class="const token" data-verso-hover="423">run_succ_sent</span> (hord : ∀ x u, u ∈ ord x ↔ h u = x) (r : <span class="const token" data-verso-hover="50">ℕ</span>) (x : H) :</span>
+<span id="L617">    (<span class="const token" data-verso-hover="407">run</span> G h ord (r + <span class="nu">1</span>)).<span class="const token" data-verso-hover="403">sent</span> x =</span>
+<span id="L618">      <span class="const token" data-verso-hover="399">changedMsg</span> h x (<span class="const token" data-verso-hover="13">improveEstimate</span> G (ord x) ⟨<span class="const token" data-verso-hover="408">ownEst</span> G h ord r, <span class="kw">fun</span> _ =&gt; <span class="const token" data-verso-hover="57">false</span>⟩) := <span class="kw">by</span></span>
+<span id="L619">  <span class="kw">simp</span> only [<span class="const token" data-verso-hover="407">run</span>, <span class="const token" data-verso-hover="406">roundHost</span>, <span class="const token" data-verso-hover="421">receive_inbox</span> hord r x]</span>
+<span id="L620"></span>
+<span id="L621"><span class="kw">theorem</span> <span class="const token" data-verso-hover="424">ownEst_succ</span> (hord : ∀ x u, u ∈ ord x ↔ h u = x) (r : <span class="const token" data-verso-hover="50">ℕ</span>) (v : V) :</span>
+<span id="L622">    <span class="const token" data-verso-hover="408">ownEst</span> G h ord (r + <span class="nu">1</span>) v =</span>
+<span id="L623">      (<span class="const token" data-verso-hover="13">improveEstimate</span> G (ord (h v)) ⟨<span class="const token" data-verso-hover="408">ownEst</span> G h ord r, <span class="kw">fun</span> _ =&gt; <span class="const token" data-verso-hover="57">false</span>⟩).<span class="const token" data-verso-hover="305">est</span> v := <span class="kw">by</span></span>
+<span id="L624">  <span class="kw">rw</span> [<span class="const token" data-verso-hover="408">ownEst</span>, <span class="const token" data-verso-hover="422">run_succ_host</span> hord]; <span class="kw">rfl</span></span>
+<span id="L625"></span>
+<span id="L626"><span class="dc">/-- **Speed comparison with the one-to-one algorithm.** At the end of round `s + 1`, the estimate</span></span>
+<span id="L627"><span class="dc">of `u` at its host is at most `traj G s u`, the estimate of `u` in the one-to-one algorithm at</span></span>
+<span id="L628"><span class="dc">the end of round `s + 1` (`run_spec` in `Run.lean`). -/</span></span>
+<span id="L629"><span class="kw">theorem</span> <span class="const token" data-verso-hover="39">ownEst_le_traj</span> (hord : ∀ x u, u ∈ ord x ↔ h u = x) :</span>
+<span id="L630">    ∀ (s : <span class="const token" data-verso-hover="50">ℕ</span>) (v : V), <span class="const token" data-verso-hover="408">ownEst</span> G h ord s v ≤ (<span class="const token" data-verso-hover="425">traj</span> G s v : <span class="const token" data-verso-hover="52">ℕ</span>∞)</span>
+<span id="L631">  | <span class="nu">0</span>, v =&gt; <span class="kw">by</span></span>
+<span id="L632">    <span class="kw">simp</span> only [<span class="const token" data-verso-hover="408">ownEst</span>, <span class="const token" data-verso-hover="407">run</span>, <span class="const token" data-verso-hover="400">resetChanged</span>]</span>
+<span id="L633">    <span class="kw">exact</span> (<span class="const token" data-verso-hover="358">improveEstimate_est_le</span> G _ _ v).<span class="const token" data-verso-hover="83">trans</span> (<span class="kw">by</span> <span class="kw">simp</span> [<span class="const token" data-verso-hover="397">initState</span>])</span>
+<span id="L634">  | s + <span class="nu">1</span>, u =&gt; <span class="kw">by</span></span>
+<span id="L635">    <span class="kw">rw</span> [<span class="const token" data-verso-hover="424">ownEst_succ</span> hord]</span>
+<span id="L636">    <span class="kw">have</span> hBle : ∀ v, (<span class="const token" data-verso-hover="13">improveEstimate</span> G (ord (h u)) ⟨<span class="const token" data-verso-hover="408">ownEst</span> G h ord s, <span class="kw">fun</span> _ =&gt; <span class="const token" data-verso-hover="57">false</span>⟩).<span class="const token" data-verso-hover="305">est</span> v ≤</span>
+<span id="L637">        (<span class="const token" data-verso-hover="425">traj</span> G s v : <span class="const token" data-verso-hover="52">ℕ</span>∞) := <span class="kw">fun</span> v =&gt;</span>
+<span id="L638">      (<span class="const token" data-verso-hover="358">improveEstimate_est_le</span> G _ _ v).<span class="const token" data-verso-hover="83">trans</span> (<span class="const token" data-verso-hover="39">ownEst_le_traj</span> hord s v)</span>
+<span id="L639">    <span class="kw">have</span> hq := <span class="const token" data-verso-hover="357">improveEstimate_quiescent</span> G (ord (h u)) ⟨<span class="const token" data-verso-hover="408">ownEst</span> G h ord s, <span class="kw">fun</span> _ =&gt; <span class="const token" data-verso-hover="57">false</span>⟩ u</span>
+<span id="L640">      ((hord _ _).<span class="const token" data-verso-hover="137">2</span> <span class="const token" data-verso-hover="70">rfl</span>)</span>
+<span id="L641">    <span class="kw">refine</span> hq.<span class="const token" data-verso-hover="83">trans</span> (<span class="const token" data-verso-hover="263">Nat.cast_le</span>.<span class="const token" data-verso-hover="137">2</span> ?_)</span>
+<span id="L642">    <span class="kw">rw</span> [<span class="const token" data-verso-hover="426">traj_succ_apply</span>]</span>
+<span id="L643">    <span class="kw">exact</span> <span class="const token" data-verso-hover="289">computeIndex_mono</span> (<span class="kw">fun</span> v _ =&gt; hBle v) (<span class="const token" data-verso-hover="427">ENat.toNat_le_of_le_natCast</span> (hBle u))</span>
+<span id="L644"></span>
+<span id="L645"><span class="kw">theorem</span> <span class="const token" data-verso-hover="428">ownEst_ne_top</span> (hord : ∀ x u, u ∈ ord x ↔ h u = x) (r : <span class="const token" data-verso-hover="50">ℕ</span>) (v : V) :</span>
+<span id="L646">    <span class="const token" data-verso-hover="408">ownEst</span> G h ord r v ≠ ⊤ :=</span>
+<span id="L647">  <span class="const token" data-verso-hover="280">ne_top_of_le_ne_top</span> (<span class="kw">by</span> <span class="kw">simp</span>) (<span class="const token" data-verso-hover="39">ownEst_le_traj</span> (G := G) hord r v)</span>
+<span id="L648"></span>
+<span id="L649"><span class="dc">/-- **Theorem 2 (Safety), one-to-many version.** Every entry of `est` at every host, at the end of</span></span>
+<span id="L650"><span class="dc">every round, is at least the coreness. -/</span></span>
+<span id="L651"><span class="kw">theorem</span> <span class="const token" data-verso-hover="36">safety</span> (hord : ∀ x u, u ∈ ord x ↔ h u = x) :</span>
+<span id="L652">    ∀ (r : <span class="const token" data-verso-hover="50">ℕ</span>) (x : H) (v : V), (<span class="const token" data-verso-hover="11">coreness</span> G v : <span class="const token" data-verso-hover="52">ℕ</span>∞) ≤ ((<span class="const token" data-verso-hover="407">run</span> G h ord r).<span class="const token" data-verso-hover="402">host</span> x).<span class="const token" data-verso-hover="305">est</span> v</span>
+<span id="L653">  | <span class="nu">0</span>, x, v =&gt; <span class="kw">by</span></span>
+<span id="L654">    <span class="kw">simp</span> only [<span class="const token" data-verso-hover="407">run</span>, <span class="const token" data-verso-hover="400">resetChanged</span>]</span>
+<span id="L655">    <span class="kw">refine</span> <span class="const token" data-verso-hover="360">improveEstimate_max</span> G (<span class="const token" data-verso-hover="369">quiescent_coreness</span> G _) _ (<span class="kw">fun</span> w =&gt; ?_) (<span class="kw">fun</span> u hu =&gt; ?_) v</span>
+<span id="L656">    · <span class="kw">simp</span> only [<span class="const token" data-verso-hover="397">initState</span>]</span>
+<span id="L657">      <span class="kw">split_ifs</span></span>
+<span id="L658">      · <span class="kw">exact_mod_cast</span> <span class="const token" data-verso-hover="152">coreness_le_degree</span> w</span>
+<span id="L659">      · <span class="kw">exact</span> <span class="const token" data-verso-hover="153">le_top</span></span>
+<span id="L660">    · <span class="kw">simp</span> [<span class="const token" data-verso-hover="397">initState</span>, (hord x u).<span class="const token" data-verso-hover="73">1</span> hu]</span>
+<span id="L661">  | r + <span class="nu">1</span>, x, v =&gt; <span class="kw">by</span></span>
+<span id="L662">    <span class="kw">rw</span> [<span class="const token" data-verso-hover="422">run_succ_host</span> hord]</span>
+<span id="L663">    <span class="kw">exact</span> <span class="const token" data-verso-hover="360">improveEstimate_max</span> G (<span class="const token" data-verso-hover="369">quiescent_coreness</span> G _) _ (<span class="kw">fun</span> w =&gt; <span class="const token" data-verso-hover="36">safety</span> hord r (h w) w)</span>
+<span id="L664">      (<span class="kw">fun</span> u _ =&gt; <span class="const token" data-verso-hover="428">ownEst_ne_top</span> (G := G) hord r u) v</span>
+<span id="L665"></span>
+<span id="L666"><span class="dc">/-- Safety of the messages: every value sent is at least the coreness of its node. -/</span></span>
+<span id="L667"><span class="kw">theorem</span> <span class="const token" data-verso-hover="429">safety_sent</span> (hord : ∀ x u, u ∈ ord x ↔ h u = x) (r : <span class="const token" data-verso-hover="50">ℕ</span>) (x : H) :</span>
+<span id="L668">    ∀ p ∈ (<span class="const token" data-verso-hover="407">run</span> G h ord r).<span class="const token" data-verso-hover="403">sent</span> x, (<span class="const token" data-verso-hover="11">coreness</span> G p.<span class="const token" data-verso-hover="60">1</span> : <span class="const token" data-verso-hover="52">ℕ</span>∞) ≤ p.<span class="const token" data-verso-hover="59">2</span> := <span class="kw">by</span></span>
+<span id="L669">  <span class="kw">cases</span> r <span class="kw">with</span></span>
+<span id="L670">  | <span class="const token" data-verso-hover="200">zero</span> =&gt;</span>
+<span id="L671">    <span class="kw">intro</span> p hp</span>
+<span id="L672">    <span class="kw">simp</span> only [<span class="const token" data-verso-hover="407">run</span>, <span class="const token" data-verso-hover="398">allMsg</span>, <span class="const token" data-verso-hover="385">mem_image</span>] <span class="kw">at</span> hp</span>
+<span id="L673">    <span class="kw">obtain</span> ⟨u, _, <span class="kw">rfl</span>⟩ := hp</span>
+<span id="L674">    <span class="kw">have</span> := <span class="const token" data-verso-hover="36">safety</span> (G := G) hord <span class="nu">0</span> x u</span>
+<span id="L675">    <span class="kw">simpa</span> [<span class="const token" data-verso-hover="407">run</span>, <span class="const token" data-verso-hover="400">resetChanged</span>] <span class="kw">using</span> this</span>
+<span id="L676">  | <span class="const token" data-verso-hover="188">succ</span> r =&gt;</span>
+<span id="L677">    <span class="kw">intro</span> p hp</span>
+<span id="L678">    <span class="kw">rw</span> [<span class="const token" data-verso-hover="423">run_succ_sent</span> hord] <span class="kw">at</span> hp</span>
+<span id="L679">    <span class="kw">simp</span> only [<span class="const token" data-verso-hover="399">changedMsg</span>, <span class="const token" data-verso-hover="385">mem_image</span>] <span class="kw">at</span> hp</span>
+<span id="L680">    <span class="kw">obtain</span> ⟨u, _, <span class="kw">rfl</span>⟩ := hp</span>
+<span id="L681">    <span class="kw">have</span> := <span class="const token" data-verso-hover="36">safety</span> (G := G) hord (r + <span class="nu">1</span>) x u</span>
+<span id="L682">    <span class="kw">simpa</span> [<span class="const token" data-verso-hover="422">run_succ_host</span> hord, <span class="const token" data-verso-hover="400">resetChanged</span>] <span class="kw">using</span> this</span>
+<span id="L683"></span>
+<span id="L684"><span class="kw">theorem</span> <span class="const token" data-verso-hover="430">ownEst_eq_coreness</span> (hord : ∀ x u, u ∈ ord x ↔ h u = x) {r : <span class="const token" data-verso-hover="50">ℕ</span>} (hr : <span class="const token" data-verso-hover="431">stab</span> G ≤ r)</span>
+<span id="L685">    (v : V) : <span class="const token" data-verso-hover="408">ownEst</span> G h ord r v = <span class="const token" data-verso-hover="11">coreness</span> G v :=</span>
+<span id="L686">  <span class="const token" data-verso-hover="71">le_antisymm</span> ((<span class="const token" data-verso-hover="39">ownEst_le_traj</span> (G := G) hord r v).<span class="const token" data-verso-hover="432">trans_eq</span> (<span class="kw">by</span> <span class="kw">rw</span> [<span class="const token" data-verso-hover="433">traj_eq_coreness_of_le</span> hr]))</span>
+<span id="L687">    (<span class="const token" data-verso-hover="36">safety</span> (G := G) hord r (h v) v)</span>
+<span id="L688"></span>
+<span id="L689"><span class="dc">/-- **Liveness, own nodes.** From the end of round `stab G + 1` on (the round at which the</span></span>
+<span id="L690"><span class="dc">one-to-one algorithm is correct), every host knows the exact coreness of each of its own nodes:</span></span>
+<span id="L691"><span class="dc">the one-to-many algorithm is never slower than the one-to-one algorithm. -/</span></span>
+<span id="L692"><span class="kw">theorem</span> <span class="const token" data-verso-hover="37">liveness</span> (hord : ∀ x u, u ∈ ord x ↔ h u = x) {r : <span class="const token" data-verso-hover="50">ℕ</span>} (hr : <span class="const token" data-verso-hover="431">stab</span> G ≤ r) (u : V) :</span>
+<span id="L693">    ((<span class="const token" data-verso-hover="407">run</span> G h ord r).<span class="const token" data-verso-hover="402">host</span> (h u)).<span class="const token" data-verso-hover="305">est</span> u = <span class="const token" data-verso-hover="11">coreness</span> G u :=</span>
+<span id="L694">  <span class="const token" data-verso-hover="430">ownEst_eq_coreness</span> (G := G) hord hr u</span>
+<span id="L695"></span>
+<span id="L696"><span class="dc">/-- From the end of round `stab G + 2` on, every entry at every host is the coreness. -/</span></span>
+<span id="L697"><span class="kw">theorem</span> <span class="const token" data-verso-hover="434">est_eq_coreness</span> (hord : ∀ x u, u ∈ ord x ↔ h u = x) {r : <span class="const token" data-verso-hover="50">ℕ</span>} (hr : <span class="const token" data-verso-hover="431">stab</span> G &lt; r) (x : H)</span>
+<span id="L698">    (v : V) : ((<span class="const token" data-verso-hover="407">run</span> G h ord r).<span class="const token" data-verso-hover="402">host</span> x).<span class="const token" data-verso-hover="305">est</span> v = <span class="const token" data-verso-hover="11">coreness</span> G v := <span class="kw">by</span></span>
+<span id="L699">  <span class="kw">obtain</span> ⟨r, <span class="kw">rfl</span>⟩ : ∃ r', r = r' + <span class="nu">1</span> := ⟨r - <span class="nu">1</span>, <span class="kw">by</span> <span class="kw">omega</span>⟩</span>
+<span id="L700">  <span class="kw">refine</span> <span class="const token" data-verso-hover="71">le_antisymm</span> ?_ (<span class="const token" data-verso-hover="36">safety</span> (G := G) hord _ x v)</span>
+<span id="L701">  <span class="kw">rw</span> [<span class="const token" data-verso-hover="422">run_succ_host</span> hord]</span>
+<span id="L702">  <span class="kw">exact</span> (<span class="const token" data-verso-hover="358">improveEstimate_est_le</span> G _ _ v).<span class="const token" data-verso-hover="432">trans_eq</span> (<span class="const token" data-verso-hover="430">ownEst_eq_coreness</span> (G := G) hord (<span class="kw">by</span> <span class="kw">omega</span>) v)</span>
+<span id="L703"></span>
+<span id="L704"><span class="dc">/-- From round `stab G + 2` on, no host sends anything. -/</span></span>
+<span id="L705"><span class="kw">theorem</span> <span class="const token" data-verso-hover="435">sent_eq_empty</span> (hord : ∀ x u, u ∈ ord x ↔ h u = x) {r : <span class="const token" data-verso-hover="50">ℕ</span>} (hr : <span class="const token" data-verso-hover="431">stab</span> G &lt; r) (x : H) :</span>
+<span id="L706">    (<span class="const token" data-verso-hover="407">run</span> G h ord r).<span class="const token" data-verso-hover="403">sent</span> x = ∅ := <span class="kw">by</span></span>
+<span id="L707">  <span class="kw">obtain</span> ⟨r, <span class="kw">rfl</span>⟩ : ∃ r', r = r' + <span class="nu">1</span> := ⟨r - <span class="nu">1</span>, <span class="kw">by</span> <span class="kw">omega</span>⟩</span>
+<span id="L708">  <span class="kw">rw</span> [<span class="const token" data-verso-hover="423">run_succ_sent</span> hord, <span class="const token" data-verso-hover="399">changedMsg</span>, <span class="const token" data-verso-hover="436">image_eq_empty</span>, <span class="const token" data-verso-hover="249">filter_eq_empty_iff</span>]</span>
+<span id="L709">  <span class="kw">intro</span> u _</span>
+<span id="L710">  <span class="kw">have</span> h1 : (<span class="const token" data-verso-hover="13">improveEstimate</span> G (ord x) ⟨<span class="const token" data-verso-hover="408">ownEst</span> G h ord r, <span class="kw">fun</span> _ =&gt; <span class="const token" data-verso-hover="57">false</span>⟩).<span class="const token" data-verso-hover="305">est</span> u =</span>
+<span id="L711">      <span class="const token" data-verso-hover="11">coreness</span> G u := <span class="kw">by</span></span>
+<span id="L712">    <span class="kw">have</span> := <span class="const token" data-verso-hover="434">est_eq_coreness</span> (G := G) hord hr x u</span>
+<span id="L713">    <span class="kw">rwa</span> [<span class="const token" data-verso-hover="422">run_succ_host</span> hord] <span class="kw">at</span> this</span>
+<span id="L714">  <span class="kw">have</span> h2 := <span class="const token" data-verso-hover="430">ownEst_eq_coreness</span> (G := G) hord (r := r) (<span class="kw">by</span> <span class="kw">omega</span>) u</span>
+<span id="L715">  <span class="kw">rw</span> [<span class="const token" data-verso-hover="361">improveEstimate_changed</span>]</span>
+<span id="L716">  <span class="kw">simp</span> [h1, h2]</span>
+<span id="L717"></span>
+<span id="L718"><span class="dc">/-- **Theorem 3 (Liveness), one-to-many version.** There is a round after which every host knows</span></span>
+<span id="L719"><span class="dc">the exact coreness of every node and no messages are sent any more. -/</span></span>
+<span id="L720"><span class="kw">theorem</span> <span class="const token" data-verso-hover="38">theorem_3_multiHost</span> (hord : ∀ x u, u ∈ ord x ↔ h u = x) :</span>
+<span id="L721">    ∃ R, ∀ r ≥ R, (∀ x v, ((<span class="const token" data-verso-hover="407">run</span> G h ord r).<span class="const token" data-verso-hover="402">host</span> x).<span class="const token" data-verso-hover="305">est</span> v = <span class="const token" data-verso-hover="11">coreness</span> G v) ∧</span>
+<span id="L722">      ∀ x, (<span class="const token" data-verso-hover="407">run</span> G h ord r).<span class="const token" data-verso-hover="403">sent</span> x = ∅ :=</span>
+<span id="L723">  ⟨<span class="const token" data-verso-hover="431">stab</span> G + <span class="nu">1</span>, <span class="kw">fun</span> _ hr =&gt;</span>
+<span id="L724">    ⟨<span class="const token" data-verso-hover="434">est_eq_coreness</span> (G := G) hord (<span class="kw">by</span> <span class="kw">omega</span>), <span class="const token" data-verso-hover="435">sent_eq_empty</span> (G := G) hord (<span class="kw">by</span> <span class="kw">omega</span>)⟩⟩</span>
+<span id="L725"></span>
+<span id="L726"><span class="dc">/-! ### Faithfulness: per-message processing and the pass order do not matter -/</span></span>
+<span id="L727"></span>
+<span id="L728"><span class="kw">theorem</span> <span class="const token" data-verso-hover="437">host_quiescent</span> (r : <span class="const token" data-verso-hover="50">ℕ</span>) (x : H) : <span class="const token" data-verso-hover="310">Quiescent</span> G (ord x) ((<span class="const token" data-verso-hover="407">run</span> G h ord r).<span class="const token" data-verso-hover="402">host</span> x).<span class="const token" data-verso-hover="305">est</span> := <span class="kw">by</span></span>
+<span id="L729">  <span class="kw">cases</span> r &lt;;&gt; <span class="kw">exact</span> <span class="const token" data-verso-hover="357">improveEstimate_quiescent</span> G _ _</span>
+<span id="L730"></span>
+<span id="L731"><span class="kw">theorem</span> <span class="const token" data-verso-hover="438">foldr_union_map</span> (l : <span class="const token" data-verso-hover="78">List</span> H) (f : H → <span class="const token" data-verso-hover="217">Finset</span> (V × <span class="const token" data-verso-hover="52">ℕ</span>∞)) :</span>
+<span id="L732">    (l.<span class="const token" data-verso-hover="439">map</span> f).<span class="const token" data-verso-hover="394">foldr</span> (· ∪ ·) ∅ = l.<span class="const token" data-verso-hover="440">toFinset</span>.<span class="const token" data-verso-hover="405">biUnion</span> f := <span class="kw">by</span></span>
+<span id="L733">  <span class="kw">induction</span> l <span class="kw">with</span></span>
+<span id="L734">  | <span class="const token" data-verso-hover="80">nil</span> =&gt; <span class="kw">simp</span></span>
+<span id="L735">  | <span class="const token" data-verso-hover="81">cons</span> y l ih =&gt; <span class="kw">simp</span> [ih, <span class="const token" data-verso-hover="441">Finset.biUnion_insert</span>]</span>
+<span id="L736"></span>
+<span id="L737"><span class="dc">/-- **Algorithm 3's per-message handler.** Processing the messages of round `r + 1` one at a time,</span></span>
+<span id="L738"><span class="dc">in any order `l` of the sending hosts, with an `improveEstimate` after each one, yields the same</span></span>
+<span id="L739"><span class="dc">state as the batch processing used in `run`. -/</span></span>
+<span id="L740"><span class="kw">theorem</span> <span class="const token" data-verso-hover="41">run_succ_host_eq_receiveSeq</span> (hord : ∀ x u, u ∈ ord x ↔ h u = x) (r : <span class="const token" data-verso-hover="50">ℕ</span>) (x : H)</span>
+<span id="L741">    (l : <span class="const token" data-verso-hover="78">List</span> H) (hl : ∀ y, y ∈ l ↔ y ≠ x) :</span>
+<span id="L742">    (<span class="const token" data-verso-hover="407">run</span> G h ord (r + <span class="nu">1</span>)).<span class="const token" data-verso-hover="402">host</span> x =</span>
+<span id="L743">      <span class="const token" data-verso-hover="400">resetChanged</span> (<span class="const token" data-verso-hover="386">receiveSeq</span> G (ord x) (l.<span class="const token" data-verso-hover="439">map</span> (<span class="const token" data-verso-hover="407">run</span> G h ord r).<span class="const token" data-verso-hover="403">sent</span>) ((<span class="const token" data-verso-hover="407">run</span> G h ord r).<span class="const token" data-verso-hover="402">host</span> x)) := <span class="kw">by</span></span>
+<span id="L744">  <span class="kw">have</span> hfin : ∀ u ∈ ord x, ((<span class="const token" data-verso-hover="407">run</span> G h ord r).<span class="const token" data-verso-hover="402">host</span> x).<span class="const token" data-verso-hover="305">est</span> u ≠ ⊤ := <span class="kw">by</span></span>
+<span id="L745">    <span class="kw">intro</span> u hu</span>
+<span id="L746">    <span class="kw">have</span> := <span class="const token" data-verso-hover="428">ownEst_ne_top</span> (G := G) hord r u</span>
+<span id="L747">    <span class="kw">rwa</span> [<span class="const token" data-verso-hover="408">ownEst</span>, (hord x u).<span class="const token" data-verso-hover="73">1</span> hu] <span class="kw">at</span> this</span>
+<span id="L748">  <span class="kw">have</span> hms : ∀ S ∈ l.<span class="const token" data-verso-hover="439">map</span> (<span class="const token" data-verso-hover="407">run</span> G h ord r).<span class="const token" data-verso-hover="403">sent</span>, ∀ u ∈ ord x, <span class="const token" data-verso-hover="371">msgVal</span> S u = ⊤ := <span class="kw">by</span></span>
+<span id="L749">    <span class="kw">intro</span> S hS u hu</span>
+<span id="L750">    <span class="kw">obtain</span> ⟨y, hy, <span class="kw">rfl</span>⟩ := <span class="const token" data-verso-hover="442">List.mem_map</span>.<span class="const token" data-verso-hover="73">1</span> hS</span>
+<span id="L751">    <span class="kw">refine</span> <span class="const token" data-verso-hover="379">msgVal_eq_top</span> <span class="kw">fun</span> p hp hpu =&gt; (hl y).<span class="const token" data-verso-hover="73">1</span> hy ?_</span>
+<span id="L752">    <span class="kw">rw</span> [← <span class="const token" data-verso-hover="413">sent_mem</span> r y p hp, hpu, (hord x u).<span class="const token" data-verso-hover="73">1</span> hu]</span>
+<span id="L753">  <span class="kw">have</span> := <span class="const token" data-verso-hover="393">receiveSeq_improveEstimate</span> G (ord x) _ _ hfin hms</span>
+<span id="L754">  <span class="kw">rw</span> [<span class="const token" data-verso-hover="364">improveEstimate_of_quiescent</span> G (<span class="const token" data-verso-hover="437">host_quiescent</span> r x)] <span class="kw">at</span> this</span>
+<span id="L755">  <span class="kw">rw</span> [this, <span class="const token" data-verso-hover="438">foldr_union_map</span>]</span>
+<span id="L756">  <span class="kw">have</span> hl' : l.<span class="const token" data-verso-hover="440">toFinset</span> = <span class="const token" data-verso-hover="220">univ</span>.<span class="const token" data-verso-hover="221">filter</span> <span class="kw">fun</span> y =&gt; y ≠ x := <span class="kw">by</span> <span class="kw">ext</span> y; <span class="kw">simp</span> [hl]</span>
+<span id="L757">  <span class="kw">rw</span> [hl']</span>
+<span id="L758">  <span class="kw">rfl</span></span>
+<span id="L759"></span>
+<span id="L760"><span class="dc">/-- The run does not depend on the order in which hosts visit their own nodes in Algorithm 4. -/</span></span>
+<span id="L761"><span class="kw">theorem</span> <span class="const token" data-verso-hover="443">run_congr_ord</span> {ord' : H → <span class="const token" data-verso-hover="78">List</span> V} (hord : ∀ x u, u ∈ ord x ↔ h u = x)</span>
+<span id="L762">    (hord' : ∀ x u, u ∈ ord' x ↔ h u = x) : ∀ r, <span class="const token" data-verso-hover="407">run</span> G h ord r = <span class="const token" data-verso-hover="407">run</span> G h ord' r</span>
+<span id="L763">  | <span class="nu">0</span> =&gt; <span class="kw">by</span></span>
+<span id="L764">    <span class="kw">have</span> hR : ∀ x, <span class="const token" data-verso-hover="13">improveEstimate</span> G (ord x) (<span class="const token" data-verso-hover="397">initState</span> G h x) =</span>
+<span id="L765">        <span class="const token" data-verso-hover="13">improveEstimate</span> G (ord' x) (<span class="const token" data-verso-hover="397">initState</span> G h x) := <span class="kw">fun</span> x =&gt;</span>
+<span id="L766">      <span class="const token" data-verso-hover="366">improveEstimate_congr</span> G (<span class="kw">fun</span> u =&gt; <span class="kw">by</span> <span class="kw">rw</span> [hord, hord']) _</span>
+<span id="L767">        (<span class="kw">fun</span> u hu =&gt; <span class="kw">by</span> <span class="kw">simp</span> [<span class="const token" data-verso-hover="397">initState</span>, (hord x u).<span class="const token" data-verso-hover="73">1</span> hu])</span>
+<span id="L768">    <span class="kw">simp</span> only [<span class="const token" data-verso-hover="407">run</span>, hR]</span>
+<span id="L769">  | r + <span class="nu">1</span> =&gt; <span class="kw">by</span></span>
+<span id="L770">    <span class="kw">have</span> hR : ∀ x, <span class="const token" data-verso-hover="406">roundHost</span> G ord (<span class="const token" data-verso-hover="407">run</span> G h ord r) x = <span class="const token" data-verso-hover="406">roundHost</span> G ord' (<span class="const token" data-verso-hover="407">run</span> G h ord r) x :=</span>
+<span id="L771">      <span class="kw">fun</span> x =&gt; <span class="const token" data-verso-hover="366">improveEstimate_congr</span> G (<span class="kw">fun</span> u =&gt; <span class="kw">by</span> <span class="kw">rw</span> [hord, hord']) _ (<span class="kw">fun</span> u _ =&gt; <span class="kw">by</span></span>
+<span id="L772">        <span class="kw">rw</span> [<span class="const token" data-verso-hover="421">receive_inbox</span> hord]; <span class="kw">exact</span> <span class="const token" data-verso-hover="428">ownEst_ne_top</span> (G := G) hord r u)</span>
+<span id="L773">    <span class="kw">simp</span> only [<span class="const token" data-verso-hover="407">run</span>]</span>
+<span id="L774">    <span class="kw">rw</span> [← <span class="const token" data-verso-hover="443">run_congr_ord</span> hord hord' r]</span>
+<span id="L775">    <span class="kw">simp</span> only [hR]</span>
+<span id="L776"></span>
+<span id="L777"><span class="kw">end</span> MultiHost</span>
+<span id="L778"></span>
+<span id="L779"><span class="kw">end</span> KCoreDecomposition</span>
+<span id="L780"></span>
+</code></div>
+        <script>
+          window.versoHoversUrl = "PODC2011/KCoreDecomposition/-hovers.json";</script>
+        <script src="static/lean/popper.js"></script>
+        <script src="static/lean/tippy.js"></script>
+        <script src="static/lean/marked.js"></script>
+        <script src="static/lean/highlighting.js"></script>
+        <script src="static/lean/lean.js"></script>
+        </article></main><footer class="site-footer"><div class="wrap">
+        Machine-checked formalizations of PODC papers in Lean 4. Generated with <a href="https://github.com/leanprover/verso">Verso</a> from the README files of <a href="https://github.com/vasnesterov/formal_podc">vasnesterov/formal_podc</a>.</div>
+      </footer></body>
+  </html>
+

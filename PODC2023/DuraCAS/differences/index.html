@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="light dark">
+    <link rel="icon" href="data:,">
+    <title>DuraCAS (PODC 2023): Differences between the formalization and the paper · Formal PODC</title><base href="../../.././"><link rel="stylesheet" href="static/lean/verso-vars.css">
+    <link rel="stylesheet" href="static/lean/highlighting.css">
+    <link rel="stylesheet" href="static/lean/tippy-border.css">
+    <link rel="stylesheet" href="static/style.css">
+    <script defer="defer" src="static/site.js"></script>
+    </head>
+  <body>
+    <header class="site-header">
+      <div class="wrap">
+        <a class="brand" href=".">Formal PODC</a><nav class="top">
+          <a href=".">Search</a><a href="about/">About</a><a href="https://github.com/vasnesterov/formal_podc">GitHub</a></nav>
+        </div>
+      </header>
+    <main class="wrap"><article><nav class="breadcrumbs" aria-label="Breadcrumb">
+          <a href=".">Search</a><span class="sep">›</span><a href="PODC2023/">PODC 2023</a><span class="sep">›</span><a href="PODC2023/DuraCAS/">DuraCAS</a><span class="sep">›</span><span aria-current="page">Differences</span></nav>
+        <h1>
+          Differences between the formalization and the paper</h1>
+        <div class="paper-links">
+          <p>
+            Rendered from <a href="https://github.com/vasnesterov/formal_podc/blob/main/Papers/PODC2023/DuraCAS/differencies.md"><code>differencies.md</code></a> of <a href="PODC2023/DuraCAS/">Efficient Recoverable Writable-CAS (DuraCAS) — PODC 2023</a>.</p>
+          </div>
+        <p>
+          Paper: Jayanti, Jayanti, Jayanti, <em>Brief Announcement: Efficient Recoverable Writable-CAS</em>, PODC 2023
+(the "BA"); proofs from the full version <em>Durable Algorithms for Writable LL/SC and CAS with Dynamic
+Joining</em>, arXiv:2302.00135v1 (the "FV").</p>
+        <section>
+          <h2 id="statement-level-issues">
+            Statement-level issues</h2>
+          <div class="loose">
+            <ol start="1">
+              <li>
+                <p>
+                  <strong>Recovery discipline (Theorem 4.1(1)) — 🔧.</strong>
+The BA states the obligation of a crashed process per object: "when π subsequently restarts, it
+must execute <code>O.Recover()</code> before invoking any other operation on <code>O</code>". The DurEC handles (and
+their <code>Val</code>/<code>DetVal</code> fields) are shared by all objects of the type, as the BA requires ("whenever
+the process calls any method on any of the implemented objects of that type, it passes its handle
+h"). A process that crashed right after its install at line 10 of DurEC's <code>ECSC</code> on object <code>O₀</code> and
+then — legally under the BA's rule — invokes a <code>CAS</code> on <code>O₁</code> overwrites <code>h.Critical.Val</code> at
+line 7; a helper then forwards that value into <code>O₀</code>. <code>theorem_4_1_1_false</code> /
+<code>perObject_counterexample</code>: 2 processes, 2 objects, initial values 0; a <code>READ</code> of <code>O₀</code> returns 2,
+which only an operation on <code>O₁</code> ever proposed. The paper explicitly states the
+weaker discipline (and the FV's Appendix A.2/A.3 argue per object too: "W.RECOVER() or Z.RECOVER()
+is executed before any other operation is executed on W or Z").
+The FV's model section says "when p subsequently restarts, it is required to execute O.RECOVER()",
+which can be read as "immediately" (per-process); under that reading the theorem holds
+(<code>theorem_4_1_1</code>). Detectability fails under the per-object rule as well (a <code>DETECT</code> bracket of an
+operation then also covers the propagation of the earlier crashed install; found by the Python model
+checker, not formalized separately).
+For the per-process reading speak the cited model
+(the BA adopts recoverable linearizability "as adapted to the individual crash model by [2]",
+Attiya–Ben-Baruch–Hendler's nesting-safe model, which is per-process), the per-handle <code>DETECT</code>
+contract (a bracket "just before … just after" an operation presupposes that the process runs
+nothing else in between) and the FV's model sentence. Against it: the BA states the per-object
+rule deliberately and twice ("before invoking any other operation <em>on O</em>"), handles are
+explicitly shared by all objects of the type, and the authors' own composition step needs and
+uses exactly the per-object rule at the DurEC level (DuraCAS's <code>RECOVER</code> runs <code>W.RECOVER</code> before
+<code>Z.RECOVER</code>, so strict per-process recovery would not even hold for <code>W</code>, <code>Z</code>); the correct
+discipline ("recover before any other non-<code>RECOVER</code> operation with the same handle") is stated
+nowhere. A user taking the BA at its word (lazy per-object recovery) gets another object's value.</p>
+                </li>
+              <li>
+                <p>
+                  <strong>Null dereference in <code>FORWARD</code> (Algorithm 1, lines 14 and 16) — 🔧 (missing case in
+pseudocode, evident fix).</strong> <code>X</code> is initialised to <code>(null, 0)</code>; <code>RECOVER</code> (hence <code>FORWARD</code>) is called
+on objects that never had an install (e.g. DuraCAS lines 22–25 always recover both <code>W</code> and <code>Z</code>), and
+then <code>x.hndl.DetVal</code> and <code>x.hndl.Val</code> dereference null. We model the evident fix "if <code>x.hndl = null</code>
+then return" (then <code>x.seq = 0</code> and line 18 does nothing anyway).</p>
+                </li>
+              <li>
+                <p>
+                  <strong>Lemma 4.4 / Lemma A.5(1) — ✏️ (typo).</strong> "In the interval (t′, t), <code>X.hndl = h</code>, <code>h.Val = v</code>"
+should be <code>h′</code> (the installer's handle), not <code>h</code> (the mover's handle, which <code>FORWARD</code> ignores).
+As written it is false whenever another process moves.</p>
+                </li>
+              <li>
+                <p>
+                  <strong>Lemma A.10(2) — 🛠️.</strong> "If <code>h.DetVal</code> is changed … then <code>X.hndl = h</code> and <code>h.pc ∈ {13,14,15}</code>" is
+false as written: a helper can change <code>h.DetVal</code> while the installer is at line 11 (has installed,
+has not yet called <code>FORWARD</code>) or has crashed (its pc is lost / it is in <code>RECOVER</code>). The intended
+statement ("h's installing <code>ECSC</code> is not yet complete") is what the proof of A.10(3) uses. The
+invariant (statements 1–5) used to prove A.10, whose proof the paper omits, is also wrong as
+stated (statement 3 fails once a helper moves while the installer is still at line 13–15; statement 4
+fails when the handle is used on two DurEC objects, as DuraCAS does with <code>h.Critical</code> on <code>W</code> and
+<code>Z</code>). Lean: <code>lemmaA10_2_counterexample</code> (p₀ installs on <code>Z</code> and crashes; p₁'s <code>FORWARD</code> raises
+<code>(p₀,crit).DetVal</code> from 0 to 1 while p₀ has no active DurEC call); the corrected statement
+<code>detVal_help_pending</code> (a successful line-15 CAS writes the sequence number of the install that is
+currently pending on that object). Detectability (A.10.1, A.10.3, A.11) holds and is proved with a
+different invariant (<a href="https://github.com/vasnesterov/formal_podc/blob/main/Papers/PODC2023/DuraCAS/CInv.lean"><code>CInv.lean</code></a>; per-process uniqueness of pending installs replaces statement 4).
+In the paper's pseudocode there is also a crash-free counterexample (the installer sits at
+line 11, between its install and its call of <code>FORWARD</code>, while a hitchhiker's <code>FORWARD</code> executes
+line 15); our model merges line 11 into line 10, so the Lean witness uses a crash. The repair of the
+lemma's statement adds the missing pc 11 and the crashed state.</p>
+                </li>
+              </ol>
+            </div>
+          </section>
+        <section>
+          <h2 id="proof-gaps-statements-true-under-the-per-process-discipline">
+            Proof gaps (statements true under the per-process discipline)</h2>
+          <div class="loose">
+            <ol start="5">
+              <li>
+                <p>
+                  <strong>Composition "W and Z behave like atomic EC objects" (start of A.2 and A.3) — 🛠️.</strong> Claimed
+without proof. It is true under the per-process discipline but only in a weaker sense than
+"atomic": a crashed <code>ECSC</code> may take effect <em>after</em> the crash (while the process is down or
+recovering), until the corresponding <code>RECOVER</code> completes. We formalize this as the A-level model
+(<a href="https://github.com/vasnesterov/formal_podc/blob/main/Papers/PODC2023/DuraCAS/AModel.lean"><code>AModel.lean</code></a>: atomic EC objects with <em>orphan</em> <code>ECSC</code>s) and prove the refinement
+(<code>reach_aReach</code>, <a href="https://github.com/vasnesterov/formal_podc/blob/main/Papers/PODC2023/DuraCAS/Refinement.lean"><code>Refinement.lean</code></a>). The A.3 proof must then also handle orphans (an orphan install,
+imprint or move behaves like the corresponding poised operation).</p>
+                </li>
+              <li>
+                <p>
+                  <strong>Linearization of hitchhiker <code>ECSC</code>s (Definition 4.6(2), main text) — ✏️.</strong> "the earliest time t
+such that a move occurs at t" must be "… with t &gt; α[6]" (as in Definition A.8); otherwise an <code>ECSC</code>
+that reads <code>Y.seq = s</code> after a move that set <code>Y.seq = s</code> would be linearized as failing in a state
+where it should succeed.</p>
+                </li>
+              <li>
+                <p>
+                  <strong>Failing <code>CAS</code> and hitchhiking writes (Definitions A.42(3), A.43(2)) — ✏️.</strong> "linearized at the earliest
+time when <code>Z.val ≠ old</code>" must be "the earliest such time in the operation's interval" (Lemma A.39
+provides one). Both linearization points are not determined forward in time (<code>Z.val</code> can go
+<code>old → x → old</code> during the first iteration while the <code>CAS</code> still succeeds in the second; a write
+may still install after the first move in its interval); the proof inserts these operations into the
+linearization retroactively at their witness step (<a href="https://github.com/vasnesterov/formal_podc/blob/main/Papers/PODC2023/DuraCAS/ALin.lean"><code>ALin.lean</code></a>, keys <code>4t + rank</code>). Lemma A.38 needs an
+extra ghost (whether the last change of <code>Z</code> was a move). No lemma of A.3 is false for the A-level
+model.</p>
+                </li>
+              <li>
+                <p>
+                  <strong>DuraCAS's <code>W</code> initial value.</strong> <code>W ← DurEC((0, 0))</code> uses the integer 0; for an arbitrary value
+type we initialise <code>W.val</code> with the object's initial value (never read before an install).</p>
+                </li>
+              </ol>
+            </div>
+          </section>
+        <section>
+          <h2 id="modelling-choices">
+            Modelling choices</h2>
+          <ul>
+            <li>
+              <p>
+                Asynchronous shared memory (NVM), individual crash–restart failures, any number of crashes;
+read and CAS hardware primitives; DurEC code inlined into DuraCAS (one hardware operation per
+step). Arbitrary process type <code>P</code> (dynamic joining), arbitrary object type <code>K</code>, arbitrary values <code>V</code>.</p>
+              </li>
+            <li>
+              <p>
+                Handles: process <code>p</code> owns the DurEC handles <code>(p, crit)</code> and <code>(p, cas)</code>, present from the start with
+<code>DetVal = 0</code>, <code>Val</code> arbitrary (<code>hv0</code>). <code>CreateHandle</code> and object construction are pure allocation
+and not modelled as steps.</p>
+              </li>
+            <li>
+              <p>
+                <code>DETECT</code> is not a step: the history records its value <code>DetVal(h.Critical)</code> at every invocation and
+completion (<code>d₁</code>, <code>d₂</code>); its second component is always <code>true</code>.</p>
+              </li>
+            <li>
+              <p>
+                Durable linearizability (<code>DurLin</code>) and detectability (<code>Detectable</code>) are defined on histories with
+invocation, response, crash and recovery-completion events (<a href="https://github.com/vasnesterov/formal_podc/blob/main/Papers/PODC2023/DuraCAS/Spec.lean"><code>Spec.lean</code></a>); "safe to repeat" is
+formalized as "not linearized" for operations completed by <code>RECOVER</code> with <code>d₂ = d₁</code>.</p>
+              </li>
+            <li>
+              <p>
+                Most general client: an idle process may invoke any operation on any object; a crash of a busy
+process restarts it at <code>RECOVER</code> of the object of its operation (per-process discipline).</p>
+              </li>
+            <li>
+              <p>
+                Wait-freedom: an explicit bound of 54 own steps per operation or <code>RECOVER</code> (<code>waitFree</code>), counting
+every hardware access.</p>
+              </li>
+            <li>
+              <p>
+                Not formalized: the space bound <code>O(m + n)</code> (Theorem 4.1(4)) — immediate from the data layout (two
+words per handle, two DurEC objects of two words each per object); dynamic joining (4.1(3)) is
+reflected by the arbitrary process type only.</p>
+              </li>
+            </ul>
+          </section>
+        </article></main><footer class="site-footer"><div class="wrap">
+        Machine-checked formalizations of PODC papers in Lean 4. Generated with <a href="https://github.com/leanprover/verso">Verso</a> from the README files of <a href="https://github.com/vasnesterov/formal_podc">vasnesterov/formal_podc</a>.</div>
+      </footer></body>
+  </html>
+

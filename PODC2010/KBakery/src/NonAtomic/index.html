@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="light dark">
+    <link rel="icon" href="data:,">
+    <title>KBakery: NonAtomic.lean · Formal PODC</title><base href="../../../.././"><link rel="stylesheet" href="static/lean/verso-vars.css">
+    <link rel="stylesheet" href="static/lean/highlighting.css">
+    <link rel="stylesheet" href="static/lean/tippy-border.css">
+    <link rel="stylesheet" href="static/style.css">
+    <script defer="defer" src="static/site.js"></script>
+    </head>
+  <body>
+    <header class="site-header">
+      <div class="wrap">
+        <a class="brand" href=".">Formal PODC</a><nav class="top">
+          <a href=".">Search</a><a href="about/">About</a><a href="https://github.com/vasnesterov/formal_podc">GitHub</a></nav>
+        </div>
+      </header>
+    <main class="wrap"><article><nav class="breadcrumbs" aria-label="Breadcrumb">
+          <a href=".">Search</a><span class="sep">›</span><a href="PODC2010/">PODC 2010</a><span class="sep">›</span><a href="PODC2010/KBakery/">KBakery</a><span class="sep">›</span><a href="PODC2010/KBakery/src/">Lean source</a><span class="sep">›</span><span aria-current="page">NonAtomic</span></nav>
+        <h1>
+          <code>NonAtomic.lean</code></h1>
+        <div class="paper-links">
+          <p>
+            Source of <a href="PODC2010/KBakery/">The k-Bakery — PODC 2010</a> · <a href="https://github.com/vasnesterov/formal_podc/blob/main/Papers/PODC2010/KBakery/NonAtomic.lean">GitHub</a> · hover over a name for its type and documentation</p>
+          </div>
+        <div class="lean-code lean-src">
+          <code class="hl lean block" data-lean-context="NonAtomic"><span id="L1"><span class="kw">import</span> Mathlib</span>
+<span id="L2"></span>
+<span id="L3"><span class="dc">/-!</span></span>
+<span id="L4"><span class="dc"># Figure 3 (non-atomic reads and writes) violates k-exclusion</span></span>
+<span id="L5"></span>
+<span id="L6"><span class="dc">We model the algorithm of Figure 3 of the paper (Figure 5.6 of the thesis) with **non-atomic**</span></span>
+<span id="L7"><span class="dc">(Lamport-safe) single-writer registers, as the paper prescribes ("atomic (non-atomic) reads and</span></span>
+<span id="L8"><span class="dc">writes of variables in this paper behave the same as reads and writes of multireader single-writer</span></span>
+<span id="L9"><span class="dc">atomic (safe) registers"; "if a non-atomic read and write access the same variable concurrently,</span></span>
+<span id="L10"><span class="dc">then the read returns an arbitrary value").</span></span>
+<span id="L11"></span>
+<span id="L12"><span class="dc">## Model (a sub-model of the paper's, which suffices for a counterexample)</span></span>
+<span id="L13"></span>
+<span id="L14"><span class="dc">* Every register (`Want[i][j][b]`, `Ticket[i]`, `Capture[i][j][b]`) holds a value in `ℕ ∪ {∞}`.</span></span>
+<span id="L15"><span class="dc">* A write takes two steps of the writer: *begin* (the register becomes busy) and *end* (the new</span></span>
+<span id="L16"><span class="dc">  value is stored, the register is no longer busy). A read is one step: if the register is not</span></span>
+<span id="L17"><span class="dc">  busy it returns the stored value; if a write is in progress it returns an arbitrary value chosen</span></span>
+<span id="L18"><span class="dc">  by the adversary. (Every execution of this model is an execution of the interval model of</span></span>
+<span id="L19"><span class="dc">  safe registers: zero-length reads overlapping a write may return anything, the others return the</span></span>
+<span id="L20"><span class="dc">  last written value.)</span></span>
+<span id="L21"><span class="dc">* A process reads its own `Ticket[p]` and `Capture[p][i][1]` (lines 30–33, 38, 41, 44, 45) without</span></span>
+<span id="L22"><span class="dc">  a separate step: it is the only writer and never reads them while writing them, so such reads</span></span>
+<span id="L23"><span class="dc">  always return the stored value.</span></span>
+<span id="L24"><span class="dc">* The `foreach` loops visit indices in the order of a fixed list `ord` of all processes (the</span></span>
+<span id="L25"><span class="dc">  paper leaves the order unspecified, so this is one of the allowed implementations; the</span></span>
+<span id="L26"><span class="dc">  counterexample uses `ord = [0, 1, 2]`).</span></span>
+<span id="L27"><span class="dc">* An execution is a list of events `(p, d)`: process `p` takes its next step; `d = some v` supplies</span></span>
+<span id="L28"><span class="dc">  the value of a read that overlaps a write (`none` otherwise). `exec` returns `none` on an</span></span>
+<span id="L29"><span class="dc">  ill-formed event, so `exec … = some s` certifies a legal execution.</span></span>
+<span id="L30"></span>
+<span id="L31"><span class="dc">`counterexample` exhibits, for `N = 3` processes and `k = 1`, a legal execution ending with two</span></span>
+<span id="L32"><span class="dc">processes in the critical section.</span></span>
+<span id="L33"></span>
+<span id="L34"><span class="dc">**The flaw.** `Ticket` is a safe register, so a process choosing its ticket while another</span></span>
+<span id="L35"><span class="dc">process `r` rewrites `Ticket[r]` may read `0`, choose a ticket smaller than an *old* capture value</span></span>
+<span id="L36"><span class="dc">`Capture[r][p]` that `r` wrote in an earlier passage, and immediately detect a (stale) capture.</span></span>
+<span id="L37"><span class="dc">-/</span></span>
+<span id="L38"></span>
+<span id="L39"><span class="kw">namespace</span> Podc.KBakery.NonAtomic</span>
+<span id="L40"></span>
+<span id="L41"><span class="dc">/-- Shared registers. -/</span></span>
+<span id="L42"><span class="kw">inductive</span> <span class="const token" data-verso-hover="286">Reg</span> (P : <span class="kw">Type</span>) <span class="kw">where</span></span>
+<span id="L43">  | <span class="const token" data-verso-hover="287">want</span> (i j : P) (b : <span class="const token" data-verso-hover="26">Bool</span>)</span>
+<span id="L44">  | <span class="const token" data-verso-hover="288">ticket</span> (i : P)</span>
+<span id="L45">  | <span class="const token" data-verso-hover="289">cap</span> (i j : P) (b : <span class="const token" data-verso-hover="26">Bool</span>)</span>
+<span id="L46">  <span class="kw">deriving</span> <span class="const token" data-verso-hover="270">DecidableEq</span></span>
+<span id="L47"></span>
+<span id="L48"><span class="dc">/-- What to do after a sequence of writes. -/</span></span>
+<span id="L49"><span class="kw">inductive</span> <span class="const token" data-verso-hover="290">Cont</span> (P : <span class="kw">Type</span>) <span class="kw">where</span></span>
+<span id="L50">  <span class="dc">/-- line 31 -/</span></span>
+<span id="L51">  | <span class="const token" data-verso-hover="291">choose</span></span>
+<span id="L52">  <span class="dc">/-- line 34: enter the loop -/</span></span>
+<span id="L53">  | <span class="const token" data-verso-hover="292">loop</span></span>
+<span id="L54">  <span class="dc">/-- lines 43–45, still to visit `rem` -/</span></span>
+<span id="L55">  | <span class="const token" data-verso-hover="293">capt</span> (rem : <span class="const token" data-verso-hover="294">List</span> P)</span>
+<span id="L56">  <span class="dc">/-- line 46 -/</span></span>
+<span id="L57">  | <span class="const token" data-verso-hover="295">cs</span></span>
+<span id="L58">  <span class="dc">/-- back to the NCS -/</span></span>
+<span id="L59">  | <span class="const token" data-verso-hover="296">ncs</span></span>
+<span id="L60">  <span class="kw">deriving</span> <span class="const token" data-verso-hover="270">DecidableEq</span></span>
+<span id="L61"></span>
+<span id="L62"><span class="dc">/-- Program counters with local variables. -/</span></span>
+<span id="L63"><span class="kw">inductive</span> <span class="const token" data-verso-hover="297">PC</span> (P : <span class="kw">Type</span>) <span class="kw">where</span></span>
+<span id="L64">  | <span class="const token" data-verso-hover="298">ncs</span></span>
+<span id="L65">  <span class="dc">/-- pending writes; `started` = the first write has begun -/</span></span>
+<span id="L66">  | <span class="const token" data-verso-hover="299">writes</span> (ws : <span class="const token" data-verso-hover="294">List</span> (<span class="const token" data-verso-hover="286">Reg</span> P × <span class="const token" data-verso-hover="188">WithTop</span> <span class="const token" data-verso-hover="27">ℕ</span>)) (started : <span class="const token" data-verso-hover="26">Bool</span>) (k : <span class="const token" data-verso-hover="290">Cont</span> P)</span>
+<span id="L67">  <span class="dc">/-- line 31: reading `Ticket[i]` for `i ∈ rem`, maximum so far `acc` -/</span></span>
+<span id="L68">  | <span class="const token" data-verso-hover="300">choose</span> (acc : <span class="const token" data-verso-hover="27">ℕ</span>) (rem : <span class="const token" data-verso-hover="294">List</span> P)</span>
+<span id="L69">  <span class="dc">/-- lines 37–39: `second = false`: read `Want[i][p][2]` of the head `i` of `rem`;</span></span>
+<span id="L70"><span class="dc">  `second = true`: read `Want[i][p][1]` -/</span></span>
+<span id="L71">  | <span class="const token" data-verso-hover="301">scan</span> (pred : <span class="const token" data-verso-hover="73">Finset</span> P) (rem : <span class="const token" data-verso-hover="294">List</span> P) (second : <span class="const token" data-verso-hover="26">Bool</span>)</span>
+<span id="L72">  <span class="dc">/-- lines 40–42 -/</span></span>
+<span id="L73">  | <span class="const token" data-verso-hover="302">chk</span> (pred : <span class="const token" data-verso-hover="73">Finset</span> P) (rem : <span class="const token" data-verso-hover="294">List</span> P) (second cap : <span class="const token" data-verso-hover="26">Bool</span>)</span>
+<span id="L74">  <span class="dc">/-- line 44: read `Ticket[i]` of the head `i` of `rem` -/</span></span>
+<span id="L75">  | <span class="const token" data-verso-hover="303">capt</span> (rem : <span class="const token" data-verso-hover="294">List</span> P)</span>
+<span id="L76">  <span class="dc">/-- line 46 -/</span></span>
+<span id="L77">  | <span class="const token" data-verso-hover="304">cs</span></span>
+<span id="L78">  <span class="kw">deriving</span> <span class="const token" data-verso-hover="270">DecidableEq</span></span>
+<span id="L79"></span>
+<span id="L80"><span class="dc">/-- Configurations. -/</span></span>
+<span id="L81"><span class="kw">structure</span> <span class="const token" data-verso-hover="305">Cfg</span> (P : <span class="kw">Type</span>) <span class="kw">where</span></span>
+<span id="L82">  <span class="const token" data-verso-hover="306">mem</span> : <span class="const token" data-verso-hover="286">Reg</span> P → <span class="const token" data-verso-hover="188">WithTop</span> <span class="const token" data-verso-hover="27">ℕ</span></span>
+<span id="L83">  <span class="const token" data-verso-hover="307">busy</span> : <span class="const token" data-verso-hover="286">Reg</span> P → <span class="const token" data-verso-hover="26">Bool</span></span>
+<span id="L84">  <span class="const token" data-verso-hover="308">pc</span> : P → <span class="const token" data-verso-hover="297">PC</span> P</span>
+<span id="L85"></span>
+<span id="L86"><span class="kw">variable</span> {P : <span class="kw">Type</span>} [<span class="const token" data-verso-hover="270">DecidableEq</span> P] [<span class="const token" data-verso-hover="24">LinearOrder</span> P] [<span class="const token" data-verso-hover="25">Fintype</span> P]</span>
+<span id="L87"></span>
+<span id="L88"><span class="dc">/-- Initial configuration: `Want = ∞`, `Ticket = 0`, `Capture = 0`. -/</span></span>
+<span id="L89"><span class="kw">def</span> <span class="const token" data-verso-hover="309">Cfg.init</span> : <span class="const token" data-verso-hover="305">Cfg</span> P <span class="kw">where</span></span>
+<span id="L90">  <span class="const token" data-verso-hover="306">mem</span> r := <span class="kw">match</span> r <span class="kw">with</span></span>
+<span id="L91">    | <span class="const token" data-verso-hover="287">.</span>want _ _ _ =&gt; ⊤</span>
+<span id="L92">    | _ =&gt; <span class="nu">0</span></span>
+<span id="L93">  <span class="const token" data-verso-hover="307">busy</span> _ := <span class="const token" data-verso-hover="2">false</span></span>
+<span id="L94">  <span class="const token" data-verso-hover="308">pc</span> _ := <span class="const token" data-verso-hover="298">.</span>ncs</span>
+<span id="L95"></span>
+<span id="L96"><span class="dc">/-- The value of a read of `r`: the stored value if `r` is not busy (and no value is supplied),</span></span>
+<span id="L97"><span class="dc">the supplied arbitrary value if `r` is busy. -/</span></span>
+<span id="L98"><span class="kw">def</span> <span class="const token" data-verso-hover="310">readVal</span> (s : <span class="const token" data-verso-hover="305">Cfg</span> P) (r : <span class="const token" data-verso-hover="286">Reg</span> P) (d : <span class="const token" data-verso-hover="277">Option</span> (<span class="const token" data-verso-hover="188">WithTop</span> <span class="const token" data-verso-hover="27">ℕ</span>)) : <span class="const token" data-verso-hover="277">Option</span> (<span class="const token" data-verso-hover="188">WithTop</span> <span class="const token" data-verso-hover="27">ℕ</span>) :=</span>
+<span id="L99">  <span class="kw">if</span> s.<span class="const token" data-verso-hover="307">busy</span> r <span class="kw">then</span> d <span class="kw">else</span> <span class="kw">if</span> d = <span class="const token" data-verso-hover="278">none</span> <span class="kw">then</span> <span class="const token" data-verso-hover="279">some</span> (s.<span class="const token" data-verso-hover="306">mem</span> r) <span class="kw">else</span> <span class="const token" data-verso-hover="278">none</span></span>
+<span id="L100"></span>
+<span id="L101"><span class="dc">/-- The stored ticket of `p` as a natural number (tickets are finite). -/</span></span>
+<span id="L102"><span class="kw">def</span> <span class="const token" data-verso-hover="311">tk</span> (s : <span class="const token" data-verso-hover="305">Cfg</span> P) (p : P) : <span class="const token" data-verso-hover="27">ℕ</span> := <span class="const token" data-verso-hover="312">WithTop.untopD</span> <span class="nu">0</span> (s.<span class="const token" data-verso-hover="306">mem</span> (<span class="const token" data-verso-hover="288">.</span>ticket p))</span>
+<span id="L103"></span>
+<span id="L104"><span class="dc">/-- `(a, p) &lt; (w, q)` lexicographically, `w ∈ ℕ ∪ {∞}`. -/</span></span>
+<span id="L105"><span class="kw">def</span> <span class="const token" data-verso-hover="313">pairLt</span> (a : <span class="const token" data-verso-hover="27">ℕ</span>) (p : P) (w : <span class="const token" data-verso-hover="188">WithTop</span> <span class="const token" data-verso-hover="27">ℕ</span>) (q : P) : <span class="const token" data-verso-hover="26">Bool</span> :=</span>
+<span id="L106">  <span class="const token" data-verso-hover="280">decide</span> ((a : <span class="const token" data-verso-hover="188">WithTop</span> <span class="const token" data-verso-hover="27">ℕ</span>) &lt; w) || (<span class="const token" data-verso-hover="280">decide</span> ((a : <span class="const token" data-verso-hover="188">WithTop</span> <span class="const token" data-verso-hover="27">ℕ</span>) = w) &amp;&amp; <span class="const token" data-verso-hover="280">decide</span> (p &lt; q))</span>
+<span id="L107"></span>
+<span id="L108"><span class="dc">/-- The writes `Want[p][i][1] := v; Want[p][i][2] := v` for `i` in `is`. -/</span></span>
+<span id="L109"><span class="kw">def</span> <span class="const token" data-verso-hover="314">wantWrites</span> (p : P) (is : <span class="const token" data-verso-hover="294">List</span> P) (v : <span class="const token" data-verso-hover="188">WithTop</span> <span class="const token" data-verso-hover="27">ℕ</span>) : <span class="const token" data-verso-hover="294">List</span> (<span class="const token" data-verso-hover="286">Reg</span> P × <span class="const token" data-verso-hover="188">WithTop</span> <span class="const token" data-verso-hover="27">ℕ</span>) :=</span>
+<span id="L110">  is.<span class="const token" data-verso-hover="315">flatMap</span> <span class="kw">fun</span> i =&gt; [(<span class="const token" data-verso-hover="287">.</span>want p i <span class="const token" data-verso-hover="2">false</span>, v), (<span class="const token" data-verso-hover="287">.</span>want p i <span class="const token" data-verso-hover="3">true</span>, v)]</span>
+<span id="L111"></span>
+<span id="L112"><span class="dc">/-- Continue after the pending writes are done. -/</span></span>
+<span id="L113"><span class="kw">def</span> <span class="const token" data-verso-hover="316">contPC</span> (ord : <span class="const token" data-verso-hover="294">List</span> P) (k : <span class="const token" data-verso-hover="27">ℕ</span>) (p : P) : <span class="const token" data-verso-hover="290">Cont</span> P → <span class="const token" data-verso-hover="297">PC</span> P</span>
+<span id="L114">  | <span class="const token" data-verso-hover="291">.</span><span class="kw">choose</span> =&gt; <span class="const token" data-verso-hover="300">.</span><span class="kw">choose</span> <span class="nu">0</span> ord</span>
+<span id="L115">  | <span class="const token" data-verso-hover="292">.</span>loop =&gt;</span>
+<span id="L116">    <span class="cm">--</span><span class="cm"> lines 34–36: `predecessor_set := {1..N} \ {p}`, `captured := false`, loop test</span></span>
+<span id="L117">    <span class="kw">let</span> pred := <span class="const token" data-verso-hover="74">Finset.univ</span>.<span class="const token" data-verso-hover="109">erase</span> p</span>
+<span id="L118">    <span class="kw">if</span> k ≤ pred.<span class="const token" data-verso-hover="100">card</span> <span class="kw">then</span> <span class="const token" data-verso-hover="301">.</span>scan pred (ord.<span class="const token" data-verso-hover="317">filter</span> (· ∈ pred)) <span class="const token" data-verso-hover="2">false</span> <span class="kw">else</span> <span class="const token" data-verso-hover="303">.</span>capt ord</span>
+<span id="L119">  | <span class="const token" data-verso-hover="293">.</span>capt rem =&gt; <span class="const token" data-verso-hover="303">.</span>capt rem</span>
+<span id="L120">  | <span class="const token" data-verso-hover="295">.</span>cs =&gt; <span class="const token" data-verso-hover="304">.</span>cs</span>
+<span id="L121">  | <span class="const token" data-verso-hover="296">.</span>ncs =&gt; <span class="const token" data-verso-hover="298">.</span>ncs</span>
+<span id="L122"></span>
+<span id="L123"><span class="dc">/-- The location after a pass of lines 37–42 (loop test of line 36). -/</span></span>
+<span id="L124"><span class="kw">def</span> <span class="const token" data-verso-hover="318">loopTest</span> (ord : <span class="const token" data-verso-hover="294">List</span> P) (k : <span class="const token" data-verso-hover="27">ℕ</span>) (pred : <span class="const token" data-verso-hover="73">Finset</span> P) (cap : <span class="const token" data-verso-hover="26">Bool</span>) : <span class="const token" data-verso-hover="297">PC</span> P :=</span>
+<span id="L125">  <span class="kw">if</span> k ≤ pred.<span class="const token" data-verso-hover="100">card</span> ∧ cap = <span class="const token" data-verso-hover="2">false</span> <span class="kw">then</span> <span class="const token" data-verso-hover="301">.</span>scan pred (ord.<span class="const token" data-verso-hover="317">filter</span> (· ∈ pred)) <span class="const token" data-verso-hover="2">false</span> <span class="kw">else</span> <span class="const token" data-verso-hover="303">.</span>capt ord</span>
+<span id="L126"></span>
+<span id="L127"><span class="dc">/-- Set the program counter of `p`. -/</span></span>
+<span id="L128"><span class="kw">def</span> <span class="const token" data-verso-hover="319">Cfg.setPc</span> (s : <span class="const token" data-verso-hover="305">Cfg</span> P) (p : P) (c : <span class="const token" data-verso-hover="297">PC</span> P) : <span class="const token" data-verso-hover="305">Cfg</span> P := { s <span class="kw">with</span> <span class="const token" data-verso-hover="308">pc</span> := <span class="const token" data-verso-hover="33">Function.update</span> s.<span class="const token" data-verso-hover="308">pc</span> p c }</span>
+<span id="L129"></span>
+<span id="L130"><span class="dc">/-- One step of process `p`; `d` supplies the value of a read overlapping a write. `none` if the</span></span>
+<span id="L131"><span class="dc">event is ill-formed. -/</span></span>
+<span id="L132"><span class="kw">def</span> <span class="const token" data-verso-hover="320">step</span> (ord : <span class="const token" data-verso-hover="294">List</span> P) (k : <span class="const token" data-verso-hover="27">ℕ</span>) (s : <span class="const token" data-verso-hover="305">Cfg</span> P) (p : P) (d : <span class="const token" data-verso-hover="277">Option</span> (<span class="const token" data-verso-hover="188">WithTop</span> <span class="const token" data-verso-hover="27">ℕ</span>)) : <span class="const token" data-verso-hover="277">Option</span> (<span class="const token" data-verso-hover="305">Cfg</span> P) :=</span>
+<span id="L133">  <span class="kw">match</span> s.<span class="const token" data-verso-hover="308">pc</span> p <span class="kw">with</span></span>
+<span id="L134">  | <span class="const token" data-verso-hover="298">.</span>ncs =&gt;</span>
+<span id="L135">    <span class="cm">--</span><span class="cm"> lines 29–30: announce the ticket of the previous passage</span></span>
+<span id="L136">    <span class="kw">if</span> d = <span class="const token" data-verso-hover="278">none</span> <span class="kw">then</span></span>
+<span id="L137">      <span class="const token" data-verso-hover="279">some</span> (s.<span class="const token" data-verso-hover="319">setPc</span> p (<span class="const token" data-verso-hover="299">.</span>writes (<span class="const token" data-verso-hover="314">wantWrites</span> p (ord.<span class="const token" data-verso-hover="317">filter</span> (· ≠ p)) (s.<span class="const token" data-verso-hover="306">mem</span> (<span class="const token" data-verso-hover="288">.</span>ticket p))) <span class="const token" data-verso-hover="2">false</span></span>
+<span id="L138">        <span class="const token" data-verso-hover="291">.</span><span class="kw">choose</span>))</span>
+<span id="L139">    <span class="kw">else</span> <span class="const token" data-verso-hover="278">none</span></span>
+<span id="L140">  | <span class="const token" data-verso-hover="299">.</span>writes [] _ c =&gt; <span class="kw">if</span> d = <span class="const token" data-verso-hover="278">none</span> <span class="kw">then</span> <span class="const token" data-verso-hover="279">some</span> (s.<span class="const token" data-verso-hover="319">setPc</span> p (<span class="const token" data-verso-hover="316">contPC</span> ord k p c)) <span class="kw">else</span> <span class="const token" data-verso-hover="278">none</span></span>
+<span id="L141">  | <span class="const token" data-verso-hover="299">.</span>writes ((r, v) :: ws) <span class="const token" data-verso-hover="2">false</span> c =&gt;</span>
+<span id="L142">    <span class="kw">if</span> d = <span class="const token" data-verso-hover="278">none</span> <span class="kw">then</span></span>
+<span id="L143">      <span class="const token" data-verso-hover="279">some</span> { s <span class="kw">with</span> <span class="const token" data-verso-hover="307">busy</span> := <span class="const token" data-verso-hover="33">Function.update</span> s.<span class="const token" data-verso-hover="307">busy</span> r <span class="const token" data-verso-hover="3">true</span>,</span>
+<span id="L144">                    <span class="const token" data-verso-hover="308">pc</span> := <span class="const token" data-verso-hover="33">Function.update</span> s.<span class="const token" data-verso-hover="308">pc</span> p (<span class="const token" data-verso-hover="299">.</span>writes ((r, v) :: ws) <span class="const token" data-verso-hover="3">true</span> c) }</span>
+<span id="L145">    <span class="kw">else</span> <span class="const token" data-verso-hover="278">none</span></span>
+<span id="L146">  | <span class="const token" data-verso-hover="299">.</span>writes ((r, v) :: ws) <span class="const token" data-verso-hover="3">true</span> c =&gt;</span>
+<span id="L147">    <span class="kw">if</span> d = <span class="const token" data-verso-hover="278">none</span> <span class="kw">then</span></span>
+<span id="L148">      <span class="const token" data-verso-hover="279">some</span> { s <span class="kw">with</span> <span class="const token" data-verso-hover="306">mem</span> := <span class="const token" data-verso-hover="33">Function.update</span> s.<span class="const token" data-verso-hover="306">mem</span> r v, <span class="const token" data-verso-hover="307">busy</span> := <span class="const token" data-verso-hover="33">Function.update</span> s.<span class="const token" data-verso-hover="307">busy</span> r <span class="const token" data-verso-hover="2">false</span>,</span>
+<span id="L149">                    <span class="const token" data-verso-hover="308">pc</span> := <span class="const token" data-verso-hover="33">Function.update</span> s.<span class="const token" data-verso-hover="308">pc</span> p (<span class="const token" data-verso-hover="299">.</span>writes ws <span class="const token" data-verso-hover="2">false</span> c) }</span>
+<span id="L150">    <span class="kw">else</span> <span class="const token" data-verso-hover="278">none</span></span>
+<span id="L151">  | <span class="const token" data-verso-hover="300">.</span><span class="kw">choose</span> acc [] =&gt;</span>
+<span id="L152">    <span class="cm">--</span><span class="cm"> line 31: write `Ticket[p] := 1 + max`, then lines 32–33</span></span>
+<span id="L153">    <span class="kw">if</span> d = <span class="const token" data-verso-hover="278">none</span> <span class="kw">then</span></span>
+<span id="L154">      <span class="const token" data-verso-hover="279">some</span> (s.<span class="const token" data-verso-hover="319">setPc</span> p (<span class="const token" data-verso-hover="299">.</span>writes ((<span class="const token" data-verso-hover="288">.</span>ticket p, ((acc + <span class="nu">1</span> : <span class="const token" data-verso-hover="27">ℕ</span>) : <span class="const token" data-verso-hover="188">WithTop</span> <span class="const token" data-verso-hover="27">ℕ</span>)) ::</span>
+<span id="L155">        <span class="const token" data-verso-hover="314">wantWrites</span> p (ord.<span class="const token" data-verso-hover="317">filter</span> (· ≠ p)) ((acc + <span class="nu">1</span> : <span class="const token" data-verso-hover="27">ℕ</span>) : <span class="const token" data-verso-hover="188">WithTop</span> <span class="const token" data-verso-hover="27">ℕ</span>)) <span class="const token" data-verso-hover="2">false</span> <span class="const token" data-verso-hover="292">.</span>loop))</span>
+<span id="L156">    <span class="kw">else</span> <span class="const token" data-verso-hover="278">none</span></span>
+<span id="L157">  | <span class="const token" data-verso-hover="300">.</span><span class="kw">choose</span> acc (i :: rem) =&gt;</span>
+<span id="L158">    <span class="kw">if</span> i = p <span class="kw">then</span></span>
+<span id="L159">      <span class="kw">if</span> d = <span class="const token" data-verso-hover="278">none</span> <span class="kw">then</span> <span class="const token" data-verso-hover="279">some</span> (s.<span class="const token" data-verso-hover="319">setPc</span> p (<span class="const token" data-verso-hover="300">.</span><span class="kw">choose</span> (<span class="const token" data-verso-hover="256">max</span> acc (<span class="const token" data-verso-hover="311">tk</span> s p)) rem)) <span class="kw">else</span> <span class="const token" data-verso-hover="278">none</span></span>
+<span id="L160">    <span class="kw">else</span></span>
+<span id="L161">      (<span class="const token" data-verso-hover="310">readVal</span> s (<span class="const token" data-verso-hover="288">.</span>ticket i) d).<span class="const token" data-verso-hover="321">bind</span> <span class="kw">fun</span> v =&gt;</span>
+<span id="L162">        <span class="const token" data-verso-hover="279">some</span> (s.<span class="const token" data-verso-hover="319">setPc</span> p (<span class="const token" data-verso-hover="300">.</span><span class="kw">choose</span> (<span class="const token" data-verso-hover="256">max</span> acc (<span class="const token" data-verso-hover="312">WithTop.untopD</span> <span class="nu">0</span> v)) rem))</span>
+<span id="L163">  | <span class="const token" data-verso-hover="301">.</span>scan pred [] _ =&gt; <span class="kw">if</span> d = <span class="const token" data-verso-hover="278">none</span> <span class="kw">then</span></span>
+<span id="L164">      <span class="const token" data-verso-hover="279">some</span> (s.<span class="const token" data-verso-hover="319">setPc</span> p (<span class="const token" data-verso-hover="302">.</span>chk pred ord <span class="const token" data-verso-hover="2">false</span> <span class="const token" data-verso-hover="2">false</span>)) <span class="kw">else</span> <span class="const token" data-verso-hover="278">none</span></span>
+<span id="L165">  | <span class="const token" data-verso-hover="301">.</span>scan pred (i :: rem) <span class="const token" data-verso-hover="2">false</span> =&gt;</span>
+<span id="L166">    (<span class="const token" data-verso-hover="310">readVal</span> s (<span class="const token" data-verso-hover="287">.</span>want i p <span class="const token" data-verso-hover="3">true</span>) d).<span class="const token" data-verso-hover="321">bind</span> <span class="kw">fun</span> v =&gt;</span>
+<span id="L167">      <span class="cm">--</span><span class="cm"> line 38</span></span>
+<span id="L168">      <span class="kw">if</span> <span class="const token" data-verso-hover="313">pairLt</span> (<span class="const token" data-verso-hover="311">tk</span> s p) p v i <span class="kw">then</span> <span class="const token" data-verso-hover="279">some</span> (s.<span class="const token" data-verso-hover="319">setPc</span> p (<span class="const token" data-verso-hover="301">.</span>scan pred (i :: rem) <span class="const token" data-verso-hover="3">true</span>))</span>
+<span id="L169">      <span class="kw">else</span> <span class="const token" data-verso-hover="279">some</span> (s.<span class="const token" data-verso-hover="319">setPc</span> p (<span class="const token" data-verso-hover="301">.</span>scan pred rem <span class="const token" data-verso-hover="2">false</span>))</span>
+<span id="L170">  | <span class="const token" data-verso-hover="301">.</span>scan pred (i :: rem) <span class="const token" data-verso-hover="3">true</span> =&gt;</span>
+<span id="L171">    (<span class="const token" data-verso-hover="310">readVal</span> s (<span class="const token" data-verso-hover="287">.</span>want i p <span class="const token" data-verso-hover="2">false</span>) d).<span class="const token" data-verso-hover="321">bind</span> <span class="kw">fun</span> v =&gt;</span>
+<span id="L172">      <span class="cm">--</span><span class="cm"> line 39</span></span>
+<span id="L173">      <span class="kw">if</span> <span class="const token" data-verso-hover="313">pairLt</span> (<span class="const token" data-verso-hover="311">tk</span> s p) p v i <span class="kw">then</span> <span class="const token" data-verso-hover="279">some</span> (s.<span class="const token" data-verso-hover="319">setPc</span> p (<span class="const token" data-verso-hover="301">.</span>scan (pred.<span class="const token" data-verso-hover="109">erase</span> i) rem <span class="const token" data-verso-hover="2">false</span>))</span>
+<span id="L174">      <span class="kw">else</span> <span class="const token" data-verso-hover="279">some</span> (s.<span class="const token" data-verso-hover="319">setPc</span> p (<span class="const token" data-verso-hover="301">.</span>scan pred rem <span class="const token" data-verso-hover="2">false</span>))</span>
+<span id="L175">  | <span class="const token" data-verso-hover="302">.</span>chk pred [] _ cap =&gt; <span class="kw">if</span> d = <span class="const token" data-verso-hover="278">none</span> <span class="kw">then</span> <span class="const token" data-verso-hover="279">some</span> (s.<span class="const token" data-verso-hover="319">setPc</span> p (<span class="const token" data-verso-hover="318">loopTest</span> ord k pred cap)) <span class="kw">else</span> <span class="const token" data-verso-hover="278">none</span></span>
+<span id="L176">  | <span class="const token" data-verso-hover="302">.</span>chk pred (i :: rem) <span class="const token" data-verso-hover="2">false</span> cap =&gt;</span>
+<span id="L177">    (<span class="const token" data-verso-hover="310">readVal</span> s (<span class="const token" data-verso-hover="289">.</span>cap i p <span class="const token" data-verso-hover="3">true</span>) d).<span class="const token" data-verso-hover="321">bind</span> <span class="kw">fun</span> v =&gt;</span>
+<span id="L178">      <span class="cm">--</span><span class="cm"> line 41</span></span>
+<span id="L179">      <span class="kw">if</span> ((<span class="const token" data-verso-hover="311">tk</span> s p : <span class="const token" data-verso-hover="27">ℕ</span>) : <span class="const token" data-verso-hover="188">WithTop</span> <span class="const token" data-verso-hover="27">ℕ</span>) &lt; v <span class="kw">then</span> <span class="const token" data-verso-hover="279">some</span> (s.<span class="const token" data-verso-hover="319">setPc</span> p (<span class="const token" data-verso-hover="302">.</span>chk pred (i :: rem) <span class="const token" data-verso-hover="3">true</span> cap))</span>
+<span id="L180">      <span class="kw">else</span> <span class="const token" data-verso-hover="279">some</span> (s.<span class="const token" data-verso-hover="319">setPc</span> p (<span class="const token" data-verso-hover="302">.</span>chk pred rem <span class="const token" data-verso-hover="2">false</span> cap))</span>
+<span id="L181">  | <span class="const token" data-verso-hover="302">.</span>chk pred (i :: rem) <span class="const token" data-verso-hover="3">true</span> cap =&gt;</span>
+<span id="L182">    (<span class="const token" data-verso-hover="310">readVal</span> s (<span class="const token" data-verso-hover="289">.</span>cap i p <span class="const token" data-verso-hover="2">false</span>) d).<span class="const token" data-verso-hover="321">bind</span> <span class="kw">fun</span> v =&gt;</span>
+<span id="L183">      <span class="cm">--</span><span class="cm"> line 42</span></span>
+<span id="L184">      <span class="kw">if</span> ((<span class="const token" data-verso-hover="311">tk</span> s p : <span class="const token" data-verso-hover="27">ℕ</span>) : <span class="const token" data-verso-hover="188">WithTop</span> <span class="const token" data-verso-hover="27">ℕ</span>) &lt; v <span class="kw">then</span> <span class="const token" data-verso-hover="279">some</span> (s.<span class="const token" data-verso-hover="319">setPc</span> p (<span class="const token" data-verso-hover="302">.</span>chk pred rem <span class="const token" data-verso-hover="2">false</span> <span class="const token" data-verso-hover="3">true</span>))</span>
+<span id="L185">      <span class="kw">else</span> <span class="const token" data-verso-hover="279">some</span> (s.<span class="const token" data-verso-hover="319">setPc</span> p (<span class="const token" data-verso-hover="302">.</span>chk pred rem <span class="const token" data-verso-hover="2">false</span> cap))</span>
+<span id="L186">  | <span class="const token" data-verso-hover="303">.</span>capt [] =&gt; <span class="kw">if</span> d = <span class="const token" data-verso-hover="278">none</span> <span class="kw">then</span> <span class="const token" data-verso-hover="279">some</span> (s.<span class="const token" data-verso-hover="319">setPc</span> p <span class="const token" data-verso-hover="304">.</span>cs) <span class="kw">else</span> <span class="const token" data-verso-hover="278">none</span></span>
+<span id="L187">  | <span class="const token" data-verso-hover="303">.</span>capt (i :: rem) =&gt;</span>
+<span id="L188">    <span class="cm">--</span><span class="cm"> line 44: `Capture[p][i][1] ≤ Ticket[i]` (own register read directly)</span></span>
+<span id="L189">    <span class="kw">let</span> readT := <span class="kw">if</span> i = p <span class="kw">then</span> (<span class="kw">if</span> d = <span class="const token" data-verso-hover="278">none</span> <span class="kw">then</span> <span class="const token" data-verso-hover="279">some</span> (s.<span class="const token" data-verso-hover="306">mem</span> (<span class="const token" data-verso-hover="288">.</span>ticket p)) <span class="kw">else</span> <span class="const token" data-verso-hover="278">none</span>)</span>
+<span id="L190">      <span class="kw">else</span> <span class="const token" data-verso-hover="310">readVal</span> s (<span class="const token" data-verso-hover="288">.</span>ticket i) d</span>
+<span id="L191">    readT.<span class="const token" data-verso-hover="321">bind</span> <span class="kw">fun</span> v =&gt;</span>
+<span id="L192">      <span class="kw">if</span> s.<span class="const token" data-verso-hover="306">mem</span> (<span class="const token" data-verso-hover="289">.</span>cap p i <span class="const token" data-verso-hover="2">false</span>) ≤ v <span class="kw">then</span></span>
+<span id="L193">        <span class="cm">--</span><span class="cm"> line 45</span></span>
+<span id="L194">        <span class="const token" data-verso-hover="279">some</span> (s.<span class="const token" data-verso-hover="319">setPc</span> p (<span class="const token" data-verso-hover="299">.</span>writes [(<span class="const token" data-verso-hover="289">.</span>cap p i <span class="const token" data-verso-hover="2">false</span>, s.<span class="const token" data-verso-hover="306">mem</span> (<span class="const token" data-verso-hover="288">.</span>ticket p)),</span>
+<span id="L195">          (<span class="const token" data-verso-hover="289">.</span>cap p i <span class="const token" data-verso-hover="3">true</span>, s.<span class="const token" data-verso-hover="306">mem</span> (<span class="const token" data-verso-hover="288">.</span>ticket p))] <span class="const token" data-verso-hover="2">false</span> (<span class="const token" data-verso-hover="293">.</span>capt rem)))</span>
+<span id="L196">      <span class="kw">else</span> <span class="const token" data-verso-hover="279">some</span> (s.<span class="const token" data-verso-hover="319">setPc</span> p (<span class="const token" data-verso-hover="303">.</span>capt rem))</span>
+<span id="L197">  | <span class="const token" data-verso-hover="304">.</span>cs =&gt;</span>
+<span id="L198">    <span class="cm">--</span><span class="cm"> lines 47–48</span></span>
+<span id="L199">    <span class="kw">if</span> d = <span class="const token" data-verso-hover="278">none</span> <span class="kw">then</span> <span class="const token" data-verso-hover="279">some</span> (s.<span class="const token" data-verso-hover="319">setPc</span> p (<span class="const token" data-verso-hover="299">.</span>writes (<span class="const token" data-verso-hover="314">wantWrites</span> p ord ⊤) <span class="const token" data-verso-hover="2">false</span> <span class="const token" data-verso-hover="296">.</span>ncs)) <span class="kw">else</span> <span class="const token" data-verso-hover="278">none</span></span>
+<span id="L200"></span>
+<span id="L201"><span class="dc">/-- Run a list of events. -/</span></span>
+<span id="L202"><span class="kw">def</span> <span class="const token" data-verso-hover="322">exec</span> (ord : <span class="const token" data-verso-hover="294">List</span> P) (k : <span class="const token" data-verso-hover="27">ℕ</span>) : <span class="const token" data-verso-hover="305">Cfg</span> P → <span class="const token" data-verso-hover="294">List</span> (P × <span class="const token" data-verso-hover="277">Option</span> (<span class="const token" data-verso-hover="188">WithTop</span> <span class="const token" data-verso-hover="27">ℕ</span>)) → <span class="const token" data-verso-hover="277">Option</span> (<span class="const token" data-verso-hover="305">Cfg</span> P)</span>
+<span id="L203">  | s, [] =&gt; <span class="const token" data-verso-hover="279">some</span> s</span>
+<span id="L204">  | s, (p, d) :: es =&gt; (<span class="const token" data-verso-hover="320">step</span> ord k s p d).<span class="const token" data-verso-hover="321">bind</span> <span class="kw">fun</span> s' =&gt; <span class="const token" data-verso-hover="322">exec</span> ord k s' es</span>
+<span id="L205"></span>
+<span id="L206"><span class="dc">/-- `n` steps of `p` without overlapping reads. -/</span></span>
+<span id="L207"><span class="kw">def</span> <span class="const token" data-verso-hover="323">seg</span> (p : P) (n : <span class="const token" data-verso-hover="27">ℕ</span>) : <span class="const token" data-verso-hover="294">List</span> (P × <span class="const token" data-verso-hover="277">Option</span> (<span class="const token" data-verso-hover="188">WithTop</span> <span class="const token" data-verso-hover="27">ℕ</span>)) := <span class="const token" data-verso-hover="324">List.replicate</span> n (p, <span class="const token" data-verso-hover="278">none</span>)</span>
+<span id="L208"></span>
+<span id="L209"><span class="dc">/-- The counterexample execution for processes `0, 1, 2` (`y, p, r` in the README), `k = 1`:</span></span>
+<span id="L210"><span class="dc">1. `y` (= 0) starts its first passage and begins writing `Ticket[y] := 1`; meanwhile `r` (= 2)</span></span>
+<span id="L211"><span class="dc">   chooses its ticket and reads the overlapping write of `Ticket[y]` as `100`, so `r`'s ticket</span></span>
+<span id="L212"><span class="dc">   is `101`.</span></span>
+<span id="L213"><span class="dc">2. `y` finishes its passage (its ticket 1 is the smallest); then `r` finishes its passage and at</span></span>
+<span id="L214"><span class="dc">   line 45 captures `y` and `p` (= 1) with `Capture[r][·] := 101`.</span></span>
+<span id="L215"><span class="dc">3. `r` starts a second passage and begins writing `Ticket[r] := 102` (and stops there).</span></span>
+<span id="L216"><span class="dc">4. `y` starts its second passage; its read of `Ticket[r]` overlaps `r`'s write and returns `0`,</span></span>
+<span id="L217"><span class="dc">   so `y`'s ticket is `2`; `y` enters the CS (all other announcements are larger).</span></span>
+<span id="L218"><span class="dc">5. `p` starts its first passage; its read of `Ticket[r]` returns `0`, so `p`'s ticket is `3`;</span></span>
+<span id="L219"><span class="dc">   `p` cannot remove `y` (whose pair `(2, y)` is smaller) but finds the stale capture</span></span>
+<span id="L220"><span class="dc">   `Capture[r][p] = 101 &gt; 3` and enters the CS as well. -/</span></span>
+<span id="L221"><span class="kw">def</span> <span class="const token" data-verso-hover="325">badTrace</span> : <span class="const token" data-verso-hover="294">List</span> (<span class="const token" data-verso-hover="326">Fin</span> <span class="nu">3</span> × <span class="const token" data-verso-hover="277">Option</span> (<span class="const token" data-verso-hover="188">WithTop</span> <span class="const token" data-verso-hover="27">ℕ</span>)) :=</span>
+<span id="L222">  <span class="const token" data-verso-hover="323">seg</span> <span class="nu">0</span> <span class="nu">15</span> ++ <span class="const token" data-verso-hover="323">seg</span> <span class="nu">2</span> <span class="nu">10</span> ++ [(<span class="nu">2</span>, <span class="const token" data-verso-hover="279">some</span> <span class="nu">100</span>)] ++ <span class="const token" data-verso-hover="323">seg</span> <span class="nu">2</span> <span class="nu">14</span> ++</span>
+<span id="L223">  <span class="const token" data-verso-hover="323">seg</span> <span class="nu">0</span> <span class="nu">52</span> ++ <span class="const token" data-verso-hover="323">seg</span> <span class="nu">2</span> <span class="nu">57</span> ++</span>
+<span id="L224">  <span class="const token" data-verso-hover="323">seg</span> <span class="nu">0</span> <span class="nu">12</span> ++ [(<span class="nu">0</span>, <span class="const token" data-verso-hover="279">some</span> <span class="nu">0</span>)] ++ <span class="const token" data-verso-hover="323">seg</span> <span class="nu">0</span> <span class="nu">29</span> ++ [(<span class="nu">0</span>, <span class="const token" data-verso-hover="279">some</span> <span class="nu">0</span>)] ++ <span class="const token" data-verso-hover="323">seg</span> <span class="nu">0</span> <span class="nu">1</span> ++</span>
+<span id="L225">  <span class="const token" data-verso-hover="323">seg</span> <span class="nu">1</span> <span class="nu">12</span> ++ [(<span class="nu">1</span>, <span class="const token" data-verso-hover="279">some</span> <span class="nu">0</span>)] ++ <span class="const token" data-verso-hover="323">seg</span> <span class="nu">1</span> <span class="nu">33</span> ++ [(<span class="nu">1</span>, <span class="const token" data-verso-hover="279">some</span> <span class="nu">0</span>)] ++ <span class="const token" data-verso-hover="323">seg</span> <span class="nu">1</span> <span class="nu">6</span></span>
+<span id="L226"></span>
+<span id="L227"><span class="dc">/-- **Theorem 10 is false**: the non-atomic algorithm of Figure 3 violates k-exclusion. With</span></span>
+<span id="L228"><span class="dc">`N = 3` and `k = 1`, `badTrace` is a legal execution after which processes `0` and `1` are both</span></span>
+<span id="L229"><span class="dc">in the critical section. -/</span></span>
+<span id="L230"><span class="kw">theorem</span> <span class="const token" data-verso-hover="0">counterexample</span> :</span>
+<span id="L231">    (<span class="const token" data-verso-hover="322">exec</span> [<span class="nu">0</span>, <span class="nu">1</span>, <span class="nu">2</span>] <span class="nu">1</span> <span class="const token" data-verso-hover="309">Cfg.init</span> <span class="const token" data-verso-hover="325">badTrace</span>).<span class="const token" data-verso-hover="327">map</span> (<span class="kw">fun</span> s =&gt; (s.<span class="const token" data-verso-hover="308">pc</span> <span class="nu">0</span>, s.<span class="const token" data-verso-hover="308">pc</span> <span class="nu">1</span>)) = <span class="const token" data-verso-hover="279">some</span> (<span class="const token" data-verso-hover="304">PC.cs</span>, <span class="const token" data-verso-hover="304">PC.cs</span>) := <span class="kw">by</span></span>
+<span id="L232">  <span class="kw">decide</span> +<span class="const token" data-verso-hover="328">kernel</span></span>
+<span id="L233"></span>
+<span id="L234"><span class="kw">end</span> Podc.KBakery.NonAtomic</span>
+<span id="L235"></span>
+</code></div>
+        <script>
+          window.versoHoversUrl = "PODC2010/KBakery/-hovers.json";</script>
+        <script src="static/lean/popper.js"></script>
+        <script src="static/lean/tippy.js"></script>
+        <script src="static/lean/marked.js"></script>
+        <script src="static/lean/highlighting.js"></script>
+        <script src="static/lean/lean.js"></script>
+        </article></main><footer class="site-footer"><div class="wrap">
+        Machine-checked formalizations of PODC papers in Lean 4. Generated with <a href="https://github.com/leanprover/verso">Verso</a> from the README files of <a href="https://github.com/vasnesterov/formal_podc">vasnesterov/formal_podc</a>.</div>
+      </footer></body>
+  </html>
+

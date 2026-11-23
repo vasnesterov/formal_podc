@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="light dark">
+    <link rel="icon" href="data:,">
+    <title>OverwriteLeastFixedPoints: Parallel.lean · Formal PODC</title><base href="../../../.././"><link rel="stylesheet" href="static/lean/verso-vars.css">
+    <link rel="stylesheet" href="static/lean/highlighting.css">
+    <link rel="stylesheet" href="static/lean/tippy-border.css">
+    <link rel="stylesheet" href="static/style.css">
+    <script defer="defer" src="static/site.js"></script>
+    </head>
+  <body>
+    <header class="site-header">
+      <div class="wrap">
+        <a class="brand" href=".">Formal PODC</a><nav class="top">
+          <a href=".">Search</a><a href="about/">About</a><a href="https://github.com/vasnesterov/formal_podc">GitHub</a></nav>
+        </div>
+      </header>
+    <main class="wrap"><article><nav class="breadcrumbs" aria-label="Breadcrumb">
+          <a href=".">Search</a><span class="sep">›</span><a href="PODC2026/">PODC 2026</a><span class="sep">›</span><a href="PODC2026/OverwriteLeastFixedPoints/">OverwriteLeastFixedPoints</a><span class="sep">›</span><a href="PODC2026/OverwriteLeastFixedPoints/src/">Lean source</a><span class="sep">›</span><span aria-current="page">Parallel</span></nav>
+        <h1>
+          <code>Parallel.lean</code></h1>
+        <div class="paper-links">
+          <p>
+            Source of <a href="PODC2026/OverwriteLeastFixedPoints/">Least Fixed Points with Overwrite Semantics — PODC 2026</a> · <a href="https://github.com/vasnesterov/formal_podc/blob/main/Papers/PODC2026/OverwriteLeastFixedPoints/Parallel.lean">GitHub</a> · hover over a name for its type and documentation</p>
+          </div>
+        <div class="lean-code lean-src">
+          <code class="hl lean block" data-lean-context="Parallel"><span id="L1"><span class="kw">import</span> Papers.PODC2026.OverwriteLeastFixedPoints.Interleaving</span>
+<span id="L2"></span>
+<span id="L3"><span class="dc">/-!</span></span>
+<span id="L4"><span class="dc"># Section 3: non-interleaving parallel rounds (Lemma 3.2, Theorem 3.1)</span></span>
+<span id="L5"></span>
+<span id="L6"><span class="dc">State space: a product `(k : κ) → β k` of coordinates (the paper: vectors in `{0,…,m}ⁿ`).</span></span>
+<span id="L7"></span>
+<span id="L8"><span class="dc">**One round** (`RoundExec wr f G S G'`), from the committed state `G`, with the set `S` of active</span></span>
+<span id="L9"><span class="dc">processes and the committed state `G'` at the end of the round. The paper's real-time description is</span></span>
+<span id="L10"><span class="dc">captured by two witnesses:</span></span>
+<span id="L11"><span class="dc">* `read i`: the vector process `i` read; coordinate `k` of it is either the committed value `G k` or</span></span>
+<span id="L12"><span class="dc">  the value written to `k` in this round by some active process `j`;</span></span>
+<span id="L13"><span class="dc">* `rank i : ℕ`: the instant at which process `i` finished its reads. Process `i` can read a write of</span></span>
+<span id="L14"><span class="dc">  `j` only if `rank j &lt; rank i`: `j` computes `f j (read j)` after finishing its reads and its write</span></span>
+<span id="L15"><span class="dc">  starts before `i`'s read ends. (Any real-time execution of finitely many processes gives such</span></span>
+<span id="L16"><span class="dc">  ranks; without them, values could come "out of thin air", see `acausal_round_breaks_leastness`.)</span></span>
+<span id="L17"><span class="dc">* process `j` writes coordinate `k` iff `wr (read j) (f j (read j)) k`: for the</span></span>
+<span id="L18"><span class="dc">  update-only-on-change model `uooc` iff the computed value differs from the read one</span></span>
+<span id="L19"><span class="dc">  (Definition 3); for the naive model `naive` always.</span></span>
+<span id="L20"><span class="dc">* the committed value of `k` is the value of *some* write to `k` (last writer wins, writes in any</span></span>
+<span id="L21"><span class="dc">  order), or `G k` if nobody writes `k`.</span></span>
+<span id="L22"></span>
+<span id="L23"><span class="dc">Reads overlapping writes may return the old value or any written value; no memory consistency is</span></span>
+<span id="L24"><span class="dc">assumed, exactly as in the paper.</span></span>
+<span id="L25"><span class="dc">-/</span></span>
+<span id="L26"></span>
+<span id="L27"><span class="kw">namespace</span> Podc.OverwriteLeastFixedPoints</span>
+<span id="L28"></span>
+<span id="L29"><span class="kw">variable</span> {ι κ : <span class="kw">Type</span>*} {β : κ → <span class="kw">Type</span>*}</span>
+<span id="L30"></span>
+<span id="L31"><span class="dc">/-- A write policy: a process that read `X` and computed `H` writes coordinate `k` iff</span></span>
+<span id="L32"><span class="dc">`wr X H k`. -/</span></span>
+<span id="L33"><span class="kw">abbrev</span> <span class="const token" data-verso-hover="156">WritePolicy</span> (β : κ → <span class="kw">Type</span>*) := ((k : κ) → β k) → ((k : κ) → β k) → κ → <span class="kw">Prop</span></span>
+<span id="L34"></span>
+<span id="L35"><span class="dc">/-- Definition 3 (update-only-on-change): write coordinate `k` iff its value changed. -/</span></span>
+<span id="L36"><span class="kw">def</span> <span class="const token" data-verso-hover="157">uooc</span> : <span class="const token" data-verso-hover="156">WritePolicy</span> β := <span class="kw">fun</span> X H k =&gt; H k ≠ X k</span>
+<span id="L37"></span>
+<span id="L38"><span class="const token" data-verso-hover="158">instance</span> [∀ k, <span class="const token" data-verso-hover="124">DecidableEq</span> (β k)] (X H : (k : κ) → β k) (k : κ) : <span class="const token" data-verso-hover="159">Decidable</span> (<span class="const token" data-verso-hover="157">uooc</span> X H k) :=</span>
+<span id="L39">  inferInstanceAs (<span class="const token" data-verso-hover="159">Decidable</span> (H k ≠ X k))</span>
+<span id="L40"></span>
+<span id="L41"><span class="dc">/-- The naive read–compute–write rule: every coordinate of the computed vector is written. -/</span></span>
+<span id="L42"><span class="kw">def</span> <span class="const token" data-verso-hover="160">naive</span> : <span class="const token" data-verso-hover="156">WritePolicy</span> β := <span class="kw">fun</span> _ _ _ =&gt; <span class="const token" data-verso-hover="161">True</span></span>
+<span id="L43"></span>
+<span id="L44"><span class="dc">/-- One non-interleaving round from committed state `G` with active set `S` ending in the committed</span></span>
+<span id="L45"><span class="dc">state `G'` (see the module docstring). -/</span></span>
+<span id="L46"><span class="kw">structure</span> <span class="const token" data-verso-hover="12">RoundExec</span> (wr : <span class="const token" data-verso-hover="156">WritePolicy</span> β) (f : ι → ((k : κ) → β k) → ((k : κ) → β k))</span>
+<span id="L47">    (G : (k : κ) → β k) (S : <span class="const token" data-verso-hover="73">Set</span> ι) (G' : (k : κ) → β k) <span class="kw">where</span></span>
+<span id="L48">  <span class="dc">/-- The vector read by process `i`. -/</span></span>
+<span id="L49">  <span class="const token" data-verso-hover="162">read</span> : ι → (k : κ) → β k</span>
+<span id="L50">  <span class="dc">/-- The instant at which process `i` finished reading. -/</span></span>
+<span id="L51">  <span class="const token" data-verso-hover="163">rank</span> : ι → <span class="const token" data-verso-hover="38">ℕ</span></span>
+<span id="L52">  <span class="dc">/-- A read returns the committed value or the value of a causally earlier write in this round. -/</span></span>
+<span id="L53">  <span class="const token" data-verso-hover="164">read_spec</span> : ∀ i ∈ S, ∀ k, <span class="const token" data-verso-hover="162">read</span> i k = G k ∨</span>
+<span id="L54">    ∃ j ∈ S, <span class="const token" data-verso-hover="163">rank</span> j &lt; <span class="const token" data-verso-hover="163">rank</span> i ∧ wr (<span class="const token" data-verso-hover="162">read</span> j) (f j (<span class="const token" data-verso-hover="162">read</span> j)) k ∧ <span class="const token" data-verso-hover="162">read</span> i k = f j (<span class="const token" data-verso-hover="162">read</span> j) k</span>
+<span id="L55">  <span class="dc">/-- Unwritten coordinates keep their committed value. -/</span></span>
+<span id="L56">  <span class="const token" data-verso-hover="165">commit_unwritten</span> : ∀ k, (∀ j ∈ S, ¬ wr (<span class="const token" data-verso-hover="162">read</span> j) (f j (<span class="const token" data-verso-hover="162">read</span> j)) k) → G' k = G k</span>
+<span id="L57">  <span class="dc">/-- A written coordinate ends with the value of one of the writes. -/</span></span>
+<span id="L58">  <span class="const token" data-verso-hover="166">commit_written</span> : ∀ k, (∃ j ∈ S, wr (<span class="const token" data-verso-hover="162">read</span> j) (f j (<span class="const token" data-verso-hover="162">read</span> j)) k) →</span>
+<span id="L59">    ∃ j ∈ S, wr (<span class="const token" data-verso-hover="162">read</span> j) (f j (<span class="const token" data-verso-hover="162">read</span> j)) k ∧ G' k = f j (<span class="const token" data-verso-hover="162">read</span> j) k</span>
+<span id="L60"></span>
+<span id="L61"><span class="dc">/-- `G'` is a possible committed state after a parallel round from `G` with active set `S`. -/</span></span>
+<span id="L62"><span class="kw">def</span> <span class="const token" data-verso-hover="167">ParRound</span> (wr : <span class="const token" data-verso-hover="156">WritePolicy</span> β) (f : ι → ((k : κ) → β k) → ((k : κ) → β k))</span>
+<span id="L63">    (G : (k : κ) → β k) (S : <span class="const token" data-verso-hover="73">Set</span> ι) (G' : (k : κ) → β k) : <span class="kw">Prop</span> :=</span>
+<span id="L64">  <span class="const token" data-verso-hover="168">Nonempty</span> (<span class="const token" data-verso-hover="12">RoundExec</span> wr f G S G')</span>
+<span id="L65"></span>
+<span id="L66"><span class="dc">/-- Non-vacuity: from every state, every set of active processes has some round (all processes read</span></span>
+<span id="L67"><span class="dc">the committed state; each written coordinate takes the value of some writer). -/</span></span>
+<span id="L68"><span class="kw">theorem</span> <span class="const token" data-verso-hover="35">exists_parRound</span> (wr : <span class="const token" data-verso-hover="156">WritePolicy</span> β) (f : ι → ((k : κ) → β k) → ((k : κ) → β k))</span>
+<span id="L69">    (G : (k : κ) → β k) (S : <span class="const token" data-verso-hover="73">Set</span> ι) : ∃ G', <span class="const token" data-verso-hover="167">ParRound</span> wr f G S G' := <span class="kw">by</span></span>
+<span id="L70">  <span class="kw">classical</span></span>
+<span id="L71">  <span class="kw">let</span> G' : (k : κ) → β k := <span class="kw">fun</span> k =&gt;</span>
+<span id="L72">    <span class="kw">if</span> h : ∃ j ∈ S, wr G (f j G) k <span class="kw">then</span> f h.<span class="const token" data-verso-hover="169">choose</span> G k <span class="kw">else</span> G k</span>
+<span id="L73">  <span class="kw">refine</span> ⟨G', ⟨⟨<span class="kw">fun</span> _ =&gt; G, <span class="kw">fun</span> _ =&gt; <span class="nu">0</span>, <span class="kw">fun</span> _ _ _ =&gt; <span class="const token" data-verso-hover="170">Or.inl</span> <span class="const token" data-verso-hover="121">rfl</span>, <span class="kw">fun</span> k hk =&gt; ?_, <span class="kw">fun</span> k hk =&gt; ?_⟩⟩⟩</span>
+<span id="L74">  · <span class="kw">have</span> : ¬ ∃ j ∈ S, wr G (f j G) k := <span class="kw">fun</span> ⟨j, hj, hw⟩ =&gt; hk j hj hw</span>
+<span id="L75">    <span class="kw">simp</span> only [G', <span class="const token" data-verso-hover="171">dite_eq_right_iff</span>]</span>
+<span id="L76">    <span class="kw">exact</span> <span class="kw">fun</span> h =&gt; <span class="const token" data-verso-hover="55">absurd</span> h this</span>
+<span id="L77">  · <span class="kw">refine</span> ⟨hk.<span class="const token" data-verso-hover="169">choose</span>, hk.<span class="const token" data-verso-hover="172">choose_spec</span>.<span class="const token" data-verso-hover="96">1</span>, hk.<span class="const token" data-verso-hover="172">choose_spec</span>.<span class="const token" data-verso-hover="97">2</span>, ?_⟩</span>
+<span id="L78">    <span class="kw">simp</span> only [G', <span class="const token" data-verso-hover="173">dite_eq_left_of_eq_true</span> (<span class="const token" data-verso-hover="174">eq_true</span> hk)]</span>
+<span id="L79"></span>
+<span id="L80"><span class="dc">/-- An atomic step `G ↦ f i G` is a special case of an update-only-on-change round with</span></span>
+<span id="L81"><span class="dc">`S = {i}`. -/</span></span>
+<span id="L82"><span class="kw">theorem</span> <span class="const token" data-verso-hover="36">parRound_single</span> (f : ι → ((k : κ) → β k) → ((k : κ) → β k)) (G : (k : κ) → β k) (i : ι) :</span>
+<span id="L83">    <span class="const token" data-verso-hover="167">ParRound</span> <span class="const token" data-verso-hover="157">uooc</span> f G {i} (f i G) := <span class="kw">by</span></span>
+<span id="L84">  <span class="kw">refine</span> ⟨⟨<span class="kw">fun</span> _ =&gt; G, <span class="kw">fun</span> _ =&gt; <span class="nu">0</span>, <span class="kw">fun</span> _ _ _ =&gt; <span class="const token" data-verso-hover="170">Or.inl</span> <span class="const token" data-verso-hover="121">rfl</span>, <span class="kw">fun</span> k hk =&gt; ?_, <span class="kw">fun</span> k hk =&gt; ?_⟩⟩</span>
+<span id="L85">  · <span class="kw">by_contra</span> h</span>
+<span id="L86">    <span class="kw">exact</span> hk i <span class="const token" data-verso-hover="121">rfl</span> h</span>
+<span id="L87">  · <span class="kw">obtain</span> ⟨j, <span class="kw">rfl</span>, hw⟩ := hk</span>
+<span id="L88">    <span class="kw">exact</span> ⟨j, <span class="const token" data-verso-hover="121">rfl</span>, hw, <span class="const token" data-verso-hover="121">rfl</span>⟩</span>
+<span id="L89"></span>
+<span id="L90"><span class="kw">section</span> Order</span>
+<span id="L91"></span>
+<span id="L92"><span class="kw">variable</span> [∀ k, <span class="const token" data-verso-hover="81">PartialOrder</span> (β k)] {f : ι → ((k : κ) → β k) → ((k : κ) → β k)}</span>
+<span id="L93">  {G G' : (k : κ) → β k} {S : <span class="const token" data-verso-hover="73">Set</span> ι}</span>
+<span id="L94"></span>
+<span id="L95"><span class="kw">omit</span> [∀ k, <span class="const token" data-verso-hover="81">PartialOrder</span> (β k)] <span class="kw">in</span></span>
+<span id="L96"><span class="dc">/-- Strong induction on the read instants of a round. -/</span></span>
+<span id="L97"><span class="kw">theorem</span> <span class="const token" data-verso-hover="175">RoundExec.induction</span> {wr : <span class="const token" data-verso-hover="156">WritePolicy</span> β} (e : <span class="const token" data-verso-hover="12">RoundExec</span> wr f G S G') {P : ι → <span class="kw">Prop</span>}</span>
+<span id="L98">    (h : ∀ i ∈ S, (∀ j ∈ S, e.<span class="const token" data-verso-hover="163">rank</span> j &lt; e.<span class="const token" data-verso-hover="163">rank</span> i → P j) → P i) : ∀ i ∈ S, P i := <span class="kw">by</span></span>
+<span id="L99">  <span class="kw">suffices</span> ∀ n, ∀ i ∈ S, e.<span class="const token" data-verso-hover="163">rank</span> i = n → P i <span class="kw">from</span> <span class="kw">fun</span> i hi =&gt; this _ i hi <span class="const token" data-verso-hover="121">rfl</span></span>
+<span id="L100">  <span class="kw">intro</span> n</span>
+<span id="L101">  <span class="kw">induction</span> n <span class="kw">using</span> <span class="const token" data-verso-hover="102">Nat.strong_induction_on</span> <span class="kw">with</span></span>
+<span id="L102">  | _ n ih =&gt;</span>
+<span id="L103">    <span class="kw">intro</span> i hi hn</span>
+<span id="L104">    <span class="kw">exact</span> h i hi <span class="kw">fun</span> j hj hr =&gt; ih _ (hn ▸ hr) j hj <span class="const token" data-verso-hover="121">rfl</span></span>
+<span id="L105"></span>
+<span id="L106"><span class="dc">/-- Every read of a round returns at least the committed state (part of Lemma 3.2). -/</span></span>
+<span id="L107"><span class="kw">theorem</span> <span class="const token" data-verso-hover="176">RoundExec.le_read</span> (e : <span class="const token" data-verso-hover="12">RoundExec</span> <span class="const token" data-verso-hover="157">uooc</span> f G S G') (hinf : ∀ i, <span class="const token" data-verso-hover="68">Inflationary</span> (f i)) :</span>
+<span id="L108">    ∀ i ∈ S, G ≤ e.<span class="const token" data-verso-hover="162">read</span> i := <span class="kw">by</span></span>
+<span id="L109">  <span class="kw">refine</span> e.<span class="const token" data-verso-hover="175">induction</span> <span class="kw">fun</span> i hi ih k =&gt; ?_</span>
+<span id="L110">  <span class="kw">rcases</span> e.<span class="const token" data-verso-hover="164">read_spec</span> i hi k <span class="kw">with</span> h | ⟨j, hj, hr, -, h⟩</span>
+<span id="L111">  · <span class="kw">rw</span> [h]</span>
+<span id="L112">  · <span class="kw">rw</span> [h]</span>
+<span id="L113">    <span class="kw">exact</span> (ih j hj hr k).<span class="const token" data-verso-hover="152">trans</span> (hinf j _ k)</span>
+<span id="L114"></span>
+<span id="L115"><span class="dc">/-- **Lemma 3.2 (1)** of [Garg–Garg, BA]: every write in round `t` writes a value strictly greater</span></span>
+<span id="L116"><span class="dc">than the committed value `G k` (the full version states `≥`). -/</span></span>
+<span id="L117"><span class="kw">theorem</span> <span class="const token" data-verso-hover="22">RoundExec.lt_write</span> (e : <span class="const token" data-verso-hover="12">RoundExec</span> <span class="const token" data-verso-hover="157">uooc</span> f G S G') (hinf : ∀ i, <span class="const token" data-verso-hover="68">Inflationary</span> (f i))</span>
+<span id="L118">    {j : ι} (hj : j ∈ S) {k : κ} (hw : <span class="const token" data-verso-hover="157">uooc</span> (e.<span class="const token" data-verso-hover="162">read</span> j) (f j (e.<span class="const token" data-verso-hover="162">read</span> j)) k) :</span>
+<span id="L119">    G k &lt; f j (e.<span class="const token" data-verso-hover="162">read</span> j) k :=</span>
+<span id="L120">  <span class="const token" data-verso-hover="177">lt_of_le_of_lt</span> (e.<span class="const token" data-verso-hover="176">le_read</span> hinf j hj k) (<span class="const token" data-verso-hover="178">lt_of_le_of_ne</span> (hinf j _ k) (<span class="const token" data-verso-hover="179">Ne.symm</span> hw))</span>
+<span id="L121"></span>
+<span id="L122"><span class="dc">/-- **Lemma 3.2 (2)**: the committed state does not decrease. -/</span></span>
+<span id="L123"><span class="kw">theorem</span> <span class="const token" data-verso-hover="23">RoundExec.le_commit</span> (e : <span class="const token" data-verso-hover="12">RoundExec</span> <span class="const token" data-verso-hover="157">uooc</span> f G S G') (hinf : ∀ i, <span class="const token" data-verso-hover="68">Inflationary</span> (f i)) :</span>
+<span id="L124">    G ≤ G' := <span class="kw">by</span></span>
+<span id="L125">  <span class="kw">intro</span> k</span>
+<span id="L126">  <span class="kw">by_cases</span> h : ∃ j ∈ S, <span class="const token" data-verso-hover="157">uooc</span> (e.<span class="const token" data-verso-hover="162">read</span> j) (f j (e.<span class="const token" data-verso-hover="162">read</span> j)) k</span>
+<span id="L127">  · <span class="kw">obtain</span> ⟨j, hj, hw, he⟩ := e.<span class="const token" data-verso-hover="166">commit_written</span> k h</span>
+<span id="L128">    <span class="kw">rw</span> [he]</span>
+<span id="L129">    <span class="kw">exact</span> (e.<span class="const token" data-verso-hover="22">lt_write</span> hinf hj hw).<span class="const token" data-verso-hover="180">le</span></span>
+<span id="L130">  · push <span class="const token" data-verso-hover="181">Not</span> <span class="kw">at</span> h</span>
+<span id="L131">    <span class="kw">rw</span> [e.<span class="const token" data-verso-hover="165">commit_unwritten</span> k h]</span>
+<span id="L132"></span>
+<span id="L133"><span class="dc">/-- **Lemma 3.2 (3)**: a coordinate keeps its committed value iff nobody writes it. -/</span></span>
+<span id="L134"><span class="kw">theorem</span> <span class="const token" data-verso-hover="24">RoundExec.commit_eq_iff</span> (e : <span class="const token" data-verso-hover="12">RoundExec</span> <span class="const token" data-verso-hover="157">uooc</span> f G S G') (hinf : ∀ i, <span class="const token" data-verso-hover="68">Inflationary</span> (f i))</span>
+<span id="L135">    (k : κ) : G' k = G k ↔ ∀ j ∈ S, ¬ <span class="const token" data-verso-hover="157">uooc</span> (e.<span class="const token" data-verso-hover="162">read</span> j) (f j (e.<span class="const token" data-verso-hover="162">read</span> j)) k := <span class="kw">by</span></span>
+<span id="L136">  <span class="kw">constructor</span></span>
+<span id="L137">  · <span class="kw">intro</span> heq j hj hw</span>
+<span id="L138">    <span class="kw">obtain</span> ⟨j', hj', hw', he⟩ := e.<span class="const token" data-verso-hover="166">commit_written</span> k ⟨j, hj, hw⟩</span>
+<span id="L139">    <span class="kw">have</span> := e.<span class="const token" data-verso-hover="22">lt_write</span> hinf hj' hw'</span>
+<span id="L140">    <span class="kw">rw</span> [← he, heq] <span class="kw">at</span> this</span>
+<span id="L141">    <span class="kw">exact</span> <span class="const token" data-verso-hover="182">lt_irrefl</span> _ this</span>
+<span id="L142">  · <span class="kw">exact</span> e.<span class="const token" data-verso-hover="165">commit_unwritten</span> k</span>
+<span id="L143"></span>
+<span id="L144"><span class="dc">/-- If a round changes nothing, every process read exactly the committed state. -/</span></span>
+<span id="L145"><span class="kw">theorem</span> <span class="const token" data-verso-hover="183">RoundExec.read_eq_of_commit_eq</span> (e : <span class="const token" data-verso-hover="12">RoundExec</span> <span class="const token" data-verso-hover="157">uooc</span> f G S G')</span>
+<span id="L146">    (hinf : ∀ i, <span class="const token" data-verso-hover="68">Inflationary</span> (f i)) (heq : G' = G) : ∀ i ∈ S, e.<span class="const token" data-verso-hover="162">read</span> i = G := <span class="kw">by</span></span>
+<span id="L147">  <span class="kw">intro</span> i hi</span>
+<span id="L148">  <span class="kw">funext</span> k</span>
+<span id="L149">  <span class="kw">rcases</span> e.<span class="const token" data-verso-hover="164">read_spec</span> i hi k <span class="kw">with</span> h | ⟨j, hj, -, hw, -⟩</span>
+<span id="L150">  · <span class="kw">exact</span> h</span>
+<span id="L151">  · <span class="kw">exact</span> <span class="const token" data-verso-hover="55">absurd</span> hw ((e.<span class="const token" data-verso-hover="24">commit_eq_iff</span> hinf k).<span class="const token" data-verso-hover="184">1</span> (<span class="const token" data-verso-hover="54">congrFun</span> heq k) j hj)</span>
+<span id="L152"></span>
+<span id="L153"><span class="dc">/-- A round from below a common fixed point `Y` of monotone functions stays below `Y` (any write</span></span>
+<span id="L154"><span class="dc">policy). -/</span></span>
+<span id="L155"><span class="kw">theorem</span> <span class="const token" data-verso-hover="10">RoundExec.commit_le</span> {wr : <span class="const token" data-verso-hover="156">WritePolicy</span> β} (e : <span class="const token" data-verso-hover="12">RoundExec</span> wr f G S G')</span>
+<span id="L156">    (hm : ∀ i, <span class="const token" data-verso-hover="46">Monotone</span> (f i)) {Y : (k : κ) → β k} (hY : <span class="const token" data-verso-hover="50">IsCommonFixed</span> f Y) (hG : G ≤ Y) :</span>
+<span id="L157">    G' ≤ Y := <span class="kw">by</span></span>
+<span id="L158">  <span class="kw">have</span> hread : ∀ i ∈ S, e.<span class="const token" data-verso-hover="162">read</span> i ≤ Y := <span class="kw">by</span></span>
+<span id="L159">    <span class="kw">refine</span> e.<span class="const token" data-verso-hover="175">induction</span> <span class="kw">fun</span> i hi ih k =&gt; ?_</span>
+<span id="L160">    <span class="kw">rcases</span> e.<span class="const token" data-verso-hover="164">read_spec</span> i hi k <span class="kw">with</span> h | ⟨j, hj, hr, -, h⟩</span>
+<span id="L161">    · <span class="kw">rw</span> [h]; <span class="kw">exact</span> hG k</span>
+<span id="L162">    · <span class="kw">rw</span> [h, ← hY j]; <span class="kw">exact</span> hm j (ih j hj hr) k</span>
+<span id="L163">  <span class="kw">intro</span> k</span>
+<span id="L164">  <span class="kw">by_cases</span> h : ∃ j ∈ S, wr (e.<span class="const token" data-verso-hover="162">read</span> j) (f j (e.<span class="const token" data-verso-hover="162">read</span> j)) k</span>
+<span id="L165">  · <span class="kw">obtain</span> ⟨j, hj, -, he⟩ := e.<span class="const token" data-verso-hover="166">commit_written</span> k h</span>
+<span id="L166">    <span class="kw">rw</span> [he, ← hY j]</span>
+<span id="L167">    <span class="kw">exact</span> hm j (hread j hj) k</span>
+<span id="L168">  · push <span class="const token" data-verso-hover="181">Not</span> <span class="kw">at</span> h</span>
+<span id="L169">    <span class="kw">rw</span> [e.<span class="const token" data-verso-hover="165">commit_unwritten</span> k h]</span>
+<span id="L170">    <span class="kw">exact</span> hG k</span>
+<span id="L171"></span>
+<span id="L172"><span class="dc">/-- Theorem 3.1 from an arbitrary initial state: a fair parallel execution with</span></span>
+<span id="L173"><span class="dc">update-only-on-change of monotone inflationary functions terminates at the least common fixed</span></span>
+<span id="L174"><span class="dc">point above `G 0`. -/</span></span>
+<span id="L175"><span class="kw">theorem</span> <span class="const token" data-verso-hover="25">parallel_converges_from</span> [<span class="const token" data-verso-hover="82">WellFoundedGT</span> ((k : κ) → β k)] (hm : ∀ i, <span class="const token" data-verso-hover="46">Monotone</span> (f i))</span>
+<span id="L176">    (hinf : ∀ i, <span class="const token" data-verso-hover="68">Inflationary</span> (f i)) {S : <span class="const token" data-verso-hover="38">ℕ</span> → <span class="const token" data-verso-hover="73">Set</span> ι} (hS : <span class="const token" data-verso-hover="72">FairSets</span> S) {G : <span class="const token" data-verso-hover="38">ℕ</span> → (k : κ) → β k}</span>
+<span id="L177">    (hG : ∀ t, <span class="const token" data-verso-hover="167">ParRound</span> <span class="const token" data-verso-hover="157">uooc</span> f (G t) (S t) (G (t + <span class="nu">1</span>))) :</span>
+<span id="L178">    ∃ x, <span class="const token" data-verso-hover="76">TerminatesAt</span> G x ∧ <span class="const token" data-verso-hover="104">IsLeast</span> {y | <span class="const token" data-verso-hover="50">IsCommonFixed</span> f y ∧ G <span class="nu">0</span> ≤ y} x := <span class="kw">by</span></span>
+<span id="L179">  <span class="kw">have</span> hmono : <span class="const token" data-verso-hover="46">Monotone</span> G := <span class="const token" data-verso-hover="100">monotone_nat_of_le_succ</span> <span class="kw">fun</span> t =&gt; (hG t).<span class="const token" data-verso-hover="185">some</span>.<span class="const token" data-verso-hover="23">le_commit</span> hinf</span>
+<span id="L180">  <span class="kw">obtain</span> ⟨T, hT⟩ := <span class="const token" data-verso-hover="80">exists_terminatesAt_of_monotone</span> hmono</span>
+<span id="L181">  <span class="kw">refine</span> ⟨G T, ⟨T, hT⟩, ⟨?_, hmono (<span class="const token" data-verso-hover="105">Nat.zero_le</span> _)⟩, ?_⟩</span>
+<span id="L182">  · <span class="kw">intro</span> i</span>
+<span id="L183">    <span class="kw">obtain</span> ⟨t, ht, hti⟩ := hS i T</span>
+<span id="L184">    <span class="kw">let</span> e := (hG t).<span class="const token" data-verso-hover="185">some</span></span>
+<span id="L185">    <span class="kw">have</span> heq : G (t + <span class="nu">1</span>) = G t := <span class="kw">by</span> <span class="kw">rw</span> [hT t ht, hT (t + <span class="nu">1</span>) (<span class="kw">by</span> <span class="kw">omega</span>)]</span>
+<span id="L186">    <span class="kw">have</span> hread := e.<span class="const token" data-verso-hover="183">read_eq_of_commit_eq</span> hinf heq i hti</span>
+<span id="L187">    <span class="kw">funext</span> k</span>
+<span id="L188">    <span class="kw">by_contra</span> hne</span>
+<span id="L189">    <span class="kw">have</span> hw : <span class="const token" data-verso-hover="157">uooc</span> (e.<span class="const token" data-verso-hover="162">read</span> i) (f i (e.<span class="const token" data-verso-hover="162">read</span> i)) k := <span class="kw">by</span></span>
+<span id="L190">      <span class="kw">simp</span> only [<span class="const token" data-verso-hover="157">uooc</span>, hread, hT t ht]</span>
+<span id="L191">      <span class="kw">exact</span> hne</span>
+<span id="L192">    <span class="kw">exact</span> (e.<span class="const token" data-verso-hover="24">commit_eq_iff</span> hinf k).<span class="const token" data-verso-hover="184">1</span> (<span class="const token" data-verso-hover="54">congrFun</span> heq k) i hti hw</span>
+<span id="L193">  · <span class="kw">rintro</span> y ⟨hy, h0⟩</span>
+<span id="L194">    <span class="kw">have</span> : ∀ t, G t ≤ y := <span class="kw">by</span></span>
+<span id="L195">      <span class="kw">intro</span> t</span>
+<span id="L196">      <span class="kw">induction</span> t <span class="kw">with</span></span>
+<span id="L197">      | <span class="const token" data-verso-hover="141">zero</span> =&gt; <span class="kw">exact</span> h0</span>
+<span id="L198">      | <span class="const token" data-verso-hover="142">succ</span> t ih =&gt; <span class="kw">exact</span> (hG t).<span class="const token" data-verso-hover="185">some</span>.<span class="const token" data-verso-hover="10">commit_le</span> hm hy ih</span>
+<span id="L199">    <span class="kw">exact</span> this T</span>
+<span id="L200"></span>
+<span id="L201"><span class="dc">/-- **Theorem 3.1** of [Garg–Garg, BA] (= Theorem 3 of the full version). Let the state space be a</span></span>
+<span id="L202"><span class="dc">finite product of finite posets with bottom (the paper: `{0,…,m}ⁿ`), and let every `fᵢ` be monotone</span></span>
+<span id="L203"><span class="dc">and inflationary. A parallel execution with update-only-on-change, non-interleaving rounds and a fair</span></span>
+<span id="L204"><span class="dc">scheduler, starting from `⊥`, terminates at the least common fixed point. -/</span></span>
+<span id="L205"><span class="kw">theorem</span> <span class="const token" data-verso-hover="9">theorem_3_1</span> [<span class="const token" data-verso-hover="106">Finite</span> κ] [∀ k, <span class="const token" data-verso-hover="106">Finite</span> (β k)] [∀ k, <span class="const token" data-verso-hover="107">OrderBot</span> (β k)]</span>
+<span id="L206">    (hm : ∀ i, <span class="const token" data-verso-hover="46">Monotone</span> (f i)) (hinf : ∀ i, <span class="const token" data-verso-hover="68">Inflationary</span> (f i)) {S : <span class="const token" data-verso-hover="38">ℕ</span> → <span class="const token" data-verso-hover="73">Set</span> ι} (hS : <span class="const token" data-verso-hover="72">FairSets</span> S)</span>
+<span id="L207">    {G : <span class="const token" data-verso-hover="38">ℕ</span> → (k : κ) → β k} (h0 : G <span class="nu">0</span> = ⊥) (hG : ∀ t, <span class="const token" data-verso-hover="167">ParRound</span> <span class="const token" data-verso-hover="157">uooc</span> f (G t) (S t) (G (t + <span class="nu">1</span>))) :</span>
+<span id="L208">    ∃ x, <span class="const token" data-verso-hover="76">TerminatesAt</span> G x ∧ <span class="const token" data-verso-hover="104">IsLeast</span> {y | <span class="const token" data-verso-hover="50">IsCommonFixed</span> f y} x := <span class="kw">by</span></span>
+<span id="L209">  <span class="kw">obtain</span> ⟨x, hx, hl⟩ := <span class="const token" data-verso-hover="25">parallel_converges_from</span> hm hinf hS hG</span>
+<span id="L210">  <span class="kw">exact</span> ⟨x, hx, hl.<span class="const token" data-verso-hover="96">1</span><span class="nu">.</span><span class="const token" data-verso-hover="96">1</span>, <span class="kw">fun</span> y hy =&gt; hl.<span class="const token" data-verso-hover="97">2</span> ⟨hy, <span class="kw">by</span> <span class="kw">rw</span> [h0]; <span class="kw">exact</span> <span class="const token" data-verso-hover="108">bot_le</span>⟩⟩</span>
+<span id="L211"></span>
+<span id="L212"><span class="dc">/-- **Corollary 4.2** of [Garg–Garg] (parallel version): for deflationary monotone functions on a</span></span>
+<span id="L213"><span class="dc">finite product of finite posets with top, a fair update-only-on-change parallel execution starting</span></span>
+<span id="L214"><span class="dc">from `⊤` terminates at the greatest common fixed point. -/</span></span>
+<span id="L215"><span class="kw">theorem</span> <span class="const token" data-verso-hover="26">corollary_4_2_parallel</span> [<span class="const token" data-verso-hover="106">Finite</span> κ] [∀ k, <span class="const token" data-verso-hover="106">Finite</span> (β k)] [∀ k, <span class="const token" data-verso-hover="109">OrderTop</span> (β k)]</span>
+<span id="L216">    (hm : ∀ i, <span class="const token" data-verso-hover="46">Monotone</span> (f i)) (hdef : ∀ i, <span class="const token" data-verso-hover="70">Deflationary</span> (f i)) {S : <span class="const token" data-verso-hover="38">ℕ</span> → <span class="const token" data-verso-hover="73">Set</span> ι}</span>
+<span id="L217">    (hS : <span class="const token" data-verso-hover="72">FairSets</span> S) {G : <span class="const token" data-verso-hover="38">ℕ</span> → (k : κ) → β k} (h0 : G <span class="nu">0</span> = ⊤)</span>
+<span id="L218">    (hG : ∀ t, <span class="const token" data-verso-hover="167">ParRound</span> <span class="const token" data-verso-hover="157">uooc</span> f (G t) (S t) (G (t + <span class="nu">1</span>))) :</span>
+<span id="L219">    ∃ x, <span class="const token" data-verso-hover="76">TerminatesAt</span> G x ∧ <span class="const token" data-verso-hover="110">IsGreatest</span> {y | <span class="const token" data-verso-hover="50">IsCommonFixed</span> f y} x := <span class="kw">by</span></span>
+<span id="L220">  <span class="kw">have</span> := @<span class="const token" data-verso-hover="9">theorem_3_1</span> ι κ (<span class="kw">fun</span> k =&gt; (β k)ᵒᵈ) (<span class="kw">fun</span> k =&gt; <span class="const token" data-verso-hover="111">inferInstance</span>) f</span>
+<span id="L221">  <span class="kw">exact</span> this (<span class="kw">fun</span> i _ _ h =&gt; hm i h) (<span class="kw">fun</span> i x =&gt; hdef i x) hS (G := G) h0 hG</span>
+<span id="L222"></span>
+<span id="L223"><span class="kw">end</span> Order</span>
+<span id="L224"></span>
+<span id="L225"><span class="dc">/-! ## Counterexamples and remarks for Section 3 -/</span></span>
+<span id="L226"></span>
+<span id="L227"><span class="dc">/-- The two functions of the paper's naive-write example on `{0,1}²`:</span></span>
+<span id="L228"><span class="dc">`f₀ (x₀, x₁) = (1, x₁)` and `f₁ (x₀, x₁) = (x₀, 1)`. -/</span></span>
+<span id="L229"><span class="kw">def</span> <span class="const token" data-verso-hover="186">naiveF</span> : <span class="const token" data-verso-hover="39">Fin</span> <span class="nu">2</span> → (<span class="const token" data-verso-hover="39">Fin</span> <span class="nu">2</span> → <span class="const token" data-verso-hover="113">Bool</span>) → (<span class="const token" data-verso-hover="39">Fin</span> <span class="nu">2</span> → <span class="const token" data-verso-hover="113">Bool</span>) := <span class="kw">fun</span> i x =&gt; <span class="const token" data-verso-hover="45">Function.update</span> x i <span class="const token" data-verso-hover="114">true</span></span>
+<span id="L230"></span>
+<span id="L231"><span class="dc">/-- Section 3: with the naive write rule (every process writes every coordinate), a round of both</span></span>
+<span id="L232"><span class="dc">processes from `(0,0)` can commit `(0,0)` again (each coordinate's last write comes from the process</span></span>
+<span id="L233"><span class="dc">that did not change it), so the fair execution that stays at `(0,0)` forever is possible, although</span></span>
+<span id="L234"><span class="dc">`(0,0)` is not a common fixed point. The functions are monotone and inflationary. -/</span></span>
+<span id="L235"><span class="kw">theorem</span> <span class="const token" data-verso-hover="21">naive_round_stuck</span> :</span>
+<span id="L236">    (∀ i, <span class="const token" data-verso-hover="46">Monotone</span> (<span class="const token" data-verso-hover="186">naiveF</span> i)) ∧ (∀ i, <span class="const token" data-verso-hover="68">Inflationary</span> (<span class="const token" data-verso-hover="186">naiveF</span> i)) ∧</span>
+<span id="L237">      <span class="const token" data-verso-hover="167">ParRound</span> <span class="const token" data-verso-hover="160">naive</span> <span class="const token" data-verso-hover="186">naiveF</span> ⊥ <span class="const token" data-verso-hover="118">Set.univ</span> ⊥ ∧ <span class="const token" data-verso-hover="72">FairSets</span> (<span class="kw">fun</span> _ : <span class="const token" data-verso-hover="38">ℕ</span> =&gt; (<span class="const token" data-verso-hover="118">Set.univ</span> : <span class="const token" data-verso-hover="73">Set</span> (<span class="const token" data-verso-hover="39">Fin</span> <span class="nu">2</span>))) ∧</span>
+<span id="L238">      ¬ <span class="const token" data-verso-hover="50">IsCommonFixed</span> <span class="const token" data-verso-hover="186">naiveF</span> ⊥ := <span class="kw">by</span></span>
+<span id="L239">  <span class="kw">refine</span> ⟨?_, ?_, ⟨⟨<span class="kw">fun</span> _ =&gt; ⊥, <span class="kw">fun</span> _ =&gt; <span class="nu">0</span>, <span class="kw">fun</span> _ _ _ =&gt; <span class="const token" data-verso-hover="170">Or.inl</span> <span class="const token" data-verso-hover="121">rfl</span>,</span>
+<span id="L240">      <span class="kw">fun</span> k hk =&gt; <span class="const token" data-verso-hover="55">absurd</span> <span class="const token" data-verso-hover="120">trivial</span> (hk <span class="nu">0</span> <span class="const token" data-verso-hover="120">trivial</span>), <span class="kw">fun</span> k _ =&gt; ?_⟩⟩,</span>
+<span id="L241">    <span class="kw">fun</span> i N =&gt; ⟨N, <span class="const token" data-verso-hover="119">le_rfl</span>, <span class="const token" data-verso-hover="120">trivial</span>⟩, <span class="kw">fun</span> h =&gt; <span class="const token" data-verso-hover="55">absurd</span> (<span class="const token" data-verso-hover="54">congrFun</span> (h <span class="nu">0</span>) <span class="nu">0</span>) (<span class="kw">by</span> <span class="kw">decide</span>)⟩</span>
+<span id="L242">  · <span class="kw">intro</span> i x y h k</span>
+<span id="L243">    <span class="kw">by_cases</span> hk : k = i</span>
+<span id="L244">    · <span class="kw">subst</span> hk; <span class="kw">simp</span> [<span class="const token" data-verso-hover="186">naiveF</span>]</span>
+<span id="L245">    · <span class="kw">simp</span> [<span class="const token" data-verso-hover="186">naiveF</span>, <span class="const token" data-verso-hover="187">Function.update_of_ne</span> hk, h k]</span>
+<span id="L246">  · <span class="kw">intro</span> i x k</span>
+<span id="L247">    <span class="kw">by_cases</span> hk : k = i</span>
+<span id="L248">    · <span class="kw">subst</span> hk; <span class="kw">simp</span> [<span class="const token" data-verso-hover="186">naiveF</span>]</span>
+<span id="L249">    · <span class="kw">simp</span> [<span class="const token" data-verso-hover="186">naiveF</span>, <span class="const token" data-verso-hover="187">Function.update_of_ne</span> hk]</span>
+<span id="L250">  · <span class="kw">refine</span> ⟨<span class="nu">1</span> - k, <span class="const token" data-verso-hover="120">trivial</span>, <span class="const token" data-verso-hover="120">trivial</span>, ?_⟩</span>
+<span id="L251">    <span class="kw">fin_cases</span> k &lt;;&gt; <span class="kw">rfl</span></span>
+<span id="L252"></span>
+<span id="L253"><span class="dc">/-- The paper's real-time model forbids a process from reading a value whose computation depends on</span></span>
+<span id="L254"><span class="dc">its own read. Without that causality constraint (no `rank`), values could appear "out of thin air":</span></span>
+<span id="L255"><span class="dc">with `f₀ x = (x₀ ∨ x₁, x₁)` and `f₁ x = (x₀, x₀ ∨ x₁)` (monotone, inflationary, `⊥` is a common fixed</span></span>
+<span id="L256"><span class="dc">point), process 0 reads `(0,1)` justified by process 1's write and process 1 reads `(1,0)` justified</span></span>
+<span id="L257"><span class="dc">by process 0's write; the round would commit `(1,1)`, above the least common fixed point. With</span></span>
+<span id="L258"><span class="dc">causality this is impossible (`RoundExec.commit_le`). -/</span></span>
+<span id="L259"><span class="kw">theorem</span> <span class="const token" data-verso-hover="13">acausal_round_breaks_leastness</span> :</span>
+<span id="L260">    <span class="kw">let</span> f : <span class="const token" data-verso-hover="39">Fin</span> <span class="nu">2</span> → (<span class="const token" data-verso-hover="39">Fin</span> <span class="nu">2</span> → <span class="const token" data-verso-hover="113">Bool</span>) → (<span class="const token" data-verso-hover="39">Fin</span> <span class="nu">2</span> → <span class="const token" data-verso-hover="113">Bool</span>) :=</span>
+<span id="L261">      <span class="kw">fun</span> i x =&gt; <span class="const token" data-verso-hover="45">Function.update</span> x i (x <span class="nu">0</span> || x <span class="nu">1</span>)</span>
+<span id="L262">    <span class="kw">let</span> X : <span class="const token" data-verso-hover="39">Fin</span> <span class="nu">2</span> → <span class="const token" data-verso-hover="39">Fin</span> <span class="nu">2</span> → <span class="const token" data-verso-hover="113">Bool</span> := <span class="kw">fun</span> i k =&gt; <span class="const token" data-verso-hover="148">decide</span> (i ≠ k)</span>
+<span id="L263">    (∀ i, <span class="const token" data-verso-hover="46">Monotone</span> (f i)) ∧ (∀ i, <span class="const token" data-verso-hover="68">Inflationary</span> (f i)) ∧ <span class="const token" data-verso-hover="50">IsCommonFixed</span> f ⊥ ∧</span>
+<span id="L264">      <span class="cm">--</span><span class="cm"> the cyclic reads are each justified by the other process's (changed) write:</span></span>
+<span id="L265">      (∀ i k, X i k = <span class="const token" data-verso-hover="116">false</span> ∨ ∃ j, <span class="const token" data-verso-hover="157">uooc</span> (X j) (f j (X j)) k ∧ X i k = f j (X j) k) ∧</span>
+<span id="L266">      <span class="cm">--</span><span class="cm"> and committing these writes gives `(1,1)`:</span></span>
+<span id="L267">      (<span class="kw">fun</span> k =&gt; f k (X k) k) = ⊤ ∧</span>
+<span id="L268">      <span class="cm">--</span><span class="cm"> whereas no causal round from `⊥` commits `(1,1)`:</span></span>
+<span id="L269">      ¬ <span class="const token" data-verso-hover="167">ParRound</span> <span class="const token" data-verso-hover="157">uooc</span> f ⊥ <span class="const token" data-verso-hover="118">Set.univ</span> ⊤ := <span class="kw">by</span></span>
+<span id="L270">  <span class="kw">intro</span> f X</span>
+<span id="L271">  <span class="kw">have</span> hm : ∀ i, <span class="const token" data-verso-hover="46">Monotone</span> (f i) := <span class="kw">by</span></span>
+<span id="L272">    <span class="kw">intro</span> i x y h k</span>
+<span id="L273">    <span class="kw">by_cases</span> hk : k = i</span>
+<span id="L274">    · <span class="kw">subst</span> hk</span>
+<span id="L275">      <span class="kw">simp</span> only [f, <span class="const token" data-verso-hover="57">Function.update_self</span>]</span>
+<span id="L276">      <span class="kw">have</span> h0 := h <span class="nu">0</span>; <span class="kw">have</span> h1 := h <span class="nu">1</span></span>
+<span id="L277">      <span class="kw">exact</span> <span class="const token" data-verso-hover="122">sup_le_sup</span> h0 h1</span>
+<span id="L278">    · <span class="kw">simp</span> [f, <span class="const token" data-verso-hover="187">Function.update_of_ne</span> hk, h k]</span>
+<span id="L279">  <span class="kw">have</span> hcf : <span class="const token" data-verso-hover="50">IsCommonFixed</span> f ⊥ := <span class="kw">by</span></span>
+<span id="L280">    <span class="kw">intro</span> i; <span class="kw">funext</span> k; <span class="kw">by_cases</span> hk : k = i</span>
+<span id="L281">    · <span class="kw">subst</span> hk; <span class="kw">simp</span> [f]</span>
+<span id="L282">    · <span class="kw">simp</span> [f, <span class="const token" data-verso-hover="187">Function.update_of_ne</span> hk]</span>
+<span id="L283">  <span class="kw">refine</span> ⟨hm, ?_, hcf, <span class="kw">by</span> <span class="kw">decide</span>, <span class="kw">by</span> <span class="kw">decide</span>, <span class="kw">fun</span> ⟨e⟩ =&gt; ?_⟩</span>
+<span id="L284">  · <span class="kw">intro</span> i x k</span>
+<span id="L285">    <span class="kw">by_cases</span> hk : k = i</span>
+<span id="L286">    · <span class="kw">subst</span> hk; <span class="kw">simp</span> only [f, <span class="const token" data-verso-hover="57">Function.update_self</span>]</span>
+<span id="L287">      <span class="kw">cases</span> h0 : x <span class="nu">0</span> &lt;;&gt; <span class="kw">cases</span> h1 : x <span class="nu">1</span> &lt;;&gt; <span class="kw">fin_cases</span> k &lt;;&gt; <span class="kw">simp_all</span></span>
+<span id="L288">    · <span class="kw">simp</span> [f, <span class="const token" data-verso-hover="187">Function.update_of_ne</span> hk]</span>
+<span id="L289">  · <span class="kw">have</span> := e.<span class="const token" data-verso-hover="10">commit_le</span> hm hcf <span class="const token" data-verso-hover="119">le_rfl</span></span>
+<span id="L290">    <span class="kw">exact</span> <span class="const token" data-verso-hover="55">absurd</span> (this <span class="nu">0</span>) (<span class="kw">by</span> <span class="kw">decide</span>)</span>
+<span id="L291"></span>
+<span id="L292"><span class="dc">/-- The brief announcement states Theorem 3.1 for a "finite distributive lattice of vectors", i.e.</span></span>
+<span id="L293"><span class="dc">possibly a proper sublattice `L` of `{0,…,m}ⁿ` (such as a lattice of consistent cuts). Then the</span></span>
+<span id="L294"><span class="dc">coordinatewise last-writer-wins commit can leave `L`: in the 5-element distributive sublattice</span></span>
+<span id="L295"><span class="dc">`L = {000, 010, 110, 021, 121}` of `{0,1,2}³`, the functions `f_A x = x ⊔ 110` and `f_B x = x ⊔ 021`</span></span>
+<span id="L296"><span class="dc">map `L` to `L` and are monotone and inflationary, but a round of both from `000` (both read `000`;</span></span>
+<span id="L297"><span class="dc">coordinates 0, 1 last written by `A`, coordinate 2 by `B`) commits `111 ∉ L`. So the theorem needs</span></span>
+<span id="L298"><span class="dc">the full product (as in the full version's "for simplicity" assumption). -/</span></span>
+<span id="L299"><span class="kw">theorem</span> <span class="const token" data-verso-hover="5">sublattice_round_escapes</span> :</span>
+<span id="L300">    <span class="kw">let</span> L : <span class="const token" data-verso-hover="127">Finset</span> (<span class="const token" data-verso-hover="39">Fin</span> <span class="nu">3</span> → <span class="const token" data-verso-hover="39">Fin</span> <span class="nu">3</span>) := {![<span class="nu">0</span>, <span class="nu">0</span>, <span class="nu">0</span>], ![<span class="nu">0</span>, <span class="nu">1</span>, <span class="nu">0</span>], ![<span class="nu">1</span>, <span class="nu">1</span>, <span class="nu">0</span>], ![<span class="nu">0</span>, <span class="nu">2</span>, <span class="nu">1</span>], ![<span class="nu">1</span>, <span class="nu">2</span>, <span class="nu">1</span>]}</span>
+<span id="L301">    <span class="kw">let</span> f : <span class="const token" data-verso-hover="113">Bool</span> → (<span class="const token" data-verso-hover="39">Fin</span> <span class="nu">3</span> → <span class="const token" data-verso-hover="39">Fin</span> <span class="nu">3</span>) → (<span class="const token" data-verso-hover="39">Fin</span> <span class="nu">3</span> → <span class="const token" data-verso-hover="39">Fin</span> <span class="nu">3</span>) :=</span>
+<span id="L302">      <span class="kw">fun</span> i x =&gt; <span class="kw">if</span> i <span class="kw">then</span> x ⊔ ![<span class="nu">0</span>, <span class="nu">2</span>, <span class="nu">1</span>] <span class="kw">else</span> x ⊔ ![<span class="nu">1</span>, <span class="nu">1</span>, <span class="nu">0</span>]</span>
+<span id="L303">    (∀ a ∈ L, ∀ b ∈ L, a ⊔ b ∈ L ∧ a ⊓ b ∈ L) ∧ (∀ i, ∀ x ∈ L, f i x ∈ L) ∧</span>
+<span id="L304">      (∀ i, <span class="const token" data-verso-hover="46">Monotone</span> (f i)) ∧ (∀ i, <span class="const token" data-verso-hover="68">Inflationary</span> (f i)) ∧ ⊥ ∈ L ∧</span>
+<span id="L305">      <span class="const token" data-verso-hover="167">ParRound</span> <span class="const token" data-verso-hover="157">uooc</span> f ⊥ <span class="const token" data-verso-hover="118">Set.univ</span> ![<span class="nu">1</span>, <span class="nu">1</span>, <span class="nu">1</span>] ∧ ![<span class="nu">1</span>, <span class="nu">1</span>, <span class="nu">1</span>] ∉ L := <span class="kw">by</span></span>
+<span id="L306">  <span class="kw">intro</span> L f</span>
+<span id="L307">  <span class="kw">refine</span> ⟨<span class="kw">by</span> <span class="kw">decide</span>, <span class="kw">by</span> <span class="kw">decide</span>, ?_, ?_, <span class="kw">by</span> <span class="kw">decide</span>, ⟨⟨<span class="kw">fun</span> _ =&gt; ⊥, <span class="kw">fun</span> _ =&gt; <span class="nu">0</span>,</span>
+<span id="L308">    <span class="kw">fun</span> _ _ _ =&gt; <span class="const token" data-verso-hover="170">Or.inl</span> <span class="const token" data-verso-hover="121">rfl</span>, <span class="kw">fun</span> k hk =&gt; ?_, <span class="kw">fun</span> k _ =&gt; ?_⟩⟩, <span class="kw">by</span> <span class="kw">decide</span>⟩</span>
+<span id="L309">  · <span class="kw">intro</span> i x y h</span>
+<span id="L310">    <span class="kw">cases</span> i &lt;;&gt; <span class="kw">exact</span> <span class="const token" data-verso-hover="188">sup_le_sup_right</span> h _</span>
+<span id="L311">  · <span class="kw">intro</span> i x</span>
+<span id="L312">    <span class="kw">cases</span> i &lt;;&gt; <span class="kw">exact</span> <span class="const token" data-verso-hover="189">le_sup_left</span></span>
+<span id="L313">  · <span class="kw">exfalso</span></span>
+<span id="L314">    <span class="kw">fin_cases</span> k</span>
+<span id="L315">    · <span class="kw">exact</span> hk <span class="const token" data-verso-hover="116">false</span> <span class="const token" data-verso-hover="120">trivial</span> (<span class="kw">by</span> <span class="kw">decide</span>)</span>
+<span id="L316">    · <span class="kw">exact</span> hk <span class="const token" data-verso-hover="116">false</span> <span class="const token" data-verso-hover="120">trivial</span> (<span class="kw">by</span> <span class="kw">decide</span>)</span>
+<span id="L317">    · <span class="kw">exact</span> hk <span class="const token" data-verso-hover="114">true</span> <span class="const token" data-verso-hover="120">trivial</span> (<span class="kw">by</span> <span class="kw">decide</span>)</span>
+<span id="L318">  · <span class="kw">fin_cases</span> k</span>
+<span id="L319">    · <span class="kw">exact</span> ⟨<span class="const token" data-verso-hover="116">false</span>, <span class="const token" data-verso-hover="120">trivial</span>, <span class="kw">by</span> <span class="kw">decide</span>, <span class="kw">by</span> <span class="kw">decide</span>⟩</span>
+<span id="L320">    · <span class="kw">exact</span> ⟨<span class="const token" data-verso-hover="116">false</span>, <span class="const token" data-verso-hover="120">trivial</span>, <span class="kw">by</span> <span class="kw">decide</span>, <span class="kw">by</span> <span class="kw">decide</span>⟩</span>
+<span id="L321">    · <span class="kw">exact</span> ⟨<span class="const token" data-verso-hover="114">true</span>, <span class="const token" data-verso-hover="120">trivial</span>, <span class="kw">by</span> <span class="kw">decide</span>, <span class="kw">by</span> <span class="kw">decide</span>⟩</span>
+<span id="L322"></span>
+<span id="L323"><span class="kw">end</span> Podc.OverwriteLeastFixedPoints</span>
+<span id="L324"></span>
+</code></div>
+        <script>
+          window.versoHoversUrl = "PODC2026/OverwriteLeastFixedPoints/-hovers.json";</script>
+        <script src="static/lean/popper.js"></script>
+        <script src="static/lean/tippy.js"></script>
+        <script src="static/lean/marked.js"></script>
+        <script src="static/lean/highlighting.js"></script>
+        <script src="static/lean/lean.js"></script>
+        </article></main><footer class="site-footer"><div class="wrap">
+        Machine-checked formalizations of PODC papers in Lean 4. Generated with <a href="https://github.com/leanprover/verso">Verso</a> from the README files of <a href="https://github.com/vasnesterov/formal_podc">vasnesterov/formal_podc</a>.</div>
+      </footer></body>
+  </html>
+

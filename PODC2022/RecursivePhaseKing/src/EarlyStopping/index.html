@@ -1,0 +1,695 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="light dark">
+    <link rel="icon" href="data:,">
+    <title>RecursivePhaseKing: EarlyStopping.lean · Formal PODC</title><base href="../../../.././"><link rel="stylesheet" href="static/lean/verso-vars.css">
+    <link rel="stylesheet" href="static/lean/highlighting.css">
+    <link rel="stylesheet" href="static/lean/tippy-border.css">
+    <link rel="stylesheet" href="static/style.css">
+    <script defer="defer" src="static/site.js"></script>
+    </head>
+  <body>
+    <header class="site-header">
+      <div class="wrap">
+        <a class="brand" href=".">Formal PODC</a><nav class="top">
+          <a href=".">Search</a><a href="about/">About</a><a href="https://github.com/vasnesterov/formal_podc">GitHub</a></nav>
+        </div>
+      </header>
+    <main class="wrap"><article><nav class="breadcrumbs" aria-label="Breadcrumb">
+          <a href=".">Search</a><span class="sep">›</span><a href="PODC2022/">PODC 2022</a><span class="sep">›</span><a href="PODC2022/RecursivePhaseKing/">RecursivePhaseKing</a><span class="sep">›</span><a href="PODC2022/RecursivePhaseKing/src/">Lean source</a><span class="sep">›</span><span aria-current="page">EarlyStopping</span></nav>
+        <h1>
+          <code>EarlyStopping.lean</code></h1>
+        <div class="paper-links">
+          <p>
+            Source of <a href="PODC2022/RecursivePhaseKing/">Recursive Early-Stopping Phase King — PODC 2022</a> · <a href="https://github.com/vasnesterov/formal_podc/blob/main/Papers/PODC2022/RecursivePhaseKing/EarlyStopping.lean">GitHub</a> · hover over a name for its type and documentation</p>
+          </div>
+        <div class="lean-code lean-src">
+          <code class="hl lean block" data-lean-context="EarlyStopping"><span id="L1"><span class="kw">import</span> Papers.PODC2022.RecursivePhaseKing.Subroutines</span>
+<span id="L2"><span class="kw">import</span> Cslib.Computability.Distributed.Byzantine.PartialSync.Rounds</span>
+<span id="L3"></span>
+<span id="L4"><span class="dc">/-!</span></span>
+<span id="L5"><span class="dc"># Algorithm 1: the early-stopping Phase King protocol (Theorem 2.9)</span></span>
+<span id="L6"></span>
+<span id="L7"><span class="dc">Algorithm 1 of [LS22] with the weak validator and the termination check implemented by</span></span>
+<span id="L8"><span class="dc">Algorithm 2 and electors' broadcast by the king's broadcast (Algorithm 3), as one round algorithm</span></span>
+<span id="L9"><span class="dc">of CSLib's synchronous round model (`RoundAlgorithm`, executions `RoundRun` with `SyncFrom 0`:</span></span>
+<span id="L10"><span class="dc">messages between correct nodes are delivered, messages from faulty nodes are arbitrary).</span></span>
+<span id="L11"></span>
+<span id="L12"><span class="dc">One loop iteration `k` (0-based; the king is `king k`) takes the six rounds `6k, …, 6k + 5`:</span></span>
+<span id="L13"></span>
+<span id="L14"><span class="dc">| round `6k + i` | `i = 0` | `1` | `2` | `3` | `4` | `5` |</span></span>
+<span id="L15"><span class="dc">|---|---|---|---|---|---|---|</span></span>
+<span id="L16"><span class="dc">| subroutine | validator, bcast 1 | validator, bcast 2 | king's bcast | termcheck, bcast 1 | termcheck, bcast 2 | termination bcast |</span></span>
+<span id="L17"></span>
+<span id="L18"><span class="dc">Convention (3) of [LS22] ("if `i ∈ V_g` terminates with output `b` and communicates this to other</span></span>
+<span id="L19"><span class="dc">nodes, they will assume that `i` sends `b` in all future rounds") is implemented explicitly: every</span></span>
+<span id="L20"><span class="dc">node records the senders of termination broadcasts (`done`) and substitutes the recorded value for</span></span>
+<span id="L21"><span class="dc">their messages from then on (`eff`). A terminated node *halts*: it sends nothing afterwards.</span></span>
+<span id="L22"></span>
+<span id="L23"><span class="dc">Main results (`n = |P|`, `3t &lt; n`, at most `t` faulty nodes, `f = |F|` the actual number of faulty</span></span>
+<span id="L24"><span class="dc">nodes; the kings of the first `t + 1` iterations are distinct):</span></span>
+<span id="L25"><span class="dc">* `theorem_2_9_validity`, `theorem_2_9_agreement` (binary consensus, Definition 2.1);</span></span>
+<span id="L26"><span class="dc">* `theorem_2_9_termination`: every correct node has decided and halted after `6 (f + 1)` rounds;</span></span>
+<span id="L27"><span class="dc">* `theorem_2_9_messages`: correct nodes send at most `6 n² (f + 1)` single-bit messages in total.</span></span>
+<span id="L28"><span class="dc">-/</span></span>
+<span id="L29"></span>
+<span id="L30"><span class="kw">set_option</span> <span class="const token" data-verso-hover="71">linter.unusedSectionVars</span> false</span>
+<span id="L31"></span>
+<span id="L32"><span class="kw">namespace</span> RecursivePhaseKing</span>
+<span id="L33"></span>
+<span id="L34"><span class="kw">open</span> Finset Cslib.Byzantine.PartialSync</span>
+<span id="L35"></span>
+<span id="L36"><span class="kw">variable</span> {P : <span class="kw">Type</span>*} [<span class="const token" data-verso-hover="72">Fintype</span> P] [<span class="const token" data-verso-hover="73">DecidableEq</span> P]</span>
+<span id="L37"></span>
+<span id="L38"><span class="dc">/-- Local state of a node running Algorithm 1. -/</span></span>
+<span id="L39"><span class="kw">structure</span> <span class="const token" data-verso-hover="221">St</span> (P : <span class="kw">Type</span>*) <span class="kw">where</span></span>
+<span id="L40">  <span class="dc">/-- The opinion `op_i`. -/</span></span>
+<span id="L41">  <span class="const token" data-verso-hover="222">op</span> : <span class="const token" data-verso-hover="75">Bool</span></span>
+<span id="L42">  <span class="dc">/-- The bit `strong_i` returned by the last validator call. -/</span></span>
+<span id="L43">  <span class="const token" data-verso-hover="223">strong</span> : <span class="const token" data-verso-hover="75">Bool</span></span>
+<span id="L44">  <span class="dc">/-- The second-round message of the current instance of Algorithm 2 (line 4), if any. -/</span></span>
+<span id="L45">  <span class="const token" data-verso-hover="224">snd</span> : <span class="const token" data-verso-hover="62">Option</span> <span class="const token" data-verso-hover="75">Bool</span></span>
+<span id="L46">  <span class="dc">/-- The output (set when `term_i = 1`). -/</span></span>
+<span id="L47">  <span class="const token" data-verso-hover="225">out</span> : <span class="const token" data-verso-hover="62">Option</span> <span class="const token" data-verso-hover="75">Bool</span></span>
+<span id="L48">  <span class="dc">/-- Whether the node has returned (after its termination broadcast). -/</span></span>
+<span id="L49">  <span class="const token" data-verso-hover="226">halted</span> : <span class="const token" data-verso-hover="75">Bool</span></span>
+<span id="L50">  <span class="dc">/-- `done q = some b`: `q` made a termination broadcast with value `b`. -/</span></span>
+<span id="L51">  <span class="const token" data-verso-hover="227">done</span> : P → <span class="const token" data-verso-hover="62">Option</span> <span class="const token" data-verso-hover="75">Bool</span></span>
+<span id="L52"></span>
+<span id="L53"><span class="dc">/-- Effective receptions (convention (3)): a sender recorded as terminated with value `b` is</span></span>
+<span id="L54"><span class="dc">assumed to send `b`. -/</span></span>
+<span id="L55"><span class="kw">def</span> <span class="const token" data-verso-hover="228">eff</span> (s : <span class="const token" data-verso-hover="221">St</span> P) (rcv : P → <span class="const token" data-verso-hover="62">Option</span> <span class="const token" data-verso-hover="75">Bool</span>) : P → <span class="const token" data-verso-hover="62">Option</span> <span class="const token" data-verso-hover="75">Bool</span> := <span class="kw">fun</span> q =&gt; (s.<span class="const token" data-verso-hover="227">done</span> q).<span class="const token" data-verso-hover="229">or</span> (rcv q)</span>
+<span id="L56"></span>
+<span id="L57"><span class="kw">variable</span> (t : <span class="const token" data-verso-hover="59">ℕ</span>) (king : <span class="const token" data-verso-hover="59">ℕ</span> → P) (tb : <span class="const token" data-verso-hover="59">ℕ</span> → P → <span class="const token" data-verso-hover="221">St</span> P → (P → <span class="const token" data-verso-hover="62">Option</span> <span class="const token" data-verso-hover="75">Bool</span>) → <span class="const token" data-verso-hover="75">Bool</span>)</span>
+<span id="L58"></span>
+<span id="L59"><span class="dc">/-- Algorithm 1 of [LS22] with Algorithms 2 and 3 as subroutines, as a round algorithm. Round `r`</span></span>
+<span id="L60"><span class="dc">is round `r % 6` of iteration `r / 6`, whose king is `king (r / 6)`. `tb` resolves the arbitrary</span></span>
+<span id="L61"><span class="dc">choices of convention (4) (line 6 of Algorithm 2 when both values qualify). -/</span></span>
+<span id="L62"><span class="kw">def</span> <span class="const token" data-verso-hover="230">alg1</span> : <span class="const token" data-verso-hover="19">RoundAlgorithm</span> P <span class="const token" data-verso-hover="75">Bool</span> (<span class="const token" data-verso-hover="221">St</span> P) <span class="const token" data-verso-hover="75">Bool</span> <span class="const token" data-verso-hover="75">Bool</span> <span class="kw">where</span></span>
+<span id="L63">  <span class="const token" data-verso-hover="64">init</span> _ b := ⟨b, <span class="const token" data-verso-hover="89">false</span>, <span class="const token" data-verso-hover="69">none</span>, <span class="const token" data-verso-hover="69">none</span>, <span class="const token" data-verso-hover="89">false</span>, <span class="kw">fun</span> _ =&gt; <span class="const token" data-verso-hover="69">none</span>⟩</span>
+<span id="L64">  <span class="const token" data-verso-hover="68">send</span> r p s _ :=</span>
+<span id="L65">    <span class="kw">if</span> s.<span class="const token" data-verso-hover="226">halted</span> <span class="kw">then</span> <span class="const token" data-verso-hover="69">none</span></span>
+<span id="L66">    <span class="kw">else</span> <span class="kw">if</span> r % <span class="nu">6</span> = <span class="nu">0</span> <span class="kw">then</span> <span class="const token" data-verso-hover="231">some</span> s.<span class="const token" data-verso-hover="222">op</span></span>
+<span id="L67">    <span class="kw">else</span> <span class="kw">if</span> r % <span class="nu">6</span> = <span class="nu">1</span> <span class="kw">then</span> s.<span class="const token" data-verso-hover="224">snd</span></span>
+<span id="L68">    <span class="kw">else</span> <span class="kw">if</span> r % <span class="nu">6</span> = <span class="nu">2</span> <span class="kw">then</span> (<span class="kw">if</span> p = king (r / <span class="nu">6</span>) <span class="kw">then</span> <span class="const token" data-verso-hover="231">some</span> s.<span class="const token" data-verso-hover="222">op</span> <span class="kw">else</span> <span class="const token" data-verso-hover="69">none</span>)</span>
+<span id="L69">    <span class="kw">else</span> <span class="kw">if</span> r % <span class="nu">6</span> = <span class="nu">3</span> <span class="kw">then</span> <span class="const token" data-verso-hover="231">some</span> s.<span class="const token" data-verso-hover="222">op</span></span>
+<span id="L70">    <span class="kw">else</span> <span class="kw">if</span> r % <span class="nu">6</span> = <span class="nu">4</span> <span class="kw">then</span> s.<span class="const token" data-verso-hover="224">snd</span></span>
+<span id="L71">    <span class="kw">else</span> s.<span class="const token" data-verso-hover="225">out</span></span>
+<span id="L72">  <span class="const token" data-verso-hover="66">trans</span> r p s rcv :=</span>
+<span id="L73">    <span class="kw">if</span> s.<span class="const token" data-verso-hover="226">halted</span> <span class="kw">then</span> s</span>
+<span id="L74">    <span class="kw">else</span> <span class="kw">if</span> r % <span class="nu">6</span> = <span class="nu">0</span> <span class="kw">then</span> { s <span class="kw">with</span> <span class="const token" data-verso-hover="224">snd</span> := <span class="const token" data-verso-hover="2">vote</span> (<span class="const token" data-verso-hover="232">Fintype.card</span> P - t) (<span class="const token" data-verso-hover="228">eff</span> s rcv) }</span>
+<span id="L75">    <span class="kw">else</span> <span class="kw">if</span> r % <span class="nu">6</span> = <span class="nu">1</span> <span class="kw">then</span></span>
+<span id="L76">      { s <span class="kw">with</span> <span class="const token" data-verso-hover="222">op</span> := <span class="const token" data-verso-hover="233">adopt</span> t (tb r p s rcv) s.<span class="const token" data-verso-hover="222">op</span> (<span class="const token" data-verso-hover="228">eff</span> s rcv), <span class="const token" data-verso-hover="223">strong</span> := <span class="const token" data-verso-hover="234">strongOf</span> t (<span class="const token" data-verso-hover="228">eff</span> s rcv) }</span>
+<span id="L77">    <span class="kw">else</span> <span class="kw">if</span> r % <span class="nu">6</span> = <span class="nu">2</span> <span class="kw">then</span> { s <span class="kw">with</span> <span class="const token" data-verso-hover="222">op</span> := <span class="const token" data-verso-hover="235">kingOut</span> s.<span class="const token" data-verso-hover="222">op</span> s.<span class="const token" data-verso-hover="223">strong</span> (<span class="const token" data-verso-hover="228">eff</span> s rcv (king (r / <span class="nu">6</span>))) }</span>
+<span id="L78">    <span class="kw">else</span> <span class="kw">if</span> r % <span class="nu">6</span> = <span class="nu">3</span> <span class="kw">then</span> { s <span class="kw">with</span> <span class="const token" data-verso-hover="224">snd</span> := <span class="const token" data-verso-hover="2">vote</span> (<span class="const token" data-verso-hover="232">Fintype.card</span> P - t) (<span class="const token" data-verso-hover="228">eff</span> s rcv) }</span>
+<span id="L79">    <span class="kw">else</span> <span class="kw">if</span> r % <span class="nu">6</span> = <span class="nu">4</span> <span class="kw">then</span></span>
+<span id="L80">      { s <span class="kw">with</span> <span class="const token" data-verso-hover="222">op</span> := <span class="const token" data-verso-hover="233">adopt</span> t (tb r p s rcv) s.<span class="const token" data-verso-hover="222">op</span> (<span class="const token" data-verso-hover="228">eff</span> s rcv),</span>
+<span id="L81">               <span class="const token" data-verso-hover="225">out</span> := <span class="kw">if</span> <span class="const token" data-verso-hover="234">strongOf</span> t (<span class="const token" data-verso-hover="228">eff</span> s rcv) <span class="kw">then</span></span>
+<span id="L82">                 <span class="const token" data-verso-hover="231">some</span> (<span class="const token" data-verso-hover="233">adopt</span> t (tb r p s rcv) s.<span class="const token" data-verso-hover="222">op</span> (<span class="const token" data-verso-hover="228">eff</span> s rcv)) <span class="kw">else</span> <span class="const token" data-verso-hover="69">none</span> }</span>
+<span id="L83">    <span class="kw">else</span> { s <span class="kw">with</span> <span class="const token" data-verso-hover="226">halted</span> := s.<span class="const token" data-verso-hover="225">out</span>.<span class="const token" data-verso-hover="236">isSome</span>, <span class="const token" data-verso-hover="227">done</span> := <span class="kw">fun</span> q =&gt; (s.<span class="const token" data-verso-hover="227">done</span> q).<span class="const token" data-verso-hover="229">or</span> (rcv q) }</span>
+<span id="L84">  <span class="const token" data-verso-hover="237">decide</span> _ s := s.<span class="const token" data-verso-hover="225">out</span></span>
+<span id="L85"></span>
+<span id="L86"><span class="kw">variable</span> {t king tb}</span>
+<span id="L87"></span>
+<span id="L88"><span class="dc">/-! ### One-step equations -/</span></span>
+<span id="L89"></span>
+<span id="L90"><span class="kw">section</span> Steps</span>
+<span id="L91"></span>
+<span id="L92"><span class="kw">variable</span> {r : <span class="const token" data-verso-hover="59">ℕ</span>} {p q : P} {s : <span class="const token" data-verso-hover="221">St</span> P} {rcv : P → <span class="const token" data-verso-hover="62">Option</span> <span class="const token" data-verso-hover="75">Bool</span>}</span>
+<span id="L93"></span>
+<span id="L94"><span class="kw">theorem</span> <span class="const token" data-verso-hover="238">trans_halted</span> (h : s.<span class="const token" data-verso-hover="226">halted</span> = <span class="const token" data-verso-hover="88">true</span>) : (<span class="const token" data-verso-hover="230">alg1</span> t king tb).<span class="const token" data-verso-hover="66">trans</span> r p s rcv = s := <span class="kw">by</span></span>
+<span id="L95">  <span class="kw">simp</span> [<span class="const token" data-verso-hover="230">alg1</span>, h]</span>
+<span id="L96"></span>
+<span id="L97"><span class="kw">theorem</span> <span class="const token" data-verso-hover="239">send_halted</span> (h : s.<span class="const token" data-verso-hover="226">halted</span> = <span class="const token" data-verso-hover="88">true</span>) : (<span class="const token" data-verso-hover="230">alg1</span> t king tb).<span class="const token" data-verso-hover="68">send</span> r p s q = <span class="const token" data-verso-hover="69">none</span> := <span class="kw">by</span></span>
+<span id="L98">  <span class="kw">simp</span> [<span class="const token" data-verso-hover="230">alg1</span>, h]</span>
+<span id="L99"></span>
+<span id="L100"><span class="kw">theorem</span> <span class="const token" data-verso-hover="240">trans_0</span> (h : s.<span class="const token" data-verso-hover="226">halted</span> = <span class="const token" data-verso-hover="89">false</span>) (hr : r % <span class="nu">6</span> = <span class="nu">0</span>) : (<span class="const token" data-verso-hover="230">alg1</span> t king tb).<span class="const token" data-verso-hover="66">trans</span> r p s rcv =</span>
+<span id="L101">    { s <span class="kw">with</span> <span class="const token" data-verso-hover="224">snd</span> := <span class="const token" data-verso-hover="2">vote</span> (<span class="const token" data-verso-hover="232">Fintype.card</span> P - t) (<span class="const token" data-verso-hover="228">eff</span> s rcv) } := <span class="kw">by</span></span>
+<span id="L102">  <span class="kw">simp</span> [<span class="const token" data-verso-hover="230">alg1</span>, h, hr]</span>
+<span id="L103"></span>
+<span id="L104"><span class="kw">theorem</span> <span class="const token" data-verso-hover="241">trans_1</span> (h : s.<span class="const token" data-verso-hover="226">halted</span> = <span class="const token" data-verso-hover="89">false</span>) (hr : r % <span class="nu">6</span> = <span class="nu">1</span>) : (<span class="const token" data-verso-hover="230">alg1</span> t king tb).<span class="const token" data-verso-hover="66">trans</span> r p s rcv =</span>
+<span id="L105">    { s <span class="kw">with</span> <span class="const token" data-verso-hover="222">op</span> := <span class="const token" data-verso-hover="233">adopt</span> t (tb r p s rcv) s.<span class="const token" data-verso-hover="222">op</span> (<span class="const token" data-verso-hover="228">eff</span> s rcv), <span class="const token" data-verso-hover="223">strong</span> := <span class="const token" data-verso-hover="234">strongOf</span> t (<span class="const token" data-verso-hover="228">eff</span> s rcv) } := <span class="kw">by</span></span>
+<span id="L106">  <span class="kw">simp</span> [<span class="const token" data-verso-hover="230">alg1</span>, h, hr]</span>
+<span id="L107"></span>
+<span id="L108"><span class="kw">theorem</span> <span class="const token" data-verso-hover="242">trans_2</span> (h : s.<span class="const token" data-verso-hover="226">halted</span> = <span class="const token" data-verso-hover="89">false</span>) (hr : r % <span class="nu">6</span> = <span class="nu">2</span>) : (<span class="const token" data-verso-hover="230">alg1</span> t king tb).<span class="const token" data-verso-hover="66">trans</span> r p s rcv =</span>
+<span id="L109">    { s <span class="kw">with</span> <span class="const token" data-verso-hover="222">op</span> := <span class="const token" data-verso-hover="235">kingOut</span> s.<span class="const token" data-verso-hover="222">op</span> s.<span class="const token" data-verso-hover="223">strong</span> (<span class="const token" data-verso-hover="228">eff</span> s rcv (king (r / <span class="nu">6</span>))) } := <span class="kw">by</span></span>
+<span id="L110">  <span class="kw">simp</span> [<span class="const token" data-verso-hover="230">alg1</span>, h, hr]</span>
+<span id="L111"></span>
+<span id="L112"><span class="kw">theorem</span> <span class="const token" data-verso-hover="243">trans_3</span> (h : s.<span class="const token" data-verso-hover="226">halted</span> = <span class="const token" data-verso-hover="89">false</span>) (hr : r % <span class="nu">6</span> = <span class="nu">3</span>) : (<span class="const token" data-verso-hover="230">alg1</span> t king tb).<span class="const token" data-verso-hover="66">trans</span> r p s rcv =</span>
+<span id="L113">    { s <span class="kw">with</span> <span class="const token" data-verso-hover="224">snd</span> := <span class="const token" data-verso-hover="2">vote</span> (<span class="const token" data-verso-hover="232">Fintype.card</span> P - t) (<span class="const token" data-verso-hover="228">eff</span> s rcv) } := <span class="kw">by</span></span>
+<span id="L114">  <span class="kw">simp</span> [<span class="const token" data-verso-hover="230">alg1</span>, h, hr]</span>
+<span id="L115"></span>
+<span id="L116"><span class="kw">theorem</span> <span class="const token" data-verso-hover="244">trans_4</span> (h : s.<span class="const token" data-verso-hover="226">halted</span> = <span class="const token" data-verso-hover="89">false</span>) (hr : r % <span class="nu">6</span> = <span class="nu">4</span>) : (<span class="const token" data-verso-hover="230">alg1</span> t king tb).<span class="const token" data-verso-hover="66">trans</span> r p s rcv =</span>
+<span id="L117">    { s <span class="kw">with</span> <span class="const token" data-verso-hover="222">op</span> := <span class="const token" data-verso-hover="233">adopt</span> t (tb r p s rcv) s.<span class="const token" data-verso-hover="222">op</span> (<span class="const token" data-verso-hover="228">eff</span> s rcv),</span>
+<span id="L118">             <span class="const token" data-verso-hover="225">out</span> := <span class="kw">if</span> <span class="const token" data-verso-hover="234">strongOf</span> t (<span class="const token" data-verso-hover="228">eff</span> s rcv) <span class="kw">then</span></span>
+<span id="L119">               <span class="const token" data-verso-hover="231">some</span> (<span class="const token" data-verso-hover="233">adopt</span> t (tb r p s rcv) s.<span class="const token" data-verso-hover="222">op</span> (<span class="const token" data-verso-hover="228">eff</span> s rcv)) <span class="kw">else</span> <span class="const token" data-verso-hover="69">none</span> } := <span class="kw">by</span></span>
+<span id="L120">  <span class="kw">simp</span> [<span class="const token" data-verso-hover="230">alg1</span>, h, hr]</span>
+<span id="L121"></span>
+<span id="L122"><span class="kw">theorem</span> <span class="const token" data-verso-hover="245">trans_5</span> (h : s.<span class="const token" data-verso-hover="226">halted</span> = <span class="const token" data-verso-hover="89">false</span>) (hr : r % <span class="nu">6</span> = <span class="nu">5</span>) : (<span class="const token" data-verso-hover="230">alg1</span> t king tb).<span class="const token" data-verso-hover="66">trans</span> r p s rcv =</span>
+<span id="L123">    { s <span class="kw">with</span> <span class="const token" data-verso-hover="226">halted</span> := s.<span class="const token" data-verso-hover="225">out</span>.<span class="const token" data-verso-hover="236">isSome</span>, <span class="const token" data-verso-hover="227">done</span> := <span class="kw">fun</span> q =&gt; (s.<span class="const token" data-verso-hover="227">done</span> q).<span class="const token" data-verso-hover="229">or</span> (rcv q) } := <span class="kw">by</span></span>
+<span id="L124">  <span class="kw">simp</span> [<span class="const token" data-verso-hover="230">alg1</span>, h, hr]</span>
+<span id="L125"></span>
+<span id="L126"><span class="kw">theorem</span> <span class="const token" data-verso-hover="246">trans_halted_of_ne5</span> (hr : r % <span class="nu">6</span> ≠ <span class="nu">5</span>) :</span>
+<span id="L127">    ((<span class="const token" data-verso-hover="230">alg1</span> t king tb).<span class="const token" data-verso-hover="66">trans</span> r p s rcv).<span class="const token" data-verso-hover="226">halted</span> = s.<span class="const token" data-verso-hover="226">halted</span> := <span class="kw">by</span></span>
+<span id="L128">  <span class="kw">unfold</span> <span class="const token" data-verso-hover="230">alg1</span>; <span class="kw">dsimp</span> only; <span class="kw">split_ifs</span> &lt;;&gt; <span class="kw">first</span> | <span class="kw">rfl</span> | <span class="kw">omega</span></span>
+<span id="L129"></span>
+<span id="L130"><span class="kw">theorem</span> <span class="const token" data-verso-hover="247">trans_done_of_ne5</span> (hr : r % <span class="nu">6</span> ≠ <span class="nu">5</span>) :</span>
+<span id="L131">    ((<span class="const token" data-verso-hover="230">alg1</span> t king tb).<span class="const token" data-verso-hover="66">trans</span> r p s rcv).<span class="const token" data-verso-hover="227">done</span> = s.<span class="const token" data-verso-hover="227">done</span> := <span class="kw">by</span></span>
+<span id="L132">  <span class="kw">unfold</span> <span class="const token" data-verso-hover="230">alg1</span>; <span class="kw">dsimp</span> only; <span class="kw">split_ifs</span> &lt;;&gt; <span class="kw">first</span> | <span class="kw">rfl</span> | <span class="kw">omega</span></span>
+<span id="L133"></span>
+<span id="L134"><span class="kw">theorem</span> <span class="const token" data-verso-hover="248">trans_out_of_ne4</span> (hr : r % <span class="nu">6</span> ≠ <span class="nu">4</span>) :</span>
+<span id="L135">    ((<span class="const token" data-verso-hover="230">alg1</span> t king tb).<span class="const token" data-verso-hover="66">trans</span> r p s rcv).<span class="const token" data-verso-hover="225">out</span> = s.<span class="const token" data-verso-hover="225">out</span> := <span class="kw">by</span></span>
+<span id="L136">  <span class="kw">unfold</span> <span class="const token" data-verso-hover="230">alg1</span>; <span class="kw">dsimp</span> only; <span class="kw">split_ifs</span> &lt;;&gt; <span class="kw">rfl</span></span>
+<span id="L137"></span>
+<span id="L138"><span class="kw">theorem</span> <span class="const token" data-verso-hover="249">send_03</span> (h : s.<span class="const token" data-verso-hover="226">halted</span> = <span class="const token" data-verso-hover="89">false</span>) (hr : r % <span class="nu">6</span> = <span class="nu">0</span> ∨ r % <span class="nu">6</span> = <span class="nu">3</span>) :</span>
+<span id="L139">    (<span class="const token" data-verso-hover="230">alg1</span> t king tb).<span class="const token" data-verso-hover="68">send</span> r p s q = <span class="const token" data-verso-hover="231">some</span> s.<span class="const token" data-verso-hover="222">op</span> := <span class="kw">by</span></span>
+<span id="L140">  <span class="kw">rcases</span> hr <span class="kw">with</span> hr | hr &lt;;&gt; <span class="kw">simp</span> [<span class="const token" data-verso-hover="230">alg1</span>, h, hr]</span>
+<span id="L141"></span>
+<span id="L142"><span class="kw">theorem</span> <span class="const token" data-verso-hover="250">send_14</span> (h : s.<span class="const token" data-verso-hover="226">halted</span> = <span class="const token" data-verso-hover="89">false</span>) (hr : r % <span class="nu">6</span> = <span class="nu">1</span> ∨ r % <span class="nu">6</span> = <span class="nu">4</span>) :</span>
+<span id="L143">    (<span class="const token" data-verso-hover="230">alg1</span> t king tb).<span class="const token" data-verso-hover="68">send</span> r p s q = s.<span class="const token" data-verso-hover="224">snd</span> := <span class="kw">by</span></span>
+<span id="L144">  <span class="kw">rcases</span> hr <span class="kw">with</span> hr | hr &lt;;&gt; <span class="kw">simp</span> [<span class="const token" data-verso-hover="230">alg1</span>, h, hr]</span>
+<span id="L145"></span>
+<span id="L146"><span class="kw">theorem</span> <span class="const token" data-verso-hover="251">send_2</span> (h : s.<span class="const token" data-verso-hover="226">halted</span> = <span class="const token" data-verso-hover="89">false</span>) (hr : r % <span class="nu">6</span> = <span class="nu">2</span>) :</span>
+<span id="L147">    (<span class="const token" data-verso-hover="230">alg1</span> t king tb).<span class="const token" data-verso-hover="68">send</span> r (king (r / <span class="nu">6</span>)) s q = <span class="const token" data-verso-hover="231">some</span> s.<span class="const token" data-verso-hover="222">op</span> := <span class="kw">by</span></span>
+<span id="L148">  <span class="kw">simp</span> [<span class="const token" data-verso-hover="230">alg1</span>, h, hr]</span>
+<span id="L149"></span>
+<span id="L150"><span class="kw">theorem</span> <span class="const token" data-verso-hover="252">send_5</span> (h : s.<span class="const token" data-verso-hover="226">halted</span> = <span class="const token" data-verso-hover="89">false</span>) (hr : r % <span class="nu">6</span> = <span class="nu">5</span>) :</span>
+<span id="L151">    (<span class="const token" data-verso-hover="230">alg1</span> t king tb).<span class="const token" data-verso-hover="68">send</span> r p s q = s.<span class="const token" data-verso-hover="225">out</span> := <span class="kw">by</span></span>
+<span id="L152">  <span class="kw">simp</span> [<span class="const token" data-verso-hover="230">alg1</span>, h, hr]</span>
+<span id="L153"></span>
+<span id="L154"><span class="kw">end</span> Steps</span>
+<span id="L155"></span>
+<span id="L156"><span class="dc">/-! ### Executions -/</span></span>
+<span id="L157"></span>
+<span id="L158"><span class="kw">variable</span> {F : <span class="const token" data-verso-hover="57">Finset</span> P} {inp : P → <span class="const token" data-verso-hover="75">Bool</span>} (E : <span class="const token" data-verso-hover="20">RoundRun</span> (<span class="const token" data-verso-hover="230">alg1</span> t king tb) F inp)</span>
+<span id="L159"></span>
+<span id="L160"><span class="kw">namespace</span> Alg1</span>
+<span id="L161"></span>
+<span id="L162"><span class="dc">/-- The effective receptions of `p` in round `r`. -/</span></span>
+<span id="L163"><span class="kw">def</span> <span class="const token" data-verso-hover="253">effR</span> (r : <span class="const token" data-verso-hover="59">ℕ</span>) (p : P) : P → <span class="const token" data-verso-hover="62">Option</span> <span class="const token" data-verso-hover="75">Bool</span> := <span class="const token" data-verso-hover="228">eff</span> (E.<span class="const token" data-verso-hover="254">s</span> r p) (E.<span class="const token" data-verso-hover="255">rcv</span> r p)</span>
+<span id="L164"></span>
+<span id="L165"><span class="kw">theorem</span> <span class="const token" data-verso-hover="256">s_succ</span> (r : <span class="const token" data-verso-hover="59">ℕ</span>) (p : P) :</span>
+<span id="L166">    E.<span class="const token" data-verso-hover="254">s</span> (r + <span class="nu">1</span>) p = (<span class="const token" data-verso-hover="230">alg1</span> t king tb).<span class="const token" data-verso-hover="66">trans</span> r p (E.<span class="const token" data-verso-hover="254">s</span> r p) (E.<span class="const token" data-verso-hover="255">rcv</span> r p) := E.<span class="const token" data-verso-hover="257">s_succ</span> r p</span>
+<span id="L167"></span>
+<span id="L168"><span class="kw">theorem</span> <span class="const token" data-verso-hover="258">s_zero</span> (p : P) : E.<span class="const token" data-verso-hover="254">s</span> <span class="nu">0</span> p = ⟨inp p, <span class="const token" data-verso-hover="89">false</span>, <span class="const token" data-verso-hover="69">none</span>, <span class="const token" data-verso-hover="69">none</span>, <span class="const token" data-verso-hover="89">false</span>, <span class="kw">fun</span> _ =&gt; <span class="const token" data-verso-hover="69">none</span>⟩ := E.<span class="const token" data-verso-hover="259">s_zero</span> p</span>
+<span id="L169"></span>
+<span id="L170"><span class="dc">/-- A halted node never changes its state. -/</span></span>
+<span id="L171"><span class="kw">theorem</span> <span class="const token" data-verso-hover="260">frozen</span> {r : <span class="const token" data-verso-hover="59">ℕ</span>} {p : P} (h : (E.<span class="const token" data-verso-hover="254">s</span> r p).<span class="const token" data-verso-hover="226">halted</span> = <span class="const token" data-verso-hover="88">true</span>) : ∀ r' ≥ r, E.<span class="const token" data-verso-hover="254">s</span> r' p = E.<span class="const token" data-verso-hover="254">s</span> r p := <span class="kw">by</span></span>
+<span id="L172">  <span class="kw">intro</span> r' hr'</span>
+<span id="L173">  <span class="kw">induction</span> r', hr' <span class="kw">using</span> <span class="const token" data-verso-hover="95">Nat.le_induction</span> <span class="kw">with</span></span>
+<span id="L174">  | base =&gt; <span class="kw">rfl</span></span>
+<span id="L175">  | <span class="const token" data-verso-hover="96">succ</span> r' _ ih =&gt; <span class="kw">rw</span> [<span class="const token" data-verso-hover="256">s_succ</span>, ih, <span class="const token" data-verso-hover="238">trans_halted</span> h]</span>
+<span id="L176"></span>
+<span id="L177"><span class="kw">theorem</span> <span class="const token" data-verso-hover="261">halted_mono</span> {r r' : <span class="const token" data-verso-hover="59">ℕ</span>} {p : P} (h : (E.<span class="const token" data-verso-hover="254">s</span> r p).<span class="const token" data-verso-hover="226">halted</span> = <span class="const token" data-verso-hover="88">true</span>) (hr : r ≤ r') :</span>
+<span id="L178">    (E.<span class="const token" data-verso-hover="254">s</span> r' p).<span class="const token" data-verso-hover="226">halted</span> = <span class="const token" data-verso-hover="88">true</span> := <span class="kw">by</span> <span class="kw">rw</span> [<span class="const token" data-verso-hover="260">frozen</span> E h r' hr]; <span class="kw">exact</span> h</span>
+<span id="L179"></span>
+<span id="L180"><span class="dc">/-- Basic invariant (for every node): halted nodes have an output, and a node with an output is</span></span>
+<span id="L181"><span class="dc">halted, except right after round `6k + 4` (before its termination broadcast). -/</span></span>
+<span id="L182"><span class="kw">theorem</span> <span class="const token" data-verso-hover="262">inv</span> (r : <span class="const token" data-verso-hover="59">ℕ</span>) (p : P) :</span>
+<span id="L183">    ((E.<span class="const token" data-verso-hover="254">s</span> r p).<span class="const token" data-verso-hover="226">halted</span> = <span class="const token" data-verso-hover="88">true</span> → (E.<span class="const token" data-verso-hover="254">s</span> r p).<span class="const token" data-verso-hover="225">out</span>.<span class="const token" data-verso-hover="236">isSome</span>) ∧</span>
+<span id="L184">      ((E.<span class="const token" data-verso-hover="254">s</span> r p).<span class="const token" data-verso-hover="225">out</span>.<span class="const token" data-verso-hover="236">isSome</span> → (E.<span class="const token" data-verso-hover="254">s</span> r p).<span class="const token" data-verso-hover="226">halted</span> = <span class="const token" data-verso-hover="88">true</span> ∨ r % <span class="nu">6</span> = <span class="nu">5</span>) := <span class="kw">by</span></span>
+<span id="L185">  <span class="kw">induction</span> r <span class="kw">with</span></span>
+<span id="L186">  | <span class="const token" data-verso-hover="117">zero</span> =&gt; <span class="kw">simp</span> [<span class="const token" data-verso-hover="258">s_zero</span>]</span>
+<span id="L187">  | <span class="const token" data-verso-hover="96">succ</span> r ih =&gt;</span>
+<span id="L188">    <span class="kw">rw</span> [<span class="const token" data-verso-hover="256">s_succ</span>]</span>
+<span id="L189">    <span class="kw">by_cases</span> hh : (E.<span class="const token" data-verso-hover="254">s</span> r p).<span class="const token" data-verso-hover="226">halted</span> = <span class="const token" data-verso-hover="88">true</span></span>
+<span id="L190">    · <span class="kw">rw</span> [<span class="const token" data-verso-hover="238">trans_halted</span> hh]; <span class="kw">exact</span> ⟨<span class="kw">fun</span> _ =&gt; ih.<span class="const token" data-verso-hover="93">1</span> hh, <span class="kw">fun</span> _ =&gt; <span class="const token" data-verso-hover="263">Or.inl</span> hh⟩</span>
+<span id="L191">    · <span class="kw">rw</span> [<span class="const token" data-verso-hover="264">Bool.not_eq_true</span>] <span class="kw">at</span> hh</span>
+<span id="L192">      <span class="kw">have</span> h6 : r % <span class="nu">6</span> &lt; <span class="nu">6</span> := <span class="const token" data-verso-hover="265">Nat.mod_lt</span> _ (<span class="kw">by</span> <span class="kw">norm_num</span>)</span>
+<span id="L193">      <span class="kw">by_cases</span> h5 : r % <span class="nu">6</span> = <span class="nu">5</span></span>
+<span id="L194">      · <span class="kw">rw</span> [<span class="const token" data-verso-hover="245">trans_5</span> hh h5]</span>
+<span id="L195">        <span class="kw">simp</span> only</span>
+<span id="L196">        <span class="kw">exact</span> ⟨<span class="const token" data-verso-hover="266">id</span>, <span class="kw">fun</span> h =&gt; <span class="const token" data-verso-hover="263">Or.inl</span> h⟩</span>
+<span id="L197">      · <span class="kw">rw</span> [<span class="const token" data-verso-hover="246">trans_halted_of_ne5</span> h5, hh]</span>
+<span id="L198">        <span class="kw">refine</span> ⟨<span class="kw">fun</span> h =&gt; <span class="const token" data-verso-hover="267">absurd</span> h (<span class="kw">by</span> <span class="kw">simp</span>), <span class="kw">fun</span> ho =&gt; <span class="const token" data-verso-hover="268">Or.inr</span> ?_⟩</span>
+<span id="L199">        <span class="kw">by_cases</span> h4 : r % <span class="nu">6</span> = <span class="nu">4</span></span>
+<span id="L200">        · <span class="kw">omega</span></span>
+<span id="L201">        · <span class="kw">rw</span> [<span class="const token" data-verso-hover="248">trans_out_of_ne4</span> h4] <span class="kw">at</span> ho</span>
+<span id="L202">          <span class="kw">rcases</span> ih.<span class="const token" data-verso-hover="97">2</span> ho <span class="kw">with</span> h | h</span>
+<span id="L203">          · <span class="kw">rw</span> [hh] <span class="kw">at</span> h; <span class="kw">exact</span> <span class="const token" data-verso-hover="267">absurd</span> h (<span class="kw">by</span> <span class="kw">simp</span>)</span>
+<span id="L204">          · <span class="kw">omega</span></span>
+<span id="L205"></span>
+<span id="L206"><span class="dc">/-- Outputs are never revoked. -/</span></span>
+<span id="L207"><span class="kw">theorem</span> <span class="const token" data-verso-hover="269">out_persist</span> {r : <span class="const token" data-verso-hover="59">ℕ</span>} {p : P} {v : <span class="const token" data-verso-hover="75">Bool</span>} (h : (E.<span class="const token" data-verso-hover="254">s</span> r p).<span class="const token" data-verso-hover="225">out</span> = <span class="const token" data-verso-hover="231">some</span> v) :</span>
+<span id="L208">    ∀ r' ≥ r, (E.<span class="const token" data-verso-hover="254">s</span> r' p).<span class="const token" data-verso-hover="225">out</span> = <span class="const token" data-verso-hover="231">some</span> v := <span class="kw">by</span></span>
+<span id="L209">  <span class="kw">have</span> hs : (E.<span class="const token" data-verso-hover="254">s</span> r p).<span class="const token" data-verso-hover="225">out</span>.<span class="const token" data-verso-hover="236">isSome</span> := <span class="kw">by</span> <span class="kw">rw</span> [h]; <span class="kw">rfl</span></span>
+<span id="L210">  <span class="kw">rcases</span> (<span class="const token" data-verso-hover="262">inv</span> E r p).<span class="const token" data-verso-hover="97">2</span> hs <span class="kw">with</span> hh | h5</span>
+<span id="L211">  · <span class="kw">intro</span> r' hr'; <span class="kw">rw</span> [<span class="const token" data-verso-hover="260">frozen</span> E hh r' hr']; <span class="kw">exact</span> h</span>
+<span id="L212">  · <span class="kw">have</span> hh1 : (E.<span class="const token" data-verso-hover="254">s</span> (r + <span class="nu">1</span>) p).<span class="const token" data-verso-hover="226">halted</span> = <span class="const token" data-verso-hover="88">true</span> := <span class="kw">by</span></span>
+<span id="L213">      <span class="kw">rw</span> [<span class="const token" data-verso-hover="256">s_succ</span>]</span>
+<span id="L214">      <span class="kw">by_cases</span> hh : (E.<span class="const token" data-verso-hover="254">s</span> r p).<span class="const token" data-verso-hover="226">halted</span> = <span class="const token" data-verso-hover="88">true</span></span>
+<span id="L215">      · <span class="kw">rw</span> [<span class="const token" data-verso-hover="238">trans_halted</span> hh]; <span class="kw">exact</span> hh</span>
+<span id="L216">      · <span class="kw">rw</span> [<span class="const token" data-verso-hover="264">Bool.not_eq_true</span>] <span class="kw">at</span> hh; <span class="kw">rw</span> [<span class="const token" data-verso-hover="245">trans_5</span> hh h5]; <span class="kw">simpa</span> <span class="kw">using</span> hs</span>
+<span id="L217">    <span class="kw">have</span> ho1 : (E.<span class="const token" data-verso-hover="254">s</span> (r + <span class="nu">1</span>) p).<span class="const token" data-verso-hover="225">out</span> = <span class="const token" data-verso-hover="231">some</span> v := <span class="kw">by</span></span>
+<span id="L218">      <span class="kw">rw</span> [<span class="const token" data-verso-hover="256">s_succ</span>]</span>
+<span id="L219">      <span class="kw">by_cases</span> hh : (E.<span class="const token" data-verso-hover="254">s</span> r p).<span class="const token" data-verso-hover="226">halted</span> = <span class="const token" data-verso-hover="88">true</span></span>
+<span id="L220">      · <span class="kw">rw</span> [<span class="const token" data-verso-hover="238">trans_halted</span> hh]; <span class="kw">exact</span> h</span>
+<span id="L221">      · <span class="kw">rw</span> [<span class="const token" data-verso-hover="264">Bool.not_eq_true</span>] <span class="kw">at</span> hh; <span class="kw">rw</span> [<span class="const token" data-verso-hover="245">trans_5</span> hh h5]; <span class="kw">exact</span> h</span>
+<span id="L222">    <span class="kw">intro</span> r' hr'</span>
+<span id="L223">    <span class="kw">rcases</span> <span class="const token" data-verso-hover="104">Nat.eq_or_lt_of_le</span> hr' <span class="kw">with</span> e | lt</span>
+<span id="L224">    · <span class="kw">rw</span> [← e]; <span class="kw">exact</span> h</span>
+<span id="L225">    · <span class="kw">rw</span> [<span class="const token" data-verso-hover="260">frozen</span> E hh1 r' lt]; <span class="kw">exact</span> ho1</span>
+<span id="L226"></span>
+<span id="L227"><span class="dc">/-! ### The "all correct nodes hold `b`" regime -/</span></span>
+<span id="L228"></span>
+<span id="L229"><span class="dc">/-- At the beginning of an iteration, all correct nodes hold `b`: running nodes have opinion `b`,</span></span>
+<span id="L230"><span class="dc">halted nodes have output `b`. -/</span></span>
+<span id="L231"><span class="kw">def</span> <span class="const token" data-verso-hover="270">Good</span> (b : <span class="const token" data-verso-hover="75">Bool</span>) (r : <span class="const token" data-verso-hover="59">ℕ</span>) : <span class="kw">Prop</span> :=</span>
+<span id="L232">  ∀ q ∉ F, ((E.<span class="const token" data-verso-hover="254">s</span> r q).<span class="const token" data-verso-hover="226">halted</span> = <span class="const token" data-verso-hover="88">true</span> → (E.<span class="const token" data-verso-hover="254">s</span> r q).<span class="const token" data-verso-hover="225">out</span> = <span class="const token" data-verso-hover="231">some</span> b) ∧</span>
+<span id="L233">    ((E.<span class="const token" data-verso-hover="254">s</span> r q).<span class="const token" data-verso-hover="226">halted</span> = <span class="const token" data-verso-hover="89">false</span> → (E.<span class="const token" data-verso-hover="254">s</span> r q).<span class="const token" data-verso-hover="222">op</span> = b)</span>
+<span id="L234"></span>
+<span id="L235"><span class="kw">theorem</span> <span class="const token" data-verso-hover="271">good_step_ne5</span> {b : <span class="const token" data-verso-hover="75">Bool</span>} {r : <span class="const token" data-verso-hover="59">ℕ</span>} (hr : r % <span class="nu">6</span> ≠ <span class="nu">5</span>) (hG : <span class="const token" data-verso-hover="270">Good</span> E b r)</span>
+<span id="L236">    (hop : ∀ q ∉ F, (E.<span class="const token" data-verso-hover="254">s</span> r q).<span class="const token" data-verso-hover="226">halted</span> = <span class="const token" data-verso-hover="89">false</span> → (E.<span class="const token" data-verso-hover="254">s</span> (r + <span class="nu">1</span>) q).<span class="const token" data-verso-hover="222">op</span> = b) : <span class="const token" data-verso-hover="270">Good</span> E b (r + <span class="nu">1</span>) := <span class="kw">by</span></span>
+<span id="L237">  <span class="kw">intro</span> q hq</span>
+<span id="L238">  <span class="kw">by_cases</span> hh : (E.<span class="const token" data-verso-hover="254">s</span> r q).<span class="const token" data-verso-hover="226">halted</span> = <span class="const token" data-verso-hover="88">true</span></span>
+<span id="L239">  · <span class="kw">rw</span> [<span class="const token" data-verso-hover="260">frozen</span> E hh (r + <span class="nu">1</span>) (<span class="const token" data-verso-hover="272">Nat.le_succ</span> r)]</span>
+<span id="L240">    <span class="kw">exact</span> ⟨<span class="kw">fun</span> _ =&gt; (hG q hq).<span class="const token" data-verso-hover="93">1</span> hh, <span class="kw">fun</span> h =&gt; <span class="const token" data-verso-hover="267">absurd</span> hh (<span class="kw">by</span> <span class="kw">simp</span> [h])⟩</span>
+<span id="L241">  · <span class="kw">rw</span> [<span class="const token" data-verso-hover="264">Bool.not_eq_true</span>] <span class="kw">at</span> hh</span>
+<span id="L242">    <span class="kw">have</span> : (E.<span class="const token" data-verso-hover="254">s</span> (r + <span class="nu">1</span>) q).<span class="const token" data-verso-hover="226">halted</span> = <span class="const token" data-verso-hover="89">false</span> := <span class="kw">by</span> <span class="kw">rw</span> [<span class="const token" data-verso-hover="256">s_succ</span>, <span class="const token" data-verso-hover="246">trans_halted_of_ne5</span> hr, hh]</span>
+<span id="L243">    <span class="kw">exact</span> ⟨<span class="kw">fun</span> h =&gt; <span class="const token" data-verso-hover="267">absurd</span> h (<span class="kw">by</span> <span class="kw">simp</span> [this]), <span class="kw">fun</span> _ =&gt; hop q hq hh⟩</span>
+<span id="L244"></span>
+<span id="L245"><span class="kw">variable</span> {E} (hE : E.<span class="const token" data-verso-hover="273">SyncFrom</span> <span class="nu">0</span>)</span>
+<span id="L246"><span class="kw">include</span> hE</span>
+<span id="L247"></span>
+<span id="L248"><span class="kw">theorem</span> <span class="const token" data-verso-hover="274">rcv_eq</span> {r : <span class="const token" data-verso-hover="59">ℕ</span>} {p q : P} (hp : p ∉ F) (hq : q ∉ F) :</span>
+<span id="L249">    E.<span class="const token" data-verso-hover="255">rcv</span> r p q = (<span class="const token" data-verso-hover="230">alg1</span> t king tb).<span class="const token" data-verso-hover="68">send</span> r q (E.<span class="const token" data-verso-hover="254">s</span> r q) p := hE r (<span class="const token" data-verso-hover="100">Nat.zero_le</span> _) p q hp hq</span>
+<span id="L250"></span>
+<span id="L251"><span class="dc">/-- Recorded terminations are exactly the terminations of correct nodes (for correct, running</span></span>
+<span id="L252"><span class="dc">receivers). -/</span></span>
+<span id="L253"><span class="kw">theorem</span> <span class="const token" data-verso-hover="275">done_eq</span> (r : <span class="const token" data-verso-hover="59">ℕ</span>) {p q : P} (hp : p ∉ F) (hq : q ∉ F) (hph : (E.<span class="const token" data-verso-hover="254">s</span> r p).<span class="const token" data-verso-hover="226">halted</span> = <span class="const token" data-verso-hover="89">false</span>) :</span>
+<span id="L254">    (E.<span class="const token" data-verso-hover="254">s</span> r p).<span class="const token" data-verso-hover="227">done</span> q = <span class="kw">if</span> (E.<span class="const token" data-verso-hover="254">s</span> r q).<span class="const token" data-verso-hover="226">halted</span> <span class="kw">then</span> (E.<span class="const token" data-verso-hover="254">s</span> r q).<span class="const token" data-verso-hover="225">out</span> <span class="kw">else</span> <span class="const token" data-verso-hover="69">none</span> := <span class="kw">by</span></span>
+<span id="L255">  <span class="kw">induction</span> r <span class="kw">with</span></span>
+<span id="L256">  | <span class="const token" data-verso-hover="117">zero</span> =&gt; <span class="kw">simp</span> [<span class="const token" data-verso-hover="258">s_zero</span>]</span>
+<span id="L257">  | <span class="const token" data-verso-hover="96">succ</span> r ih =&gt;</span>
+<span id="L258">    <span class="kw">have</span> hph' : (E.<span class="const token" data-verso-hover="254">s</span> r p).<span class="const token" data-verso-hover="226">halted</span> = <span class="const token" data-verso-hover="89">false</span> := <span class="kw">by</span></span>
+<span id="L259">      <span class="kw">by_contra</span> h; <span class="kw">rw</span> [<span class="const token" data-verso-hover="107">Bool.not_eq_false</span>] <span class="kw">at</span> h</span>
+<span id="L260">      <span class="kw">rw</span> [<span class="const token" data-verso-hover="261">halted_mono</span> E h (<span class="const token" data-verso-hover="272">Nat.le_succ</span> r)] <span class="kw">at</span> hph; <span class="kw">exact</span> <span class="const token" data-verso-hover="267">absurd</span> hph (<span class="kw">by</span> <span class="kw">simp</span>)</span>
+<span id="L261">    <span class="kw">have</span> ih := ih hph'</span>
+<span id="L262">    <span class="kw">by_cases</span> hqh : (E.<span class="const token" data-verso-hover="254">s</span> r q).<span class="const token" data-verso-hover="226">halted</span> = <span class="const token" data-verso-hover="88">true</span></span>
+<span id="L263">    · <span class="cm">--</span><span class="cm"> `q` is frozen</span></span>
+<span id="L264">      <span class="kw">have</span> hq1 : E.<span class="const token" data-verso-hover="254">s</span> (r + <span class="nu">1</span>) q = E.<span class="const token" data-verso-hover="254">s</span> r q := <span class="const token" data-verso-hover="260">frozen</span> E hqh (r + <span class="nu">1</span>) (<span class="const token" data-verso-hover="272">Nat.le_succ</span> r)</span>
+<span id="L265">      <span class="kw">rw</span> [hq1]; <span class="kw">simp</span> only [hqh, ↓<span class="const token" data-verso-hover="212">reduceIte</span>]</span>
+<span id="L266">      <span class="kw">simp</span> only [hqh, ↓<span class="const token" data-verso-hover="212">reduceIte</span>] <span class="kw">at</span> ih</span>
+<span id="L267">      <span class="kw">obtain</span> ⟨v, hv⟩ := <span class="const token" data-verso-hover="276">Option.isSome_iff_exists</span>.<span class="const token" data-verso-hover="178">1</span> ((<span class="const token" data-verso-hover="262">inv</span> E r q).<span class="const token" data-verso-hover="93">1</span> hqh)</span>
+<span id="L268">      <span class="kw">rw</span> [<span class="const token" data-verso-hover="256">s_succ</span>]</span>
+<span id="L269">      <span class="kw">by_cases</span> h5 : r % <span class="nu">6</span> = <span class="nu">5</span></span>
+<span id="L270">      · <span class="kw">rw</span> [<span class="const token" data-verso-hover="245">trans_5</span> hph' h5]; <span class="kw">simp</span> only; <span class="kw">rw</span> [ih, hv]; <span class="kw">rfl</span></span>
+<span id="L271">      · <span class="kw">rw</span> [<span class="const token" data-verso-hover="247">trans_done_of_ne5</span> h5, ih]</span>
+<span id="L272">    · <span class="kw">rw</span> [<span class="const token" data-verso-hover="264">Bool.not_eq_true</span>] <span class="kw">at</span> hqh</span>
+<span id="L273">      <span class="kw">simp</span> only [hqh, <span class="const token" data-verso-hover="277">Bool.false_eq_true</span>, ↓<span class="const token" data-verso-hover="212">reduceIte</span>] <span class="kw">at</span> ih</span>
+<span id="L274">      <span class="kw">rw</span> [<span class="const token" data-verso-hover="256">s_succ</span> E r p, <span class="const token" data-verso-hover="256">s_succ</span> E r q]</span>
+<span id="L275">      <span class="kw">by_cases</span> h5 : r % <span class="nu">6</span> = <span class="nu">5</span></span>
+<span id="L276">      · <span class="kw">rw</span> [<span class="const token" data-verso-hover="245">trans_5</span> hph' h5, <span class="const token" data-verso-hover="245">trans_5</span> hqh h5]</span>
+<span id="L277">        <span class="kw">simp</span> only</span>
+<span id="L278">        <span class="kw">rw</span> [ih, <span class="const token" data-verso-hover="274">rcv_eq</span> hE hp hq, <span class="const token" data-verso-hover="252">send_5</span> hqh h5]</span>
+<span id="L279">        <span class="kw">cases</span> (E.<span class="const token" data-verso-hover="254">s</span> r q).<span class="const token" data-verso-hover="225">out</span> &lt;;&gt; <span class="kw">simp</span></span>
+<span id="L280">      · <span class="kw">rw</span> [<span class="const token" data-verso-hover="247">trans_done_of_ne5</span> h5, <span class="const token" data-verso-hover="246">trans_halted_of_ne5</span> h5, hqh, ih]; <span class="kw">simp</span></span>
+<span id="L281"></span>
+<span id="L282"><span class="dc">/-- Effective reception from a correct sender by a correct running receiver. -/</span></span>
+<span id="L283"><span class="kw">theorem</span> <span class="const token" data-verso-hover="278">effR_eq</span> (r : <span class="const token" data-verso-hover="59">ℕ</span>) {p q : P} (hp : p ∉ F) (hq : q ∉ F) (hph : (E.<span class="const token" data-verso-hover="254">s</span> r p).<span class="const token" data-verso-hover="226">halted</span> = <span class="const token" data-verso-hover="89">false</span>) :</span>
+<span id="L284">    <span class="const token" data-verso-hover="253">effR</span> E r p q = <span class="kw">if</span> (E.<span class="const token" data-verso-hover="254">s</span> r q).<span class="const token" data-verso-hover="226">halted</span> <span class="kw">then</span> (E.<span class="const token" data-verso-hover="254">s</span> r q).<span class="const token" data-verso-hover="225">out</span></span>
+<span id="L285">      <span class="kw">else</span> (<span class="const token" data-verso-hover="230">alg1</span> t king tb).<span class="const token" data-verso-hover="68">send</span> r q (E.<span class="const token" data-verso-hover="254">s</span> r q) p := <span class="kw">by</span></span>
+<span id="L286">  <span class="kw">unfold</span> <span class="const token" data-verso-hover="253">effR</span> <span class="const token" data-verso-hover="228">eff</span></span>
+<span id="L287">  <span class="kw">rw</span> [<span class="const token" data-verso-hover="275">done_eq</span> hE r hp hq hph, <span class="const token" data-verso-hover="274">rcv_eq</span> hE hp hq]</span>
+<span id="L288">  <span class="kw">split_ifs</span> <span class="kw">with</span> h</span>
+<span id="L289">  · <span class="kw">rw</span> [<span class="const token" data-verso-hover="239">send_halted</span> h]; <span class="kw">cases</span> (E.<span class="const token" data-verso-hover="254">s</span> r q).<span class="const token" data-verso-hover="225">out</span> &lt;;&gt; <span class="kw">rfl</span></span>
+<span id="L290">  · <span class="kw">rfl</span></span>
+<span id="L291"></span>
+<span id="L292"><span class="dc">/-- In the `Good b` regime, every correct running node receives `b` (effectively) from every</span></span>
+<span id="L293"><span class="dc">correct node in the broadcast rounds `6k` and `6k + 3`. -/</span></span>
+<span id="L294"><span class="kw">theorem</span> <span class="const token" data-verso-hover="279">effR_good_03</span> {b : <span class="const token" data-verso-hover="75">Bool</span>} {r : <span class="const token" data-verso-hover="59">ℕ</span>} (hr : r % <span class="nu">6</span> = <span class="nu">0</span> ∨ r % <span class="nu">6</span> = <span class="nu">3</span>) (hG : <span class="const token" data-verso-hover="270">Good</span> E b r)</span>
+<span id="L295">    {p q : P} (hp : p ∉ F) (hq : q ∉ F) (hph : (E.<span class="const token" data-verso-hover="254">s</span> r p).<span class="const token" data-verso-hover="226">halted</span> = <span class="const token" data-verso-hover="89">false</span>) :</span>
+<span id="L296">    <span class="const token" data-verso-hover="253">effR</span> E r p q = <span class="const token" data-verso-hover="231">some</span> b := <span class="kw">by</span></span>
+<span id="L297">  <span class="kw">rw</span> [<span class="const token" data-verso-hover="278">effR_eq</span> hE r hp hq hph]</span>
+<span id="L298">  <span class="kw">split_ifs</span> <span class="kw">with</span> h</span>
+<span id="L299">  · <span class="kw">exact</span> (hG q hq).<span class="const token" data-verso-hover="93">1</span> h</span>
+<span id="L300">  · <span class="kw">rw</span> [<span class="const token" data-verso-hover="264">Bool.not_eq_true</span>] <span class="kw">at</span> h; <span class="kw">rw</span> [<span class="const token" data-verso-hover="249">send_03</span> h hr, (hG q hq).<span class="const token" data-verso-hover="97">2</span> h]</span>
+<span id="L301"></span>
+<span id="L302"><span class="dc">/-- Lemma (`Good` regime): if all correct nodes hold `b` at the beginning of iteration `k`, all of</span></span>
+<span id="L303"><span class="dc">them have halted with output `b` at its end. This is the validity argument of Theorem 2.9</span></span>
+<span id="L304"><span class="dc">(Lemma 2.3, validity of Definition 2.5 and Corollary 2.8), including nodes that terminated</span></span>
+<span id="L305"><span class="dc">earlier (convention (3)). -/</span></span>
+<span id="L306"><span class="kw">theorem</span> <span class="const token" data-verso-hover="280">good_iter</span> (h3 : <span class="nu">3</span> * t &lt; <span class="const token" data-verso-hover="232">Fintype.card</span> P) (hF : F.<span class="const token" data-verso-hover="106">card</span> ≤ t) {b : <span class="const token" data-verso-hover="75">Bool</span>} {k : <span class="const token" data-verso-hover="59">ℕ</span>}</span>
+<span id="L307">    (hG : <span class="const token" data-verso-hover="270">Good</span> E b (<span class="nu">6</span> * k)) : ∀ q ∉ F, (E.<span class="const token" data-verso-hover="254">s</span> (<span class="nu">6</span> * k + <span class="nu">6</span>) q).<span class="const token" data-verso-hover="226">halted</span> = <span class="const token" data-verso-hover="88">true</span> ∧</span>
+<span id="L308">      (E.<span class="const token" data-verso-hover="254">s</span> (<span class="nu">6</span> * k + <span class="nu">6</span>) q).<span class="const token" data-verso-hover="225">out</span> = <span class="const token" data-verso-hover="231">some</span> b := <span class="kw">by</span></span>
+<span id="L309">  <span class="kw">have</span> m0 : (<span class="nu">6</span> * k) % <span class="nu">6</span> = <span class="nu">0</span> := <span class="kw">by</span> <span class="kw">omega</span></span>
+<span id="L310">  <span class="kw">have</span> m1 : (<span class="nu">6</span> * k + <span class="nu">1</span>) % <span class="nu">6</span> = <span class="nu">1</span> := <span class="kw">by</span> <span class="kw">omega</span></span>
+<span id="L311">  <span class="kw">have</span> m2 : (<span class="nu">6</span> * k + <span class="nu">2</span>) % <span class="nu">6</span> = <span class="nu">2</span> := <span class="kw">by</span> <span class="kw">omega</span></span>
+<span id="L312">  <span class="kw">have</span> m3 : (<span class="nu">6</span> * k + <span class="nu">3</span>) % <span class="nu">6</span> = <span class="nu">3</span> := <span class="kw">by</span> <span class="kw">omega</span></span>
+<span id="L313">  <span class="kw">have</span> m4 : (<span class="nu">6</span> * k + <span class="nu">4</span>) % <span class="nu">6</span> = <span class="nu">4</span> := <span class="kw">by</span> <span class="kw">omega</span></span>
+<span id="L314">  <span class="kw">have</span> m5 : (<span class="nu">6</span> * k + <span class="nu">5</span>) % <span class="nu">6</span> = <span class="nu">5</span> := <span class="kw">by</span> <span class="kw">omega</span></span>
+<span id="L315">  <span class="cm">--</span><span class="cm"> running nodes are running in all rounds `6k, …, 6k + 5`</span></span>
+<span id="L316">  <span class="kw">have</span> run : ∀ q, (E.<span class="const token" data-verso-hover="254">s</span> (<span class="nu">6</span> * k) q).<span class="const token" data-verso-hover="226">halted</span> = <span class="const token" data-verso-hover="89">false</span> → ∀ i ≤ <span class="nu">5</span>, (E.<span class="const token" data-verso-hover="254">s</span> (<span class="nu">6</span> * k + i) q).<span class="const token" data-verso-hover="226">halted</span> = <span class="const token" data-verso-hover="89">false</span> := <span class="kw">by</span></span>
+<span id="L317">    <span class="kw">intro</span> q hq i hi</span>
+<span id="L318">    <span class="kw">induction</span> i <span class="kw">with</span></span>
+<span id="L319">    | <span class="const token" data-verso-hover="117">zero</span> =&gt; <span class="kw">exact</span> hq</span>
+<span id="L320">    | <span class="const token" data-verso-hover="96">succ</span> i ih =&gt;</span>
+<span id="L321">      <span class="kw">rw</span> [← <span class="const token" data-verso-hover="281">Nat.add_assoc</span>, <span class="const token" data-verso-hover="256">s_succ</span>, <span class="const token" data-verso-hover="246">trans_halted_of_ne5</span> (<span class="kw">by</span> <span class="kw">omega</span>), ih (<span class="kw">by</span> <span class="kw">omega</span>)]</span>
+<span id="L322">  <span class="cm">--</span><span class="cm"> round 6k: everybody sends `b`</span></span>
+<span id="L323">  <span class="kw">have</span> r0 : ∀ q ∉ F, (E.<span class="const token" data-verso-hover="254">s</span> (<span class="nu">6</span> * k) q).<span class="const token" data-verso-hover="226">halted</span> = <span class="const token" data-verso-hover="89">false</span> → (E.<span class="const token" data-verso-hover="254">s</span> (<span class="nu">6</span> * k + <span class="nu">1</span>) q).<span class="const token" data-verso-hover="224">snd</span> = <span class="const token" data-verso-hover="231">some</span> b ∧</span>
+<span id="L324">      (E.<span class="const token" data-verso-hover="254">s</span> (<span class="nu">6</span> * k + <span class="nu">1</span>) q).<span class="const token" data-verso-hover="222">op</span> = b := <span class="kw">by</span></span>
+<span id="L325">    <span class="kw">intro</span> q hq hh</span>
+<span id="L326">    <span class="kw">rw</span> [<span class="const token" data-verso-hover="256">s_succ</span>, <span class="const token" data-verso-hover="240">trans_0</span> hh m0]</span>
+<span id="L327">    <span class="kw">exact</span> ⟨<span class="const token" data-verso-hover="282">vote_of_all</span> h3 hF <span class="kw">fun</span> q' hq' =&gt; <span class="const token" data-verso-hover="279">effR_good_03</span> hE (<span class="const token" data-verso-hover="263">Or.inl</span> m0) hG hq hq' hh,</span>
+<span id="L328">      (hG q hq).<span class="const token" data-verso-hover="97">2</span> hh⟩</span>
+<span id="L329">  <span class="kw">have</span> G1 : <span class="const token" data-verso-hover="270">Good</span> E b (<span class="nu">6</span> * k + <span class="nu">1</span>) := <span class="const token" data-verso-hover="271">good_step_ne5</span> E (<span class="kw">by</span> <span class="kw">omega</span>) hG <span class="kw">fun</span> q hq hh =&gt; (r0 q hq hh).<span class="const token" data-verso-hover="97">2</span></span>
+<span id="L330">  <span class="cm">--</span><span class="cm"> round 6k+1: second broadcast of the validator</span></span>
+<span id="L331">  <span class="kw">have</span> r1 : ∀ q ∉ F, (E.<span class="const token" data-verso-hover="254">s</span> (<span class="nu">6</span> * k) q).<span class="const token" data-verso-hover="226">halted</span> = <span class="const token" data-verso-hover="89">false</span> → (E.<span class="const token" data-verso-hover="254">s</span> (<span class="nu">6</span> * k + <span class="nu">2</span>) q).<span class="const token" data-verso-hover="222">op</span> = b ∧</span>
+<span id="L332">      (E.<span class="const token" data-verso-hover="254">s</span> (<span class="nu">6</span> * k + <span class="nu">2</span>) q).<span class="const token" data-verso-hover="223">strong</span> = <span class="const token" data-verso-hover="88">true</span> := <span class="kw">by</span></span>
+<span id="L333">    <span class="kw">intro</span> q hq hh</span>
+<span id="L334">    <span class="kw">have</span> hh1 := run q hh <span class="nu">1</span> (<span class="kw">by</span> <span class="kw">omega</span>)</span>
+<span id="L335">    <span class="kw">rw</span> [<span class="const token" data-verso-hover="256">s_succ</span>, <span class="const token" data-verso-hover="241">trans_1</span> hh1 m1]</span>
+<span id="L336">    <span class="kw">have</span> hall : ∀ q' ∉ F, <span class="const token" data-verso-hover="253">effR</span> E (<span class="nu">6</span> * k + <span class="nu">1</span>) q q' = <span class="const token" data-verso-hover="231">some</span> b := <span class="kw">by</span></span>
+<span id="L337">      <span class="kw">intro</span> q' hq'</span>
+<span id="L338">      <span class="kw">rw</span> [<span class="const token" data-verso-hover="278">effR_eq</span> hE _ hq hq' hh1]</span>
+<span id="L339">      <span class="kw">split_ifs</span> <span class="kw">with</span> h</span>
+<span id="L340">      · <span class="kw">exact</span> (G1 q' hq').<span class="const token" data-verso-hover="93">1</span> h</span>
+<span id="L341">      · <span class="kw">rw</span> [<span class="const token" data-verso-hover="264">Bool.not_eq_true</span>] <span class="kw">at</span> h</span>
+<span id="L342">        <span class="kw">rw</span> [<span class="const token" data-verso-hover="250">send_14</span> h (<span class="const token" data-verso-hover="263">Or.inl</span> m1)]</span>
+<span id="L343">        <span class="kw">have</span> h0 : (E.<span class="const token" data-verso-hover="254">s</span> (<span class="nu">6</span> * k) q').<span class="const token" data-verso-hover="226">halted</span> = <span class="const token" data-verso-hover="89">false</span> := <span class="kw">by</span></span>
+<span id="L344">          <span class="kw">by_contra</span> h'; <span class="kw">rw</span> [<span class="const token" data-verso-hover="107">Bool.not_eq_false</span>] <span class="kw">at</span> h'</span>
+<span id="L345">          <span class="kw">rw</span> [<span class="const token" data-verso-hover="261">halted_mono</span> E h' (<span class="const token" data-verso-hover="272">Nat.le_succ</span> _)] <span class="kw">at</span> h; <span class="kw">exact</span> <span class="const token" data-verso-hover="267">absurd</span> h (<span class="kw">by</span> <span class="kw">simp</span>)</span>
+<span id="L346">        <span class="kw">exact</span> (r0 q' hq' h0).<span class="const token" data-verso-hover="93">1</span></span>
+<span id="L347">    <span class="kw">exact</span> <span class="const token" data-verso-hover="283">alg2_out_of_all</span> h3 hF _ _ hall</span>
+<span id="L348">  <span class="kw">have</span> G2 : <span class="const token" data-verso-hover="270">Good</span> E b (<span class="nu">6</span> * k + <span class="nu">2</span>) := <span class="const token" data-verso-hover="271">good_step_ne5</span> E (<span class="kw">by</span> <span class="kw">omega</span>) G1 <span class="kw">fun</span> q hq hh =&gt; <span class="kw">by</span></span>
+<span id="L349">    <span class="kw">have</span> h0 : (E.<span class="const token" data-verso-hover="254">s</span> (<span class="nu">6</span> * k) q).<span class="const token" data-verso-hover="226">halted</span> = <span class="const token" data-verso-hover="89">false</span> := <span class="kw">by</span></span>
+<span id="L350">      <span class="kw">by_contra</span> h'; <span class="kw">rw</span> [<span class="const token" data-verso-hover="107">Bool.not_eq_false</span>] <span class="kw">at</span> h'</span>
+<span id="L351">      <span class="kw">rw</span> [<span class="const token" data-verso-hover="261">halted_mono</span> E h' (<span class="const token" data-verso-hover="272">Nat.le_succ</span> _)] <span class="kw">at</span> hh; <span class="kw">exact</span> <span class="const token" data-verso-hover="267">absurd</span> hh (<span class="kw">by</span> <span class="kw">simp</span>)</span>
+<span id="L352">    <span class="kw">exact</span> (r1 q hq h0).<span class="const token" data-verso-hover="93">1</span></span>
+<span id="L353">  <span class="cm">--</span><span class="cm"> round 6k+2: strong nodes keep their opinion</span></span>
+<span id="L354">  <span class="kw">have</span> r2 : ∀ q ∉ F, (E.<span class="const token" data-verso-hover="254">s</span> (<span class="nu">6</span> * k) q).<span class="const token" data-verso-hover="226">halted</span> = <span class="const token" data-verso-hover="89">false</span> → (E.<span class="const token" data-verso-hover="254">s</span> (<span class="nu">6</span> * k + <span class="nu">3</span>) q).<span class="const token" data-verso-hover="222">op</span> = b := <span class="kw">by</span></span>
+<span id="L355">    <span class="kw">intro</span> q hq hh</span>
+<span id="L356">    <span class="kw">rw</span> [<span class="const token" data-verso-hover="256">s_succ</span>, <span class="const token" data-verso-hover="242">trans_2</span> (run q hh <span class="nu">2</span> (<span class="kw">by</span> <span class="kw">omega</span>)) m2]</span>
+<span id="L357">    <span class="kw">simp</span> [<span class="const token" data-verso-hover="235">kingOut</span>, (r1 q hq hh).<span class="const token" data-verso-hover="97">2</span>, (r1 q hq hh).<span class="const token" data-verso-hover="93">1</span>]</span>
+<span id="L358">  <span class="kw">have</span> G3 : <span class="const token" data-verso-hover="270">Good</span> E b (<span class="nu">6</span> * k + <span class="nu">3</span>) := <span class="const token" data-verso-hover="271">good_step_ne5</span> E (<span class="kw">by</span> <span class="kw">omega</span>) G2 <span class="kw">fun</span> q hq hh =&gt; <span class="kw">by</span></span>
+<span id="L359">    <span class="kw">have</span> h0 : (E.<span class="const token" data-verso-hover="254">s</span> (<span class="nu">6</span> * k) q).<span class="const token" data-verso-hover="226">halted</span> = <span class="const token" data-verso-hover="89">false</span> := <span class="kw">by</span></span>
+<span id="L360">      <span class="kw">by_contra</span> h'; <span class="kw">rw</span> [<span class="const token" data-verso-hover="107">Bool.not_eq_false</span>] <span class="kw">at</span> h'</span>
+<span id="L361">      <span class="kw">rw</span> [<span class="const token" data-verso-hover="261">halted_mono</span> E h' (<span class="kw">by</span> <span class="kw">omega</span>)] <span class="kw">at</span> hh; <span class="kw">exact</span> <span class="const token" data-verso-hover="267">absurd</span> hh (<span class="kw">by</span> <span class="kw">simp</span>)</span>
+<span id="L362">    <span class="kw">exact</span> r2 q hq h0</span>
+<span id="L363">  <span class="cm">--</span><span class="cm"> round 6k+3: first broadcast of the termination check</span></span>
+<span id="L364">  <span class="kw">have</span> r3 : ∀ q ∉ F, (E.<span class="const token" data-verso-hover="254">s</span> (<span class="nu">6</span> * k) q).<span class="const token" data-verso-hover="226">halted</span> = <span class="const token" data-verso-hover="89">false</span> → (E.<span class="const token" data-verso-hover="254">s</span> (<span class="nu">6</span> * k + <span class="nu">4</span>) q).<span class="const token" data-verso-hover="224">snd</span> = <span class="const token" data-verso-hover="231">some</span> b ∧</span>
+<span id="L365">      (E.<span class="const token" data-verso-hover="254">s</span> (<span class="nu">6</span> * k + <span class="nu">4</span>) q).<span class="const token" data-verso-hover="222">op</span> = b := <span class="kw">by</span></span>
+<span id="L366">    <span class="kw">intro</span> q hq hh</span>
+<span id="L367">    <span class="kw">have</span> hh3 := run q hh <span class="nu">3</span> (<span class="kw">by</span> <span class="kw">omega</span>)</span>
+<span id="L368">    <span class="kw">rw</span> [<span class="const token" data-verso-hover="256">s_succ</span>, <span class="const token" data-verso-hover="243">trans_3</span> hh3 m3]</span>
+<span id="L369">    <span class="kw">exact</span> ⟨<span class="const token" data-verso-hover="282">vote_of_all</span> h3 hF <span class="kw">fun</span> q' hq' =&gt; <span class="const token" data-verso-hover="279">effR_good_03</span> hE (<span class="const token" data-verso-hover="268">Or.inr</span> m3) G3 hq hq' hh3,</span>
+<span id="L370">      (G3 q hq).<span class="const token" data-verso-hover="97">2</span> hh3⟩</span>
+<span id="L371">  <span class="cm">--</span><span class="cm"> round 6k+4: second broadcast of the termination check</span></span>
+<span id="L372">  <span class="kw">have</span> r4 : ∀ q ∉ F, (E.<span class="const token" data-verso-hover="254">s</span> (<span class="nu">6</span> * k) q).<span class="const token" data-verso-hover="226">halted</span> = <span class="const token" data-verso-hover="89">false</span> → (E.<span class="const token" data-verso-hover="254">s</span> (<span class="nu">6</span> * k + <span class="nu">5</span>) q).<span class="const token" data-verso-hover="225">out</span> = <span class="const token" data-verso-hover="231">some</span> b := <span class="kw">by</span></span>
+<span id="L373">    <span class="kw">intro</span> q hq hh</span>
+<span id="L374">    <span class="kw">have</span> hh4 := run q hh <span class="nu">4</span> (<span class="kw">by</span> <span class="kw">omega</span>)</span>
+<span id="L375">    <span class="kw">rw</span> [<span class="const token" data-verso-hover="256">s_succ</span>, <span class="const token" data-verso-hover="244">trans_4</span> hh4 m4]</span>
+<span id="L376">    <span class="kw">have</span> hall : ∀ q' ∉ F, <span class="const token" data-verso-hover="253">effR</span> E (<span class="nu">6</span> * k + <span class="nu">4</span>) q q' = <span class="const token" data-verso-hover="231">some</span> b := <span class="kw">by</span></span>
+<span id="L377">      <span class="kw">intro</span> q' hq'</span>
+<span id="L378">      <span class="kw">rw</span> [<span class="const token" data-verso-hover="278">effR_eq</span> hE _ hq hq' hh4]</span>
+<span id="L379">      <span class="kw">split_ifs</span> <span class="kw">with</span> h</span>
+<span id="L380">      · <span class="kw">have</span> h0 : (E.<span class="const token" data-verso-hover="254">s</span> (<span class="nu">6</span> * k) q').<span class="const token" data-verso-hover="226">halted</span> = <span class="const token" data-verso-hover="88">true</span> := <span class="kw">by</span></span>
+<span id="L381">          <span class="kw">by_contra</span> h'; <span class="kw">rw</span> [<span class="const token" data-verso-hover="264">Bool.not_eq_true</span>] <span class="kw">at</span> h'</span>
+<span id="L382">          <span class="kw">rw</span> [run q' h' <span class="nu">4</span> (<span class="kw">by</span> <span class="kw">omega</span>)] <span class="kw">at</span> h; <span class="kw">exact</span> <span class="const token" data-verso-hover="267">absurd</span> h (<span class="kw">by</span> <span class="kw">simp</span>)</span>
+<span id="L383">        <span class="kw">rw</span> [<span class="const token" data-verso-hover="260">frozen</span> E h0 _ (<span class="kw">by</span> <span class="kw">omega</span>)]; <span class="kw">exact</span> (hG q' hq').<span class="const token" data-verso-hover="93">1</span> h0</span>
+<span id="L384">      · <span class="kw">rw</span> [<span class="const token" data-verso-hover="264">Bool.not_eq_true</span>] <span class="kw">at</span> h</span>
+<span id="L385">        <span class="kw">rw</span> [<span class="const token" data-verso-hover="250">send_14</span> h (<span class="const token" data-verso-hover="268">Or.inr</span> m4)]</span>
+<span id="L386">        <span class="kw">have</span> h0 : (E.<span class="const token" data-verso-hover="254">s</span> (<span class="nu">6</span> * k) q').<span class="const token" data-verso-hover="226">halted</span> = <span class="const token" data-verso-hover="89">false</span> := <span class="kw">by</span></span>
+<span id="L387">          <span class="kw">by_contra</span> h'; <span class="kw">rw</span> [<span class="const token" data-verso-hover="107">Bool.not_eq_false</span>] <span class="kw">at</span> h'</span>
+<span id="L388">          <span class="kw">rw</span> [<span class="const token" data-verso-hover="261">halted_mono</span> E h' (<span class="kw">by</span> <span class="kw">omega</span>)] <span class="kw">at</span> h; <span class="kw">exact</span> <span class="const token" data-verso-hover="267">absurd</span> h (<span class="kw">by</span> <span class="kw">simp</span>)</span>
+<span id="L389">        <span class="kw">exact</span> (r3 q' hq' h0).<span class="const token" data-verso-hover="93">1</span></span>
+<span id="L390">    <span class="kw">obtain</span> ⟨ha, hs⟩ := <span class="const token" data-verso-hover="283">alg2_out_of_all</span> h3 hF (tb (<span class="nu">6</span> * k + <span class="nu">4</span>) q (E.<span class="const token" data-verso-hover="254">s</span> (<span class="nu">6</span> * k + <span class="nu">4</span>) q)</span>
+<span id="L391">      (E.<span class="const token" data-verso-hover="255">rcv</span> (<span class="nu">6</span> * k + <span class="nu">4</span>) q)) (E.<span class="const token" data-verso-hover="254">s</span> (<span class="nu">6</span> * k + <span class="nu">4</span>) q).<span class="const token" data-verso-hover="222">op</span> hall</span>
+<span id="L392">    <span class="kw">simp</span> only [<span class="const token" data-verso-hover="253">effR</span>] <span class="kw">at</span> ha hs</span>
+<span id="L393">    <span class="kw">simp</span> [hs, ha]</span>
+<span id="L394">  <span class="cm">--</span><span class="cm"> round 6k+5: termination broadcast</span></span>
+<span id="L395">  <span class="kw">intro</span> q hq</span>
+<span id="L396">  <span class="kw">by_cases</span> hh : (E.<span class="const token" data-verso-hover="254">s</span> (<span class="nu">6</span> * k) q).<span class="const token" data-verso-hover="226">halted</span> = <span class="const token" data-verso-hover="88">true</span></span>
+<span id="L397">  · <span class="kw">rw</span> [<span class="const token" data-verso-hover="260">frozen</span> E hh _ (<span class="kw">by</span> <span class="kw">omega</span>)]; <span class="kw">exact</span> ⟨hh, (hG q hq).<span class="const token" data-verso-hover="93">1</span> hh⟩</span>
+<span id="L398">  · <span class="kw">rw</span> [<span class="const token" data-verso-hover="264">Bool.not_eq_true</span>] <span class="kw">at</span> hh</span>
+<span id="L399">    <span class="kw">have</span> ho := r4 q hq hh</span>
+<span id="L400">    <span class="kw">rw</span> [<span class="kw">show</span> <span class="nu">6</span> * k + <span class="nu">6</span> = <span class="nu">6</span> * k + <span class="nu">5</span> + <span class="nu">1</span> <span class="kw">by</span> <span class="kw">rfl</span>, <span class="const token" data-verso-hover="256">s_succ</span>, <span class="const token" data-verso-hover="245">trans_5</span> (run q hh <span class="nu">5</span> (<span class="kw">by</span> <span class="kw">omega</span>)) m5]</span>
+<span id="L401">    <span class="kw">simp</span> [ho]</span>
+<span id="L402"></span>
+<span id="L403"><span class="dc">/-! ### Iterations in which no correct node has terminated yet -/</span></span>
+<span id="L404"></span>
+<span id="L405"><span class="dc">/-- If no correct node has halted at the beginning of iteration `k`, the first five rounds of the</span></span>
+<span id="L406"><span class="dc">iteration are an instance of Algorithm 2 (validator), Algorithm 3 (king) and Algorithm 2</span></span>
+<span id="L407"><span class="dc">(termination check) among the correct nodes. -/</span></span>
+<span id="L408"><span class="kw">theorem</span> <span class="const token" data-verso-hover="284">fresh_iter</span> {k : <span class="const token" data-verso-hover="59">ℕ</span>}</span>
+<span id="L409">    (hfresh : ∀ q ∉ F, (E.<span class="const token" data-verso-hover="254">s</span> (<span class="nu">6</span> * k) q).<span class="const token" data-verso-hover="226">halted</span> = <span class="const token" data-verso-hover="89">false</span>) :</span>
+<span id="L410">    ∃ (Iv It : <span class="const token" data-verso-hover="285">Alg2Inst</span> F t),</span>
+<span id="L411">      (∀ q ∉ F, Iv.<span class="const token" data-verso-hover="286">x</span> q = (E.<span class="const token" data-verso-hover="254">s</span> (<span class="nu">6</span> * k) q).<span class="const token" data-verso-hover="222">op</span>) ∧</span>
+<span id="L412">      (∀ q ∉ F, (E.<span class="const token" data-verso-hover="254">s</span> (<span class="nu">6</span> * k + <span class="nu">2</span>) q).<span class="const token" data-verso-hover="222">op</span> = Iv.<span class="const token" data-verso-hover="287">o</span> q ∧ (E.<span class="const token" data-verso-hover="254">s</span> (<span class="nu">6</span> * k + <span class="nu">2</span>) q).<span class="const token" data-verso-hover="223">strong</span> = Iv.<span class="const token" data-verso-hover="288">s</span> q) ∧</span>
+<span id="L413">      (∀ q ∉ F, (E.<span class="const token" data-verso-hover="254">s</span> (<span class="nu">6</span> * k + <span class="nu">3</span>) q).<span class="const token" data-verso-hover="222">op</span> = <span class="const token" data-verso-hover="235">kingOut</span> (Iv.<span class="const token" data-verso-hover="287">o</span> q) (Iv.<span class="const token" data-verso-hover="288">s</span> q)</span>
+<span id="L414">        (<span class="const token" data-verso-hover="253">effR</span> E (<span class="nu">6</span> * k + <span class="nu">2</span>) q (king k))) ∧</span>
+<span id="L415">      (king k ∉ F → ∀ q ∉ F, <span class="const token" data-verso-hover="253">effR</span> E (<span class="nu">6</span> * k + <span class="nu">2</span>) q (king k) = <span class="const token" data-verso-hover="231">some</span> (Iv.<span class="const token" data-verso-hover="287">o</span> (king k))) ∧</span>
+<span id="L416">      (∀ q ∉ F, It.<span class="const token" data-verso-hover="286">x</span> q = (E.<span class="const token" data-verso-hover="254">s</span> (<span class="nu">6</span> * k + <span class="nu">3</span>) q).<span class="const token" data-verso-hover="222">op</span>) ∧</span>
+<span id="L417">      (∀ q ∉ F, (E.<span class="const token" data-verso-hover="254">s</span> (<span class="nu">6</span> * k + <span class="nu">5</span>) q).<span class="const token" data-verso-hover="222">op</span> = It.<span class="const token" data-verso-hover="287">o</span> q ∧</span>
+<span id="L418">        (E.<span class="const token" data-verso-hover="254">s</span> (<span class="nu">6</span> * k + <span class="nu">5</span>) q).<span class="const token" data-verso-hover="225">out</span> = <span class="kw">if</span> It.<span class="const token" data-verso-hover="288">s</span> q <span class="kw">then</span> <span class="const token" data-verso-hover="231">some</span> (It.<span class="const token" data-verso-hover="287">o</span> q) <span class="kw">else</span> <span class="const token" data-verso-hover="69">none</span>) ∧</span>
+<span id="L419">      (∀ q ∉ F, (E.<span class="const token" data-verso-hover="254">s</span> (<span class="nu">6</span> * k + <span class="nu">5</span>) q).<span class="const token" data-verso-hover="226">halted</span> = <span class="const token" data-verso-hover="89">false</span>) := <span class="kw">by</span></span>
+<span id="L420">  <span class="kw">have</span> m0 : (<span class="nu">6</span> * k) % <span class="nu">6</span> = <span class="nu">0</span> := <span class="kw">by</span> <span class="kw">omega</span></span>
+<span id="L421">  <span class="kw">have</span> m1 : (<span class="nu">6</span> * k + <span class="nu">1</span>) % <span class="nu">6</span> = <span class="nu">1</span> := <span class="kw">by</span> <span class="kw">omega</span></span>
+<span id="L422">  <span class="kw">have</span> m2 : (<span class="nu">6</span> * k + <span class="nu">2</span>) % <span class="nu">6</span> = <span class="nu">2</span> := <span class="kw">by</span> <span class="kw">omega</span></span>
+<span id="L423">  <span class="kw">have</span> m3 : (<span class="nu">6</span> * k + <span class="nu">3</span>) % <span class="nu">6</span> = <span class="nu">3</span> := <span class="kw">by</span> <span class="kw">omega</span></span>
+<span id="L424">  <span class="kw">have</span> m4 : (<span class="nu">6</span> * k + <span class="nu">4</span>) % <span class="nu">6</span> = <span class="nu">4</span> := <span class="kw">by</span> <span class="kw">omega</span></span>
+<span id="L425">  <span class="kw">have</span> d2 : (<span class="nu">6</span> * k + <span class="nu">2</span>) / <span class="nu">6</span> = k := <span class="kw">by</span> <span class="kw">omega</span></span>
+<span id="L426">  <span class="kw">have</span> run : ∀ q ∉ F, ∀ i ≤ <span class="nu">5</span>, (E.<span class="const token" data-verso-hover="254">s</span> (<span class="nu">6</span> * k + i) q).<span class="const token" data-verso-hover="226">halted</span> = <span class="const token" data-verso-hover="89">false</span> := <span class="kw">by</span></span>
+<span id="L427">    <span class="kw">intro</span> q hq i hi</span>
+<span id="L428">    <span class="kw">induction</span> i <span class="kw">with</span></span>
+<span id="L429">    | <span class="const token" data-verso-hover="117">zero</span> =&gt; <span class="kw">exact</span> hfresh q hq</span>
+<span id="L430">    | <span class="const token" data-verso-hover="96">succ</span> i ih =&gt;</span>
+<span id="L431">      <span class="kw">rw</span> [← <span class="const token" data-verso-hover="281">Nat.add_assoc</span>, <span class="const token" data-verso-hover="256">s_succ</span>, <span class="const token" data-verso-hover="246">trans_halted_of_ne5</span> (<span class="kw">by</span> <span class="kw">omega</span>), ih (<span class="kw">by</span> <span class="kw">omega</span>)]</span>
+<span id="L432">  <span class="kw">have</span> eff_run : ∀ i ≤ <span class="nu">5</span>, ∀ p ∉ F, ∀ q ∉ F, <span class="const token" data-verso-hover="253">effR</span> E (<span class="nu">6</span> * k + i) p q =</span>
+<span id="L433">      (<span class="const token" data-verso-hover="230">alg1</span> t king tb).<span class="const token" data-verso-hover="68">send</span> (<span class="nu">6</span> * k + i) q (E.<span class="const token" data-verso-hover="254">s</span> (<span class="nu">6</span> * k + i) q) p := <span class="kw">by</span></span>
+<span id="L434">    <span class="kw">intro</span> i hi p hp q hq</span>
+<span id="L435">    <span class="kw">rw</span> [<span class="const token" data-verso-hover="278">effR_eq</span> hE _ hp hq (run p hp i hi)]; <span class="kw">simp</span> only [run q hq i hi, <span class="const token" data-verso-hover="277">Bool.false_eq_true</span>, ↓<span class="const token" data-verso-hover="212">reduceIte</span>]</span>
+<span id="L436">  <span class="cm">--</span><span class="cm"> the validator instance</span></span>
+<span id="L437">  <span class="kw">let</span> Iv : <span class="const token" data-verso-hover="285">Alg2Inst</span> F t :=</span>
+<span id="L438">    { <span class="const token" data-verso-hover="286">x</span> := <span class="kw">fun</span> q =&gt; (E.<span class="const token" data-verso-hover="254">s</span> (<span class="nu">6</span> * k) q).<span class="const token" data-verso-hover="222">op</span></span>
+<span id="L439">      <span class="const token" data-verso-hover="289">pick</span> := <span class="kw">fun</span> q =&gt; tb (<span class="nu">6</span> * k + <span class="nu">1</span>) q (E.<span class="const token" data-verso-hover="254">s</span> (<span class="nu">6</span> * k + <span class="nu">1</span>) q) (E.<span class="const token" data-verso-hover="255">rcv</span> (<span class="nu">6</span> * k + <span class="nu">1</span>) q)</span>
+<span id="L440">      <span class="const token" data-verso-hover="290">r1</span> := <span class="const token" data-verso-hover="253">effR</span> E (<span class="nu">6</span> * k)</span>
+<span id="L441">      <span class="const token" data-verso-hover="291">r2</span> := <span class="const token" data-verso-hover="253">effR</span> E (<span class="nu">6</span> * k + <span class="nu">1</span>)</span>
+<span id="L442">      <span class="const token" data-verso-hover="292">h1</span> := <span class="kw">fun</span> i hi q hq =&gt; <span class="kw">by</span></span>
+<span id="L443">        <span class="kw">have</span> e0 := eff_run <span class="nu">0</span> (<span class="kw">by</span> <span class="kw">omega</span>) i hi q hq</span>
+<span id="L444">        <span class="kw">rw</span> [<span class="const token" data-verso-hover="293">Nat.add_zero</span>] <span class="kw">at</span> e0</span>
+<span id="L445">        <span class="kw">rw</span> [e0, <span class="const token" data-verso-hover="249">send_03</span> (hfresh q hq) (<span class="const token" data-verso-hover="263">Or.inl</span> m0)]</span>
+<span id="L446">      <span class="const token" data-verso-hover="294">h2</span> := <span class="kw">fun</span> i hi q hq =&gt; <span class="kw">by</span></span>
+<span id="L447">        <span class="kw">rw</span> [eff_run <span class="nu">1</span> (<span class="kw">by</span> <span class="kw">omega</span>) i hi q hq, <span class="const token" data-verso-hover="250">send_14</span> (run q hq <span class="nu">1</span> (<span class="kw">by</span> <span class="kw">omega</span>)) (<span class="const token" data-verso-hover="263">Or.inl</span> m1), <span class="const token" data-verso-hover="256">s_succ</span>,</span>
+<span id="L448">          <span class="const token" data-verso-hover="240">trans_0</span> (hfresh q hq) m0]</span>
+<span id="L449">        <span class="kw">rfl</span> }</span>
+<span id="L450">  <span class="kw">have</span> hv2 : ∀ q ∉ F, (E.<span class="const token" data-verso-hover="254">s</span> (<span class="nu">6</span> * k + <span class="nu">2</span>) q).<span class="const token" data-verso-hover="222">op</span> = Iv.<span class="const token" data-verso-hover="287">o</span> q ∧ (E.<span class="const token" data-verso-hover="254">s</span> (<span class="nu">6</span> * k + <span class="nu">2</span>) q).<span class="const token" data-verso-hover="223">strong</span> = Iv.<span class="const token" data-verso-hover="288">s</span> q := <span class="kw">by</span></span>
+<span id="L451">    <span class="kw">intro</span> q hq</span>
+<span id="L452">    <span class="kw">rw</span> [<span class="const token" data-verso-hover="256">s_succ</span>, <span class="const token" data-verso-hover="241">trans_1</span> (run q hq <span class="nu">1</span> (<span class="kw">by</span> <span class="kw">omega</span>)) m1]</span>
+<span id="L453">    <span class="kw">have</span> : (E.<span class="const token" data-verso-hover="254">s</span> (<span class="nu">6</span> * k + <span class="nu">1</span>) q).<span class="const token" data-verso-hover="222">op</span> = (E.<span class="const token" data-verso-hover="254">s</span> (<span class="nu">6</span> * k) q).<span class="const token" data-verso-hover="222">op</span> := <span class="kw">by</span></span>
+<span id="L454">      <span class="kw">rw</span> [<span class="const token" data-verso-hover="256">s_succ</span>, <span class="const token" data-verso-hover="240">trans_0</span> (hfresh q hq) m0]</span>
+<span id="L455">    <span class="kw">exact</span> ⟨<span class="kw">by</span> <span class="kw">simp</span> only [<span class="const token" data-verso-hover="287">Alg2Inst.o</span>]; <span class="kw">rw</span> [this]; <span class="kw">rfl</span>, <span class="const token" data-verso-hover="113">rfl</span>⟩</span>
+<span id="L456">  <span class="kw">have</span> hk3 : ∀ q ∉ F, (E.<span class="const token" data-verso-hover="254">s</span> (<span class="nu">6</span> * k + <span class="nu">3</span>) q).<span class="const token" data-verso-hover="222">op</span> = <span class="const token" data-verso-hover="235">kingOut</span> (Iv.<span class="const token" data-verso-hover="287">o</span> q) (Iv.<span class="const token" data-verso-hover="288">s</span> q)</span>
+<span id="L457">      (<span class="const token" data-verso-hover="253">effR</span> E (<span class="nu">6</span> * k + <span class="nu">2</span>) q (king k)) := <span class="kw">by</span></span>
+<span id="L458">    <span class="kw">intro</span> q hq</span>
+<span id="L459">    <span class="kw">rw</span> [<span class="const token" data-verso-hover="256">s_succ</span>, <span class="const token" data-verso-hover="242">trans_2</span> (run q hq <span class="nu">2</span> (<span class="kw">by</span> <span class="kw">omega</span>)) m2, d2]</span>
+<span id="L460">    <span class="kw">simp</span> only</span>
+<span id="L461">    <span class="kw">rw</span> [(hv2 q hq).<span class="const token" data-verso-hover="93">1</span>, (hv2 q hq).<span class="const token" data-verso-hover="97">2</span>]; <span class="kw">rfl</span></span>
+<span id="L462">  <span class="kw">have</span> hkk : king k ∉ F → ∀ q ∉ F, <span class="const token" data-verso-hover="253">effR</span> E (<span class="nu">6</span> * k + <span class="nu">2</span>) q (king k) = <span class="const token" data-verso-hover="231">some</span> (Iv.<span class="const token" data-verso-hover="287">o</span> (king k)) := <span class="kw">by</span></span>
+<span id="L463">    <span class="kw">intro</span> hk q hq</span>
+<span id="L464">    <span class="kw">rw</span> [eff_run <span class="nu">2</span> (<span class="kw">by</span> <span class="kw">omega</span>) q hq _ hk]</span>
+<span id="L465">    <span class="kw">have</span> := <span class="const token" data-verso-hover="251">send_2</span> (t := t) (king := king) (tb := tb) (q := q) (run _ hk <span class="nu">2</span> (<span class="kw">by</span> <span class="kw">omega</span>)) m2</span>
+<span id="L466">    <span class="kw">rw</span> [d2] <span class="kw">at</span> this</span>
+<span id="L467">    <span class="kw">rw</span> [this, (hv2 _ hk).<span class="const token" data-verso-hover="93">1</span>]</span>
+<span id="L468">  <span class="cm">--</span><span class="cm"> the termination-check instance</span></span>
+<span id="L469">  <span class="kw">let</span> It : <span class="const token" data-verso-hover="285">Alg2Inst</span> F t :=</span>
+<span id="L470">    { <span class="const token" data-verso-hover="286">x</span> := <span class="kw">fun</span> q =&gt; (E.<span class="const token" data-verso-hover="254">s</span> (<span class="nu">6</span> * k + <span class="nu">3</span>) q).<span class="const token" data-verso-hover="222">op</span></span>
+<span id="L471">      <span class="const token" data-verso-hover="289">pick</span> := <span class="kw">fun</span> q =&gt; tb (<span class="nu">6</span> * k + <span class="nu">4</span>) q (E.<span class="const token" data-verso-hover="254">s</span> (<span class="nu">6</span> * k + <span class="nu">4</span>) q) (E.<span class="const token" data-verso-hover="255">rcv</span> (<span class="nu">6</span> * k + <span class="nu">4</span>) q)</span>
+<span id="L472">      <span class="const token" data-verso-hover="290">r1</span> := <span class="const token" data-verso-hover="253">effR</span> E (<span class="nu">6</span> * k + <span class="nu">3</span>)</span>
+<span id="L473">      <span class="const token" data-verso-hover="291">r2</span> := <span class="const token" data-verso-hover="253">effR</span> E (<span class="nu">6</span> * k + <span class="nu">4</span>)</span>
+<span id="L474">      <span class="const token" data-verso-hover="292">h1</span> := <span class="kw">fun</span> i hi q hq =&gt; <span class="kw">by</span></span>
+<span id="L475">        <span class="kw">rw</span> [eff_run <span class="nu">3</span> (<span class="kw">by</span> <span class="kw">omega</span>) i hi q hq, <span class="const token" data-verso-hover="249">send_03</span> (run q hq <span class="nu">3</span> (<span class="kw">by</span> <span class="kw">omega</span>)) (<span class="const token" data-verso-hover="268">Or.inr</span> m3)]</span>
+<span id="L476">      <span class="const token" data-verso-hover="294">h2</span> := <span class="kw">fun</span> i hi q hq =&gt; <span class="kw">by</span></span>
+<span id="L477">        <span class="kw">rw</span> [eff_run <span class="nu">4</span> (<span class="kw">by</span> <span class="kw">omega</span>) i hi q hq, <span class="const token" data-verso-hover="250">send_14</span> (run q hq <span class="nu">4</span> (<span class="kw">by</span> <span class="kw">omega</span>)) (<span class="const token" data-verso-hover="268">Or.inr</span> m4), <span class="const token" data-verso-hover="256">s_succ</span>,</span>
+<span id="L478">          <span class="const token" data-verso-hover="243">trans_3</span> (run q hq <span class="nu">3</span> (<span class="kw">by</span> <span class="kw">omega</span>)) m3]</span>
+<span id="L479">        <span class="kw">rfl</span> }</span>
+<span id="L480">  <span class="kw">refine</span> ⟨Iv, It, <span class="kw">fun</span> q _ =&gt; <span class="const token" data-verso-hover="113">rfl</span>, hv2, hk3, hkk, <span class="kw">fun</span> q _ =&gt; <span class="const token" data-verso-hover="113">rfl</span>, <span class="kw">fun</span> q hq =&gt; ?_,</span>
+<span id="L481">    <span class="kw">fun</span> q hq =&gt; run q hq <span class="nu">5</span> (<span class="kw">by</span> <span class="kw">omega</span>)⟩</span>
+<span id="L482">  <span class="kw">rw</span> [<span class="const token" data-verso-hover="256">s_succ</span>, <span class="const token" data-verso-hover="244">trans_4</span> (run q hq <span class="nu">4</span> (<span class="kw">by</span> <span class="kw">omega</span>)) m4]</span>
+<span id="L483">  <span class="kw">have</span> : (E.<span class="const token" data-verso-hover="254">s</span> (<span class="nu">6</span> * k + <span class="nu">4</span>) q).<span class="const token" data-verso-hover="222">op</span> = (E.<span class="const token" data-verso-hover="254">s</span> (<span class="nu">6</span> * k + <span class="nu">3</span>) q).<span class="const token" data-verso-hover="222">op</span> := <span class="kw">by</span></span>
+<span id="L484">    <span class="kw">rw</span> [<span class="const token" data-verso-hover="256">s_succ</span>, <span class="const token" data-verso-hover="243">trans_3</span> (run q hq <span class="nu">3</span> (<span class="kw">by</span> <span class="kw">omega</span>)) m3]</span>
+<span id="L485">  <span class="kw">simp</span> only [<span class="const token" data-verso-hover="287">Alg2Inst.o</span>, <span class="const token" data-verso-hover="288">Alg2Inst.s</span>]</span>
+<span id="L486">  <span class="kw">rw</span> [this]</span>
+<span id="L487">  <span class="kw">exact</span> ⟨<span class="const token" data-verso-hover="113">rfl</span>, <span class="const token" data-verso-hover="113">rfl</span>⟩</span>
+<span id="L488"></span>
+<span id="L489"><span class="dc">/-- Halting happens only in round `6k + 5`: the state at `6k + 6` from the state at `6k + 5`. -/</span></span>
+<span id="L490"><span class="kw">theorem</span> <span class="const token" data-verso-hover="295">halted_6</span> {k : <span class="const token" data-verso-hover="59">ℕ</span>} {q : P} (hq : (E.<span class="const token" data-verso-hover="254">s</span> (<span class="nu">6</span> * k + <span class="nu">5</span>) q).<span class="const token" data-verso-hover="226">halted</span> = <span class="const token" data-verso-hover="89">false</span>) :</span>
+<span id="L491">    (E.<span class="const token" data-verso-hover="254">s</span> (<span class="nu">6</span> * k + <span class="nu">6</span>) q).<span class="const token" data-verso-hover="226">halted</span> = (E.<span class="const token" data-verso-hover="254">s</span> (<span class="nu">6</span> * k + <span class="nu">5</span>) q).<span class="const token" data-verso-hover="225">out</span>.<span class="const token" data-verso-hover="236">isSome</span> ∧</span>
+<span id="L492">      (E.<span class="const token" data-verso-hover="254">s</span> (<span class="nu">6</span> * k + <span class="nu">6</span>) q).<span class="const token" data-verso-hover="225">out</span> = (E.<span class="const token" data-verso-hover="254">s</span> (<span class="nu">6</span> * k + <span class="nu">5</span>) q).<span class="const token" data-verso-hover="225">out</span> ∧</span>
+<span id="L493">      (E.<span class="const token" data-verso-hover="254">s</span> (<span class="nu">6</span> * k + <span class="nu">6</span>) q).<span class="const token" data-verso-hover="222">op</span> = (E.<span class="const token" data-verso-hover="254">s</span> (<span class="nu">6</span> * k + <span class="nu">5</span>) q).<span class="const token" data-verso-hover="222">op</span> := <span class="kw">by</span></span>
+<span id="L494">  <span class="kw">rw</span> [<span class="kw">show</span> <span class="nu">6</span> * k + <span class="nu">6</span> = <span class="nu">6</span> * k + <span class="nu">5</span> + <span class="nu">1</span> <span class="kw">by</span> <span class="kw">rfl</span>, <span class="const token" data-verso-hover="256">s_succ</span>, <span class="const token" data-verso-hover="245">trans_5</span> hq (<span class="kw">by</span> <span class="kw">omega</span>)]</span>
+<span id="L495">  <span class="kw">exact</span> ⟨<span class="const token" data-verso-hover="113">rfl</span>, <span class="const token" data-verso-hover="113">rfl</span>, <span class="const token" data-verso-hover="113">rfl</span>⟩</span>
+<span id="L496"></span>
+<span id="L497"><span class="dc">/-- The invariant of Theorem 2.9: at the beginning of every iteration, either no correct node has</span></span>
+<span id="L498"><span class="dc">terminated, or all correct nodes hold a common value (termination agreement, Corollary 2.8). -/</span></span>
+<span id="L499"><span class="kw">theorem</span> <span class="const token" data-verso-hover="296">fresh_or_good</span> (h3 : <span class="nu">3</span> * t &lt; <span class="const token" data-verso-hover="232">Fintype.card</span> P) (hF : F.<span class="const token" data-verso-hover="106">card</span> ≤ t) (k : <span class="const token" data-verso-hover="59">ℕ</span>) :</span>
+<span id="L500">    (∀ q ∉ F, (E.<span class="const token" data-verso-hover="254">s</span> (<span class="nu">6</span> * k) q).<span class="const token" data-verso-hover="226">halted</span> = <span class="const token" data-verso-hover="89">false</span>) ∨ ∃ b, <span class="const token" data-verso-hover="270">Good</span> E b (<span class="nu">6</span> * k) := <span class="kw">by</span></span>
+<span id="L501">  <span class="kw">induction</span> k <span class="kw">with</span></span>
+<span id="L502">  | <span class="const token" data-verso-hover="117">zero</span> =&gt; <span class="kw">left</span>; <span class="kw">intro</span> q _; <span class="kw">simp</span> [<span class="const token" data-verso-hover="258">s_zero</span>]</span>
+<span id="L503">  | <span class="const token" data-verso-hover="96">succ</span> k ih =&gt;</span>
+<span id="L504">    <span class="kw">rw</span> [<span class="kw">show</span> <span class="nu">6</span> * (k + <span class="nu">1</span>) = <span class="nu">6</span> * k + <span class="nu">6</span> <span class="kw">by</span> <span class="kw">ring</span>]</span>
+<span id="L505">    <span class="kw">rcases</span> ih <span class="kw">with</span> hfresh | ⟨b, hG⟩</span>
+<span id="L506">    · <span class="kw">obtain</span> ⟨Iv, It, -, -, -, -, -, hout, hrun⟩ := <span class="const token" data-verso-hover="284">fresh_iter</span> hE hfresh</span>
+<span id="L507">      <span class="kw">by_cases</span> hex : ∃ p ∉ F, (E.<span class="const token" data-verso-hover="254">s</span> (<span class="nu">6</span> * k + <span class="nu">6</span>) p).<span class="const token" data-verso-hover="226">halted</span> = <span class="const token" data-verso-hover="88">true</span></span>
+<span id="L508">      · <span class="kw">right</span></span>
+<span id="L509">        <span class="kw">obtain</span> ⟨p, hp, hph⟩ := hex</span>
+<span id="L510">        <span class="kw">rw</span> [(<span class="const token" data-verso-hover="295">halted_6</span> hE (hrun p hp)).<span class="const token" data-verso-hover="93">1</span>, (hout p hp).<span class="const token" data-verso-hover="97">2</span>] <span class="kw">at</span> hph</span>
+<span id="L511">        <span class="kw">have</span> hsp : It.<span class="const token" data-verso-hover="288">s</span> p = <span class="const token" data-verso-hover="88">true</span> := <span class="kw">by</span> <span class="kw">by_contra</span> h; <span class="kw">simp</span> [h] <span class="kw">at</span> hph</span>
+<span id="L512">        <span class="kw">refine</span> ⟨It.<span class="const token" data-verso-hover="287">o</span> p, <span class="kw">fun</span> q hq =&gt; ⟨<span class="kw">fun</span> hqh =&gt; ?_, <span class="kw">fun</span> hqh =&gt; ?_⟩⟩</span>
+<span id="L513">        · <span class="kw">obtain</span> ⟨-, ho, -⟩ := <span class="const token" data-verso-hover="295">halted_6</span> hE (hrun q hq)</span>
+<span id="L514">          <span class="kw">rw</span> [(<span class="const token" data-verso-hover="295">halted_6</span> hE (hrun q hq)).<span class="const token" data-verso-hover="93">1</span>, (hout q hq).<span class="const token" data-verso-hover="97">2</span>] <span class="kw">at</span> hqh</span>
+<span id="L515">          <span class="kw">have</span> hsq : It.<span class="const token" data-verso-hover="288">s</span> q = <span class="const token" data-verso-hover="88">true</span> := <span class="kw">by</span> <span class="kw">by_contra</span> h; <span class="kw">simp</span> [h] <span class="kw">at</span> hqh</span>
+<span id="L516">          <span class="kw">rw</span> [ho, (hout q hq).<span class="const token" data-verso-hover="97">2</span>]; <span class="kw">simp</span> only [hsq, ↓<span class="const token" data-verso-hover="212">reduceIte</span>]; <span class="kw">rw</span> [It.<span class="const token" data-verso-hover="27">lemma_2_4</span> h3 hF p hp hsp q hq]</span>
+<span id="L517">        · <span class="kw">rw</span> [(<span class="const token" data-verso-hover="295">halted_6</span> hE (hrun q hq)).<span class="const token" data-verso-hover="97">2</span><span class="nu">.</span><span class="const token" data-verso-hover="97">2</span>, (hout q hq).<span class="const token" data-verso-hover="93">1</span>, It.<span class="const token" data-verso-hover="27">lemma_2_4</span> h3 hF p hp hsp q hq]</span>
+<span id="L518">      · <span class="kw">left</span></span>
+<span id="L519">        <span class="kw">intro</span> q hq</span>
+<span id="L520">        <span class="kw">by_contra</span> h</span>
+<span id="L521">        <span class="kw">exact</span> hex ⟨q, hq, <span class="kw">by</span> <span class="kw">simpa</span> <span class="kw">using</span> h⟩</span>
+<span id="L522">    · <span class="kw">right</span></span>
+<span id="L523">      <span class="kw">refine</span> ⟨b, <span class="kw">fun</span> q hq =&gt; ?_⟩</span>
+<span id="L524">      <span class="kw">have</span> := <span class="const token" data-verso-hover="280">good_iter</span> hE h3 hF hG q hq</span>
+<span id="L525">      <span class="kw">exact</span> ⟨<span class="kw">fun</span> _ =&gt; this.<span class="const token" data-verso-hover="97">2</span>, <span class="kw">fun</span> h =&gt; <span class="const token" data-verso-hover="267">absurd</span> this.<span class="const token" data-verso-hover="93">1</span> (<span class="kw">by</span> <span class="kw">simp</span> [h])⟩</span>
+<span id="L526"></span>
+<span id="L527"><span class="dc">/-- An iteration with a correct king (in which no correct node terminated before) ends with all</span></span>
+<span id="L528"><span class="dc">correct nodes halted: Lemma 2.6 + Lemma 2.4 + Corollary 2.8. -/</span></span>
+<span id="L529"><span class="kw">theorem</span> <span class="const token" data-verso-hover="297">king_iter</span> (h3 : <span class="nu">3</span> * t &lt; <span class="const token" data-verso-hover="232">Fintype.card</span> P) (hF : F.<span class="const token" data-verso-hover="106">card</span> ≤ t) {k : <span class="const token" data-verso-hover="59">ℕ</span>} (hk : king k ∉ F)</span>
+<span id="L530">    (hfresh : ∀ q ∉ F, (E.<span class="const token" data-verso-hover="254">s</span> (<span class="nu">6</span> * k) q).<span class="const token" data-verso-hover="226">halted</span> = <span class="const token" data-verso-hover="89">false</span>) :</span>
+<span id="L531">    ∀ q ∉ F, (E.<span class="const token" data-verso-hover="254">s</span> (<span class="nu">6</span> * k + <span class="nu">6</span>) q).<span class="const token" data-verso-hover="226">halted</span> = <span class="const token" data-verso-hover="88">true</span> := <span class="kw">by</span></span>
+<span id="L532">  <span class="kw">obtain</span> ⟨Iv, It, -, -, hk3, hkk, hItx, hout, hrun⟩ := <span class="const token" data-verso-hover="284">fresh_iter</span> hE hfresh</span>
+<span id="L533">  <span class="cm">--</span><span class="cm"> Lemma 2.6: after the king's broadcast all correct nodes agree</span></span>
+<span id="L534">  <span class="kw">have</span> hEB := <span class="const token" data-verso-hover="30">lemma_2_6</span> (F := F) (k := king k) (b := Iv.<span class="const token" data-verso-hover="287">o</span>) (s := Iv.<span class="const token" data-verso-hover="288">s</span>)</span>
+<span id="L535">    (rk := <span class="kw">fun</span> q =&gt; <span class="const token" data-verso-hover="253">effR</span> E (<span class="nu">6</span> * k + <span class="nu">2</span>) q (king k)) (<span class="kw">fun</span> hk' q hq =&gt; hkk hk' q hq)</span>
+<span id="L536">  <span class="kw">have</span> hagree := hEB.<span class="const token" data-verso-hover="97">2</span> (<span class="kw">by</span></span>
+<span id="L537">    <span class="kw">rw</span> [<span class="const token" data-verso-hover="298">card_singleton</span>]</span>
+<span id="L538">    <span class="kw">exact</span> <span class="const token" data-verso-hover="154">lt_of_lt_of_le</span> (<span class="kw">by</span> <span class="kw">norm_num</span>) (<span class="const token" data-verso-hover="299">card_pos</span>.<span class="const token" data-verso-hover="110">2</span> ⟨king k, <span class="const token" data-verso-hover="300">mem_sdiff</span>.<span class="const token" data-verso-hover="110">2</span> ⟨<span class="const token" data-verso-hover="301">mem_singleton_self</span> _, hk⟩⟩))</span>
+<span id="L539">    (Iv.<span class="const token" data-verso-hover="28">spec</span> h3 hF).<span class="const token" data-verso-hover="111">weakAgreement</span></span>
+<span id="L540">  <span class="cm">--</span><span class="cm"> termination check validity</span></span>
+<span id="L541">  <span class="kw">have</span> hval := It.<span class="const token" data-verso-hover="26">lemma_2_3</span> h3 hF</span>
+<span id="L542">    (v := <span class="const token" data-verso-hover="235">kingOut</span> (Iv.<span class="const token" data-verso-hover="287">o</span> (king k)) (Iv.<span class="const token" data-verso-hover="288">s</span> (king k)) (<span class="const token" data-verso-hover="253">effR</span> E (<span class="nu">6</span> * k + <span class="nu">2</span>) (king k) (king k)))</span>
+<span id="L543">    (<span class="kw">fun</span> q hq =&gt; <span class="kw">by</span> <span class="kw">rw</span> [hItx q hq, hk3 q hq]; <span class="kw">exact</span> hagree q hq (king k) hk)</span>
+<span id="L544">  <span class="kw">intro</span> q hq</span>
+<span id="L545">  <span class="kw">rw</span> [(<span class="const token" data-verso-hover="295">halted_6</span> hE (hrun q hq)).<span class="const token" data-verso-hover="93">1</span>, (hout q hq).<span class="const token" data-verso-hover="97">2</span>]</span>
+<span id="L546">  <span class="kw">simp</span> [(hval q hq).<span class="const token" data-verso-hover="97">2</span>]</span>
+<span id="L547"></span>
+<span id="L548"><span class="dc">/-! ### Theorem 2.9 -/</span></span>
+<span id="L549"></span>
+<span id="L550"><span class="kw">omit</span> hE <span class="kw">in</span></span>
+<span id="L551"><span class="dc">/-- Some king among the first `f + 1` iterations is correct. -/</span></span>
+<span id="L552"><span class="kw">theorem</span> <span class="const token" data-verso-hover="302">exists_correct_king</span> (hF : F.<span class="const token" data-verso-hover="106">card</span> ≤ t)</span>
+<span id="L553">    (hking : ∀ i ≤ t, ∀ j ≤ t, king i = king j → i = j) :</span>
+<span id="L554">    ∃ k ≤ F.<span class="const token" data-verso-hover="106">card</span>, king k ∉ F := <span class="kw">by</span></span>
+<span id="L555">  <span class="kw">have</span> hcard : ((<span class="const token" data-verso-hover="145">range</span> (F.<span class="const token" data-verso-hover="106">card</span> + <span class="nu">1</span>)).<span class="const token" data-verso-hover="303">image</span> king).<span class="const token" data-verso-hover="106">card</span> = F.<span class="const token" data-verso-hover="106">card</span> + <span class="nu">1</span> := <span class="kw">by</span></span>
+<span id="L556">    <span class="kw">rw</span> [<span class="const token" data-verso-hover="304">card_image_of_injOn</span>, <span class="const token" data-verso-hover="218">card_range</span>]</span>
+<span id="L557">    <span class="kw">intro</span> i hi j hj h</span>
+<span id="L558">    <span class="kw">simp</span> only [<span class="const token" data-verso-hover="305">coe_range</span>, <span class="const token" data-verso-hover="306">Set.mem_Iio</span>] <span class="kw">at</span> hi hj</span>
+<span id="L559">    <span class="kw">exact</span> hking i (<span class="kw">by</span> <span class="kw">omega</span>) j (<span class="kw">by</span> <span class="kw">omega</span>) h</span>
+<span id="L560">  <span class="kw">obtain</span> ⟨e, he, heF⟩ := <span class="const token" data-verso-hover="307">exists_mem_notMem_of_card_lt_card</span> (s := F)</span>
+<span id="L561">    (t := (<span class="const token" data-verso-hover="145">range</span> (F.<span class="const token" data-verso-hover="106">card</span> + <span class="nu">1</span>)).<span class="const token" data-verso-hover="303">image</span> king) (<span class="kw">by</span> <span class="kw">omega</span>)</span>
+<span id="L562">  <span class="kw">obtain</span> ⟨k, hk, <span class="kw">rfl</span>⟩ := <span class="const token" data-verso-hover="308">mem_image</span>.<span class="const token" data-verso-hover="178">1</span> he</span>
+<span id="L563">  <span class="kw">exact</span> ⟨k, <span class="kw">by</span> <span class="kw">simpa</span> [<span class="const token" data-verso-hover="195">Nat.lt_succ_iff</span>] <span class="kw">using</span> hk, heF⟩</span>
+<span id="L564"></span>
+<span id="L565"><span class="kw">theorem</span> <span class="const token" data-verso-hover="309">all_halted</span> (h3 : <span class="nu">3</span> * t &lt; <span class="const token" data-verso-hover="232">Fintype.card</span> P) (hF : F.<span class="const token" data-verso-hover="106">card</span> ≤ t)</span>
+<span id="L566">    (hking : ∀ i ≤ t, ∀ j ≤ t, king i = king j → i = j) :</span>
+<span id="L567">    ∀ q ∉ F, (E.<span class="const token" data-verso-hover="254">s</span> (<span class="nu">6</span> * (F.<span class="const token" data-verso-hover="106">card</span> + <span class="nu">1</span>)) q).<span class="const token" data-verso-hover="226">halted</span> = <span class="const token" data-verso-hover="88">true</span> := <span class="kw">by</span></span>
+<span id="L568">  <span class="kw">obtain</span> ⟨k, hkf, hk⟩ := <span class="const token" data-verso-hover="302">exists_correct_king</span> hF hking</span>
+<span id="L569">  <span class="kw">intro</span> q hq</span>
+<span id="L570">  <span class="kw">refine</span> <span class="const token" data-verso-hover="261">halted_mono</span> E ?_ (<span class="kw">show</span> <span class="nu">6</span> * k + <span class="nu">6</span> ≤ <span class="nu">6</span> * (F.<span class="const token" data-verso-hover="106">card</span> + <span class="nu">1</span>) <span class="kw">by</span> <span class="kw">omega</span>)</span>
+<span id="L571">  <span class="kw">rcases</span> <span class="const token" data-verso-hover="296">fresh_or_good</span> hE h3 hF k <span class="kw">with</span> hfresh | ⟨b, hG⟩</span>
+<span id="L572">  · <span class="kw">exact</span> <span class="const token" data-verso-hover="297">king_iter</span> hE h3 hF hk hfresh q hq</span>
+<span id="L573">  · <span class="kw">exact</span> (<span class="const token" data-verso-hover="280">good_iter</span> hE h3 hF hG q hq).<span class="const token" data-verso-hover="93">1</span></span>
+<span id="L574"></span>
+<span id="L575"><span class="kw">end</span> Alg1</span>
+<span id="L576"></span>
+<span id="L577"><span class="kw">open</span> Alg1</span>
+<span id="L578"></span>
+<span id="L579"><span class="kw">variable</span> {E}</span>
+<span id="L580"></span>
+<span id="L581"><span class="dc">/-- Theorem 2.9 of [LS22] (termination within `6(f+1)` rounds): after `6(f + 1)` rounds every</span></span>
+<span id="L582"><span class="dc">correct node has decided and halted, where `f = |F|` is the actual number of faulty nodes. -/</span></span>
+<span id="L583"><span class="kw">theorem</span> <span class="const token" data-verso-hover="34">theorem_2_9_termination</span> (hE : E.<span class="const token" data-verso-hover="273">SyncFrom</span> <span class="nu">0</span>) (h3 : <span class="nu">3</span> * t &lt; <span class="const token" data-verso-hover="232">Fintype.card</span> P)</span>
+<span id="L584">    (hF : F.<span class="const token" data-verso-hover="106">card</span> ≤ t) (hking : ∀ i ≤ t, ∀ j ≤ t, king i = king j → i = j) :</span>
+<span id="L585">    ∀ q ∉ F, ((<span class="const token" data-verso-hover="230">alg1</span> t king tb).<span class="const token" data-verso-hover="237">decide</span> q (E.<span class="const token" data-verso-hover="254">s</span> (<span class="nu">6</span> * (F.<span class="const token" data-verso-hover="106">card</span> + <span class="nu">1</span>)) q)).<span class="const token" data-verso-hover="236">isSome</span> ∧</span>
+<span id="L586">      (E.<span class="const token" data-verso-hover="254">s</span> (<span class="nu">6</span> * (F.<span class="const token" data-verso-hover="106">card</span> + <span class="nu">1</span>)) q).<span class="const token" data-verso-hover="226">halted</span> = <span class="const token" data-verso-hover="88">true</span> := <span class="kw">by</span></span>
+<span id="L587">  <span class="kw">intro</span> q hq</span>
+<span id="L588">  <span class="kw">have</span> hh := <span class="const token" data-verso-hover="309">all_halted</span> hE h3 hF hking q hq</span>
+<span id="L589">  <span class="kw">exact</span> ⟨(<span class="const token" data-verso-hover="262">inv</span> E _ q).<span class="const token" data-verso-hover="93">1</span> hh, hh⟩</span>
+<span id="L590"></span>
+<span id="L591"><span class="dc">/-- Theorem 2.9 of [LS22] (agreement): all decisions of correct nodes are equal. -/</span></span>
+<span id="L592"><span class="kw">theorem</span> <span class="const token" data-verso-hover="33">theorem_2_9_agreement</span> (hE : E.<span class="const token" data-verso-hover="273">SyncFrom</span> <span class="nu">0</span>) (h3 : <span class="nu">3</span> * t &lt; <span class="const token" data-verso-hover="232">Fintype.card</span> P)</span>
+<span id="L593">    (hF : F.<span class="const token" data-verso-hover="106">card</span> ≤ t) (hking : ∀ i ≤ t, ∀ j ≤ t, king i = king j → i = j)</span>
+<span id="L594">    {p q : P} (hp : p ∉ F) (hq : q ∉ F) {r r' : <span class="const token" data-verso-hover="59">ℕ</span>} {v w : <span class="const token" data-verso-hover="75">Bool</span>}</span>
+<span id="L595">    (hv : (<span class="const token" data-verso-hover="230">alg1</span> t king tb).<span class="const token" data-verso-hover="237">decide</span> p (E.<span class="const token" data-verso-hover="254">s</span> r p) = <span class="const token" data-verso-hover="231">some</span> v)</span>
+<span id="L596">    (hw : (<span class="const token" data-verso-hover="230">alg1</span> t king tb).<span class="const token" data-verso-hover="237">decide</span> q (E.<span class="const token" data-verso-hover="254">s</span> r' q) = <span class="const token" data-verso-hover="231">some</span> w) : v = w := <span class="kw">by</span></span>
+<span id="L597">  <span class="kw">set</span> T := <span class="nu">6</span> * (F.<span class="const token" data-verso-hover="106">card</span> + <span class="nu">1</span>)</span>
+<span id="L598">  <span class="kw">have</span> hv' := <span class="const token" data-verso-hover="269">out_persist</span> E hv (<span class="const token" data-verso-hover="171">max</span> r T) (<span class="const token" data-verso-hover="183">le_max_left</span> _ _)</span>
+<span id="L599">  <span class="kw">have</span> hw' := <span class="const token" data-verso-hover="269">out_persist</span> E hw (<span class="const token" data-verso-hover="171">max</span> r' T) (<span class="const token" data-verso-hover="183">le_max_left</span> _ _)</span>
+<span id="L600">  <span class="kw">rcases</span> <span class="const token" data-verso-hover="296">fresh_or_good</span> hE h3 hF (F.<span class="const token" data-verso-hover="106">card</span> + <span class="nu">1</span>) <span class="kw">with</span> hfresh | ⟨b, hG⟩</span>
+<span id="L601">  · <span class="kw">have</span> := <span class="const token" data-verso-hover="309">all_halted</span> hE h3 hF hking p hp</span>
+<span id="L602">    <span class="kw">rw</span> [hfresh p hp] <span class="kw">at</span> this; <span class="kw">exact</span> <span class="const token" data-verso-hover="267">absurd</span> this (<span class="kw">by</span> <span class="kw">simp</span>)</span>
+<span id="L603">  · <span class="kw">have</span> hpT := <span class="const token" data-verso-hover="309">all_halted</span> hE h3 hF hking p hp</span>
+<span id="L604">    <span class="kw">have</span> hqT := <span class="const token" data-verso-hover="309">all_halted</span> hE h3 hF hking q hq</span>
+<span id="L605">    <span class="kw">rw</span> [<span class="const token" data-verso-hover="260">frozen</span> E hpT _ (<span class="const token" data-verso-hover="174">le_max_right</span> _ _), (hG p hp).<span class="const token" data-verso-hover="93">1</span> hpT] <span class="kw">at</span> hv'</span>
+<span id="L606">    <span class="kw">rw</span> [<span class="const token" data-verso-hover="260">frozen</span> E hqT _ (<span class="const token" data-verso-hover="174">le_max_right</span> _ _), (hG q hq).<span class="const token" data-verso-hover="93">1</span> hqT] <span class="kw">at</span> hw'</span>
+<span id="L607">    <span class="kw">rw</span> [← <span class="const token" data-verso-hover="310">Option.some_inj</span>, ← hv', ← hw']</span>
+<span id="L608"></span>
+<span id="L609"><span class="dc">/-- Theorem 2.9 of [LS22] (validity): if all correct nodes have input `b`, every decision of a</span></span>
+<span id="L610"><span class="dc">correct node is `b`. -/</span></span>
+<span id="L611"><span class="kw">theorem</span> <span class="const token" data-verso-hover="32">theorem_2_9_validity</span> (hE : E.<span class="const token" data-verso-hover="273">SyncFrom</span> <span class="nu">0</span>) (h3 : <span class="nu">3</span> * t &lt; <span class="const token" data-verso-hover="232">Fintype.card</span> P)</span>
+<span id="L612">    (hF : F.<span class="const token" data-verso-hover="106">card</span> ≤ t) {b : <span class="const token" data-verso-hover="75">Bool</span>} (hinp : ∀ q ∉ F, inp q = b) {p : P} (hp : p ∉ F) {r : <span class="const token" data-verso-hover="59">ℕ</span>}</span>
+<span id="L613">    {v : <span class="const token" data-verso-hover="75">Bool</span>} (hv : (<span class="const token" data-verso-hover="230">alg1</span> t king tb).<span class="const token" data-verso-hover="237">decide</span> p (E.<span class="const token" data-verso-hover="254">s</span> r p) = <span class="const token" data-verso-hover="231">some</span> v) : v = b := <span class="kw">by</span></span>
+<span id="L614">  <span class="kw">have</span> hG : <span class="const token" data-verso-hover="270">Good</span> E b (<span class="nu">6</span> * <span class="nu">0</span>) := <span class="kw">fun</span> q hq =&gt; <span class="kw">by</span> <span class="kw">simp</span> [<span class="const token" data-verso-hover="258">s_zero</span>, hinp q hq]</span>
+<span id="L615">  <span class="kw">have</span> h1 := <span class="const token" data-verso-hover="280">good_iter</span> hE h3 hF hG p hp</span>
+<span id="L616">  <span class="kw">have</span> hv' := <span class="const token" data-verso-hover="269">out_persist</span> E hv (<span class="const token" data-verso-hover="171">max</span> r <span class="nu">6</span>) (<span class="const token" data-verso-hover="183">le_max_left</span> _ _)</span>
+<span id="L617">  <span class="kw">rw</span> [<span class="const token" data-verso-hover="260">frozen</span> E h1.<span class="const token" data-verso-hover="93">1</span> _ (<span class="const token" data-verso-hover="174">le_max_right</span> _ _), h1.<span class="const token" data-verso-hover="97">2</span>] <span class="kw">at</span> hv'</span>
+<span id="L618">  <span class="kw">exact</span> (<span class="const token" data-verso-hover="310">Option.some_inj</span>.<span class="const token" data-verso-hover="178">1</span> hv').<span class="const token" data-verso-hover="311">symm</span></span>
+<span id="L619"></span>
+<span id="L620"><span class="dc">/-- The number of messages sent by correct nodes in round `r`. -/</span></span>
+<span id="L621"><span class="kw">def</span> <span class="const token" data-verso-hover="312">msgs</span> (E : <span class="const token" data-verso-hover="20">RoundRun</span> (<span class="const token" data-verso-hover="230">alg1</span> t king tb) F inp) (r : <span class="const token" data-verso-hover="59">ℕ</span>) : <span class="const token" data-verso-hover="59">ℕ</span> :=</span>
+<span id="L622">  ((Fᶜ ×ˢ <span class="const token" data-verso-hover="122">univ</span>).<span class="const token" data-verso-hover="123">filter</span> <span class="kw">fun</span> pq : P × P =&gt;</span>
+<span id="L623">    ((<span class="const token" data-verso-hover="230">alg1</span> t king tb).<span class="const token" data-verso-hover="68">send</span> r pq.<span class="const token" data-verso-hover="313">1</span> (E.<span class="const token" data-verso-hover="254">s</span> r pq.<span class="const token" data-verso-hover="313">1</span>) pq.<span class="const token" data-verso-hover="314">2</span>).<span class="const token" data-verso-hover="236">isSome</span>).<span class="const token" data-verso-hover="106">card</span></span>
+<span id="L624"></span>
+<span id="L625"><span class="dc">/-- Theorem 2.9 of [LS22] (communication): correct nodes send at most `6 n² (f + 1)` messages in</span></span>
+<span id="L626"><span class="dc">total, each a single bit (`Bool`). -/</span></span>
+<span id="L627"><span class="kw">theorem</span> <span class="const token" data-verso-hover="35">theorem_2_9_messages</span> (hE : E.<span class="const token" data-verso-hover="273">SyncFrom</span> <span class="nu">0</span>) (h3 : <span class="nu">3</span> * t &lt; <span class="const token" data-verso-hover="232">Fintype.card</span> P)</span>
+<span id="L628">    (hF : F.<span class="const token" data-verso-hover="106">card</span> ≤ t) (hking : ∀ i ≤ t, ∀ j ≤ t, king i = king j → i = j) (R : <span class="const token" data-verso-hover="59">ℕ</span>) :</span>
+<span id="L629">    ∑ r ∈ <span class="const token" data-verso-hover="145">range</span> R, <span class="const token" data-verso-hover="312">msgs</span> E r ≤ <span class="nu">6</span> * <span class="const token" data-verso-hover="232">Fintype.card</span> P ^ <span class="nu">2</span> * (F.<span class="const token" data-verso-hover="106">card</span> + <span class="nu">1</span>) := <span class="kw">by</span></span>
+<span id="L630">  <span class="kw">set</span> T := <span class="nu">6</span> * (F.<span class="const token" data-verso-hover="106">card</span> + <span class="nu">1</span>)</span>
+<span id="L631">  <span class="kw">have</span> hzero : ∀ r ≥ T, <span class="const token" data-verso-hover="312">msgs</span> E r = <span class="nu">0</span> := <span class="kw">by</span></span>
+<span id="L632">    <span class="kw">intro</span> r hr</span>
+<span id="L633">    <span class="kw">unfold</span> <span class="const token" data-verso-hover="312">msgs</span></span>
+<span id="L634">    <span class="kw">rw</span> [<span class="const token" data-verso-hover="315">card_eq_zero</span>, <span class="const token" data-verso-hover="316">filter_eq_empty_iff</span>]</span>
+<span id="L635">    <span class="kw">rintro</span> ⟨p, q⟩ hpq</span>
+<span id="L636">    <span class="kw">have</span> hp : p ∉ F := <span class="kw">by</span> <span class="kw">simpa</span> <span class="kw">using</span> (<span class="const token" data-verso-hover="317">mem_product</span>.<span class="const token" data-verso-hover="178">1</span> hpq).<span class="const token" data-verso-hover="93">1</span></span>
+<span id="L637">    <span class="kw">have</span> hh := <span class="const token" data-verso-hover="261">halted_mono</span> E (<span class="const token" data-verso-hover="309">all_halted</span> hE h3 hF hking p hp) hr</span>
+<span id="L638">    <span class="kw">simp</span> [<span class="const token" data-verso-hover="239">send_halted</span> hh]</span>
+<span id="L639">  <span class="kw">have</span> hle : ∀ r, <span class="const token" data-verso-hover="312">msgs</span> E r ≤ <span class="const token" data-verso-hover="232">Fintype.card</span> P ^ <span class="nu">2</span> := <span class="kw">by</span></span>
+<span id="L640">    <span class="kw">intro</span> r</span>
+<span id="L641">    <span class="kw">refine</span> <span class="const token" data-verso-hover="206">le_trans</span> (<span class="const token" data-verso-hover="318">card_filter_le</span> _ _) ?_</span>
+<span id="L642">    <span class="kw">rw</span> [<span class="const token" data-verso-hover="319">card_product</span>, <span class="const token" data-verso-hover="204">card_univ</span>, <span class="const token" data-verso-hover="320">sq</span>]</span>
+<span id="L643">    <span class="kw">exact</span> <span class="const token" data-verso-hover="321">Nat.mul_le_mul_right</span> _ (<span class="const token" data-verso-hover="216">card_le_univ</span> _)</span>
+<span id="L644">  <span class="kw">calc</span> ∑ r ∈ <span class="const token" data-verso-hover="145">range</span> R, <span class="const token" data-verso-hover="312">msgs</span> E r ≤ ∑ r ∈ <span class="const token" data-verso-hover="145">range</span> T, <span class="const token" data-verso-hover="312">msgs</span> E r := <span class="kw">by</span></span>
+<span id="L645">        <span class="kw">rcases</span> <span class="const token" data-verso-hover="322">le_total</span> R T <span class="kw">with</span> h | h</span>
+<span id="L646">        · <span class="kw">exact</span> <span class="const token" data-verso-hover="323">sum_le_sum_of_subset</span> (<span class="const token" data-verso-hover="324">range_subset_range</span>.<span class="const token" data-verso-hover="110">2</span> h)</span>
+<span id="L647">        · <span class="kw">rw</span> [← <span class="const token" data-verso-hover="325">sum_range_add_sum_Ico</span> _ h, <span class="const token" data-verso-hover="326">sum_eq_zero</span> (<span class="kw">fun</span> r hr =&gt; hzero r (<span class="const token" data-verso-hover="327">mem_Ico</span>.<span class="const token" data-verso-hover="178">1</span> hr).<span class="const token" data-verso-hover="93">1</span>)]</span>
+<span id="L648">          <span class="kw">simp</span></span>
+<span id="L649">    _ ≤ ∑ _r ∈ <span class="const token" data-verso-hover="145">range</span> T, <span class="const token" data-verso-hover="232">Fintype.card</span> P ^ <span class="nu">2</span> := <span class="const token" data-verso-hover="194">sum_le_sum</span> <span class="kw">fun</span> r _ =&gt; hle r</span>
+<span id="L650">    _ = <span class="nu">6</span> * <span class="const token" data-verso-hover="232">Fintype.card</span> P ^ <span class="nu">2</span> * (F.<span class="const token" data-verso-hover="106">card</span> + <span class="nu">1</span>) := <span class="kw">by</span> <span class="kw">simp</span> [T]; <span class="kw">ring</span></span>
+<span id="L651"></span>
+<span id="L652"><span class="kw">end</span> RecursivePhaseKing</span>
+<span id="L653"></span>
+</code></div>
+        <script>
+          window.versoHoversUrl = "PODC2022/RecursivePhaseKing/-hovers.json";</script>
+        <script src="static/lean/popper.js"></script>
+        <script src="static/lean/tippy.js"></script>
+        <script src="static/lean/marked.js"></script>
+        <script src="static/lean/highlighting.js"></script>
+        <script src="static/lean/lean.js"></script>
+        </article></main><footer class="site-footer"><div class="wrap">
+        Machine-checked formalizations of PODC papers in Lean 4. Generated with <a href="https://github.com/leanprover/verso">Verso</a> from the README files of <a href="https://github.com/vasnesterov/formal_podc">vasnesterov/formal_podc</a>.</div>
+      </footer></body>
+  </html>
+

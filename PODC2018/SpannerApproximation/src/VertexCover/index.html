@@ -1,0 +1,448 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="light dark">
+    <link rel="icon" href="data:,">
+    <title>SpannerApproximation: VertexCover.lean · Formal PODC</title><base href="../../../.././"><link rel="stylesheet" href="static/lean/verso-vars.css">
+    <link rel="stylesheet" href="static/lean/highlighting.css">
+    <link rel="stylesheet" href="static/lean/tippy-border.css">
+    <link rel="stylesheet" href="static/style.css">
+    <script defer="defer" src="static/site.js"></script>
+    </head>
+  <body>
+    <header class="site-header">
+      <div class="wrap">
+        <a class="brand" href=".">Formal PODC</a><nav class="top">
+          <a href=".">Search</a><a href="about/">About</a><a href="https://github.com/vasnesterov/formal_podc">GitHub</a></nav>
+        </div>
+      </header>
+    <main class="wrap"><article><nav class="breadcrumbs" aria-label="Breadcrumb">
+          <a href=".">Search</a><span class="sep">›</span><a href="PODC2018/">PODC 2018</a><span class="sep">›</span><a href="PODC2018/SpannerApproximation/">SpannerApproximation</a><span class="sep">›</span><a href="PODC2018/SpannerApproximation/src/">Lean source</a><span class="sep">›</span><span aria-current="page">VertexCover</span></nav>
+        <h1>
+          <code>VertexCover.lean</code></h1>
+        <div class="paper-links">
+          <p>
+            Source of <a href="PODC2018/SpannerApproximation/">Distributed Spanner Approximation — PODC 2018</a> · <a href="https://github.com/vasnesterov/formal_podc/blob/main/Papers/PODC2018/SpannerApproximation/VertexCover.lean">GitHub</a> · hover over a name for its type and documentation</p>
+          </div>
+        <div class="lean-code lean-src">
+          <code class="hl lean block" data-lean-context="VertexCover"><span id="L1"><span class="kw">import</span> Mathlib.Combinatorics.SimpleGraph.VertexCover</span>
+<span id="L2"><span class="kw">import</span> Mathlib.Combinatorics.SimpleGraph.Finite</span>
+<span id="L3"><span class="kw">import</span> Mathlib.Basic.Real.Basic</span>
+<span id="L4"><span class="kw">import</span> Mathlib.Algebra.BigOperators.Ring.Finset</span>
+<span id="L5"><span class="kw">import</span> Mathlib.Algebra.Order.BigOperators.Group.Finset</span>
+<span id="L6"><span class="kw">import</span> Mathlib.Tactic.FinCases</span>
+<span id="L7"><span class="kw">import</span> Cslib.Foundations.Combinatorics.SimpleGraph.Spanner</span>
+<span id="L8"></span>
+<span id="L9"><span class="dc">/-!</span></span>
+<span id="L10"><span class="dc"># Weighted 2-spanner versus minimum vertex cover (Claim 3.1 of [CD18])</span></span>
+<span id="L11"></span>
+<span id="L12"><span class="dc">[CD18] K. Censor-Hillel, M. Dory, *Distributed Spanner Approximation*, PODC 2018.</span></span>
+<span id="L13"></span>
+<span id="L14"><span class="dc">Given a graph `G` on `V` (vertex names are the IDs, compared by a linear order), the graph</span></span>
+<span id="L15"><span class="dc">`GS G` lives on `V × Fin 3`; the copies `0, 1, 2` of `v` are the paper's `v₁, v₂, v₃`.</span></span>
+<span id="L16"></span>
+<span id="L17"><span class="dc">* the triangle `{v₁, v₂}` (weight 1), `{v₁, v₃}`, `{v₂, v₃}` (weight 0) for every `v`;</span></span>
+<span id="L18"><span class="dc">* for every edge `{v, u}` of `G`: `{v₁, u₁}`, `{v₂, u₂}` (weight 0) and the *cross edge*</span></span>
+<span id="L19"><span class="dc">  `{v₁, u₂}` for `v &lt; u` (weight 2) — the paper chooses one of `{v₁,u₂}`, `{u₁,v₂}` "according to</span></span>
+<span id="L20"><span class="dc">  the order of the IDs"; we fix this convention.</span></span>
+<span id="L21"></span>
+<span id="L22"><span class="dc">A 2-spanner of `GS G` is a subgraph `H ≤ GS G` such that every edge of `GS G` is joined in `H` by a</span></span>
+<span id="L23"><span class="dc">walk of length at most 2 (`IsTwoSpanner`, equivalent to CSLib's `SimpleGraph.IsSpanner _ H 2`);</span></span>
+<span id="L24"><span class="dc">its cost is the sum of the weights of its edges (`wcost`).</span></span>
+<span id="L25"></span>
+<span id="L26"><span class="dc">Main results:</span></span>
+<span id="L27"><span class="dc">* `isTwoSpanner_HC`, `cost_HC`: for every vertex cover `C`, `HC G C` is a 2-spanner of cost `|C|`;</span></span>
+<span id="L28"><span class="dc">* `isVertexCover_CH`, `ncard_CH_le_cost`: for every 2-spanner `H`, the explicit set</span></span>
+<span id="L29"><span class="dc">  `CH H = {v | {v₁,v₂} ∈ H or a cross edge at v₁ or at v₂ is in H}` is a vertex cover with</span></span>
+<span id="L30"><span class="dc">  `|CH H| ≤ cost H`;</span></span>
+<span id="L31"><span class="dc">* `claim_3_1`: the minimum 2-spanner cost equals the vertex cover number;</span></span>
+<span id="L32"><span class="dc">* `approx_transfer`: an `α`-approximate 2-spanner `H` yields the `α`-approximate vertex cover</span></span>
+<span id="L33"><span class="dc">  `CH H`.</span></span>
+<span id="L34"><span class="dc">-/</span></span>
+<span id="L35"></span>
+<span id="L36"><span class="kw">namespace</span> Podc.SpannerApproximation</span>
+<span id="L37"></span>
+<span id="L38"><span class="kw">open</span> Finset</span>
+<span id="L39"></span>
+<span id="L40"><span class="kw">section</span> General</span>
+<span id="L41"></span>
+<span id="L42"><span class="kw">variable</span> {W : <span class="kw">Type</span>*}</span>
+<span id="L43"></span>
+<span id="L44"><span class="dc">/-- `H` is a 2-spanner of `Gs`: a subgraph in which every edge of `Gs` is covered by a path of</span></span>
+<span id="L45"><span class="dc">length at most 2 (Section 1.5 of [CD18], `k = 2`). -/</span></span>
+<span id="L46"><span class="kw">def</span> <span class="const token" data-verso-hover="405">IsTwoSpanner</span> (Gs H : <span class="const token" data-verso-hover="247">SimpleGraph</span> W) : <span class="kw">Prop</span> :=</span>
+<span id="L47">  H ≤ Gs ∧ ∀ ⦃a b : W⦄, Gs.<span class="const token" data-verso-hover="130">Adj</span> a b → H.<span class="const token" data-verso-hover="130">Adj</span> a b ∨ ∃ c, H.<span class="const token" data-verso-hover="130">Adj</span> a c ∧ H.<span class="const token" data-verso-hover="130">Adj</span> c b</span>
+<span id="L48"></span>
+<span id="L49"><span class="dc">/-- The edge-covering definition of a 2-spanner agrees with CSLib's distance-stretch definition</span></span>
+<span id="L50"><span class="dc">`SimpleGraph.IsSpanner Gs H 2`. -/</span></span>
+<span id="L51"><span class="kw">theorem</span> <span class="const token" data-verso-hover="414">isTwoSpanner_iff_isSpanner</span> {Gs H : <span class="const token" data-verso-hover="247">SimpleGraph</span> W} :</span>
+<span id="L52">    <span class="const token" data-verso-hover="405">IsTwoSpanner</span> Gs H ↔ Gs.<span class="const token" data-verso-hover="415">IsSpanner</span> H <span class="nu">2</span> := <span class="kw">by</span></span>
+<span id="L53">  <span class="kw">constructor</span></span>
+<span id="L54">  · <span class="kw">rintro</span> ⟨hle, hcov⟩</span>
+<span id="L55">    <span class="kw">refine</span> ⟨hle, <span class="const token" data-verso-hover="416">SimpleGraph.edist_le_mul_of_adj</span> (<span class="kw">by</span> <span class="kw">norm_num</span>) <span class="kw">fun</span> x y hxy =&gt; ?_⟩</span>
+<span id="L56">    <span class="kw">rw</span> [<span class="const token" data-verso-hover="417">SimpleGraph.edist_le_coe_iff</span>]</span>
+<span id="L57">    <span class="kw">rcases</span> hcov hxy <span class="kw">with</span> h | ⟨c, h1, h2⟩</span>
+<span id="L58">    · <span class="kw">exact</span> ⟨h.<span class="const token" data-verso-hover="418">toWalk</span>, <span class="kw">by</span> <span class="kw">simp</span>⟩</span>
+<span id="L59">    · <span class="kw">exact</span> ⟨<span class="const token" data-verso-hover="419">.</span>cons h1 (<span class="const token" data-verso-hover="419">.</span>cons h2 <span class="const token" data-verso-hover="420">.</span>nil), <span class="kw">by</span> <span class="kw">simp</span>⟩</span>
+<span id="L60">  · <span class="kw">rintro</span> ⟨hle, hd⟩</span>
+<span id="L61">    <span class="kw">refine</span> ⟨hle, <span class="kw">fun</span> a b hab =&gt; ?_⟩</span>
+<span id="L62">    <span class="kw">have</span> h := hd a b</span>
+<span id="L63">    <span class="kw">rw</span> [<span class="const token" data-verso-hover="421">SimpleGraph.edist_eq_one_iff_adj</span>.<span class="const token" data-verso-hover="121">mpr</span> hab, <span class="const token" data-verso-hover="422">mul_one</span>] <span class="kw">at</span> h</span>
+<span id="L64">    <span class="kw">obtain</span> ⟨p, hp⟩ := <span class="const token" data-verso-hover="417">SimpleGraph.edist_le_coe_iff</span>.<span class="const token" data-verso-hover="202">mp</span> (<span class="kw">by</span> <span class="kw">exact_mod_cast</span> h)</span>
+<span id="L65">    <span class="kw">cases</span> p <span class="kw">with</span></span>
+<span id="L66">    | <span class="const token" data-verso-hover="420">nil</span> =&gt; <span class="kw">exact</span> <span class="const token" data-verso-hover="384">absurd</span> hab Gs.<span class="const token" data-verso-hover="284">irrefl</span></span>
+<span id="L67">    | <span class="const token" data-verso-hover="419">cons</span> h1 q =&gt;</span>
+<span id="L68">      <span class="kw">cases</span> q <span class="kw">with</span></span>
+<span id="L69">      | <span class="const token" data-verso-hover="420">nil</span> =&gt; <span class="kw">exact</span> <span class="const token" data-verso-hover="131">Or.inl</span> h1</span>
+<span id="L70">      | <span class="const token" data-verso-hover="419">cons</span> h2 r =&gt;</span>
+<span id="L71">        <span class="kw">cases</span> r <span class="kw">with</span></span>
+<span id="L72">        | <span class="const token" data-verso-hover="420">nil</span> =&gt; <span class="kw">exact</span> <span class="const token" data-verso-hover="153">Or.inr</span> ⟨_, h1, h2⟩</span>
+<span id="L73">        | <span class="const token" data-verso-hover="419">cons</span> _ _ =&gt; <span class="kw">simp</span> <span class="kw">at</span> hp</span>
+<span id="L74"></span>
+<span id="L75"><span class="kw">variable</span> [<span class="const token" data-verso-hover="49">Fintype</span> W]</span>
+<span id="L76"></span>
+<span id="L77"><span class="dc">/-- Cost `w(H) = ∑_{e ∈ H} w(e)` of a subgraph `H` for edge weights `w`. -/</span></span>
+<span id="L78"><span class="kw">noncomputable</span> <span class="kw">def</span> <span class="const token" data-verso-hover="423">wcost</span> (w : <span class="const token" data-verso-hover="424">Sym2</span> W → <span class="const token" data-verso-hover="30">ℕ</span>) (H : <span class="const token" data-verso-hover="247">SimpleGraph</span> W) : <span class="const token" data-verso-hover="30">ℕ</span> := <span class="kw">by</span></span>
+<span id="L79">  <span class="kw">classical</span> <span class="kw">exact</span> ∑ e ∈ H.<span class="const token" data-verso-hover="425">edgeFinset</span>, w e</span>
+<span id="L80"></span>
+<span id="L81"><span class="kw">lemma</span> <span class="const token" data-verso-hover="402">wcost_eq</span> (w : <span class="const token" data-verso-hover="424">Sym2</span> W → <span class="const token" data-verso-hover="30">ℕ</span>) (H : <span class="const token" data-verso-hover="247">SimpleGraph</span> W) [<span class="const token" data-verso-hover="49">Fintype</span> H.<span class="const token" data-verso-hover="426">edgeSet</span>] :</span>
+<span id="L82">    <span class="const token" data-verso-hover="423">wcost</span> w H = ∑ e ∈ H.<span class="const token" data-verso-hover="425">edgeFinset</span>, w e := <span class="kw">by</span></span>
+<span id="L83">  <span class="kw">unfold</span> <span class="const token" data-verso-hover="423">wcost</span></span>
+<span id="L84">  <span class="kw">congr</span> <span class="nu">1</span></span>
+<span id="L85">  <span class="kw">ext</span> e</span>
+<span id="L86">  <span class="kw">simp</span></span>
+<span id="L87"></span>
+<span id="L88"><span class="kw">end</span> General</span>
+<span id="L89"></span>
+<span id="L90"><span class="kw">variable</span> {V : <span class="kw">Type</span>*} [<span class="const token" data-verso-hover="287">LinearOrder</span> V]</span>
+<span id="L91"></span>
+<span id="L92"><span class="dc">/-- Adjacency of `G_S` in terms of the adjacency `r` of `G` (copies `0, 1, 2` = `v₁, v₂, v₃`). -/</span></span>
+<span id="L93"><span class="kw">def</span> <span class="const token" data-verso-hover="293">SAdj</span> (r : V → V → <span class="kw">Prop</span>) (a b : V × <span class="const token" data-verso-hover="32">Fin</span> <span class="nu">3</span>) : <span class="kw">Prop</span> :=</span>
+<span id="L94">  (a.<span class="const token" data-verso-hover="70">1</span> = b.<span class="const token" data-verso-hover="70">1</span> ∧ a.<span class="const token" data-verso-hover="71">2</span> ≠ b.<span class="const token" data-verso-hover="71">2</span>) ∨</span>
+<span id="L95">  (r a.<span class="const token" data-verso-hover="70">1</span> b.<span class="const token" data-verso-hover="70">1</span> ∧ ((a.<span class="const token" data-verso-hover="71">2</span> = <span class="nu">0</span> ∧ b.<span class="const token" data-verso-hover="71">2</span> = <span class="nu">0</span>) ∨ (a.<span class="const token" data-verso-hover="71">2</span> = <span class="nu">1</span> ∧ b.<span class="const token" data-verso-hover="71">2</span> = <span class="nu">1</span>) ∨</span>
+<span id="L96">    (a.<span class="const token" data-verso-hover="70">1</span> &lt; b.<span class="const token" data-verso-hover="70">1</span> ∧ a.<span class="const token" data-verso-hover="71">2</span> = <span class="nu">0</span> ∧ b.<span class="const token" data-verso-hover="71">2</span> = <span class="nu">1</span>) ∨ (b.<span class="const token" data-verso-hover="70">1</span> &lt; a.<span class="const token" data-verso-hover="70">1</span> ∧ a.<span class="const token" data-verso-hover="71">2</span> = <span class="nu">1</span> ∧ b.<span class="const token" data-verso-hover="71">2</span> = <span class="nu">0</span>)))</span>
+<span id="L97"></span>
+<span id="L98"><span class="const token" data-verso-hover="427">instance</span> (r : V → V → <span class="kw">Prop</span>) [<span class="const token" data-verso-hover="157">DecidableRel</span> r] : <span class="const token" data-verso-hover="157">DecidableRel</span> (<span class="const token" data-verso-hover="293">SAdj</span> r) := <span class="kw">fun</span> _ _ =&gt; <span class="kw">by</span></span>
+<span id="L99">  <span class="kw">unfold</span> <span class="const token" data-verso-hover="293">SAdj</span>; <span class="kw">infer_instance</span></span>
+<span id="L100"></span>
+<span id="L101"><span class="dc">/-- The graph `G_S` of Section 3 of [CD18] (Figure 3). -/</span></span>
+<span id="L102"><span class="kw">def</span> <span class="const token" data-verso-hover="290">GS</span> (G : <span class="const token" data-verso-hover="247">SimpleGraph</span> V) : <span class="const token" data-verso-hover="247">SimpleGraph</span> (V × <span class="const token" data-verso-hover="32">Fin</span> <span class="nu">3</span>) <span class="kw">where</span></span>
+<span id="L103">  <span class="const token" data-verso-hover="130">Adj</span> := <span class="const token" data-verso-hover="293">SAdj</span> G.<span class="const token" data-verso-hover="130">Adj</span></span>
+<span id="L104">  <span class="const token" data-verso-hover="248">symm</span> := ⟨<span class="kw">fun</span> a b h =&gt; <span class="kw">by</span></span>
+<span id="L105">    <span class="kw">unfold</span> <span class="const token" data-verso-hover="293">SAdj</span> <span class="kw">at</span> *</span>
+<span id="L106">    <span class="kw">rcases</span> h <span class="kw">with</span> ⟨h1, h2⟩ | ⟨h1, h2⟩</span>
+<span id="L107">    · <span class="kw">exact</span> <span class="const token" data-verso-hover="131">Or.inl</span> ⟨h1.<span class="const token" data-verso-hover="267">symm</span>, <span class="const token" data-verso-hover="249">Ne.symm</span> h2⟩</span>
+<span id="L108">    · <span class="kw">refine</span> <span class="const token" data-verso-hover="153">Or.inr</span> ⟨h1.<span class="const token" data-verso-hover="283">symm</span>, ?_⟩</span>
+<span id="L109">      <span class="kw">rcases</span> h2 <span class="kw">with</span> h | h | h | h</span>
+<span id="L110">      · <span class="kw">exact</span> <span class="const token" data-verso-hover="131">Or.inl</span> h.<span class="const token" data-verso-hover="428">symm</span></span>
+<span id="L111">      · <span class="kw">exact</span> <span class="const token" data-verso-hover="153">Or.inr</span> (<span class="const token" data-verso-hover="131">Or.inl</span> h.<span class="const token" data-verso-hover="428">symm</span>)</span>
+<span id="L112">      · <span class="kw">exact</span> <span class="const token" data-verso-hover="153">Or.inr</span> (<span class="const token" data-verso-hover="153">Or.inr</span> (<span class="const token" data-verso-hover="153">Or.inr</span> ⟨h.<span class="const token" data-verso-hover="80">1</span>, h.<span class="const token" data-verso-hover="96">2</span><span class="nu">.</span><span class="const token" data-verso-hover="96">2</span>, h.<span class="const token" data-verso-hover="96">2</span><span class="nu">.</span><span class="const token" data-verso-hover="80">1</span>⟩))</span>
+<span id="L113">      · <span class="kw">exact</span> <span class="const token" data-verso-hover="153">Or.inr</span> (<span class="const token" data-verso-hover="153">Or.inr</span> (<span class="const token" data-verso-hover="131">Or.inl</span> ⟨h.<span class="const token" data-verso-hover="80">1</span>, h.<span class="const token" data-verso-hover="96">2</span><span class="nu">.</span><span class="const token" data-verso-hover="96">2</span>, h.<span class="const token" data-verso-hover="96">2</span><span class="nu">.</span><span class="const token" data-verso-hover="80">1</span>⟩))⟩</span>
+<span id="L114">  <span class="const token" data-verso-hover="251">loopless</span> := ⟨<span class="kw">fun</span> a h =&gt; <span class="kw">by</span></span>
+<span id="L115">    <span class="kw">unfold</span> <span class="const token" data-verso-hover="293">SAdj</span> <span class="kw">at</span> h</span>
+<span id="L116">    <span class="kw">rcases</span> h <span class="kw">with</span> ⟨_, h⟩ | ⟨h, _⟩</span>
+<span id="L117">    · <span class="kw">exact</span> h <span class="const token" data-verso-hover="90">rfl</span></span>
+<span id="L118">    · <span class="kw">exact</span> G.<span class="const token" data-verso-hover="284">irrefl</span> h⟩</span>
+<span id="L119"></span>
+<span id="L120"><span class="const token" data-verso-hover="429">instance</span> (G : <span class="const token" data-verso-hover="247">SimpleGraph</span> V) [<span class="const token" data-verso-hover="157">DecidableRel</span> G.<span class="const token" data-verso-hover="130">Adj</span>] : <span class="const token" data-verso-hover="157">DecidableRel</span> (<span class="const token" data-verso-hover="290">GS</span> G).<span class="const token" data-verso-hover="130">Adj</span> :=</span>
+<span id="L121">  inferInstanceAs (<span class="const token" data-verso-hover="157">DecidableRel</span> (<span class="const token" data-verso-hover="293">SAdj</span> G.<span class="const token" data-verso-hover="130">Adj</span>))</span>
+<span id="L122"></span>
+<span id="L123"><span class="kw">lemma</span> <span class="const token" data-verso-hover="295">GS_adj</span> {G : <span class="const token" data-verso-hover="247">SimpleGraph</span> V} {a b : V × <span class="const token" data-verso-hover="32">Fin</span> <span class="nu">3</span>} : (<span class="const token" data-verso-hover="290">GS</span> G).<span class="const token" data-verso-hover="130">Adj</span> a b ↔ <span class="const token" data-verso-hover="293">SAdj</span> G.<span class="const token" data-verso-hover="130">Adj</span> a b := <span class="const token" data-verso-hover="355">Iff.rfl</span></span>
+<span id="L124"></span>
+<span id="L125">@[<span class="kw">simp</span>] <span class="kw">lemma</span> <span class="const token" data-verso-hover="341">GS_adj_same</span> {G : <span class="const token" data-verso-hover="247">SimpleGraph</span> V} {v : V} {i j : <span class="const token" data-verso-hover="32">Fin</span> <span class="nu">3</span>} :</span>
+<span id="L126">    (<span class="const token" data-verso-hover="290">GS</span> G).<span class="const token" data-verso-hover="130">Adj</span> (v, i) (v, j) ↔ i ≠ j := <span class="kw">by</span></span>
+<span id="L127">  <span class="kw">simp</span> [<span class="const token" data-verso-hover="295">GS_adj</span>, <span class="const token" data-verso-hover="293">SAdj</span>]</span>
+<span id="L128"></span>
+<span id="L129"><span class="kw">lemma</span> <span class="const token" data-verso-hover="302">GS_adj_of_ne</span> {G : <span class="const token" data-verso-hover="247">SimpleGraph</span> V} {v u : V} (h : v ≠ u) {i j : <span class="const token" data-verso-hover="32">Fin</span> <span class="nu">3</span>} :</span>
+<span id="L130">    (<span class="const token" data-verso-hover="290">GS</span> G).<span class="const token" data-verso-hover="130">Adj</span> (v, i) (u, j) ↔ G.<span class="const token" data-verso-hover="130">Adj</span> v u ∧ ((i = <span class="nu">0</span> ∧ j = <span class="nu">0</span>) ∨ (i = <span class="nu">1</span> ∧ j = <span class="nu">1</span>) ∨</span>
+<span id="L131">      (v &lt; u ∧ i = <span class="nu">0</span> ∧ j = <span class="nu">1</span>) ∨ (u &lt; v ∧ i = <span class="nu">1</span> ∧ j = <span class="nu">0</span>)) := <span class="kw">by</span></span>
+<span id="L132">  <span class="kw">simp</span> [<span class="const token" data-verso-hover="295">GS_adj</span>, <span class="const token" data-verso-hover="293">SAdj</span>, h]</span>
+<span id="L133"></span>
+<span id="L134"><span class="kw">lemma</span> <span class="const token" data-verso-hover="430">GS_adj_fst</span> {G : <span class="const token" data-verso-hover="247">SimpleGraph</span> V} {a b : V × <span class="const token" data-verso-hover="32">Fin</span> <span class="nu">3</span>} (h : (<span class="const token" data-verso-hover="290">GS</span> G).<span class="const token" data-verso-hover="130">Adj</span> a b) :</span>
+<span id="L135">    a.<span class="const token" data-verso-hover="70">1</span> = b.<span class="const token" data-verso-hover="70">1</span> ∨ G.<span class="const token" data-verso-hover="130">Adj</span> a.<span class="const token" data-verso-hover="70">1</span> b.<span class="const token" data-verso-hover="70">1</span> := <span class="kw">by</span></span>
+<span id="L136">  <span class="kw">rcases</span> h <span class="kw">with</span> h | h</span>
+<span id="L137">  · <span class="kw">exact</span> <span class="const token" data-verso-hover="131">Or.inl</span> h.<span class="const token" data-verso-hover="80">1</span></span>
+<span id="L138">  · <span class="kw">exact</span> <span class="const token" data-verso-hover="153">Or.inr</span> h.<span class="const token" data-verso-hover="80">1</span></span>
+<span id="L139"></span>
+<span id="L140"><span class="dc">/-- Weights of `G_S` on ordered pairs: `1` on `{v₁,v₂}`, `0` on `{v₁,v₃}, {v₂,v₃}, {v₁,u₁},</span></span>
+<span id="L141"><span class="dc">{v₂,u₂}`, `2` on the cross edges `{v₁,u₂}`. (Only the values on edges of `G_S` matter.) -/</span></span>
+<span id="L142"><span class="kw">def</span> <span class="const token" data-verso-hover="291">wtPair</span> (a b : V × <span class="const token" data-verso-hover="32">Fin</span> <span class="nu">3</span>) : <span class="const token" data-verso-hover="30">ℕ</span> :=</span>
+<span id="L143">  <span class="kw">if</span> a.<span class="const token" data-verso-hover="70">1</span> = b.<span class="const token" data-verso-hover="70">1</span> <span class="kw">then</span> (<span class="kw">if</span> a.<span class="const token" data-verso-hover="71">2</span> = <span class="nu">2</span> ∨ b.<span class="const token" data-verso-hover="71">2</span> = <span class="nu">2</span> <span class="kw">then</span> <span class="nu">0</span> <span class="kw">else</span> <span class="nu">1</span>) <span class="kw">else</span> <span class="kw">if</span> a.<span class="const token" data-verso-hover="71">2</span> = b.<span class="const token" data-verso-hover="71">2</span> <span class="kw">then</span> <span class="nu">0</span> <span class="kw">else</span> <span class="nu">2</span></span>
+<span id="L144"></span>
+<span id="L145"><span class="kw">lemma</span> <span class="const token" data-verso-hover="394">wtPair_comm</span> (a b : V × <span class="const token" data-verso-hover="32">Fin</span> <span class="nu">3</span>) : <span class="const token" data-verso-hover="291">wtPair</span> a b = <span class="const token" data-verso-hover="291">wtPair</span> b a := <span class="kw">by</span></span>
+<span id="L146">  <span class="kw">unfold</span> <span class="const token" data-verso-hover="291">wtPair</span></span>
+<span id="L147">  <span class="kw">by_cases</span> h : a.<span class="const token" data-verso-hover="70">1</span> = b.<span class="const token" data-verso-hover="70">1</span></span>
+<span id="L148">  · <span class="kw">simp</span> [h, <span class="const token" data-verso-hover="431">or_comm</span>]</span>
+<span id="L149">  · <span class="kw">simp</span> [h, <span class="const token" data-verso-hover="249">Ne.symm</span> h, <span class="const token" data-verso-hover="164">eq_comm</span>]</span>
+<span id="L150"></span>
+<span id="L151"><span class="dc">/-- The edge weights of `G_S`. -/</span></span>
+<span id="L152"><span class="kw">def</span> <span class="const token" data-verso-hover="362">wt</span> : <span class="const token" data-verso-hover="424">Sym2</span> (V × <span class="const token" data-verso-hover="32">Fin</span> <span class="nu">3</span>) → <span class="const token" data-verso-hover="30">ℕ</span> := <span class="const token" data-verso-hover="432">Sym2.lift</span> ⟨<span class="const token" data-verso-hover="291">wtPair</span>, <span class="const token" data-verso-hover="394">wtPair_comm</span>⟩</span>
+<span id="L153"></span>
+<span id="L154">@[<span class="kw">simp</span>] <span class="kw">lemma</span> <span class="const token" data-verso-hover="433">wt_mk</span> (a b : V × <span class="const token" data-verso-hover="32">Fin</span> <span class="nu">3</span>) : <span class="const token" data-verso-hover="362">wt</span> s(a, b) = <span class="const token" data-verso-hover="291">wtPair</span> a b := <span class="const token" data-verso-hover="90">rfl</span></span>
+<span id="L155"></span>
+<span id="L156"><span class="kw">variable</span> [<span class="const token" data-verso-hover="49">Fintype</span> V]</span>
+<span id="L157"></span>
+<span id="L158"><span class="dc">/-- The cost of a subgraph of `G_S`. -/</span></span>
+<span id="L159"><span class="kw">noncomputable</span> <span class="kw">abbrev</span> <span class="const token" data-verso-hover="401">cost</span> (H : <span class="const token" data-verso-hover="247">SimpleGraph</span> (V × <span class="const token" data-verso-hover="32">Fin</span> <span class="nu">3</span>)) : <span class="const token" data-verso-hover="30">ℕ</span> := <span class="const token" data-verso-hover="423">wcost</span> <span class="const token" data-verso-hover="362">wt</span> H</span>
+<span id="L160"></span>
+<span id="L161"><span class="dc">/-! ### From vertex covers to 2-spanners -/</span></span>
+<span id="L162"></span>
+<span id="L163"><span class="dc">/-- The spanner `H_C` of the proof of Claim 3.1: all weight-0 edges of `G_S` and the triangle</span></span>
+<span id="L164"><span class="dc">edges `{v₁, v₂}` for `v ∈ C`. (We add the whole triangle of `v ∈ C`; its other edges have weight</span></span>
+<span id="L165"><span class="dc">0 anyway.) -/</span></span>
+<span id="L166"><span class="kw">def</span> <span class="const token" data-verso-hover="434">HC</span> (G : <span class="const token" data-verso-hover="247">SimpleGraph</span> V) (C : <span class="const token" data-verso-hover="391">Set</span> V) : <span class="const token" data-verso-hover="247">SimpleGraph</span> (V × <span class="const token" data-verso-hover="32">Fin</span> <span class="nu">3</span>) <span class="kw">where</span></span>
+<span id="L167">  <span class="const token" data-verso-hover="130">Adj</span> a b := (<span class="const token" data-verso-hover="290">GS</span> G).<span class="const token" data-verso-hover="130">Adj</span> a b ∧ (<span class="const token" data-verso-hover="291">wtPair</span> a b = <span class="nu">0</span> ∨ (a.<span class="const token" data-verso-hover="70">1</span> = b.<span class="const token" data-verso-hover="70">1</span> ∧ a.<span class="const token" data-verso-hover="70">1</span> ∈ C))</span>
+<span id="L168">  <span class="const token" data-verso-hover="248">symm</span> := ⟨<span class="kw">fun</span> a b h =&gt; ⟨h.<span class="const token" data-verso-hover="80">1</span>.<span class="const token" data-verso-hover="283">symm</span>, <span class="kw">by</span></span>
+<span id="L169">    <span class="kw">rcases</span> h.<span class="const token" data-verso-hover="96">2</span> <span class="kw">with</span> h2 | ⟨h2, h3⟩</span>
+<span id="L170">    · <span class="kw">exact</span> <span class="const token" data-verso-hover="131">Or.inl</span> (<span class="kw">by</span> <span class="kw">rw</span> [<span class="const token" data-verso-hover="394">wtPair_comm</span>]; <span class="kw">exact</span> h2)</span>
+<span id="L171">    · <span class="kw">exact</span> <span class="const token" data-verso-hover="153">Or.inr</span> ⟨h2.<span class="const token" data-verso-hover="267">symm</span>, h2 ▸ h3⟩⟩⟩</span>
+<span id="L172">  <span class="const token" data-verso-hover="251">loopless</span> := ⟨<span class="kw">fun</span> _ h =&gt; (<span class="const token" data-verso-hover="290">GS</span> G).<span class="const token" data-verso-hover="284">irrefl</span> h.<span class="const token" data-verso-hover="80">1</span>⟩</span>
+<span id="L173"></span>
+<span id="L174"><span class="kw">omit</span> [<span class="const token" data-verso-hover="49">Fintype</span> V] <span class="kw">in</span></span>
+<span id="L175"><span class="kw">lemma</span> <span class="const token" data-verso-hover="435">HC_le</span> (G : <span class="const token" data-verso-hover="247">SimpleGraph</span> V) (C : <span class="const token" data-verso-hover="391">Set</span> V) : <span class="const token" data-verso-hover="434">HC</span> G C ≤ <span class="const token" data-verso-hover="290">GS</span> G := <span class="kw">fun</span> _ _ h =&gt; h.<span class="const token" data-verso-hover="80">1</span></span>
+<span id="L176"></span>
+<span id="L177"><span class="kw">omit</span> [<span class="const token" data-verso-hover="49">Fintype</span> V] <span class="kw">in</span></span>
+<span id="L178"><span class="dc">/-- First half of the proof of Claim 3.1: `H_C` is a 2-spanner if `C` is a vertex cover. -/</span></span>
+<span id="L179"><span class="kw">theorem</span> <span class="const token" data-verso-hover="21">isTwoSpanner_HC</span> {G : <span class="const token" data-verso-hover="247">SimpleGraph</span> V} {C : <span class="const token" data-verso-hover="391">Set</span> V} (hC : G.<span class="const token" data-verso-hover="412">IsVertexCover</span> C) :</span>
+<span id="L180">    <span class="const token" data-verso-hover="405">IsTwoSpanner</span> (<span class="const token" data-verso-hover="290">GS</span> G) (<span class="const token" data-verso-hover="434">HC</span> G C) := <span class="kw">by</span></span>
+<span id="L181">  <span class="kw">refine</span> ⟨<span class="const token" data-verso-hover="435">HC_le</span> G C, ?_⟩</span>
+<span id="L182">  <span class="kw">rintro</span> ⟨v, i⟩ ⟨u, j⟩ hab</span>
+<span id="L183">  <span class="kw">by_cases</span> hvu : v = u</span>
+<span id="L184">  · <span class="kw">subst</span> hvu</span>
+<span id="L185">    <span class="cm">--</span><span class="cm"> triangle edge: covered directly, or by the path through the third copy</span></span>
+<span id="L186">    <span class="kw">have</span> hij : i ≠ j := <span class="const token" data-verso-hover="341">GS_adj_same</span>.<span class="const token" data-verso-hover="202">mp</span> hab</span>
+<span id="L187">    <span class="kw">by_cases</span> hw : <span class="const token" data-verso-hover="291">wtPair</span> (v, i) (v, j) = <span class="nu">0</span></span>
+<span id="L188">    · <span class="kw">exact</span> <span class="const token" data-verso-hover="131">Or.inl</span> ⟨hab, <span class="const token" data-verso-hover="131">Or.inl</span> hw⟩</span>
+<span id="L189">    · <span class="kw">right</span></span>
+<span id="L190">      <span class="kw">have</span> h2 : i ≠ <span class="nu">2</span> ∧ j ≠ <span class="nu">2</span> := <span class="kw">by</span> <span class="kw">simp</span> only [<span class="const token" data-verso-hover="291">wtPair</span>, <span class="const token" data-verso-hover="305">ite_true</span>] <span class="kw">at</span> hw; <span class="kw">split_ifs</span> <span class="kw">at</span> hw &lt;;&gt; <span class="kw">tauto</span></span>
+<span id="L191">      <span class="kw">refine</span> ⟨(v, <span class="nu">2</span>), ⟨<span class="const token" data-verso-hover="341">GS_adj_same</span>.<span class="const token" data-verso-hover="121">mpr</span> h2.<span class="const token" data-verso-hover="80">1</span>, <span class="const token" data-verso-hover="131">Or.inl</span> ?_⟩, ⟨<span class="const token" data-verso-hover="341">GS_adj_same</span>.<span class="const token" data-verso-hover="121">mpr</span> (<span class="const token" data-verso-hover="249">Ne.symm</span> h2.<span class="const token" data-verso-hover="96">2</span>),</span>
+<span id="L192">        <span class="const token" data-verso-hover="131">Or.inl</span> ?_⟩⟩ &lt;;&gt; <span class="kw">simp</span> [<span class="const token" data-verso-hover="291">wtPair</span>]</span>
+<span id="L193">  · <span class="kw">rw</span> [<span class="const token" data-verso-hover="302">GS_adj_of_ne</span> hvu] <span class="kw">at</span> hab</span>
+<span id="L194">    <span class="kw">obtain</span> ⟨hG, hk⟩ := hab</span>
+<span id="L195">    <span class="kw">rcases</span> hk <span class="kw">with</span> ⟨<span class="kw">rfl</span>, <span class="kw">rfl</span>⟩ | ⟨<span class="kw">rfl</span>, <span class="kw">rfl</span>⟩ | ⟨hlt, <span class="kw">rfl</span>, <span class="kw">rfl</span>⟩ | ⟨hlt, <span class="kw">rfl</span>, <span class="kw">rfl</span>⟩</span>
+<span id="L196">    · <span class="kw">exact</span> <span class="const token" data-verso-hover="131">Or.inl</span> ⟨(<span class="const token" data-verso-hover="302">GS_adj_of_ne</span> hvu).<span class="const token" data-verso-hover="121">mpr</span> ⟨hG, <span class="kw">by</span> <span class="kw">simp</span>⟩, <span class="const token" data-verso-hover="131">Or.inl</span> (<span class="kw">by</span> <span class="kw">simp</span> [<span class="const token" data-verso-hover="291">wtPair</span>, hvu])⟩</span>
+<span id="L197">    · <span class="kw">exact</span> <span class="const token" data-verso-hover="131">Or.inl</span> ⟨(<span class="const token" data-verso-hover="302">GS_adj_of_ne</span> hvu).<span class="const token" data-verso-hover="121">mpr</span> ⟨hG, <span class="kw">by</span> <span class="kw">simp</span>⟩, <span class="const token" data-verso-hover="131">Or.inl</span> (<span class="kw">by</span> <span class="kw">simp</span> [<span class="const token" data-verso-hover="291">wtPair</span>, hvu])⟩</span>
+<span id="L198">    · <span class="cm">--</span><span class="cm"> cross edge `{v₁, u₂}`, `v &lt; u`</span></span>
+<span id="L199">      <span class="kw">right</span></span>
+<span id="L200">      <span class="kw">rcases</span> hC hG <span class="kw">with</span> hv | hu</span>
+<span id="L201">      · <span class="kw">refine</span> ⟨(v, <span class="nu">1</span>), ⟨<span class="const token" data-verso-hover="341">GS_adj_same</span>.<span class="const token" data-verso-hover="121">mpr</span> (<span class="kw">by</span> <span class="kw">decide</span>), <span class="const token" data-verso-hover="153">Or.inr</span> ⟨<span class="const token" data-verso-hover="90">rfl</span>, hv⟩⟩, ?_⟩</span>
+<span id="L202">        <span class="kw">exact</span> ⟨(<span class="const token" data-verso-hover="302">GS_adj_of_ne</span> hvu).<span class="const token" data-verso-hover="121">mpr</span> ⟨hG, <span class="kw">by</span> <span class="kw">simp</span>⟩, <span class="const token" data-verso-hover="131">Or.inl</span> (<span class="kw">by</span> <span class="kw">simp</span> [<span class="const token" data-verso-hover="291">wtPair</span>, hvu])⟩</span>
+<span id="L203">      · <span class="kw">refine</span> ⟨(u, <span class="nu">0</span>), ⟨(<span class="const token" data-verso-hover="302">GS_adj_of_ne</span> hvu).<span class="const token" data-verso-hover="121">mpr</span> ⟨hG, <span class="kw">by</span> <span class="kw">simp</span>⟩, <span class="const token" data-verso-hover="131">Or.inl</span> (<span class="kw">by</span> <span class="kw">simp</span> [<span class="const token" data-verso-hover="291">wtPair</span>, hvu])⟩,</span>
+<span id="L204">          ⟨<span class="const token" data-verso-hover="341">GS_adj_same</span>.<span class="const token" data-verso-hover="121">mpr</span> (<span class="kw">by</span> <span class="kw">decide</span>), <span class="const token" data-verso-hover="153">Or.inr</span> ⟨<span class="const token" data-verso-hover="90">rfl</span>, hu⟩⟩⟩</span>
+<span id="L205">    · <span class="cm">--</span><span class="cm"> cross edge `{v₂, u₁}`, `u &lt; v`</span></span>
+<span id="L206">      <span class="kw">right</span></span>
+<span id="L207">      <span class="kw">rcases</span> hC hG <span class="kw">with</span> hv | hu</span>
+<span id="L208">      · <span class="kw">refine</span> ⟨(v, <span class="nu">0</span>), ⟨<span class="const token" data-verso-hover="341">GS_adj_same</span>.<span class="const token" data-verso-hover="121">mpr</span> (<span class="kw">by</span> <span class="kw">decide</span>), <span class="const token" data-verso-hover="153">Or.inr</span> ⟨<span class="const token" data-verso-hover="90">rfl</span>, hv⟩⟩, ?_⟩</span>
+<span id="L209">        <span class="kw">exact</span> ⟨(<span class="const token" data-verso-hover="302">GS_adj_of_ne</span> hvu).<span class="const token" data-verso-hover="121">mpr</span> ⟨hG, <span class="kw">by</span> <span class="kw">simp</span>⟩, <span class="const token" data-verso-hover="131">Or.inl</span> (<span class="kw">by</span> <span class="kw">simp</span> [<span class="const token" data-verso-hover="291">wtPair</span>, hvu])⟩</span>
+<span id="L210">      · <span class="kw">refine</span> ⟨(u, <span class="nu">1</span>), ⟨(<span class="const token" data-verso-hover="302">GS_adj_of_ne</span> hvu).<span class="const token" data-verso-hover="121">mpr</span> ⟨hG, <span class="kw">by</span> <span class="kw">simp</span>⟩, <span class="const token" data-verso-hover="131">Or.inl</span> (<span class="kw">by</span> <span class="kw">simp</span> [<span class="const token" data-verso-hover="291">wtPair</span>, hvu])⟩,</span>
+<span id="L211">          ⟨<span class="const token" data-verso-hover="341">GS_adj_same</span>.<span class="const token" data-verso-hover="121">mpr</span> (<span class="kw">by</span> <span class="kw">decide</span>), <span class="const token" data-verso-hover="153">Or.inr</span> ⟨<span class="const token" data-verso-hover="90">rfl</span>, hu⟩⟩⟩</span>
+<span id="L212"></span>
+<span id="L213"><span class="dc">/-- The edge `{v₁, v₂}`. -/</span></span>
+<span id="L214"><span class="kw">def</span> <span class="const token" data-verso-hover="436">diag</span> (v : V) : <span class="const token" data-verso-hover="424">Sym2</span> (V × <span class="const token" data-verso-hover="32">Fin</span> <span class="nu">3</span>) := s((v, <span class="nu">0</span>), (v, <span class="nu">1</span>))</span>
+<span id="L215"></span>
+<span id="L216"><span class="kw">omit</span> [<span class="const token" data-verso-hover="287">LinearOrder</span> V] [<span class="const token" data-verso-hover="49">Fintype</span> V] <span class="kw">in</span></span>
+<span id="L217"><span class="kw">lemma</span> <span class="const token" data-verso-hover="437">diag_injective</span> : <span class="const token" data-verso-hover="115">Function.Injective</span> (<span class="const token" data-verso-hover="436">diag</span> (V := V)) := <span class="kw">by</span></span>
+<span id="L218">  <span class="kw">intro</span> v u h</span>
+<span id="L219">  <span class="kw">simp</span> only [<span class="const token" data-verso-hover="436">diag</span>, <span class="const token" data-verso-hover="438">Sym2.eq_iff</span>, <span class="const token" data-verso-hover="107">Prod.mk.injEq</span>] <span class="kw">at</span> h</span>
+<span id="L220">  <span class="kw">rcases</span> h <span class="kw">with</span> ⟨⟨h, _⟩, _⟩ | ⟨⟨_, h⟩, _⟩</span>
+<span id="L221">  · <span class="kw">exact</span> h</span>
+<span id="L222">  · <span class="kw">exact</span> <span class="const token" data-verso-hover="384">absurd</span> h (<span class="kw">by</span> <span class="kw">decide</span>)</span>
+<span id="L223"></span>
+<span id="L224"><span class="kw">open</span> Classical <span class="kw">in</span></span>
+<span id="L225"><span class="kw">lemma</span> <span class="const token" data-verso-hover="439">wtPair_HC</span> {G : <span class="const token" data-verso-hover="247">SimpleGraph</span> V} {C : <span class="const token" data-verso-hover="391">Set</span> V} {a b : V × <span class="const token" data-verso-hover="32">Fin</span> <span class="nu">3</span>} (h : (<span class="const token" data-verso-hover="434">HC</span> G C).<span class="const token" data-verso-hover="130">Adj</span> a b) :</span>
+<span id="L226">    <span class="const token" data-verso-hover="291">wtPair</span> a b = <span class="kw">if</span> ∃ v ∈ C, <span class="const token" data-verso-hover="436">diag</span> v = s(a, b) <span class="kw">then</span> <span class="nu">1</span> <span class="kw">else</span> <span class="nu">0</span> := <span class="kw">by</span></span>
+<span id="L227">  <span class="kw">by_cases</span> hw : <span class="const token" data-verso-hover="291">wtPair</span> a b = <span class="nu">0</span></span>
+<span id="L228">  · <span class="kw">rw</span> [hw, <span class="const token" data-verso-hover="164">eq_comm</span>, <span class="const token" data-verso-hover="440">ite_eq_right_iff</span>]</span>
+<span id="L229">    <span class="kw">rintro</span> ⟨w, _, hd⟩</span>
+<span id="L230">    <span class="kw">simp</span> only [<span class="const token" data-verso-hover="436">diag</span>, <span class="const token" data-verso-hover="438">Sym2.eq_iff</span>] <span class="kw">at</span> hd</span>
+<span id="L231">    <span class="kw">rcases</span> hd <span class="kw">with</span> ⟨<span class="kw">rfl</span>, <span class="kw">rfl</span>⟩ | ⟨<span class="kw">rfl</span>, <span class="kw">rfl</span>⟩ &lt;;&gt; <span class="kw">simp</span> [<span class="const token" data-verso-hover="291">wtPair</span>] <span class="kw">at</span> hw</span>
+<span id="L232">  · <span class="kw">obtain</span> ⟨hadj, h2⟩ := h</span>
+<span id="L233">    <span class="kw">rcases</span> h2 <span class="kw">with</span> h2 | ⟨h2, hC⟩</span>
+<span id="L234">    · <span class="kw">exact</span> <span class="const token" data-verso-hover="384">absurd</span> h2 hw</span>
+<span id="L235">    <span class="kw">obtain</span> ⟨v, i⟩ := a</span>
+<span id="L236">    <span class="kw">obtain</span> ⟨u, j⟩ := b</span>
+<span id="L237">    <span class="kw">simp</span> only <span class="kw">at</span> h2 hC</span>
+<span id="L238">    <span class="kw">subst</span> h2</span>
+<span id="L239">    <span class="kw">have</span> hij : i ≠ j := <span class="const token" data-verso-hover="341">GS_adj_same</span>.<span class="const token" data-verso-hover="202">mp</span> hadj</span>
+<span id="L240">    <span class="kw">clear</span> hadj</span>
+<span id="L241">    <span class="kw">simp</span> only [<span class="const token" data-verso-hover="291">wtPair</span>, <span class="const token" data-verso-hover="305">ite_true</span>] <span class="kw">at</span> hw ⊢</span>
+<span id="L242">    <span class="kw">have</span> h2 : i ≠ <span class="nu">2</span> ∧ j ≠ <span class="nu">2</span> := <span class="kw">by</span> <span class="kw">split_ifs</span> <span class="kw">at</span> hw &lt;;&gt; <span class="kw">tauto</span></span>
+<span id="L243">    <span class="kw">have</span> hd : <span class="const token" data-verso-hover="436">diag</span> v = s((v, i), (v, j)) := <span class="kw">by</span></span>
+<span id="L244">      <span class="kw">simp</span> only [<span class="const token" data-verso-hover="436">diag</span>, <span class="const token" data-verso-hover="438">Sym2.eq_iff</span>, <span class="const token" data-verso-hover="107">Prod.mk.injEq</span>, <span class="const token" data-verso-hover="79">true_and</span>]</span>
+<span id="L245">      <span class="kw">clear</span> hw; <span class="kw">revert</span> h2 hij; <span class="kw">revert</span> i j; <span class="kw">decide</span></span>
+<span id="L246">    <span class="kw">have</span> hex : ∃ w ∈ C, <span class="const token" data-verso-hover="436">diag</span> w = s((v, i), (v, j)) := ⟨v, hC, hd⟩</span>
+<span id="L247">    <span class="kw">simp</span> only [hex, <span class="const token" data-verso-hover="305">ite_true</span>]</span>
+<span id="L248">    <span class="kw">simp</span> [h2.<span class="const token" data-verso-hover="80">1</span>, h2.<span class="const token" data-verso-hover="96">2</span>]</span>
+<span id="L249"></span>
+<span id="L250"><span class="dc">/-- First half of the proof of Claim 3.1: the cost of `H_C` is exactly `|C|`. -/</span></span>
+<span id="L251"><span class="kw">theorem</span> <span class="const token" data-verso-hover="22">cost_HC</span> (G : <span class="const token" data-verso-hover="247">SimpleGraph</span> V) (C : <span class="const token" data-verso-hover="391">Set</span> V) : <span class="const token" data-verso-hover="401">cost</span> (<span class="const token" data-verso-hover="434">HC</span> G C) = C.<span class="const token" data-verso-hover="441">ncard</span> := <span class="kw">by</span></span>
+<span id="L252">  <span class="kw">classical</span></span>
+<span id="L253">  <span class="kw">rw</span> [<span class="const token" data-verso-hover="401">cost</span>, <span class="const token" data-verso-hover="402">wcost_eq</span>, <span class="const token" data-verso-hover="442">Set.ncard_eq_toFinset_card'</span>, ← <span class="const token" data-verso-hover="122">card_image_of_injective</span> _ <span class="const token" data-verso-hover="437">diag_injective</span>]</span>
+<span id="L254">  <span class="kw">have</span> hsub : C.<span class="const token" data-verso-hover="443">toFinset</span>.<span class="const token" data-verso-hover="104">image</span> <span class="const token" data-verso-hover="436">diag</span> ⊆ (<span class="const token" data-verso-hover="434">HC</span> G C).<span class="const token" data-verso-hover="425">edgeFinset</span> := <span class="kw">by</span></span>
+<span id="L255">    <span class="kw">intro</span> e he</span>
+<span id="L256">    <span class="kw">simp</span> only [<span class="const token" data-verso-hover="106">mem_image</span>, <span class="const token" data-verso-hover="444">Set.mem_toFinset</span>] <span class="kw">at</span> he</span>
+<span id="L257">    <span class="kw">obtain</span> ⟨v, hv, <span class="kw">rfl</span>⟩ := he</span>
+<span id="L258">    <span class="kw">simp</span> only [<span class="const token" data-verso-hover="436">diag</span>, <span class="const token" data-verso-hover="445">SimpleGraph.mem_edgeFinset</span>, <span class="const token" data-verso-hover="446">SimpleGraph.mem_edgeSet</span>]</span>
+<span id="L259">    <span class="kw">exact</span> ⟨<span class="const token" data-verso-hover="341">GS_adj_same</span>.<span class="const token" data-verso-hover="121">mpr</span> (<span class="kw">by</span> <span class="kw">decide</span>), <span class="const token" data-verso-hover="153">Or.inr</span> ⟨<span class="const token" data-verso-hover="90">rfl</span>, hv⟩⟩</span>
+<span id="L260">  <span class="kw">rw</span> [<span class="const token" data-verso-hover="447">sum_congr</span> <span class="const token" data-verso-hover="90">rfl</span> (g := <span class="kw">fun</span> e =&gt; <span class="kw">if</span> e ∈ C.<span class="const token" data-verso-hover="443">toFinset</span>.<span class="const token" data-verso-hover="104">image</span> <span class="const token" data-verso-hover="436">diag</span> <span class="kw">then</span> <span class="nu">1</span> <span class="kw">else</span> <span class="nu">0</span>), <span class="const token" data-verso-hover="448">sum_boole</span>,</span>
+<span id="L261">    <span class="const token" data-verso-hover="449">filter_mem_eq_inter</span>, <span class="const token" data-verso-hover="450">inter_eq_right</span>.<span class="const token" data-verso-hover="121">mpr</span> hsub, <span class="const token" data-verso-hover="451">Nat.cast_id</span>]</span>
+<span id="L262">  <span class="kw">intro</span> e he</span>
+<span id="L263">  <span class="kw">induction</span> e <span class="kw">using</span> <span class="const token" data-verso-hover="452">Sym2.ind</span> <span class="kw">with</span></span>
+<span id="L264">  | _ a b =&gt;</span>
+<span id="L265">    <span class="kw">rw</span> [<span class="const token" data-verso-hover="445">SimpleGraph.mem_edgeFinset</span>, <span class="const token" data-verso-hover="446">SimpleGraph.mem_edgeSet</span>] <span class="kw">at</span> he</span>
+<span id="L266">    <span class="kw">rw</span> [<span class="const token" data-verso-hover="433">wt_mk</span>, <span class="const token" data-verso-hover="439">wtPair_HC</span> he]</span>
+<span id="L267">    <span class="kw">simp</span></span>
+<span id="L268"></span>
+<span id="L269"><span class="dc">/-! ### From 2-spanners to vertex covers -/</span></span>
+<span id="L270"></span>
+<span id="L271"><span class="dc">/-- The vertex cover `C_H` of the proof of Claim 3.1, read off directly from `H`: `v ∈ C_H` iff</span></span>
+<span id="L272"><span class="dc">`{v₁, v₂} ∈ H` (the case `u = v`) or some cross edge `{v₁, u₂}` or `{u₁, v₂}` is in `H`.</span></span>
+<span id="L273"><span class="dc">This is the paper's `C_{H'} = {v | {v₁,v₂} ∈ H'}`, where `H'` replaces each cross edge</span></span>
+<span id="L274"><span class="dc">`{v₁, u₂} ∈ H` by `{v₁, v₂}, {u₁, u₂}`. -/</span></span>
+<span id="L275"><span class="kw">def</span> <span class="const token" data-verso-hover="346">CH</span> (H : <span class="const token" data-verso-hover="247">SimpleGraph</span> (V × <span class="const token" data-verso-hover="32">Fin</span> <span class="nu">3</span>)) : <span class="const token" data-verso-hover="391">Set</span> V :=</span>
+<span id="L276">  {v | ∃ u, H.<span class="const token" data-verso-hover="130">Adj</span> (v, <span class="nu">0</span>) (u, <span class="nu">1</span>) ∨ H.<span class="const token" data-verso-hover="130">Adj</span> (u, <span class="nu">0</span>) (v, <span class="nu">1</span>)}</span>
+<span id="L277"></span>
+<span id="L278"><span class="dc">/-- `v` is the name of an endpoint of the edge `e`, which joins a first copy to a second copy. -/</span></span>
+<span id="L279"><span class="kw">def</span> <span class="const token" data-verso-hover="453">Touches</span> (v : V) (e : <span class="const token" data-verso-hover="424">Sym2</span> (V × <span class="const token" data-verso-hover="32">Fin</span> <span class="nu">3</span>)) : <span class="kw">Prop</span> :=</span>
+<span id="L280">  ∃ u, e = s((v, <span class="nu">0</span>), (u, <span class="nu">1</span>)) ∨ e = s((u, <span class="nu">0</span>), (v, <span class="nu">1</span>))</span>
+<span id="L281"></span>
+<span id="L282"><span class="kw">omit</span> [<span class="const token" data-verso-hover="287">LinearOrder</span> V] [<span class="const token" data-verso-hover="49">Fintype</span> V] <span class="kw">in</span></span>
+<span id="L283"><span class="kw">lemma</span> <span class="const token" data-verso-hover="454">touches_mk</span> {v : V} {a b : V × <span class="const token" data-verso-hover="32">Fin</span> <span class="nu">3</span>} : <span class="const token" data-verso-hover="453">Touches</span> v s(a, b) ↔</span>
+<span id="L284">    ((a.<span class="const token" data-verso-hover="71">2</span> = <span class="nu">0</span> ∧ b.<span class="const token" data-verso-hover="71">2</span> = <span class="nu">1</span>) ∨ (a.<span class="const token" data-verso-hover="71">2</span> = <span class="nu">1</span> ∧ b.<span class="const token" data-verso-hover="71">2</span> = <span class="nu">0</span>)) ∧ (v = a.<span class="const token" data-verso-hover="70">1</span> ∨ v = b.<span class="const token" data-verso-hover="70">1</span>) := <span class="kw">by</span></span>
+<span id="L285">  <span class="kw">obtain</span> ⟨x, i⟩ := a</span>
+<span id="L286">  <span class="kw">obtain</span> ⟨y, j⟩ := b</span>
+<span id="L287">  <span class="kw">simp</span> only [<span class="const token" data-verso-hover="453">Touches</span>, <span class="const token" data-verso-hover="438">Sym2.eq_iff</span>, <span class="const token" data-verso-hover="107">Prod.mk.injEq</span>]</span>
+<span id="L288">  <span class="kw">constructor</span></span>
+<span id="L289">  · <span class="kw">rintro</span> ⟨u, h⟩</span>
+<span id="L290">    <span class="kw">rcases</span> h <span class="kw">with</span> (⟨⟨h1, h2⟩, h3, h4⟩ | ⟨⟨h1, h2⟩, h3, h4⟩) | (⟨⟨h1, h2⟩, h3, h4⟩ | ⟨⟨h1, h2⟩, h3, h4⟩)</span>
+<span id="L291">    <span class="kw">all_goals</span> <span class="kw">subst_vars</span>; <span class="kw">simp</span></span>
+<span id="L292">  · <span class="kw">rintro</span> ⟨(⟨<span class="kw">rfl</span>, <span class="kw">rfl</span>⟩ | ⟨<span class="kw">rfl</span>, <span class="kw">rfl</span>⟩), (<span class="kw">rfl</span> | <span class="kw">rfl</span>)⟩</span>
+<span id="L293">    · <span class="kw">exact</span> ⟨y, <span class="const token" data-verso-hover="131">Or.inl</span> (<span class="const token" data-verso-hover="131">Or.inl</span> ⟨⟨<span class="const token" data-verso-hover="90">rfl</span>, <span class="const token" data-verso-hover="90">rfl</span>⟩, <span class="const token" data-verso-hover="90">rfl</span>, <span class="const token" data-verso-hover="90">rfl</span>⟩)⟩</span>
+<span id="L294">    · <span class="kw">exact</span> ⟨x, <span class="const token" data-verso-hover="153">Or.inr</span> (<span class="const token" data-verso-hover="131">Or.inl</span> ⟨⟨<span class="const token" data-verso-hover="90">rfl</span>, <span class="const token" data-verso-hover="90">rfl</span>⟩, <span class="const token" data-verso-hover="90">rfl</span>, <span class="const token" data-verso-hover="90">rfl</span>⟩)⟩</span>
+<span id="L295">    · <span class="kw">exact</span> ⟨y, <span class="const token" data-verso-hover="153">Or.inr</span> (<span class="const token" data-verso-hover="153">Or.inr</span> ⟨⟨<span class="const token" data-verso-hover="90">rfl</span>, <span class="const token" data-verso-hover="90">rfl</span>⟩, <span class="const token" data-verso-hover="90">rfl</span>, <span class="const token" data-verso-hover="90">rfl</span>⟩)⟩</span>
+<span id="L296">    · <span class="kw">exact</span> ⟨x, <span class="const token" data-verso-hover="131">Or.inl</span> (<span class="const token" data-verso-hover="153">Or.inr</span> ⟨⟨<span class="const token" data-verso-hover="90">rfl</span>, <span class="const token" data-verso-hover="90">rfl</span>⟩, <span class="const token" data-verso-hover="90">rfl</span>, <span class="const token" data-verso-hover="90">rfl</span>⟩)⟩</span>
+<span id="L297"></span>
+<span id="L298"><span class="kw">open</span> Classical <span class="kw">in</span></span>
+<span id="L299"><span class="dc">/-- An edge `e` touches at most `wt e` names: the triangle edge `{v₁, v₂}` (weight 1) one name,</span></span>
+<span id="L300"><span class="dc">a cross edge (weight 2) two names, every other edge none. -/</span></span>
+<span id="L301"><span class="kw">lemma</span> <span class="const token" data-verso-hover="455">card_touches_le</span> (a b : V × <span class="const token" data-verso-hover="32">Fin</span> <span class="nu">3</span>) :</span>
+<span id="L302">    (<span class="const token" data-verso-hover="68">univ</span>.<span class="const token" data-verso-hover="69">filter</span> (<span class="kw">fun</span> v =&gt; <span class="const token" data-verso-hover="453">Touches</span> v s(a, b))).<span class="const token" data-verso-hover="103">card</span> ≤ <span class="const token" data-verso-hover="291">wtPair</span> a b := <span class="kw">by</span></span>
+<span id="L303">  <span class="kw">classical</span></span>
+<span id="L304">  <span class="kw">by_cases</span> h01 : (a.<span class="const token" data-verso-hover="71">2</span> = <span class="nu">0</span> ∧ b.<span class="const token" data-verso-hover="71">2</span> = <span class="nu">1</span>) ∨ (a.<span class="const token" data-verso-hover="71">2</span> = <span class="nu">1</span> ∧ b.<span class="const token" data-verso-hover="71">2</span> = <span class="nu">0</span>)</span>
+<span id="L305">  · <span class="kw">have</span> hsub : <span class="const token" data-verso-hover="68">univ</span>.<span class="const token" data-verso-hover="69">filter</span> (<span class="kw">fun</span> v =&gt; <span class="const token" data-verso-hover="453">Touches</span> v s(a, b)) ⊆ {a.<span class="const token" data-verso-hover="70">1</span>, b.<span class="const token" data-verso-hover="70">1</span>} := <span class="kw">by</span></span>
+<span id="L306">      <span class="kw">intro</span> v hv</span>
+<span id="L307">      <span class="kw">simp</span> only [<span class="const token" data-verso-hover="77">mem_filter</span>, <span class="const token" data-verso-hover="78">mem_univ</span>, <span class="const token" data-verso-hover="79">true_and</span>, <span class="const token" data-verso-hover="454">touches_mk</span>] <span class="kw">at</span> hv</span>
+<span id="L308">      <span class="kw">simp</span> [hv.<span class="const token" data-verso-hover="96">2</span>]</span>
+<span id="L309">    <span class="kw">refine</span> (<span class="const token" data-verso-hover="114">card_le_card</span> hsub).<span class="const token" data-verso-hover="112">trans</span> ?_</span>
+<span id="L310">    <span class="kw">have</span> h2 : a.<span class="const token" data-verso-hover="71">2</span> ≠ <span class="nu">2</span> ∧ b.<span class="const token" data-verso-hover="71">2</span> ≠ <span class="nu">2</span> := <span class="kw">by</span> <span class="kw">rcases</span> h01 <span class="kw">with</span> ⟨h, h'⟩ | ⟨h, h'⟩ &lt;;&gt; <span class="kw">simp</span> [h, h']</span>
+<span id="L311">    <span class="kw">have</span> hne : a.<span class="const token" data-verso-hover="71">2</span> ≠ b.<span class="const token" data-verso-hover="71">2</span> := <span class="kw">by</span> <span class="kw">rcases</span> h01 <span class="kw">with</span> ⟨h, h'⟩ | ⟨h, h'⟩ &lt;;&gt; <span class="kw">simp</span> [h, h']</span>
+<span id="L312">    <span class="kw">by_cases</span> h : a.<span class="const token" data-verso-hover="70">1</span> = b.<span class="const token" data-verso-hover="70">1</span></span>
+<span id="L313">    · <span class="kw">simp</span> [h, <span class="const token" data-verso-hover="291">wtPair</span>, h2.<span class="const token" data-verso-hover="80">1</span>, h2.<span class="const token" data-verso-hover="96">2</span>]</span>
+<span id="L314">    · <span class="kw">simp</span> only [<span class="const token" data-verso-hover="291">wtPair</span>, h, hne, <span class="const token" data-verso-hover="308">ite_false</span>]</span>
+<span id="L315">      <span class="kw">exact</span> <span class="const token" data-verso-hover="456">card_le_two</span></span>
+<span id="L316">  · <span class="kw">have</span> : <span class="const token" data-verso-hover="68">univ</span>.<span class="const token" data-verso-hover="69">filter</span> (<span class="kw">fun</span> v =&gt; <span class="const token" data-verso-hover="453">Touches</span> v s(a, b)) = ∅ := <span class="kw">by</span></span>
+<span id="L317">      <span class="kw">ext</span> v; <span class="kw">simp</span> [<span class="const token" data-verso-hover="454">touches_mk</span>, h01]</span>
+<span id="L318">    <span class="kw">simp</span> [this]</span>
+<span id="L319"></span>
+<span id="L320"><span class="dc">/-- Second half of the proof of Claim 3.1: `|C_H| ≤ w(H)` (for every subgraph `H`). -/</span></span>
+<span id="L321"><span class="kw">theorem</span> <span class="const token" data-verso-hover="24">ncard_CH_le_cost</span> (H : <span class="const token" data-verso-hover="247">SimpleGraph</span> (V × <span class="const token" data-verso-hover="32">Fin</span> <span class="nu">3</span>)) : (<span class="const token" data-verso-hover="346">CH</span> H).<span class="const token" data-verso-hover="441">ncard</span> ≤ <span class="const token" data-verso-hover="401">cost</span> H := <span class="kw">by</span></span>
+<span id="L322">  <span class="kw">classical</span></span>
+<span id="L323">  <span class="kw">rw</span> [<span class="const token" data-verso-hover="401">cost</span>, <span class="const token" data-verso-hover="402">wcost_eq</span>, <span class="const token" data-verso-hover="442">Set.ncard_eq_toFinset_card'</span>]</span>
+<span id="L324">  <span class="kw">have</span> hsub : (<span class="const token" data-verso-hover="346">CH</span> H).<span class="const token" data-verso-hover="443">toFinset</span> ⊆</span>
+<span id="L325">      H.<span class="const token" data-verso-hover="425">edgeFinset</span>.<span class="const token" data-verso-hover="457">biUnion</span> (<span class="kw">fun</span> e =&gt; <span class="const token" data-verso-hover="68">univ</span>.<span class="const token" data-verso-hover="69">filter</span> (<span class="kw">fun</span> v =&gt; <span class="const token" data-verso-hover="453">Touches</span> v e)) := <span class="kw">by</span></span>
+<span id="L326">    <span class="kw">intro</span> v hv</span>
+<span id="L327">    <span class="kw">obtain</span> ⟨u, h | h⟩ := <span class="const token" data-verso-hover="444">Set.mem_toFinset</span>.<span class="const token" data-verso-hover="202">mp</span> hv</span>
+<span id="L328">    · <span class="kw">exact</span> <span class="const token" data-verso-hover="458">mem_biUnion</span>.<span class="const token" data-verso-hover="121">mpr</span> ⟨s((v, <span class="nu">0</span>), (u, <span class="nu">1</span>)), <span class="kw">by</span> <span class="kw">simpa</span> <span class="kw">using</span> h,</span>
+<span id="L329">        <span class="kw">by</span> <span class="kw">simpa</span> <span class="kw">using</span> ⟨u, <span class="const token" data-verso-hover="131">Or.inl</span> <span class="const token" data-verso-hover="90">rfl</span>⟩⟩</span>
+<span id="L330">    · <span class="kw">exact</span> <span class="const token" data-verso-hover="458">mem_biUnion</span>.<span class="const token" data-verso-hover="121">mpr</span> ⟨s((u, <span class="nu">0</span>), (v, <span class="nu">1</span>)), <span class="kw">by</span> <span class="kw">simpa</span> <span class="kw">using</span> h,</span>
+<span id="L331">        <span class="kw">by</span> <span class="kw">simpa</span> <span class="kw">using</span> ⟨u, <span class="const token" data-verso-hover="153">Or.inr</span> <span class="const token" data-verso-hover="90">rfl</span>⟩⟩</span>
+<span id="L332">  <span class="kw">refine</span> (<span class="const token" data-verso-hover="114">card_le_card</span> hsub).<span class="const token" data-verso-hover="112">trans</span> (<span class="const token" data-verso-hover="459">card_biUnion_le</span>.<span class="const token" data-verso-hover="112">trans</span> (<span class="const token" data-verso-hover="460">sum_le_sum</span> <span class="kw">fun</span> e _ =&gt; ?_))</span>
+<span id="L333">  <span class="kw">induction</span> e <span class="kw">using</span> <span class="const token" data-verso-hover="452">Sym2.ind</span> <span class="kw">with</span></span>
+<span id="L334">  | _ a b =&gt; <span class="kw">exact</span> <span class="const token" data-verso-hover="455">card_touches_le</span> a b</span>
+<span id="L335"></span>
+<span id="L336"><span class="kw">omit</span> [<span class="const token" data-verso-hover="49">Fintype</span> V] <span class="kw">in</span></span>
+<span id="L337"><span class="kw">lemma</span> <span class="const token" data-verso-hover="461">GS_adj_two</span> {G : <span class="const token" data-verso-hover="247">SimpleGraph</span> V} {a : V × <span class="const token" data-verso-hover="32">Fin</span> <span class="nu">3</span>} {y : V} (h : (<span class="const token" data-verso-hover="290">GS</span> G).<span class="const token" data-verso-hover="130">Adj</span> a (y, <span class="nu">2</span>)) :</span>
+<span id="L338">    a.<span class="const token" data-verso-hover="70">1</span> = y := <span class="kw">by</span></span>
+<span id="L339">  <span class="kw">rcases</span> h <span class="kw">with</span> h | ⟨_, h⟩</span>
+<span id="L340">  · <span class="kw">exact</span> h.<span class="const token" data-verso-hover="80">1</span></span>
+<span id="L341">  · <span class="kw">simp</span> <span class="kw">at</span> h</span>
+<span id="L342"></span>
+<span id="L343"><span class="kw">omit</span> [<span class="const token" data-verso-hover="49">Fintype</span> V] <span class="kw">in</span></span>
+<span id="L344"><span class="dc">/-- Second half of the proof of Claim 3.1: `C_H` is a vertex cover of `G` for every 2-spanner `H`</span></span>
+<span id="L345"><span class="dc">of `G_S`. -/</span></span>
+<span id="L346"><span class="kw">theorem</span> <span class="const token" data-verso-hover="23">isVertexCover_CH</span> {G : <span class="const token" data-verso-hover="247">SimpleGraph</span> V} {H : <span class="const token" data-verso-hover="247">SimpleGraph</span> (V × <span class="const token" data-verso-hover="32">Fin</span> <span class="nu">3</span>)}</span>
+<span id="L347">    (hH : <span class="const token" data-verso-hover="405">IsTwoSpanner</span> (<span class="const token" data-verso-hover="290">GS</span> G) H) : G.<span class="const token" data-verso-hover="412">IsVertexCover</span> (<span class="const token" data-verso-hover="346">CH</span> H) := <span class="kw">by</span></span>
+<span id="L348">  <span class="kw">have</span> key : ∀ v u, v &lt; u → G.<span class="const token" data-verso-hover="130">Adj</span> v u → v ∈ <span class="const token" data-verso-hover="346">CH</span> H ∨ u ∈ <span class="const token" data-verso-hover="346">CH</span> H := <span class="kw">by</span></span>
+<span id="L349">    <span class="kw">intro</span> v u hlt hG</span>
+<span id="L350">    <span class="kw">have</span> he : (<span class="const token" data-verso-hover="290">GS</span> G).<span class="const token" data-verso-hover="130">Adj</span> (v, <span class="nu">0</span>) (u, <span class="nu">1</span>) :=</span>
+<span id="L351">      (<span class="const token" data-verso-hover="302">GS_adj_of_ne</span> hlt.<span class="const token" data-verso-hover="462">ne</span>).<span class="const token" data-verso-hover="121">mpr</span> ⟨hG, <span class="const token" data-verso-hover="153">Or.inr</span> (<span class="const token" data-verso-hover="153">Or.inr</span> (<span class="const token" data-verso-hover="131">Or.inl</span> ⟨hlt, <span class="const token" data-verso-hover="90">rfl</span>, <span class="const token" data-verso-hover="90">rfl</span>⟩))⟩</span>
+<span id="L352">    <span class="kw">rcases</span> hH.<span class="const token" data-verso-hover="96">2</span> he <span class="kw">with</span> h | ⟨⟨w, k⟩, h1, h2⟩</span>
+<span id="L353">    · <span class="kw">exact</span> <span class="const token" data-verso-hover="131">Or.inl</span> ⟨u, <span class="const token" data-verso-hover="131">Or.inl</span> h⟩</span>
+<span id="L354">    · <span class="kw">fin_cases</span> k</span>
+<span id="L355">      · <span class="cm">--</span><span class="cm"> the middle vertex is `w₁`: the edge `{w₁, u₂}` is in `H`</span></span>
+<span id="L356">        <span class="kw">exact</span> <span class="const token" data-verso-hover="153">Or.inr</span> ⟨w, <span class="const token" data-verso-hover="153">Or.inr</span> h2⟩</span>
+<span id="L357">      · <span class="cm">--</span><span class="cm"> the middle vertex is `w₂`: the edge `{v₁, w₂}` is in `H`</span></span>
+<span id="L358">        <span class="kw">exact</span> <span class="const token" data-verso-hover="131">Or.inl</span> ⟨w, <span class="const token" data-verso-hover="131">Or.inl</span> h1⟩</span>
+<span id="L359">      · <span class="cm">--</span><span class="cm"> the middle vertex is `w₃`: impossible, it would force `v = w = u`</span></span>
+<span id="L360">        <span class="kw">have</span> e1 := <span class="const token" data-verso-hover="461">GS_adj_two</span> (hH.<span class="const token" data-verso-hover="80">1</span> h1)</span>
+<span id="L361">        <span class="kw">have</span> e2 := <span class="const token" data-verso-hover="461">GS_adj_two</span> ((hH.<span class="const token" data-verso-hover="80">1</span> h2).<span class="const token" data-verso-hover="283">symm</span>)</span>
+<span id="L362">        <span class="kw">simp</span> only <span class="kw">at</span> e1 e2</span>
+<span id="L363">        <span class="kw">exact</span> <span class="const token" data-verso-hover="384">absurd</span> (e1.<span class="const token" data-verso-hover="463">trans</span> e2.<span class="const token" data-verso-hover="267">symm</span>) hlt.<span class="const token" data-verso-hover="462">ne</span></span>
+<span id="L364">  <span class="kw">intro</span> v u hG</span>
+<span id="L365">  <span class="kw">rcases</span> <span class="const token" data-verso-hover="304">lt_or_gt_of_ne</span> (G.<span class="const token" data-verso-hover="349">ne_of_adj</span> hG) <span class="kw">with</span> hlt | hlt</span>
+<span id="L366">  · <span class="kw">exact</span> key v u hlt hG</span>
+<span id="L367">  · <span class="kw">exact</span> (key u v hlt hG.<span class="const token" data-verso-hover="283">symm</span>).<span class="const token" data-verso-hover="250">symm</span></span>
+<span id="L368"></span>
+<span id="L369"><span class="dc">/-! ### Claim 3.1 and approximation transfer -/</span></span>
+<span id="L370"></span>
+<span id="L371"><span class="dc">/-- The minimum cost of a 2-spanner of `G_S`. -/</span></span>
+<span id="L372"><span class="kw">noncomputable</span> <span class="kw">def</span> <span class="const token" data-verso-hover="406">minSpannerCost</span> (G : <span class="const token" data-verso-hover="247">SimpleGraph</span> V) : <span class="const token" data-verso-hover="464">ℕ</span>∞ :=</span>
+<span id="L373">  ⨅ (H : <span class="const token" data-verso-hover="247">SimpleGraph</span> (V × <span class="const token" data-verso-hover="32">Fin</span> <span class="nu">3</span>)) (_ : <span class="const token" data-verso-hover="405">IsTwoSpanner</span> (<span class="const token" data-verso-hover="290">GS</span> G) H), (<span class="const token" data-verso-hover="401">cost</span> H : <span class="const token" data-verso-hover="464">ℕ</span>∞)</span>
+<span id="L374"></span>
+<span id="L375"><span class="dc">/-- **Claim 3.1 of [CD18].** The cost of the minimum 2-spanner in `G_S` is exactly the size of the</span></span>
+<span id="L376"><span class="dc">minimum vertex cover in `G`. -/</span></span>
+<span id="L377"><span class="kw">theorem</span> <span class="const token" data-verso-hover="20">claim_3_1</span> (G : <span class="const token" data-verso-hover="247">SimpleGraph</span> V) : <span class="const token" data-verso-hover="406">minSpannerCost</span> G = G.<span class="const token" data-verso-hover="465">vertexCoverNum</span> := <span class="kw">by</span></span>
+<span id="L378">  <span class="kw">apply</span> <span class="const token" data-verso-hover="466">le_antisymm</span></span>
+<span id="L379">  · <span class="kw">refine</span> <span class="const token" data-verso-hover="467">le_iInf₂</span> <span class="kw">fun</span> C hC =&gt; ?_</span>
+<span id="L380">    <span class="kw">refine</span> (<span class="const token" data-verso-hover="407">iInf₂_le</span> (<span class="const token" data-verso-hover="434">HC</span> G C) (<span class="const token" data-verso-hover="21">isTwoSpanner_HC</span> hC)).<span class="const token" data-verso-hover="112">trans</span> ?_</span>
+<span id="L381">    <span class="kw">rw</span> [<span class="const token" data-verso-hover="22">cost_HC</span>, <span class="const token" data-verso-hover="468">Set.Finite.cast_ncard_eq</span> C.<span class="const token" data-verso-hover="469">toFinite</span>]</span>
+<span id="L382">  · <span class="kw">refine</span> <span class="const token" data-verso-hover="467">le_iInf₂</span> <span class="kw">fun</span> H hH =&gt; ?_</span>
+<span id="L383">    <span class="kw">refine</span> (<span class="const token" data-verso-hover="23">isVertexCover_CH</span> hH).<span class="const token" data-verso-hover="470">vertexCoverNum_le</span>.<span class="const token" data-verso-hover="112">trans</span> ?_</span>
+<span id="L384">    <span class="kw">rw</span> [← <span class="const token" data-verso-hover="468">Set.Finite.cast_ncard_eq</span> (<span class="const token" data-verso-hover="346">CH</span> H).<span class="const token" data-verso-hover="469">toFinite</span>]</span>
+<span id="L385">    <span class="kw">exact_mod_cast</span> <span class="const token" data-verso-hover="24">ncard_CH_le_cost</span> H</span>
+<span id="L386"></span>
+<span id="L387"><span class="dc">/-- `H` is an `α`-approximate minimum-cost 2-spanner of `Gs` for the weights `w`. -/</span></span>
+<span id="L388"><span class="kw">def</span> <span class="const token" data-verso-hover="361">IsApproxMinSpanner</span> {W : <span class="kw">Type</span>*} [<span class="const token" data-verso-hover="49">Fintype</span> W] (w : <span class="const token" data-verso-hover="424">Sym2</span> W → <span class="const token" data-verso-hover="30">ℕ</span>) (α : <span class="const token" data-verso-hover="184">ℝ</span>)</span>
+<span id="L389">    (Gs H : <span class="const token" data-verso-hover="247">SimpleGraph</span> W) : <span class="kw">Prop</span> :=</span>
+<span id="L390">  <span class="const token" data-verso-hover="405">IsTwoSpanner</span> Gs H ∧ ∀ H', <span class="const token" data-verso-hover="405">IsTwoSpanner</span> Gs H' → (<span class="const token" data-verso-hover="423">wcost</span> w H : <span class="const token" data-verso-hover="184">ℝ</span>) ≤ α * <span class="const token" data-verso-hover="423">wcost</span> w H'</span>
+<span id="L391"></span>
+<span id="L392"><span class="dc">/-- `C` is an `α`-approximate minimum vertex cover of `G`. -/</span></span>
+<span id="L393"><span class="kw">def</span> <span class="const token" data-verso-hover="363">IsApproxMinVC</span> {U : <span class="kw">Type</span>*} (α : <span class="const token" data-verso-hover="184">ℝ</span>) (G : <span class="const token" data-verso-hover="247">SimpleGraph</span> U) (C : <span class="const token" data-verso-hover="391">Set</span> U) : <span class="kw">Prop</span> :=</span>
+<span id="L394">  G.<span class="const token" data-verso-hover="412">IsVertexCover</span> C ∧ ∀ C', G.<span class="const token" data-verso-hover="412">IsVertexCover</span> C' → (C.<span class="const token" data-verso-hover="441">ncard</span> : <span class="const token" data-verso-hover="184">ℝ</span>) ≤ α * C'.<span class="const token" data-verso-hover="441">ncard</span></span>
+<span id="L395"></span>
+<span id="L396"><span class="dc">/-- Approximation transfer (used in Lemma 3.2 of [CD18]): if `H` is an `α`-approximate minimum</span></span>
+<span id="L397"><span class="dc">2-spanner of `G_S`, then `C_H` is an `α`-approximate minimum vertex cover of `G`. -/</span></span>
+<span id="L398"><span class="kw">theorem</span> <span class="const token" data-verso-hover="25">approx_transfer</span> {G : <span class="const token" data-verso-hover="247">SimpleGraph</span> V} {H : <span class="const token" data-verso-hover="247">SimpleGraph</span> (V × <span class="const token" data-verso-hover="32">Fin</span> <span class="nu">3</span>)} {α : <span class="const token" data-verso-hover="184">ℝ</span>}</span>
+<span id="L399">    (hH : <span class="const token" data-verso-hover="361">IsApproxMinSpanner</span> <span class="const token" data-verso-hover="362">wt</span> α (<span class="const token" data-verso-hover="290">GS</span> G) H) : <span class="const token" data-verso-hover="363">IsApproxMinVC</span> α G (<span class="const token" data-verso-hover="346">CH</span> H) := <span class="kw">by</span></span>
+<span id="L400">  <span class="kw">refine</span> ⟨<span class="const token" data-verso-hover="23">isVertexCover_CH</span> hH.<span class="const token" data-verso-hover="80">1</span>, <span class="kw">fun</span> C hC =&gt; ?_⟩</span>
+<span id="L401">  <span class="kw">calc</span> ((<span class="const token" data-verso-hover="346">CH</span> H).<span class="const token" data-verso-hover="441">ncard</span> : <span class="const token" data-verso-hover="184">ℝ</span>) ≤ <span class="const token" data-verso-hover="401">cost</span> H := <span class="kw">by</span> <span class="kw">exact_mod_cast</span> <span class="const token" data-verso-hover="24">ncard_CH_le_cost</span> H</span>
+<span id="L402">    _ ≤ α * <span class="const token" data-verso-hover="401">cost</span> (<span class="const token" data-verso-hover="434">HC</span> G C) := hH.<span class="const token" data-verso-hover="96">2</span> _ (<span class="const token" data-verso-hover="21">isTwoSpanner_HC</span> hC)</span>
+<span id="L403">    _ = α * C.<span class="const token" data-verso-hover="441">ncard</span> := <span class="kw">by</span> <span class="kw">rw</span> [<span class="const token" data-verso-hover="22">cost_HC</span>]</span>
+<span id="L404"></span>
+<span id="L405"><span class="kw">end</span> Podc.SpannerApproximation</span>
+<span id="L406"></span>
+</code></div>
+        <script>
+          window.versoHoversUrl = "PODC2018/SpannerApproximation/-hovers.json";</script>
+        <script src="static/lean/popper.js"></script>
+        <script src="static/lean/tippy.js"></script>
+        <script src="static/lean/marked.js"></script>
+        <script src="static/lean/highlighting.js"></script>
+        <script src="static/lean/lean.js"></script>
+        </article></main><footer class="site-footer"><div class="wrap">
+        Machine-checked formalizations of PODC papers in Lean 4. Generated with <a href="https://github.com/leanprover/verso">Verso</a> from the README files of <a href="https://github.com/vasnesterov/formal_podc">vasnesterov/formal_podc</a>.</div>
+      </footer></body>
+  </html>
+

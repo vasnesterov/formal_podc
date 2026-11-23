@@ -1,0 +1,424 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="light dark">
+    <link rel="icon" href="data:,">
+    <title>ConcurrentDSU: WaitFree.lean · Formal PODC</title><base href="../../../.././"><link rel="stylesheet" href="static/lean/verso-vars.css">
+    <link rel="stylesheet" href="static/lean/highlighting.css">
+    <link rel="stylesheet" href="static/lean/tippy-border.css">
+    <link rel="stylesheet" href="static/style.css">
+    <script defer="defer" src="static/site.js"></script>
+    </head>
+  <body>
+    <header class="site-header">
+      <div class="wrap">
+        <a class="brand" href=".">Formal PODC</a><nav class="top">
+          <a href=".">Search</a><a href="about/">About</a><a href="https://github.com/vasnesterov/formal_podc">GitHub</a></nav>
+        </div>
+      </header>
+    <main class="wrap"><article><nav class="breadcrumbs" aria-label="Breadcrumb">
+          <a href=".">Search</a><span class="sep">›</span><a href="PODC2016/">PODC 2016</a><span class="sep">›</span><a href="PODC2016/ConcurrentDSU/">ConcurrentDSU</a><span class="sep">›</span><a href="PODC2016/ConcurrentDSU/src/">Lean source</a><span class="sep">›</span><span aria-current="page">WaitFree</span></nav>
+        <h1>
+          <code>WaitFree.lean</code></h1>
+        <div class="paper-links">
+          <p>
+            Source of <a href="PODC2016/ConcurrentDSU/">A Randomized Concurrent Algorithm for Disjoint Set Union — PODC 2016</a> · <a href="https://github.com/vasnesterov/formal_podc/blob/main/Papers/PODC2016/ConcurrentDSU/WaitFree.lean">GitHub</a> · hover over a name for its type and documentation</p>
+          </div>
+        <div class="lean-code lean-src">
+          <code class="hl lean block" data-lean-context="WaitFree"><span id="L1"><span class="kw">import</span> Papers.PODC2016.ConcurrentDSU.Inv</span>
+<span id="L2"><span class="kw">import</span> Papers.PODC2016.ConcurrentDSU.Lin</span>
+<span id="L3"><span class="kw">import</span> Cslib.Computability.Distributed.SharedMemory.Mutex</span>
+<span id="L4"><span class="kw">import</span> Cslib.Computability.Distributed.SharedMemory.Potential</span>
+<span id="L5"><span class="kw">import</span> Cslib.Computability.Distributed.SharedMemory.Task</span>
+<span id="L6"></span>
+<span id="L7"><span class="dc">/-!</span></span>
+<span id="L8"><span class="dc"># Wait-freedom (Lemma 3.3)</span></span>
+<span id="L9"></span>
+<span id="L10"><span class="dc">Every operation finishes within a bounded number of its own steps, whatever the other processes</span></span>
+<span id="L11"><span class="dc">do. The proof uses a potential `Ψ p C = bnd · mpot C.mem + Φ (C.loc p) C.mem` where</span></span>
+<span id="L12"></span>
+<span id="L13"><span class="dc">* `mpot` (`Forest.lean`) decreases with every change of the memory: every successful `Cas`</span></span>
+<span id="L14"><span class="dc">  moves one parent pointer to a node with a larger id, so there are only finitely many memory</span></span>
+<span id="L15"><span class="dc">  changes overall;</span></span>
+<span id="L16"><span class="dc">* `Φ &lt; bnd` is a potential of the local state of `p` *in a fixed memory*: every step of `p` that</span></span>
+<span id="L17"><span class="dc">  does not change the memory decreases it.</span></span>
+<span id="L18"></span>
+<span id="L19"><span class="dc">The local potential `Φ` combines, lexicographically, the "positions" of `u` and `v` (twice the</span></span>
+<span id="L20"><span class="dc">number of larger ids, plus one for a root, see `qv`), the phase of the loop body and the</span></span>
+<span id="L21"><span class="dc">progress of the running `Find`. Positions are measured at the *roots* of `u` and `v` while a</span></span>
+<span id="L22"><span class="dc">`Find` is running, and at `u`, `v` themselves at the checks of lines 7–10: a failing `Cas` /</span></span>
+<span id="L23"><span class="dc">failing root test (`u` is not a root) then strictly decreases the position, which pays for the</span></span>
+<span id="L24"><span class="dc">next iteration of the loop.</span></span>
+<span id="L25"></span>
+<span id="L26"><span class="dc">* `Impl.waitFree_of_cfgPotential` (library, `Cslib/Computability/Distributed/SharedMemory/Potential.lean`): a</span></span>
+<span id="L27"><span class="dc">  configuration potential that never increases while `p` is pending and decreases with every</span></span>
+<span id="L28"><span class="dc">  step of `p` gives wait-freedom.</span></span>
+<span id="L29"><span class="dc">* `waitFree` — Lemma 3.3 for all versions of `Find`.</span></span>
+<span id="L30"><span class="dc">-/</span></span>
+<span id="L31"></span>
+<span id="L32"><span class="kw">set_option</span> <span class="const token" data-verso-hover="93">linter.unusedSectionVars</span> false</span>
+<span id="L33"></span>
+<span id="L34"><span class="kw">namespace</span> Podc.ConcurrentDSU</span>
+<span id="L35"></span>
+<span id="L36"><span class="kw">open</span> Cslib.SharedMemory</span>
+<span id="L37"></span>
+<span id="L38"><span class="kw">variable</span> {E : <span class="kw">Type</span>} [<span class="const token" data-verso-hover="106">Fintype</span> E] [<span class="const token" data-verso-hover="46">DecidableEq</span> E] {P : <span class="kw">Type</span>} [<span class="const token" data-verso-hover="46">DecidableEq</span> P]</span>
+<span id="L39"><span class="kw">variable</span> (K : <span class="const token" data-verso-hover="48">FindKind</span>) (key : E → <span class="const token" data-verso-hover="51">ℕ</span>)</span>
+<span id="L40"></span>
+<span id="L41"><span class="dc">/-- Position of a node: twice the number of larger ids, plus one if it is a root. -/</span></span>
+<span id="L42"><span class="kw">def</span> <span class="const token" data-verso-hover="423">qv</span> (m : E → E) (x : E) : <span class="const token" data-verso-hover="51">ℕ</span> := <span class="nu">2</span> * <span class="const token" data-verso-hover="240">hgt</span> key x + <span class="kw">if</span> m x = x <span class="kw">then</span> <span class="nu">1</span> <span class="kw">else</span> <span class="nu">0</span></span>
+<span id="L43"></span>
+<span id="L44"><span class="dc">/-- The current node of a `Find`. -/</span></span>
+<span id="L45"><span class="kw">def</span> <span class="const token" data-verso-hover="424">cnode</span> : <span class="const token" data-verso-hover="56">FS</span> E → E</span>
+<span id="L46">  | <span class="const token" data-verso-hover="57">.</span>tst u =&gt; u</span>
+<span id="L47">  | <span class="const token" data-verso-hover="58">.</span>adv u =&gt; u</span>
+<span id="L48">  | <span class="const token" data-verso-hover="59">.</span>rdP u _ =&gt; u</span>
+<span id="L49">  | <span class="const token" data-verso-hover="60">.</span>rdG u _ _ =&gt; u</span>
+<span id="L50">  | <span class="const token" data-verso-hover="61">.</span>cas u _ _ _ =&gt; u</span>
+<span id="L51"></span>
+<span id="L52"><span class="dc">/-- Position part of the potential of a `Find`. -/</span></span>
+<span id="L53"><span class="kw">def</span> <span class="const token" data-verso-hover="425">fpos</span> (m : E → E) : <span class="const token" data-verso-hover="56">FS</span> E → <span class="const token" data-verso-hover="51">ℕ</span></span>
+<span id="L54">  | <span class="const token" data-verso-hover="57">.</span>tst u =&gt; <span class="const token" data-verso-hover="423">qv</span> key m u</span>
+<span id="L55">  | <span class="const token" data-verso-hover="58">.</span>adv u =&gt; <span class="nu">2</span> * <span class="const token" data-verso-hover="240">hgt</span> key u</span>
+<span id="L56">  | <span class="const token" data-verso-hover="59">.</span>rdP u _ =&gt; <span class="const token" data-verso-hover="423">qv</span> key m u</span>
+<span id="L57">  | <span class="const token" data-verso-hover="60">.</span>rdG u v _ =&gt; <span class="nu">2</span> * <span class="const token" data-verso-hover="240">hgt</span> key u + <span class="kw">if</span> v = u <span class="kw">then</span> <span class="nu">1</span> <span class="kw">else</span> <span class="nu">0</span></span>
+<span id="L58">  | <span class="const token" data-verso-hover="61">.</span>cas u v _ _ =&gt; <span class="nu">2</span> * <span class="const token" data-verso-hover="240">hgt</span> key u + <span class="kw">if</span> v = u <span class="kw">then</span> <span class="nu">1</span> <span class="kw">else</span> <span class="nu">0</span></span>
+<span id="L59"></span>
+<span id="L60"><span class="dc">/-- Program-counter part of the potential of a `Find`. -/</span></span>
+<span id="L61"><span class="kw">def</span> <span class="const token" data-verso-hover="426">fpc</span> : <span class="const token" data-verso-hover="56">FS</span> E → <span class="const token" data-verso-hover="51">ℕ</span></span>
+<span id="L62">  | <span class="const token" data-verso-hover="57">.</span>tst _ =&gt; <span class="nu">1</span></span>
+<span id="L63">  | <span class="const token" data-verso-hover="58">.</span>adv _ =&gt; <span class="nu">0</span></span>
+<span id="L64">  | <span class="const token" data-verso-hover="59">.</span>rdP _ i =&gt; <span class="nu">3</span> * (K.<span class="const token" data-verso-hover="54">tries</span> - <span class="nu">1</span> - i) + <span class="nu">2</span></span>
+<span id="L65">  | <span class="const token" data-verso-hover="60">.</span>rdG _ _ i =&gt; <span class="nu">3</span> * (K.<span class="const token" data-verso-hover="54">tries</span> - <span class="nu">1</span> - i) + <span class="nu">1</span></span>
+<span id="L66">  | <span class="const token" data-verso-hover="61">.</span>cas _ _ _ i =&gt; <span class="nu">3</span> * (K.<span class="const token" data-verso-hover="54">tries</span> - <span class="nu">1</span> - i)</span>
+<span id="L67"></span>
+<span id="L68"><span class="dc">/-- Potential of a running `Find`. -/</span></span>
+<span id="L69"><span class="kw">def</span> <span class="const token" data-verso-hover="427">fpot</span> (m : E → E) (fs : <span class="const token" data-verso-hover="56">FS</span> E) : <span class="const token" data-verso-hover="51">ℕ</span> := <span class="nu">3</span> * K.<span class="const token" data-verso-hover="54">tries</span> * <span class="const token" data-verso-hover="425">fpos</span> key m fs + <span class="const token" data-verso-hover="426">fpc</span> K fs</span>
+<span id="L70"></span>
+<span id="L71"><span class="dc">/-- Bound on `fpot`. -/</span></span>
+<span id="L72"><span class="kw">def</span> <span class="const token" data-verso-hover="428">fB</span> : <span class="const token" data-verso-hover="51">ℕ</span> := <span class="nu">3</span> * K.<span class="const token" data-verso-hover="54">tries</span> * (<span class="nu">2</span> * <span class="const token" data-verso-hover="211">Fintype.card</span> E + <span class="nu">2</span>)</span>
+<span id="L73"></span>
+<span id="L74"><span class="dc">/-- Weight of the positions in the local potential. -/</span></span>
+<span id="L75"><span class="kw">def</span> <span class="const token" data-verso-hover="429">wB</span> : <span class="const token" data-verso-hover="51">ℕ</span> := <span class="nu">3</span> * <span class="const token" data-verso-hover="428">fB</span> (E := E) K + <span class="nu">3</span></span>
+<span id="L76"></span>
+<span id="L77"><span class="dc">/-- The local potential of a process (in a fixed memory). -/</span></span>
+<span id="L78"><span class="kw">def</span> <span class="const token" data-verso-hover="430">Φ</span> (m : E → E) : <span class="const token" data-verso-hover="69">Loc</span> E → <span class="const token" data-verso-hover="51">ℕ</span></span>
+<span id="L79">  | <span class="const token" data-verso-hover="70">.</span>idle =&gt; <span class="nu">0</span></span>
+<span id="L80">  | <span class="const token" data-verso-hover="75">.</span>done _ =&gt; <span class="nu">0</span></span>
+<span id="L81">  | <span class="const token" data-verso-hover="71">.</span>fu _ fs v =&gt; <span class="const token" data-verso-hover="429">wB</span> (E := E) K * (<span class="const token" data-verso-hover="423">qv</span> key m (<span class="const token" data-verso-hover="25">rootOf</span> m (<span class="const token" data-verso-hover="424">cnode</span> fs)) + <span class="const token" data-verso-hover="423">qv</span> key m (<span class="const token" data-verso-hover="25">rootOf</span> m v)) +</span>
+<span id="L82">      <span class="nu">2</span> * <span class="const token" data-verso-hover="428">fB</span> (E := E) K + <span class="const token" data-verso-hover="427">fpot</span> K key m fs + <span class="nu">2</span></span>
+<span id="L83">  | <span class="const token" data-verso-hover="72">.</span>fv _ u fs =&gt; <span class="const token" data-verso-hover="429">wB</span> (E := E) K * (<span class="const token" data-verso-hover="423">qv</span> key m u + <span class="const token" data-verso-hover="423">qv</span> key m (<span class="const token" data-verso-hover="25">rootOf</span> m (<span class="const token" data-verso-hover="424">cnode</span> fs))) +</span>
+<span id="L84">      <span class="const token" data-verso-hover="428">fB</span> (E := E) K + <span class="const token" data-verso-hover="427">fpot</span> K key m fs + <span class="nu">1</span></span>
+<span id="L85">  | <span class="const token" data-verso-hover="73">.</span>chk u v =&gt; <span class="const token" data-verso-hover="429">wB</span> (E := E) K * (<span class="const token" data-verso-hover="423">qv</span> key m u + <span class="const token" data-verso-hover="423">qv</span> key m v)</span>
+<span id="L86">  | <span class="const token" data-verso-hover="74">.</span>lnk u v =&gt; <span class="const token" data-verso-hover="429">wB</span> (E := E) K * (<span class="const token" data-verso-hover="423">qv</span> key m u + <span class="const token" data-verso-hover="423">qv</span> key m v)</span>
+<span id="L87"></span>
+<span id="L88"><span class="dc">/-- Bound on `Φ`. -/</span></span>
+<span id="L89"><span class="kw">def</span> <span class="const token" data-verso-hover="431">bnd</span> : <span class="const token" data-verso-hover="51">ℕ</span> := <span class="const token" data-verso-hover="429">wB</span> (E := E) K * (<span class="nu">4</span> * <span class="const token" data-verso-hover="211">Fintype.card</span> E + <span class="nu">3</span>)</span>
+<span id="L90"></span>
+<span id="L91"><span class="kw">variable</span> {K key}</span>
+<span id="L92"></span>
+<span id="L93"><span class="kw">lemma</span> <span class="const token" data-verso-hover="432">qv_le</span> (m : E → E) (x : E) : <span class="const token" data-verso-hover="423">qv</span> key m x ≤ <span class="nu">2</span> * <span class="const token" data-verso-hover="211">Fintype.card</span> E + <span class="nu">1</span> := <span class="kw">by</span></span>
+<span id="L94">  <span class="kw">have</span> := <span class="const token" data-verso-hover="267">hgt_le_card</span> (key := key) x</span>
+<span id="L95">  <span class="kw">unfold</span> <span class="const token" data-verso-hover="423">qv</span>; <span class="kw">split_ifs</span> &lt;;&gt; <span class="kw">omega</span></span>
+<span id="L96"></span>
+<span id="L97"><span class="kw">lemma</span> <span class="const token" data-verso-hover="433">qv_rootOf</span> {m : E → E} (hg : <span class="const token" data-verso-hover="121">Good</span> key m) (x : E) :</span>
+<span id="L98">    <span class="const token" data-verso-hover="423">qv</span> key m (<span class="const token" data-verso-hover="25">rootOf</span> m x) = <span class="nu">2</span> * <span class="const token" data-verso-hover="240">hgt</span> key (<span class="const token" data-verso-hover="25">rootOf</span> m x) + <span class="nu">1</span> := <span class="kw">by</span></span>
+<span id="L99">  <span class="kw">simp</span> [<span class="const token" data-verso-hover="423">qv</span>, <span class="const token" data-verso-hover="278">rootOf_fixed</span> hg x]</span>
+<span id="L100"></span>
+<span id="L101"><span class="kw">lemma</span> <span class="const token" data-verso-hover="434">qv_rootOf_le</span> {m : E → E} (hg : <span class="const token" data-verso-hover="121">Good</span> key m) (x : E) : <span class="const token" data-verso-hover="423">qv</span> key m (<span class="const token" data-verso-hover="25">rootOf</span> m x) ≤ <span class="const token" data-verso-hover="423">qv</span> key m x := <span class="kw">by</span></span>
+<span id="L102">  <span class="kw">by_cases</span> hx : m x = x</span>
+<span id="L103">  · <span class="kw">rw</span> [<span class="const token" data-verso-hover="163">rootOf_of_fixed</span> hx]</span>
+<span id="L104">  · <span class="kw">have</span> h1 := <span class="const token" data-verso-hover="244">hgt_lt</span> (<span class="const token" data-verso-hover="287">key_lt_rootOf</span> hg hx)</span>
+<span id="L105">    <span class="kw">rw</span> [<span class="const token" data-verso-hover="433">qv_rootOf</span> hg]; <span class="kw">simp</span> only [<span class="const token" data-verso-hover="423">qv</span>, hx, <span class="const token" data-verso-hover="143">ite_false</span>]; <span class="kw">omega</span></span>
+<span id="L106"></span>
+<span id="L107"><span class="kw">lemma</span> <span class="const token" data-verso-hover="435">qv_rootOf_lt</span> {m : E → E} (hg : <span class="const token" data-verso-hover="121">Good</span> key m) {x : E} (hx : m x ≠ x) :</span>
+<span id="L108">    <span class="const token" data-verso-hover="423">qv</span> key m (<span class="const token" data-verso-hover="25">rootOf</span> m x) + <span class="nu">1</span> ≤ <span class="const token" data-verso-hover="423">qv</span> key m x := <span class="kw">by</span></span>
+<span id="L109">  <span class="kw">have</span> h1 := <span class="const token" data-verso-hover="244">hgt_lt</span> (<span class="const token" data-verso-hover="287">key_lt_rootOf</span> hg hx)</span>
+<span id="L110">  <span class="kw">rw</span> [<span class="const token" data-verso-hover="433">qv_rootOf</span> hg]; <span class="kw">simp</span> only [<span class="const token" data-verso-hover="423">qv</span>, hx, <span class="const token" data-verso-hover="143">ite_false</span>]; <span class="kw">omega</span></span>
+<span id="L111"></span>
+<span id="L112"><span class="kw">lemma</span> <span class="const token" data-verso-hover="436">fpot_lt</span> (m : E → E) (fs : <span class="const token" data-verso-hover="56">FS</span> E) : <span class="const token" data-verso-hover="427">fpot</span> K key m fs &lt; <span class="const token" data-verso-hover="428">fB</span> (E := E) K := <span class="kw">by</span></span>
+<span id="L113">  <span class="kw">have</span> hT := K.<span class="const token" data-verso-hover="55">tries_pos</span></span>
+<span id="L114">  <span class="kw">have</span> hpos : <span class="const token" data-verso-hover="425">fpos</span> key m fs ≤ <span class="nu">2</span> * <span class="const token" data-verso-hover="211">Fintype.card</span> E + <span class="nu">1</span> := <span class="kw">by</span></span>
+<span id="L115">    <span class="kw">cases</span> fs <span class="kw">with</span></span>
+<span id="L116">    | <span class="const token" data-verso-hover="57">tst</span> u =&gt; <span class="kw">exact</span> <span class="const token" data-verso-hover="432">qv_le</span> _ _</span>
+<span id="L117">    | <span class="const token" data-verso-hover="58">adv</span> u =&gt; <span class="kw">simp</span> only [<span class="const token" data-verso-hover="425">fpos</span>]; <span class="kw">have</span> := <span class="const token" data-verso-hover="267">hgt_le_card</span> (key := key) u; <span class="kw">omega</span></span>
+<span id="L118">    | <span class="const token" data-verso-hover="59">rdP</span> u i =&gt; <span class="kw">exact</span> <span class="const token" data-verso-hover="432">qv_le</span> _ _</span>
+<span id="L119">    | <span class="const token" data-verso-hover="60">rdG</span> u v i =&gt; <span class="kw">simp</span> only [<span class="const token" data-verso-hover="425">fpos</span>]; <span class="kw">have</span> := <span class="const token" data-verso-hover="267">hgt_le_card</span> (key := key) u; <span class="kw">split_ifs</span> &lt;;&gt; <span class="kw">omega</span></span>
+<span id="L120">    | <span class="const token" data-verso-hover="61">cas</span> u v w i =&gt; <span class="kw">simp</span> only [<span class="const token" data-verso-hover="425">fpos</span>]; <span class="kw">have</span> := <span class="const token" data-verso-hover="267">hgt_le_card</span> (key := key) u; <span class="kw">split_ifs</span> &lt;;&gt; <span class="kw">omega</span></span>
+<span id="L121">  <span class="kw">have</span> hpc : <span class="const token" data-verso-hover="426">fpc</span> K fs &lt; <span class="nu">3</span> * K.<span class="const token" data-verso-hover="54">tries</span> := <span class="kw">by</span></span>
+<span id="L122">    <span class="kw">cases</span> fs &lt;;&gt; <span class="kw">simp</span> only [<span class="const token" data-verso-hover="426">fpc</span>] &lt;;&gt; <span class="kw">omega</span></span>
+<span id="L123">  <span class="kw">unfold</span> <span class="const token" data-verso-hover="427">fpot</span> <span class="const token" data-verso-hover="428">fB</span></span>
+<span id="L124">  <span class="kw">calc</span> <span class="nu">3</span> * K.<span class="const token" data-verso-hover="54">tries</span> * <span class="const token" data-verso-hover="425">fpos</span> key m fs + <span class="const token" data-verso-hover="426">fpc</span> K fs</span>
+<span id="L125">      &lt; <span class="nu">3</span> * K.<span class="const token" data-verso-hover="54">tries</span> * <span class="const token" data-verso-hover="425">fpos</span> key m fs + <span class="nu">3</span> * K.<span class="const token" data-verso-hover="54">tries</span> := <span class="kw">by</span> <span class="kw">omega</span></span>
+<span id="L126">    _ = <span class="nu">3</span> * K.<span class="const token" data-verso-hover="54">tries</span> * (<span class="const token" data-verso-hover="425">fpos</span> key m fs + <span class="nu">1</span>) := <span class="kw">by</span> <span class="kw">ring</span></span>
+<span id="L127">    _ ≤ <span class="nu">3</span> * K.<span class="const token" data-verso-hover="54">tries</span> * (<span class="nu">2</span> * <span class="const token" data-verso-hover="211">Fintype.card</span> E + <span class="nu">2</span>) := <span class="kw">by</span></span>
+<span id="L128">        <span class="kw">apply</span> <span class="const token" data-verso-hover="246">Nat.mul_le_mul_left</span>; <span class="kw">omega</span></span>
+<span id="L129"></span>
+<span id="L130"><span class="kw">lemma</span> <span class="const token" data-verso-hover="437">Φ_lt</span> (m : E → E) (l : <span class="const token" data-verso-hover="69">Loc</span> E) : <span class="const token" data-verso-hover="430">Φ</span> K key m l &lt; <span class="const token" data-verso-hover="431">bnd</span> (E := E) K := <span class="kw">by</span></span>
+<span id="L131">  <span class="kw">have</span> h1 := <span class="const token" data-verso-hover="436">fpot_lt</span> (K := K) (key := key) m</span>
+<span id="L132">  <span class="kw">have</span> hq := <span class="const token" data-verso-hover="432">qv_le</span> (key := key) m</span>
+<span id="L133">  <span class="kw">have</span> hW : <span class="const token" data-verso-hover="429">wB</span> (E := E) K = <span class="nu">3</span> * <span class="const token" data-verso-hover="428">fB</span> (E := E) K + <span class="nu">3</span> := <span class="const token" data-verso-hover="42">rfl</span></span>
+<span id="L134">  <span class="kw">unfold</span> <span class="const token" data-verso-hover="431">bnd</span></span>
+<span id="L135">  <span class="kw">cases</span> l <span class="kw">with</span></span>
+<span id="L136">  | <span class="const token" data-verso-hover="70">idle</span> =&gt; <span class="kw">simp</span> only [<span class="const token" data-verso-hover="430">Φ</span>]; <span class="kw">rw</span> [hW]; <span class="kw">positivity</span></span>
+<span id="L137">  | <span class="const token" data-verso-hover="75">done</span> r =&gt; <span class="kw">simp</span> only [<span class="const token" data-verso-hover="430">Φ</span>]; <span class="kw">rw</span> [hW]; <span class="kw">positivity</span></span>
+<span id="L138">  | <span class="const token" data-verso-hover="71">fu</span> b fs v =&gt;</span>
+<span id="L139">    <span class="kw">simp</span> only [<span class="const token" data-verso-hover="430">Φ</span>]</span>
+<span id="L140">    <span class="kw">have</span> := h1 fs; <span class="kw">have</span> := hq (<span class="const token" data-verso-hover="25">rootOf</span> m (<span class="const token" data-verso-hover="424">cnode</span> fs)); <span class="kw">have</span> := hq (<span class="const token" data-verso-hover="25">rootOf</span> m v)</span>
+<span id="L141">    <span class="kw">nlinarith</span></span>
+<span id="L142">  | <span class="const token" data-verso-hover="72">fv</span> b u fs =&gt;</span>
+<span id="L143">    <span class="kw">simp</span> only [<span class="const token" data-verso-hover="430">Φ</span>]</span>
+<span id="L144">    <span class="kw">have</span> := h1 fs; <span class="kw">have</span> := hq u; <span class="kw">have</span> := hq (<span class="const token" data-verso-hover="25">rootOf</span> m (<span class="const token" data-verso-hover="424">cnode</span> fs))</span>
+<span id="L145">    <span class="kw">nlinarith</span></span>
+<span id="L146">  | <span class="const token" data-verso-hover="73">chk</span> u v =&gt;</span>
+<span id="L147">    <span class="kw">simp</span> only [<span class="const token" data-verso-hover="430">Φ</span>]; <span class="kw">have</span> := hq u; <span class="kw">have</span> := hq v</span>
+<span id="L148">    <span class="kw">nlinarith</span></span>
+<span id="L149">  | <span class="const token" data-verso-hover="74">lnk</span> u v =&gt;</span>
+<span id="L150">    <span class="kw">simp</span> only [<span class="const token" data-verso-hover="430">Φ</span>]; <span class="kw">have</span> := hq u; <span class="kw">have</span> := hq v</span>
+<span id="L151">    <span class="kw">nlinarith</span></span>
+<span id="L152"></span>
+<span id="L153"><span class="kw">lemma</span> <span class="const token" data-verso-hover="438">FInv.same_cnode</span> {m : E → E} {s : E} {fs : <span class="const token" data-verso-hover="56">FS</span> E} (hf : <span class="const token" data-verso-hover="303">FInv</span> K key m s fs) :</span>
+<span id="L154">    <span class="const token" data-verso-hover="108">same</span> m (<span class="const token" data-verso-hover="424">cnode</span> fs) s := <span class="kw">by</span></span>
+<span id="L155">  <span class="kw">cases</span> fs <span class="kw">with</span></span>
+<span id="L156">  | <span class="const token" data-verso-hover="57">tst</span> u =&gt; <span class="kw">exact</span> hf</span>
+<span id="L157">  | <span class="const token" data-verso-hover="58">adv</span> u =&gt; <span class="kw">exact</span> hf.<span class="const token" data-verso-hover="137">1</span></span>
+<span id="L158">  | <span class="const token" data-verso-hover="59">rdP</span> u i =&gt; <span class="kw">exact</span> hf.<span class="const token" data-verso-hover="138">2</span></span>
+<span id="L159">  | <span class="const token" data-verso-hover="60">rdG</span> u v i =&gt; <span class="kw">exact</span> hf.<span class="const token" data-verso-hover="138">2</span><span class="nu">.</span><span class="const token" data-verso-hover="137">1</span></span>
+<span id="L160">  | <span class="const token" data-verso-hover="61">cas</span> u v w i =&gt; <span class="kw">exact</span> hf.<span class="const token" data-verso-hover="138">2</span><span class="nu">.</span><span class="const token" data-verso-hover="137">1</span></span>
+<span id="L161"></span>
+<span id="L162"><span class="dc">/-- One step of a `Find` that does not change the memory decreases its potential and stays in</span></span>
+<span id="L163"><span class="dc">the same tree. -/</span></span>
+<span id="L164"><span class="kw">lemma</span> <span class="const token" data-verso-hover="439">find_dec</span> {m : E → E} (hg : <span class="const token" data-verso-hover="121">Good</span> key m) {s : E} {fs fs' : <span class="const token" data-verso-hover="56">FS</span> E} (hf : <span class="const token" data-verso-hover="303">FInv</span> K key m s fs)</span>
+<span id="L165">    (h : (<span class="const token" data-verso-hover="312">fRes</span> K fs m).<span class="const token" data-verso-hover="147">1</span> = <span class="const token" data-verso-hover="68">.</span>inl fs') (hm : (<span class="const token" data-verso-hover="312">fRes</span> K fs m).<span class="const token" data-verso-hover="145">2</span> = m) :</span>
+<span id="L166">    <span class="const token" data-verso-hover="427">fpot</span> K key m fs' &lt; <span class="const token" data-verso-hover="427">fpot</span> K key m fs ∧ <span class="const token" data-verso-hover="25">rootOf</span> m (<span class="const token" data-verso-hover="424">cnode</span> fs') = <span class="const token" data-verso-hover="25">rootOf</span> m (<span class="const token" data-verso-hover="424">cnode</span> fs) := <span class="kw">by</span></span>
+<span id="L167">  <span class="kw">have</span> hT := K.<span class="const token" data-verso-hover="55">tries_pos</span></span>
+<span id="L168">  <span class="kw">cases</span> fs <span class="kw">with</span></span>
+<span id="L169">  | <span class="const token" data-verso-hover="57">tst</span> u =&gt;</span>
+<span id="L170">    <span class="kw">simp</span> only [<span class="const token" data-verso-hover="312">fRes</span>, <span class="const token" data-verso-hover="66">FS.next</span>] <span class="kw">at</span> h</span>
+<span id="L171">    <span class="kw">split_ifs</span> <span class="kw">at</span> h <span class="kw">with</span> hu</span>
+<span id="L172">    <span class="kw">cases</span> h</span>
+<span id="L173">    <span class="kw">refine</span> ⟨?_, <span class="const token" data-verso-hover="42">rfl</span>⟩</span>
+<span id="L174">    <span class="kw">simp</span> only [<span class="const token" data-verso-hover="427">fpot</span>, <span class="const token" data-verso-hover="425">fpos</span>, <span class="const token" data-verso-hover="426">fpc</span>, <span class="const token" data-verso-hover="423">qv</span>, hu, <span class="const token" data-verso-hover="143">ite_false</span>, <span class="const token" data-verso-hover="440">Nat.add_zero</span>]; <span class="kw">omega</span></span>
+<span id="L175">  | <span class="const token" data-verso-hover="58">adv</span> u =&gt;</span>
+<span id="L176">    <span class="kw">simp</span> only [<span class="const token" data-verso-hover="312">fRes</span>, <span class="const token" data-verso-hover="66">FS.next</span>, <span class="const token" data-verso-hover="415">Sum.inl.injEq</span>] <span class="kw">at</span> h</span>
+<span id="L177">    <span class="kw">subst</span> h</span>
+<span id="L178">    <span class="kw">have</span> hk := <span class="const token" data-verso-hover="244">hgt_lt</span> ((hg u).<span class="const token" data-verso-hover="173">resolve_left</span> hf.<span class="const token" data-verso-hover="138">2</span>)</span>
+<span id="L179">    <span class="kw">refine</span> ⟨?_, <span class="const token" data-verso-hover="284">rootOf_apply</span> hg u⟩</span>
+<span id="L180">    <span class="kw">have</span> hq : <span class="const token" data-verso-hover="423">qv</span> key m (m u) ≤ <span class="nu">2</span> * <span class="const token" data-verso-hover="240">hgt</span> key (m u) + <span class="nu">1</span> := <span class="kw">by</span> <span class="kw">unfold</span> <span class="const token" data-verso-hover="423">qv</span>; <span class="kw">split_ifs</span> &lt;;&gt; <span class="kw">omega</span></span>
+<span id="L181">    <span class="kw">simp</span> only [<span class="const token" data-verso-hover="427">fpot</span>, <span class="const token" data-verso-hover="425">fpos</span>, <span class="const token" data-verso-hover="426">fpc</span>]</span>
+<span id="L182">    <span class="kw">have</span> : <span class="nu">3</span> * K.<span class="const token" data-verso-hover="54">tries</span> * <span class="const token" data-verso-hover="423">qv</span> key m (m u) + <span class="nu">1</span> &lt; <span class="nu">3</span> * K.<span class="const token" data-verso-hover="54">tries</span> * (<span class="nu">2</span> * <span class="const token" data-verso-hover="240">hgt</span> key u) := <span class="kw">by</span></span>
+<span id="L183">      <span class="kw">calc</span> <span class="nu">3</span> * K.<span class="const token" data-verso-hover="54">tries</span> * <span class="const token" data-verso-hover="423">qv</span> key m (m u) + <span class="nu">1</span> &lt; <span class="nu">3</span> * K.<span class="const token" data-verso-hover="54">tries</span> * <span class="const token" data-verso-hover="423">qv</span> key m (m u) + <span class="nu">3</span> * K.<span class="const token" data-verso-hover="54">tries</span> := <span class="kw">by</span></span>
+<span id="L184">            <span class="kw">omega</span></span>
+<span id="L185">        _ = <span class="nu">3</span> * K.<span class="const token" data-verso-hover="54">tries</span> * (<span class="const token" data-verso-hover="423">qv</span> key m (m u) + <span class="nu">1</span>) := <span class="kw">by</span> <span class="kw">ring</span></span>
+<span id="L186">        _ ≤ <span class="nu">3</span> * K.<span class="const token" data-verso-hover="54">tries</span> * (<span class="nu">2</span> * <span class="const token" data-verso-hover="240">hgt</span> key u) := <span class="kw">by</span> <span class="kw">apply</span> <span class="const token" data-verso-hover="246">Nat.mul_le_mul_left</span>; <span class="kw">omega</span></span>
+<span id="L187">    <span class="kw">omega</span></span>
+<span id="L188">  | <span class="const token" data-verso-hover="59">rdP</span> u i =&gt;</span>
+<span id="L189">    <span class="kw">simp</span> only [<span class="const token" data-verso-hover="312">fRes</span>, <span class="const token" data-verso-hover="66">FS.next</span>, <span class="const token" data-verso-hover="415">Sum.inl.injEq</span>] <span class="kw">at</span> h</span>
+<span id="L190">    <span class="kw">subst</span> h</span>
+<span id="L191">    <span class="kw">refine</span> ⟨?_, <span class="const token" data-verso-hover="42">rfl</span>⟩</span>
+<span id="L192">    <span class="kw">have</span> : (<span class="nu">2</span> * <span class="const token" data-verso-hover="240">hgt</span> key u + <span class="kw">if</span> m u = u <span class="kw">then</span> <span class="nu">1</span> <span class="kw">else</span> <span class="nu">0</span>) = <span class="const token" data-verso-hover="423">qv</span> key m u := <span class="const token" data-verso-hover="42">rfl</span></span>
+<span id="L193">    <span class="kw">simp</span> only [<span class="const token" data-verso-hover="427">fpot</span>, <span class="const token" data-verso-hover="425">fpos</span>, <span class="const token" data-verso-hover="426">fpc</span>, this]; <span class="kw">omega</span></span>
+<span id="L194">  | <span class="const token" data-verso-hover="60">rdG</span> u v i =&gt;</span>
+<span id="L195">    <span class="kw">simp</span> only [<span class="const token" data-verso-hover="312">fRes</span>, <span class="const token" data-verso-hover="66">FS.next</span>] <span class="kw">at</span> h</span>
+<span id="L196">    <span class="kw">split_ifs</span> <span class="kw">at</span> h <span class="kw">with</span> hv</span>
+<span id="L197">    <span class="kw">cases</span> h</span>
+<span id="L198">    <span class="kw">refine</span> ⟨?_, <span class="const token" data-verso-hover="42">rfl</span>⟩</span>
+<span id="L199">    <span class="kw">simp</span> only [<span class="const token" data-verso-hover="427">fpot</span>, <span class="const token" data-verso-hover="425">fpos</span>, <span class="const token" data-verso-hover="426">fpc</span>]; <span class="kw">omega</span></span>
+<span id="L200">  | <span class="const token" data-verso-hover="61">cas</span> u v w i =&gt;</span>
+<span id="L201">    <span class="kw">obtain</span> ⟨h1, h2, h3, h4, h5, h6, h7, h8⟩ := hf</span>
+<span id="L202">    <span class="kw">simp</span> only [<span class="const token" data-verso-hover="312">fRes</span>, <span class="const token" data-verso-hover="66">FS.next</span>] <span class="kw">at</span> h</span>
+<span id="L203">    <span class="kw">split_ifs</span> <span class="kw">at</span> h <span class="kw">with</span> hi &lt;;&gt; <span class="kw">cases</span> h</span>
+<span id="L204">    · <span class="kw">refine</span> ⟨?_, <span class="const token" data-verso-hover="42">rfl</span>⟩</span>
+<span id="L205">      <span class="kw">have</span> hq : <span class="const token" data-verso-hover="423">qv</span> key m u ≤ <span class="nu">2</span> * <span class="const token" data-verso-hover="240">hgt</span> key u + <span class="kw">if</span> v = u <span class="kw">then</span> <span class="nu">1</span> <span class="kw">else</span> <span class="nu">0</span> := <span class="kw">by</span></span>
+<span id="L206">        <span class="kw">by_cases</span> hvu : v = u</span>
+<span id="L207">        · <span class="kw">simp</span> only [hvu, <span class="const token" data-verso-hover="161">ite_true</span>, <span class="const token" data-verso-hover="423">qv</span>]; <span class="kw">split_ifs</span> &lt;;&gt; <span class="kw">omega</span></span>
+<span id="L208">        · <span class="kw">simp</span> only [<span class="const token" data-verso-hover="423">qv</span>, hvu, <span class="const token" data-verso-hover="143">ite_false</span>, h7 hvu]; <span class="kw">omega</span></span>
+<span id="L209">      <span class="kw">simp</span> only [<span class="const token" data-verso-hover="427">fpot</span>, <span class="const token" data-verso-hover="425">fpos</span>, <span class="const token" data-verso-hover="426">fpc</span>]</span>
+<span id="L210">      <span class="kw">have</span> : <span class="nu">3</span> * K.<span class="const token" data-verso-hover="54">tries</span> * <span class="const token" data-verso-hover="423">qv</span> key m u ≤ <span class="nu">3</span> * K.<span class="const token" data-verso-hover="54">tries</span> * (<span class="nu">2</span> * <span class="const token" data-verso-hover="240">hgt</span> key u + <span class="kw">if</span> v = u <span class="kw">then</span> <span class="nu">1</span> <span class="kw">else</span> <span class="nu">0</span>) :=</span>
+<span id="L211">        <span class="const token" data-verso-hover="246">Nat.mul_le_mul_left</span> _ hq</span>
+<span id="L212">      <span class="kw">omega</span></span>
+<span id="L213">    · <span class="kw">refine</span> ⟨?_, h3⟩</span>
+<span id="L214">      <span class="kw">have</span> hqv : <span class="const token" data-verso-hover="423">qv</span> key m v = <span class="nu">2</span> * <span class="const token" data-verso-hover="240">hgt</span> key v := <span class="kw">by</span> <span class="kw">simp</span> [<span class="const token" data-verso-hover="423">qv</span>, h8]</span>
+<span id="L215">      <span class="kw">have</span> hpos : <span class="nu">2</span> * <span class="const token" data-verso-hover="240">hgt</span> key v + <span class="nu">1</span> ≤ <span class="nu">2</span> * <span class="const token" data-verso-hover="240">hgt</span> key u + <span class="kw">if</span> v = u <span class="kw">then</span> <span class="nu">1</span> <span class="kw">else</span> <span class="nu">0</span> := <span class="kw">by</span></span>
+<span id="L216">        <span class="kw">by_cases</span> hvu : v = u</span>
+<span id="L217">        · <span class="kw">subst</span> hvu; <span class="kw">simp</span></span>
+<span id="L218">        · <span class="kw">have</span> := <span class="const token" data-verso-hover="244">hgt_lt</span> (h6.<span class="const token" data-verso-hover="173">resolve_left</span> hvu); <span class="kw">simp</span> only [hvu, <span class="const token" data-verso-hover="143">ite_false</span>]; <span class="kw">omega</span></span>
+<span id="L219">      <span class="kw">simp</span> only [<span class="const token" data-verso-hover="427">fpot</span>, <span class="const token" data-verso-hover="425">fpos</span>, <span class="const token" data-verso-hover="426">fpc</span>, hqv]</span>
+<span id="L220">      <span class="kw">have</span> : <span class="nu">3</span> * K.<span class="const token" data-verso-hover="54">tries</span> * (<span class="nu">2</span> * <span class="const token" data-verso-hover="240">hgt</span> key v + <span class="nu">1</span>) ≤</span>
+<span id="L221">          <span class="nu">3</span> * K.<span class="const token" data-verso-hover="54">tries</span> * (<span class="nu">2</span> * <span class="const token" data-verso-hover="240">hgt</span> key u + <span class="kw">if</span> v = u <span class="kw">then</span> <span class="nu">1</span> <span class="kw">else</span> <span class="nu">0</span>) := <span class="const token" data-verso-hover="246">Nat.mul_le_mul_left</span> _ hpos</span>
+<span id="L222">      <span class="kw">have</span> : <span class="nu">3</span> * K.<span class="const token" data-verso-hover="54">tries</span> * (<span class="nu">2</span> * <span class="const token" data-verso-hover="240">hgt</span> key v + <span class="nu">1</span>) = <span class="nu">3</span> * K.<span class="const token" data-verso-hover="54">tries</span> * (<span class="nu">2</span> * <span class="const token" data-verso-hover="240">hgt</span> key v) + <span class="nu">3</span> * K.<span class="const token" data-verso-hover="54">tries</span> := <span class="kw">by</span></span>
+<span id="L223">        <span class="kw">ring</span></span>
+<span id="L224">      <span class="kw">omega</span></span>
+<span id="L225"></span>
+<span id="L226"><span class="dc">/-- The root returned by a `Find` is the root of its current node. -/</span></span>
+<span id="L227"><span class="kw">lemma</span> <span class="const token" data-verso-hover="441">find_found</span> {m : E → E} (hg : <span class="const token" data-verso-hover="121">Good</span> key m) {s : E} {fs : <span class="const token" data-verso-hover="56">FS</span> E} {r : E}</span>
+<span id="L228">    (hf : <span class="const token" data-verso-hover="303">FInv</span> K key m s fs) (h : (<span class="const token" data-verso-hover="312">fRes</span> K fs m).<span class="const token" data-verso-hover="147">1</span> = <span class="const token" data-verso-hover="67">.</span>inr r) : r = <span class="const token" data-verso-hover="25">rootOf</span> m (<span class="const token" data-verso-hover="424">cnode</span> fs) := <span class="kw">by</span></span>
+<span id="L229">  <span class="kw">have</span> hs := (<span class="const token" data-verso-hover="313">fRes_spec</span> hg hf).<span class="const token" data-verso-hover="138">2</span></span>
+<span id="L230">  <span class="kw">rw</span> [h] <span class="kw">at</span> hs</span>
+<span id="L231">  <span class="kw">obtain</span> ⟨-, hr, hrs⟩ := hs</span>
+<span id="L232">  <span class="kw">have</span> := <span class="const token" data-verso-hover="133">same_trans</span> hrs (<span class="const token" data-verso-hover="135">same_symm</span> hf.<span class="const token" data-verso-hover="438">same_cnode</span>)</span>
+<span id="L233">  <span class="kw">unfold</span> <span class="const token" data-verso-hover="108">same</span> <span class="kw">at</span> this</span>
+<span id="L234">  <span class="kw">rw</span> [<span class="const token" data-verso-hover="163">rootOf_of_fixed</span> hr] <span class="kw">at</span> this</span>
+<span id="L235">  <span class="kw">exact</span> this</span>
+<span id="L236"></span>
+<span id="L237"><span class="kw">lemma</span> <span class="const token" data-verso-hover="442">cnode_start</span> (v : E) : <span class="const token" data-verso-hover="424">cnode</span> (<span class="const token" data-verso-hover="65">FS.start</span> K v) = v := <span class="kw">by</span> <span class="kw">cases</span> K &lt;;&gt; <span class="kw">rfl</span></span>
+<span id="L238"></span>
+<span id="L239"><span class="dc">/-- **A step of a process that does not change the memory decreases its local potential.** -/</span></span>
+<span id="L240"><span class="kw">theorem</span> <span class="const token" data-verso-hover="443">Φ_dec</span> {m : E → E} (hg : <span class="const token" data-verso-hover="121">Good</span> key m) {o : <span class="const token" data-verso-hover="28">DSUOp</span> E} {l l' : <span class="const token" data-verso-hover="69">Loc</span> E}</span>
+<span id="L241">    (hl : <span class="const token" data-verso-hover="304">LocInv</span> K key m (<span class="const token" data-verso-hover="112">some</span> o) l) (h : <span class="const token" data-verso-hover="314">tauRes</span> K key l m = <span class="const token" data-verso-hover="112">some</span> (l', m)) :</span>
+<span id="L242">    <span class="const token" data-verso-hover="430">Φ</span> K key m l' &lt; <span class="const token" data-verso-hover="430">Φ</span> K key m l := <span class="kw">by</span></span>
+<span id="L243">  <span class="kw">have</span> hW : <span class="const token" data-verso-hover="429">wB</span> (E := E) K = <span class="nu">3</span> * <span class="const token" data-verso-hover="428">fB</span> (E := E) K + <span class="nu">3</span> := <span class="const token" data-verso-hover="42">rfl</span></span>
+<span id="L244">  <span class="kw">cases</span> l <span class="kw">with</span></span>
+<span id="L245">  | <span class="const token" data-verso-hover="70">idle</span> =&gt; <span class="kw">exact</span> hl.<span class="const token" data-verso-hover="155">elim</span></span>
+<span id="L246">  | <span class="const token" data-verso-hover="75">done</span> r =&gt; <span class="kw">simp</span> [<span class="const token" data-verso-hover="314">tauRes</span>, <span class="const token" data-verso-hover="84">act</span>] <span class="kw">at</span> h</span>
+<span id="L247">  | <span class="const token" data-verso-hover="71">fu</span> b fs v =&gt;</span>
+<span id="L248">    <span class="kw">obtain</span> ⟨hb, hf, hv⟩ := hl</span>
+<span id="L249">    <span class="kw">simp</span> only [<span class="const token" data-verso-hover="314">tauRes</span>, <span class="const token" data-verso-hover="84">act</span>, <span class="const token" data-verso-hover="315">tauRes_liftF</span>, <span class="const token" data-verso-hover="158">Option.some.injEq</span>, <span class="const token" data-verso-hover="159">Prod.mk.injEq</span>] <span class="kw">at</span> h</span>
+<span id="L250">    <span class="kw">obtain</span> ⟨<span class="kw">rfl</span>, hm⟩ := h</span>
+<span id="L251">    <span class="kw">cases</span> hc : (<span class="const token" data-verso-hover="312">fRes</span> K fs m).<span class="const token" data-verso-hover="147">1</span> <span class="kw">with</span></span>
+<span id="L252">    | <span class="const token" data-verso-hover="68">inl</span> fs' =&gt;</span>
+<span id="L253">      <span class="kw">obtain</span> ⟨h1, h2⟩ := <span class="const token" data-verso-hover="439">find_dec</span> hg hf hc hm</span>
+<span id="L254">      <span class="kw">simp</span> only [<span class="const token" data-verso-hover="77">contU</span>, <span class="const token" data-verso-hover="430">Φ</span>, h2]; <span class="kw">omega</span></span>
+<span id="L255">    | <span class="const token" data-verso-hover="67">inr</span> r =&gt;</span>
+<span id="L256">      <span class="kw">have</span> hr := <span class="const token" data-verso-hover="441">find_found</span> hg hf hc</span>
+<span id="L257">      <span class="kw">have</span> := <span class="const token" data-verso-hover="436">fpot_lt</span> (K := K) (key := key) m (<span class="const token" data-verso-hover="65">FS.start</span> K v)</span>
+<span id="L258">      <span class="kw">simp</span> only [<span class="const token" data-verso-hover="77">contU</span>, <span class="const token" data-verso-hover="430">Φ</span>, <span class="const token" data-verso-hover="442">cnode_start</span>]</span>
+<span id="L259">      <span class="kw">rw</span> [hr]</span>
+<span id="L260">      <span class="kw">omega</span></span>
+<span id="L261">  | <span class="const token" data-verso-hover="72">fv</span> b u fs =&gt;</span>
+<span id="L262">    <span class="kw">obtain</span> ⟨hb, hu, hf⟩ := hl</span>
+<span id="L263">    <span class="kw">simp</span> only [<span class="const token" data-verso-hover="314">tauRes</span>, <span class="const token" data-verso-hover="84">act</span>, <span class="const token" data-verso-hover="315">tauRes_liftF</span>, <span class="const token" data-verso-hover="158">Option.some.injEq</span>, <span class="const token" data-verso-hover="159">Prod.mk.injEq</span>] <span class="kw">at</span> h</span>
+<span id="L264">    <span class="kw">obtain</span> ⟨<span class="kw">rfl</span>, hm⟩ := h</span>
+<span id="L265">    <span class="kw">cases</span> hc : (<span class="const token" data-verso-hover="312">fRes</span> K fs m).<span class="const token" data-verso-hover="147">1</span> <span class="kw">with</span></span>
+<span id="L266">    | <span class="const token" data-verso-hover="68">inl</span> fs' =&gt;</span>
+<span id="L267">      <span class="kw">obtain</span> ⟨h1, h2⟩ := <span class="const token" data-verso-hover="439">find_dec</span> hg hf hc hm</span>
+<span id="L268">      <span class="kw">simp</span> only [<span class="const token" data-verso-hover="78">contV</span>, <span class="const token" data-verso-hover="430">Φ</span>, h2]; <span class="kw">omega</span></span>
+<span id="L269">    | <span class="const token" data-verso-hover="67">inr</span> r =&gt;</span>
+<span id="L270">      <span class="kw">have</span> hr := <span class="const token" data-verso-hover="441">find_found</span> hg hf hc</span>
+<span id="L271">      <span class="kw">simp</span> only [<span class="const token" data-verso-hover="78">contV</span>]</span>
+<span id="L272">      <span class="kw">split_ifs</span></span>
+<span id="L273">      · <span class="kw">simp</span> only [<span class="const token" data-verso-hover="430">Φ</span>]; <span class="kw">omega</span></span>
+<span id="L274">      · <span class="kw">simp</span> only [<span class="const token" data-verso-hover="430">Φ</span>, hr]; <span class="kw">omega</span></span>
+<span id="L275">      · <span class="kw">simp</span> only [<span class="const token" data-verso-hover="430">Φ</span>, hr]; <span class="kw">omega</span></span>
+<span id="L276">  | <span class="const token" data-verso-hover="73">chk</span> u v =&gt;</span>
+<span id="L277">    <span class="kw">simp</span> only [<span class="const token" data-verso-hover="314">tauRes</span>, <span class="const token" data-verso-hover="84">act</span>, <span class="const token" data-verso-hover="156">ptr_read</span>, <span class="const token" data-verso-hover="157">Function.update_eq_self</span>, <span class="const token" data-verso-hover="76">val</span>, <span class="const token" data-verso-hover="158">Option.some.injEq</span>,</span>
+<span id="L278">      <span class="const token" data-verso-hover="159">Prod.mk.injEq</span>] <span class="kw">at</span> h</span>
+<span id="L279">    <span class="kw">obtain</span> ⟨<span class="kw">rfl</span>, -⟩ := h</span>
+<span id="L280">    <span class="kw">by_cases</span> hu : m u = u</span>
+<span id="L281">    · <span class="kw">simp</span> only [hu, <span class="const token" data-verso-hover="161">ite_true</span>, <span class="const token" data-verso-hover="430">Φ</span>]</span>
+<span id="L282">      <span class="kw">have</span> : <span class="nu">1</span> ≤ <span class="const token" data-verso-hover="423">qv</span> key m u := <span class="kw">by</span> <span class="kw">simp</span> [<span class="const token" data-verso-hover="423">qv</span>, hu]</span>
+<span id="L283">      <span class="kw">have</span> : <span class="nu">0</span> &lt; <span class="const token" data-verso-hover="429">wB</span> (E := E) K := <span class="kw">by</span> <span class="kw">rw</span> [hW]; <span class="kw">omega</span></span>
+<span id="L284">      <span class="kw">nlinarith</span></span>
+<span id="L285">    · <span class="kw">simp</span> only [hu, <span class="const token" data-verso-hover="143">ite_false</span>, <span class="const token" data-verso-hover="430">Φ</span>, <span class="const token" data-verso-hover="442">cnode_start</span>]</span>
+<span id="L286">      <span class="kw">have</span> h1 := <span class="const token" data-verso-hover="435">qv_rootOf_lt</span> hg hu</span>
+<span id="L287">      <span class="kw">have</span> h2 := <span class="const token" data-verso-hover="434">qv_rootOf_le</span> hg v</span>
+<span id="L288">      <span class="kw">have</span> h3 := <span class="const token" data-verso-hover="436">fpot_lt</span> (K := K) (key := key) m (<span class="const token" data-verso-hover="65">FS.start</span> K u)</span>
+<span id="L289">      <span class="kw">have</span> : <span class="const token" data-verso-hover="429">wB</span> (E := E) K * (<span class="const token" data-verso-hover="423">qv</span> key m (<span class="const token" data-verso-hover="25">rootOf</span> m u) + <span class="const token" data-verso-hover="423">qv</span> key m (<span class="const token" data-verso-hover="25">rootOf</span> m v)) + <span class="const token" data-verso-hover="429">wB</span> (E := E) K ≤</span>
+<span id="L290">          <span class="const token" data-verso-hover="429">wB</span> (E := E) K * (<span class="const token" data-verso-hover="423">qv</span> key m u + <span class="const token" data-verso-hover="423">qv</span> key m v) := <span class="kw">by</span></span>
+<span id="L291">        <span class="kw">rw</span> [← <span class="const token" data-verso-hover="245">Nat.mul_succ</span>]; <span class="kw">apply</span> <span class="const token" data-verso-hover="246">Nat.mul_le_mul_left</span>; <span class="kw">omega</span></span>
+<span id="L292">      <span class="kw">omega</span></span>
+<span id="L293">  | <span class="const token" data-verso-hover="74">lnk</span> u v =&gt;</span>
+<span id="L294">    <span class="kw">obtain</span> ⟨hb, hu, hv, huv⟩ := hl</span>
+<span id="L295">    <span class="kw">by_cases</span> hlt : key u &lt; key v</span>
+<span id="L296">    · <span class="kw">simp</span> only [<span class="const token" data-verso-hover="314">tauRes</span>, <span class="const token" data-verso-hover="84">act</span>, hlt, <span class="const token" data-verso-hover="161">ite_true</span>, <span class="const token" data-verso-hover="166">ptr_cas</span>, <span class="const token" data-verso-hover="158">Option.some.injEq</span>, <span class="const token" data-verso-hover="159">Prod.mk.injEq</span>] <span class="kw">at</span> h</span>
+<span id="L297">      <span class="kw">obtain</span> ⟨<span class="kw">rfl</span>, hm⟩ := h</span>
+<span id="L298">      <span class="kw">by_cases</span> hr : m u = u</span>
+<span id="L299">      · <span class="kw">exfalso</span></span>
+<span id="L300">        <span class="kw">simp</span> only [hr, <span class="const token" data-verso-hover="161">ite_true</span>] <span class="kw">at</span> hm</span>
+<span id="L301">        <span class="kw">have</span> := <span class="const token" data-verso-hover="400">congrFun</span> hm u</span>
+<span id="L302">        <span class="kw">simp</span> only [<span class="const token" data-verso-hover="153">Function.update_self</span>] <span class="kw">at</span> this</span>
+<span id="L303">        <span class="kw">rw</span> [hr] <span class="kw">at</span> this; <span class="kw">exact</span> huv this.<span class="const token" data-verso-hover="294">symm</span></span>
+<span id="L304">      · <span class="kw">simp</span> only [hr, <span class="const token" data-verso-hover="143">ite_false</span>, <span class="const token" data-verso-hover="170">Sum.inr.injEq</span>, <span class="const token" data-verso-hover="171">Bool.false_eq_true</span>, <span class="const token" data-verso-hover="430">Φ</span>, <span class="const token" data-verso-hover="442">cnode_start</span>]</span>
+<span id="L305">        <span class="kw">have</span> h1 := <span class="const token" data-verso-hover="435">qv_rootOf_lt</span> hg hr</span>
+<span id="L306">        <span class="kw">have</span> h2 := <span class="const token" data-verso-hover="434">qv_rootOf_le</span> hg v</span>
+<span id="L307">        <span class="kw">have</span> h3 := <span class="const token" data-verso-hover="436">fpot_lt</span> (K := K) (key := key) m (<span class="const token" data-verso-hover="65">FS.start</span> K u)</span>
+<span id="L308">        <span class="kw">have</span> : <span class="const token" data-verso-hover="429">wB</span> (E := E) K * (<span class="const token" data-verso-hover="423">qv</span> key m (<span class="const token" data-verso-hover="25">rootOf</span> m u) + <span class="const token" data-verso-hover="423">qv</span> key m (<span class="const token" data-verso-hover="25">rootOf</span> m v)) + <span class="const token" data-verso-hover="429">wB</span> (E := E) K ≤</span>
+<span id="L309">            <span class="const token" data-verso-hover="429">wB</span> (E := E) K * (<span class="const token" data-verso-hover="423">qv</span> key m u + <span class="const token" data-verso-hover="423">qv</span> key m v) := <span class="kw">by</span></span>
+<span id="L310">          <span class="kw">rw</span> [← <span class="const token" data-verso-hover="245">Nat.mul_succ</span>]; <span class="kw">apply</span> <span class="const token" data-verso-hover="246">Nat.mul_le_mul_left</span>; <span class="kw">omega</span></span>
+<span id="L311">        <span class="kw">omega</span></span>
+<span id="L312">    · <span class="kw">simp</span> only [<span class="const token" data-verso-hover="314">tauRes</span>, <span class="const token" data-verso-hover="84">act</span>, hlt, <span class="const token" data-verso-hover="143">ite_false</span>, <span class="const token" data-verso-hover="166">ptr_cas</span>, <span class="const token" data-verso-hover="158">Option.some.injEq</span>, <span class="const token" data-verso-hover="159">Prod.mk.injEq</span>] <span class="kw">at</span> h</span>
+<span id="L313">      <span class="kw">obtain</span> ⟨<span class="kw">rfl</span>, hm⟩ := h</span>
+<span id="L314">      <span class="kw">by_cases</span> hr : m v = v</span>
+<span id="L315">      · <span class="kw">exfalso</span></span>
+<span id="L316">        <span class="kw">simp</span> only [hr, <span class="const token" data-verso-hover="161">ite_true</span>] <span class="kw">at</span> hm</span>
+<span id="L317">        <span class="kw">have</span> := <span class="const token" data-verso-hover="400">congrFun</span> hm v</span>
+<span id="L318">        <span class="kw">simp</span> only [<span class="const token" data-verso-hover="153">Function.update_self</span>] <span class="kw">at</span> this</span>
+<span id="L319">        <span class="kw">rw</span> [hr] <span class="kw">at</span> this; <span class="kw">exact</span> huv this</span>
+<span id="L320">      · <span class="kw">simp</span> only [hr, <span class="const token" data-verso-hover="143">ite_false</span>, <span class="const token" data-verso-hover="170">Sum.inr.injEq</span>, <span class="const token" data-verso-hover="171">Bool.false_eq_true</span>, <span class="const token" data-verso-hover="430">Φ</span>, <span class="const token" data-verso-hover="442">cnode_start</span>]</span>
+<span id="L321">        <span class="kw">have</span> h1 := <span class="const token" data-verso-hover="434">qv_rootOf_le</span> hg u</span>
+<span id="L322">        <span class="kw">have</span> h2 := <span class="const token" data-verso-hover="435">qv_rootOf_lt</span> hg hr</span>
+<span id="L323">        <span class="kw">have</span> h3 := <span class="const token" data-verso-hover="436">fpot_lt</span> (K := K) (key := key) m (<span class="const token" data-verso-hover="65">FS.start</span> K u)</span>
+<span id="L324">        <span class="kw">have</span> : <span class="const token" data-verso-hover="429">wB</span> (E := E) K * (<span class="const token" data-verso-hover="423">qv</span> key m (<span class="const token" data-verso-hover="25">rootOf</span> m u) + <span class="const token" data-verso-hover="423">qv</span> key m (<span class="const token" data-verso-hover="25">rootOf</span> m v)) + <span class="const token" data-verso-hover="429">wB</span> (E := E) K ≤</span>
+<span id="L325">            <span class="const token" data-verso-hover="429">wB</span> (E := E) K * (<span class="const token" data-verso-hover="423">qv</span> key m u + <span class="const token" data-verso-hover="423">qv</span> key m v) := <span class="kw">by</span></span>
+<span id="L326">          <span class="kw">rw</span> [← <span class="const token" data-verso-hover="245">Nat.mul_succ</span>]; <span class="kw">apply</span> <span class="const token" data-verso-hover="246">Nat.mul_le_mul_left</span>; <span class="kw">omega</span></span>
+<span id="L327">        <span class="kw">omega</span></span>
+<span id="L328"></span>
+<span id="L329"><span class="kw">variable</span> (K key) <span class="kw">in</span></span>
+<span id="L330"><span class="dc">/-- The potential of process `p` in a configuration. -/</span></span>
+<span id="L331"><span class="kw">def</span> <span class="const token" data-verso-hover="444">Ψ</span> (p : P) (C : <span class="const token" data-verso-hover="119">Config</span> (<span class="const token" data-verso-hover="30">dsu</span> E) (<span class="const token" data-verso-hover="45">Ptr</span> E) P (<span class="const token" data-verso-hover="69">Loc</span> E)) : <span class="const token" data-verso-hover="51">ℕ</span> :=</span>
+<span id="L332">  <span class="const token" data-verso-hover="431">bnd</span> (E := E) K * <span class="const token" data-verso-hover="297">mpot</span> key C.<span class="const token" data-verso-hover="122">mem</span> + <span class="const token" data-verso-hover="430">Φ</span> K key C.<span class="const token" data-verso-hover="122">mem</span> (C.<span class="const token" data-verso-hover="125">loc</span> p)</span>
+<span id="L333"></span>
+<span id="L334"><span class="dc">/-- **Lemma 3.3 (Wait-freedom).** With any version of `Find` and injective ids, every operation</span></span>
+<span id="L335"><span class="dc">finishes within finitely many of its own steps. -/</span></span>
+<span id="L336"><span class="kw">theorem</span> <span class="const token" data-verso-hover="3">waitFree</span> (hkey : <span class="const token" data-verso-hover="141">Function.Injective</span> key) : (<span class="const token" data-verso-hover="87">dsuImpl</span> K key P).<span class="const token" data-verso-hover="8">WaitFree</span> := <span class="kw">by</span></span>
+<span id="L337">  <span class="kw">refine</span> <span class="const token" data-verso-hover="17">Impl.waitFree_of_cfgPotential</span> _ (<span class="const token" data-verso-hover="305">LInv</span> K key) <span class="const token" data-verso-hover="319">linv_init</span></span>
+<span id="L338">    (<span class="kw">fun</span> C C' ℓ hI h =&gt; (<span class="const token" data-verso-hover="320">linv_step</span> hkey hI h).<span class="const token" data-verso-hover="137">1</span>) (<span class="const token" data-verso-hover="444">Ψ</span> K key) ?_</span>
+<span id="L339">  <span class="kw">intro</span> p C C' ℓ hI hp h</span>
+<span id="L340">  <span class="kw">have</span> hleg := (<span class="const token" data-verso-hover="320">linv_step</span> hkey hI h).<span class="const token" data-verso-hover="138">2</span></span>
+<span id="L341">  <span class="kw">have</span> hΦ := <span class="const token" data-verso-hover="437">Φ_lt</span> (K := K) (key := key) C'.<span class="const token" data-verso-hover="122">mem</span> (C'.<span class="const token" data-verso-hover="125">loc</span> p)</span>
+<span id="L342">  <span class="kw">by_cases</span> hm : C'.<span class="const token" data-verso-hover="122">mem</span> = C.<span class="const token" data-verso-hover="122">mem</span></span>
+<span id="L343">  · <span class="cm">--</span><span class="cm"> the memory did not change</span></span>
+<span id="L344">    <span class="kw">by_cases</span> hℓ : ℓ = <span class="const token" data-verso-hover="150">.</span>tau p</span>
+<span id="L345">    · <span class="kw">subst</span> hℓ</span>
+<span id="L346">      <span class="kw">obtain</span> ⟨-, hres, -, -⟩ := <span class="const token" data-verso-hover="316">step_tau_tauRes</span> h</span>
+<span id="L347">      <span class="kw">obtain</span> ⟨o, ho⟩ := <span class="const token" data-verso-hover="184">Option.ne_none_iff_exists'</span>.<span class="const token" data-verso-hover="185">1</span> hp</span>
+<span id="L348">      <span class="kw">have</span> hl := hI.<span class="const token" data-verso-hover="307">loc</span> p</span>
+<span id="L349">      <span class="kw">rw</span> [ho] <span class="kw">at</span> hl</span>
+<span id="L350">      <span class="kw">rw</span> [hm] <span class="kw">at</span> hres</span>
+<span id="L351">      <span class="kw">have</span> := <span class="const token" data-verso-hover="443">Φ_dec</span> hI.<span class="const token" data-verso-hover="306">good</span> hl hres</span>
+<span id="L352">      <span class="kw">simp</span> only [<span class="const token" data-verso-hover="444">Ψ</span>, hm]</span>
+<span id="L353">      <span class="kw">exact</span> ⟨<span class="kw">by</span> <span class="kw">omega</span>, <span class="kw">fun</span> _ =&gt; <span class="kw">by</span> <span class="kw">omega</span>⟩</span>
+<span id="L354">    · <span class="kw">have</span> hle : <span class="const token" data-verso-hover="430">Φ</span> K key C.<span class="const token" data-verso-hover="122">mem</span> (C'.<span class="const token" data-verso-hover="125">loc</span> p) ≤ <span class="const token" data-verso-hover="430">Φ</span> K key C.<span class="const token" data-verso-hover="122">mem</span> (C.<span class="const token" data-verso-hover="125">loc</span> p) := <span class="kw">by</span></span>
+<span id="L355">        <span class="kw">by_cases</span> hq : ℓ.<span class="const token" data-verso-hover="247">proc</span> = p</span>
+<span id="L356">        · <span class="kw">cases</span> ℓ <span class="kw">with</span></span>
+<span id="L357">          | <span class="const token" data-verso-hover="180">inv</span> q o =&gt;</span>
+<span id="L358">            <span class="kw">simp</span> only [<span class="const token" data-verso-hover="247">Label.proc</span>] <span class="kw">at</span> hq; <span class="kw">subst</span> hq; <span class="kw">exact</span> <span class="const token" data-verso-hover="228">absurd</span> (<span class="const token" data-verso-hover="181">Impl.step_inv</span> h).<span class="const token" data-verso-hover="137">1</span> hp</span>
+<span id="L359">          | <span class="const token" data-verso-hover="182">ret</span> q r =&gt;</span>
+<span id="L360">            <span class="kw">simp</span> only [<span class="const token" data-verso-hover="247">Label.proc</span>] <span class="kw">at</span> hq; <span class="kw">subst</span> hq</span>
+<span id="L361">            <span class="kw">obtain</span> ⟨h0, -, -, l, hact, hl⟩ := <span class="const token" data-verso-hover="183">Impl.step_ret</span> h</span>
+<span id="L362">            <span class="kw">have</span> hact' : <span class="const token" data-verso-hover="84">act</span> K key (C.<span class="const token" data-verso-hover="125">loc</span> q) = <span class="const token" data-verso-hover="85">.</span>ret r l := hact</span>
+<span id="L363">            <span class="kw">rcases</span> <span class="const token" data-verso-hover="372">act_ret_cases</span> hact' <span class="kw">with</span> h1 | h1</span>
+<span id="L364">            · <span class="kw">rw</span> [h1] <span class="kw">at</span> hact'; <span class="kw">simp</span> only [<span class="const token" data-verso-hover="84">act</span>] <span class="kw">at</span> hact'; <span class="kw">cases</span> hact'</span>
+<span id="L365">              <span class="kw">rw</span> [hl, <span class="const token" data-verso-hover="153">Function.update_self</span>]; <span class="kw">simp</span> [<span class="const token" data-verso-hover="430">Φ</span>]</span>
+<span id="L366">            · <span class="kw">have</span> := hI.<span class="const token" data-verso-hover="307">loc</span> q</span>
+<span id="L367">              <span class="kw">obtain</span> ⟨o, ho⟩ := <span class="const token" data-verso-hover="184">Option.ne_none_iff_exists'</span>.<span class="const token" data-verso-hover="185">1</span> hp</span>
+<span id="L368">              <span class="kw">rw</span> [ho, h1] <span class="kw">at</span> this; <span class="kw">exact</span> this.<span class="const token" data-verso-hover="155">elim</span></span>
+<span id="L369">          | <span class="const token" data-verso-hover="150">tau</span> q =&gt; <span class="kw">simp</span> only [<span class="const token" data-verso-hover="247">Label.proc</span>] <span class="kw">at</span> hq; <span class="kw">exact</span> <span class="const token" data-verso-hover="228">absurd</span> (<span class="kw">by</span> <span class="kw">rw</span> [hq]) hℓ</span>
+<span id="L370">        · <span class="kw">rw</span> [(<span class="const token" data-verso-hover="249">Impl.step_other</span> h hq).<span class="const token" data-verso-hover="137">1</span>]</span>
+<span id="L371">      <span class="kw">simp</span> only [<span class="const token" data-verso-hover="444">Ψ</span>, hm]</span>
+<span id="L372">      <span class="kw">exact</span> ⟨<span class="kw">by</span> <span class="kw">omega</span>, <span class="kw">fun</span> h' =&gt; <span class="const token" data-verso-hover="228">absurd</span> h' hℓ⟩</span>
+<span id="L373">  · <span class="cm">--</span><span class="cm"> the memory changed: `mpot` decreased</span></span>
+<span id="L374">    <span class="kw">have</span> hlt := <span class="const token" data-verso-hover="298">mpot_lt</span> hleg hm</span>
+<span id="L375">    <span class="kw">have</span> hΦ' := <span class="const token" data-verso-hover="437">Φ_lt</span> (K := K) (key := key) C.<span class="const token" data-verso-hover="122">mem</span> (C.<span class="const token" data-verso-hover="125">loc</span> p)</span>
+<span id="L376">    <span class="kw">have</span> : <span class="const token" data-verso-hover="431">bnd</span> (E := E) K * <span class="const token" data-verso-hover="297">mpot</span> key C'.<span class="const token" data-verso-hover="122">mem</span> + <span class="const token" data-verso-hover="431">bnd</span> (E := E) K ≤ <span class="const token" data-verso-hover="431">bnd</span> (E := E) K * <span class="const token" data-verso-hover="297">mpot</span> key C.<span class="const token" data-verso-hover="122">mem</span> := <span class="kw">by</span></span>
+<span id="L377">      <span class="kw">rw</span> [← <span class="const token" data-verso-hover="245">Nat.mul_succ</span>]; <span class="kw">exact</span> <span class="const token" data-verso-hover="246">Nat.mul_le_mul_left</span> _ hlt</span>
+<span id="L378">    <span class="kw">simp</span> only [<span class="const token" data-verso-hover="444">Ψ</span>]</span>
+<span id="L379">    <span class="kw">exact</span> ⟨<span class="kw">by</span> <span class="kw">omega</span>, <span class="kw">fun</span> _ =&gt; <span class="kw">by</span> <span class="kw">omega</span>⟩</span>
+<span id="L380"></span>
+<span id="L381"><span class="kw">end</span> Podc.ConcurrentDSU</span>
+<span id="L382"></span>
+</code></div>
+        <script>
+          window.versoHoversUrl = "PODC2016/ConcurrentDSU/-hovers.json";</script>
+        <script src="static/lean/popper.js"></script>
+        <script src="static/lean/tippy.js"></script>
+        <script src="static/lean/marked.js"></script>
+        <script src="static/lean/highlighting.js"></script>
+        <script src="static/lean/lean.js"></script>
+        </article></main><footer class="site-footer"><div class="wrap">
+        Machine-checked formalizations of PODC papers in Lean 4. Generated with <a href="https://github.com/leanprover/verso">Verso</a> from the README files of <a href="https://github.com/vasnesterov/formal_podc">vasnesterov/formal_podc</a>.</div>
+      </footer></body>
+  </html>
+

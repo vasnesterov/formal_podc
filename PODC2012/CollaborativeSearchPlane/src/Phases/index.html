@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="light dark">
+    <link rel="icon" href="data:,">
+    <title>CollaborativeSearchPlane: Phases.lean · Formal PODC</title><base href="../../../.././"><link rel="stylesheet" href="static/lean/verso-vars.css">
+    <link rel="stylesheet" href="static/lean/highlighting.css">
+    <link rel="stylesheet" href="static/lean/tippy-border.css">
+    <link rel="stylesheet" href="static/style.css">
+    <script defer="defer" src="static/site.js"></script>
+    </head>
+  <body>
+    <header class="site-header">
+      <div class="wrap">
+        <a class="brand" href=".">Formal PODC</a><nav class="top">
+          <a href=".">Search</a><a href="about/">About</a><a href="https://github.com/vasnesterov/formal_podc">GitHub</a></nav>
+        </div>
+      </header>
+    <main class="wrap"><article><nav class="breadcrumbs" aria-label="Breadcrumb">
+          <a href=".">Search</a><span class="sep">›</span><a href="PODC2012/">PODC 2012</a><span class="sep">›</span><a href="PODC2012/CollaborativeSearchPlane/">CollaborativeSearchPlane</a><span class="sep">›</span><a href="PODC2012/CollaborativeSearchPlane/src/">Lean source</a><span class="sep">›</span><span aria-current="page">Phases</span></nav>
+        <h1>
+          <code>Phases.lean</code></h1>
+        <div class="paper-links">
+          <p>
+            Source of <a href="PODC2012/CollaborativeSearchPlane/">Collaborative Search on the Plane without Communication — PODC 2012</a> · <a href="https://github.com/vasnesterov/formal_podc/blob/main/Papers/PODC2012/CollaborativeSearchPlane/Phases.lean">GitHub</a> · hover over a name for its type and documentation</p>
+          </div>
+        <div class="lean-code lean-src">
+          <code class="hl lean block" data-lean-context="Phases"><span id="L1"><span class="kw">import</span> Papers.PODC2012.CollaborativeSearchPlane.Basic</span>
+<span id="L2"></span>
+<span id="L3"><span class="dc">/-!</span></span>
+<span id="L4"><span class="dc"># Phased search algorithms (the algorithms of §3 and of the appendix)</span></span>
+<span id="L5"></span>
+<span id="L6"><span class="dc">All upper-bound algorithms of the paper are built from *phases*: "go to a node `u` chosen</span></span>
+<span id="L7"><span class="dc">uniformly at random in the ball `B(R)`, perform a spiral search of length `t` starting at `u`,</span></span>
+<span id="L8"><span class="dc">return to the source". Phases are grouped into *blocks* `b = 0, 1, 2, …` (stages, resp. big</span></span>
+<span id="L9"><span class="dc">stages), block `b` consisting of the finitely many phases `P b`.</span></span>
+<span id="L10"></span>
+<span id="L11"><span class="dc">As in the paper, the navigation procedures are atomic, with the guarantees the paper assumes</span></span>
+<span id="L12"><span class="dc">(§2 and footnote 1):</span></span>
+<span id="L13"></span>
+<span id="L14"><span class="dc">* walking to `u` takes `d(u) ≤ R` steps, a spiral search of length `t` takes `t` steps and</span></span>
+<span id="L15"><span class="dc">  ends within distance `t` of `u`, so returning takes `≤ R + t` steps: a phase lasts at most</span></span>
+<span id="L16"><span class="dc">  `2R + 2t` (`phaseDur`);</span></span>
+<span id="L17"><span class="dc">* a spiral search of length `t` from `u` visits every node `v` with `σ · d(u, v)² ≤ t`</span></span>
+<span id="L18"><span class="dc">  (the paper takes `σ = 4`: "visits all nodes at distance at most `√x/2`"; we keep the constant</span></span>
+<span id="L19"><span class="dc">  `σ ≥ 1` as a parameter, any value gives the same asymptotics).</span></span>
+<span id="L20"></span>
+<span id="L21"><span class="dc">Hence an agent whose node `u` in phase `x` satisfies `σ · d(u, τ)² ≤ t` has found the treasure by</span></span>
+<span id="L22"><span class="dc">the end of phase `x`. We formalize the analysis at this level: the random choices of all agents in</span></span>
+<span id="L23"><span class="dc">all phases are independent (`Measure.infinitePi`), `notFoundBefore S b` is the event that no agent</span></span>
+<span id="L24"><span class="dc">has hit its success set in a block `&lt; b`, and if every agent finishes block `b'` within time</span></span>
+<span id="L25"><span class="dc">`∑_{b'' ≤ b'} dur b''`, then the search is over by time</span></span>
+<span id="L26"></span>
+<span id="L27"><span class="dc">`timeBound S dur = ∑_b dur b · 1[notFoundBefore S b]`.</span></span>
+<span id="L28"></span>
+<span id="L29"><span class="dc">`lintegral_timeBound` computes its expectation exactly:</span></span>
+<span id="L30"><span class="dc">`E[timeBound] = ∑_b dur b · ∏_{a} ∏_{phases x before b} Pr[u_{a,x} ∉ S(a,x)]`.</span></span>
+<span id="L31"><span class="dc">-/</span></span>
+<span id="L32"></span>
+<span id="L33"><span class="kw">namespace</span> Podc.CollaborativeSearchPlane</span>
+<span id="L34"></span>
+<span id="L35"><span class="kw">open</span> MeasureTheory Finset</span>
+<span id="L36"><span class="kw">open</span> <span class="kw">scoped</span> ENNReal</span>
+<span id="L37"></span>
+<span id="L38"><span class="kw">variable</span> {P : <span class="const token" data-verso-hover="32">ℕ</span> → <span class="kw">Type</span>} [∀ b, <span class="const token" data-verso-hover="277">Fintype</span> (P b)]</span>
+<span id="L39"></span>
+<span id="L40"><span class="dc">/-- The random choices of a phased search with `k` agents: the node chosen by agent `a` in</span></span>
+<span id="L41"><span class="dc">phase `x = ⟨b, p⟩` (phase `p` of block `b`). -/</span></span>
+<span id="L42"><span class="kw">abbrev</span> <span class="const token" data-verso-hover="278">Choices</span> (k : <span class="const token" data-verso-hover="32">ℕ</span>) (P : <span class="const token" data-verso-hover="32">ℕ</span> → <span class="kw">Type</span>) := <span class="const token" data-verso-hover="38">Fin</span> k × (Σ b, P b) → <span class="const token" data-verso-hover="29">Node</span></span>
+<span id="L43"></span>
+<span id="L44"><span class="dc">/-- The phases of the blocks `&lt; b`. -/</span></span>
+<span id="L45"><span class="kw">def</span> <span class="const token" data-verso-hover="279">phasesBefore</span> (P : <span class="const token" data-verso-hover="32">ℕ</span> → <span class="kw">Type</span>) [∀ b, <span class="const token" data-verso-hover="277">Fintype</span> (P b)] (b : <span class="const token" data-verso-hover="32">ℕ</span>) : <span class="const token" data-verso-hover="54">Finset</span> (Σ b, P b) :=</span>
+<span id="L46">  (<span class="const token" data-verso-hover="49">range</span> b).<span class="const token" data-verso-hover="280">sigma</span> <span class="kw">fun</span> _ =&gt; <span class="const token" data-verso-hover="103">univ</span></span>
+<span id="L47"></span>
+<span id="L48"><span class="kw">theorem</span> <span class="const token" data-verso-hover="281">mem_phasesBefore</span> {b : <span class="const token" data-verso-hover="32">ℕ</span>} {x : Σ b, P b} : x ∈ <span class="const token" data-verso-hover="279">phasesBefore</span> P b ↔ x.<span class="const token" data-verso-hover="282">1</span> &lt; b := <span class="kw">by</span></span>
+<span id="L49">  <span class="kw">simp</span> [<span class="const token" data-verso-hover="279">phasesBefore</span>]</span>
+<span id="L50"></span>
+<span id="L51"><span class="dc">/-- No agent has chosen a node of its success set in any phase of the blocks `&lt; b`. -/</span></span>
+<span id="L52"><span class="kw">def</span> <span class="const token" data-verso-hover="283">notFoundBefore</span> {k : <span class="const token" data-verso-hover="32">ℕ</span>} (S : <span class="const token" data-verso-hover="38">Fin</span> k × (Σ b, P b) → <span class="const token" data-verso-hover="46">Set</span> <span class="const token" data-verso-hover="29">Node</span>) (b : <span class="const token" data-verso-hover="32">ℕ</span>) : <span class="const token" data-verso-hover="46">Set</span> (<span class="const token" data-verso-hover="278">Choices</span> k P) :=</span>
+<span id="L53">  {ω | ∀ a x, x.<span class="const token" data-verso-hover="282">1</span> &lt; b → ω (a, x) ∉ S (a, x)}</span>
+<span id="L54"></span>
+<span id="L55"><span class="dc">/-- The time by which the search is over: `∑_b dur b · 1[no success before block b]`. -/</span></span>
+<span id="L56"><span class="kw">noncomputable</span> <span class="kw">def</span> <span class="const token" data-verso-hover="284">timeBound</span> {k : <span class="const token" data-verso-hover="32">ℕ</span>} (S : <span class="const token" data-verso-hover="38">Fin</span> k × (Σ b, P b) → <span class="const token" data-verso-hover="46">Set</span> <span class="const token" data-verso-hover="29">Node</span>) (dur : <span class="const token" data-verso-hover="32">ℕ</span> → <span class="const token" data-verso-hover="39">ℝ</span>≥0∞)</span>
+<span id="L57">    (ω : <span class="const token" data-verso-hover="278">Choices</span> k P) : <span class="const token" data-verso-hover="39">ℝ</span>≥0∞ :=</span>
+<span id="L58">  ∑' b, dur b * (<span class="const token" data-verso-hover="283">notFoundBefore</span> S b).<span class="const token" data-verso-hover="55">indicator</span> <span class="nu">1</span> ω</span>
+<span id="L59"></span>
+<span id="L60"><span class="kw">theorem</span> <span class="const token" data-verso-hover="285">notFoundBefore_eq_pi</span> {k : <span class="const token" data-verso-hover="32">ℕ</span>} (S : <span class="const token" data-verso-hover="38">Fin</span> k × (Σ b, P b) → <span class="const token" data-verso-hover="46">Set</span> <span class="const token" data-verso-hover="29">Node</span>) (b : <span class="const token" data-verso-hover="32">ℕ</span>) :</span>
+<span id="L61">    <span class="const token" data-verso-hover="283">notFoundBefore</span> S b = <span class="const token" data-verso-hover="80">Set.pi</span> ↑((<span class="const token" data-verso-hover="103">univ</span> : <span class="const token" data-verso-hover="54">Finset</span> (<span class="const token" data-verso-hover="38">Fin</span> k)) ×ˢ <span class="const token" data-verso-hover="279">phasesBefore</span> P b) <span class="kw">fun</span> i =&gt; (S i)ᶜ := <span class="kw">by</span></span>
+<span id="L62">  <span class="kw">ext</span> ω</span>
+<span id="L63">  <span class="kw">simp</span> only [<span class="const token" data-verso-hover="283">notFoundBefore</span>, <span class="const token" data-verso-hover="86">Set.mem_ofPred_eq</span>, <span class="const token" data-verso-hover="83">Set.mem_pi</span>, <span class="const token" data-verso-hover="286">Finset.coe_product</span>, <span class="const token" data-verso-hover="287">Set.mem_prod</span>,</span>
+<span id="L64">    <span class="const token" data-verso-hover="216">Finset.mem_coe</span>, <span class="const token" data-verso-hover="109">Finset.mem_univ</span>, <span class="const token" data-verso-hover="288">true_and</span>, <span class="const token" data-verso-hover="281">mem_phasesBefore</span>, <span class="const token" data-verso-hover="85">Set.mem_compl_iff</span>, <span class="const token" data-verso-hover="289">Prod.forall</span>]</span>
+<span id="L65"></span>
+<span id="L66"><span class="kw">theorem</span> <span class="const token" data-verso-hover="290">measurableSet_notFoundBefore</span> {k : <span class="const token" data-verso-hover="32">ℕ</span>} (S : <span class="const token" data-verso-hover="38">Fin</span> k × (Σ b, P b) → <span class="const token" data-verso-hover="46">Set</span> <span class="const token" data-verso-hover="29">Node</span>) (b : <span class="const token" data-verso-hover="32">ℕ</span>) :</span>
+<span id="L67">    <span class="const token" data-verso-hover="48">MeasurableSet</span> (<span class="const token" data-verso-hover="283">notFoundBefore</span> S b) := <span class="kw">by</span></span>
+<span id="L68">  <span class="kw">rw</span> [<span class="const token" data-verso-hover="285">notFoundBefore_eq_pi</span>]</span>
+<span id="L69">  <span class="kw">exact</span> <span class="const token" data-verso-hover="291">MeasurableSet.pi</span> (<span class="const token" data-verso-hover="292">Finset.countable_toSet</span> _) <span class="kw">fun</span> i _ =&gt; (S i)ᶜ.<span class="const token" data-verso-hover="293">to_countable</span>.<span class="const token" data-verso-hover="294">measurableSet</span></span>
+<span id="L70"></span>
+<span id="L71"><span class="cm">--</span><span class="cm"> CSLib candidate</span></span>
+<span id="L72"><span class="dc">/-- **Expected time of a phased search.** With independent choices of law `π (a, x)`, the</span></span>
+<span id="L73"><span class="dc">expected value of `timeBound` is `∑_b dur b · ∏_a ∏_{x before b} π (a,x) (S (a,x))ᶜ`. -/</span></span>
+<span id="L74"><span class="kw">theorem</span> <span class="const token" data-verso-hover="14">lintegral_timeBound</span> {k : <span class="const token" data-verso-hover="32">ℕ</span>} (π : <span class="const token" data-verso-hover="38">Fin</span> k × (Σ b, P b) → <span class="const token" data-verso-hover="40">Measure</span> <span class="const token" data-verso-hover="29">Node</span>)</span>
+<span id="L75">    [∀ i, <span class="const token" data-verso-hover="53">IsProbabilityMeasure</span> (π i)] (S : <span class="const token" data-verso-hover="38">Fin</span> k × (Σ b, P b) → <span class="const token" data-verso-hover="46">Set</span> <span class="const token" data-verso-hover="29">Node</span>) (dur : <span class="const token" data-verso-hover="32">ℕ</span> → <span class="const token" data-verso-hover="39">ℝ</span>≥0∞) :</span>
+<span id="L76">    ∫⁻ ω, <span class="const token" data-verso-hover="284">timeBound</span> S dur ω ∂(<span class="const token" data-verso-hover="12">Measure.infinitePi</span> π)</span>
+<span id="L77">      = ∑' b, dur b * ∏ a, ∏ x ∈ <span class="const token" data-verso-hover="279">phasesBefore</span> P b, π (a, x) (S (a, x))ᶜ := <span class="kw">by</span></span>
+<span id="L78">  <span class="kw">unfold</span> <span class="const token" data-verso-hover="284">timeBound</span></span>
+<span id="L79">  <span class="kw">rw</span> [<span class="const token" data-verso-hover="295">lintegral_tsum</span> (f := <span class="kw">fun</span> b ω =&gt; dur b * (<span class="const token" data-verso-hover="283">notFoundBefore</span> S b).<span class="const token" data-verso-hover="55">indicator</span> <span class="nu">1</span> ω)</span>
+<span id="L80">    <span class="kw">fun</span> b =&gt; ((<span class="const token" data-verso-hover="296">measurable_one</span>.<span class="const token" data-verso-hover="77">indicator</span></span>
+<span id="L81">    (<span class="const token" data-verso-hover="290">measurableSet_notFoundBefore</span> S b)).<span class="const token" data-verso-hover="297">const_mul</span> _).<span class="const token" data-verso-hover="298">aemeasurable</span>]</span>
+<span id="L82">  <span class="kw">congr</span> <span class="nu">1</span></span>
+<span id="L83">  <span class="kw">ext</span> b</span>
+<span id="L84">  <span class="kw">rw</span> [<span class="const token" data-verso-hover="299">lintegral_const_mul</span> _ (<span class="const token" data-verso-hover="296">measurable_one</span>.<span class="const token" data-verso-hover="77">indicator</span> (<span class="const token" data-verso-hover="290">measurableSet_notFoundBefore</span> S b)),</span>
+<span id="L85">    <span class="const token" data-verso-hover="300">lintegral_indicator_one</span> (<span class="const token" data-verso-hover="290">measurableSet_notFoundBefore</span> S b), <span class="const token" data-verso-hover="285">notFoundBefore_eq_pi</span>,</span>
+<span id="L86">    <span class="const token" data-verso-hover="301">Measure.infinitePi_pi</span> _ (<span class="kw">fun</span> i _ =&gt; (S i)ᶜ.<span class="const token" data-verso-hover="293">to_countable</span>.<span class="const token" data-verso-hover="294">measurableSet</span>), <span class="const token" data-verso-hover="302">Finset.prod_product</span>]</span>
+<span id="L87"></span>
+<span id="L88"><span class="dc">/-! ### Uniform choice in a ball -/</span></span>
+<span id="L89"></span>
+<span id="L90"><span class="dc">/-- The ball `B(R) = {u : d(s, u) ≤ R}` as a finite set. -/</span></span>
+<span id="L91"><span class="kw">def</span> <span class="const token" data-verso-hover="199">ballFinset</span> (R : <span class="const token" data-verso-hover="32">ℕ</span>) : <span class="const token" data-verso-hover="54">Finset</span> <span class="const token" data-verso-hover="29">Node</span> :=</span>
+<span id="L92">  ((<span class="const token" data-verso-hover="201">Icc</span> (-(R : <span class="const token" data-verso-hover="30">ℤ</span>)) R) ×ˢ (<span class="const token" data-verso-hover="201">Icc</span> (-(R : <span class="const token" data-verso-hover="30">ℤ</span>)) R)).<span class="const token" data-verso-hover="56">filter</span> <span class="kw">fun</span> u =&gt; <span class="const token" data-verso-hover="31">dist</span> u ≤ R</span>
+<span id="L93"></span>
+<span id="L94"><span class="kw">theorem</span> <span class="const token" data-verso-hover="223">mem_ballFinset</span> {R : <span class="const token" data-verso-hover="32">ℕ</span>} {u : <span class="const token" data-verso-hover="29">Node</span>} : u ∈ <span class="const token" data-verso-hover="199">ballFinset</span> R ↔ <span class="const token" data-verso-hover="31">dist</span> u ≤ R := <span class="kw">by</span></span>
+<span id="L95">  <span class="kw">unfold</span> <span class="const token" data-verso-hover="199">ballFinset</span></span>
+<span id="L96">  <span class="kw">rw</span> [<span class="const token" data-verso-hover="61">Finset.mem_filter</span>, <span class="const token" data-verso-hover="303">Finset.mem_product</span>, <span class="const token" data-verso-hover="304">Finset.mem_Icc</span>, <span class="const token" data-verso-hover="304">Finset.mem_Icc</span>]</span>
+<span id="L97">  <span class="kw">unfold</span> <span class="const token" data-verso-hover="31">dist</span></span>
+<span id="L98">  <span class="kw">constructor</span></span>
+<span id="L99">  · <span class="kw">exact</span> <span class="kw">fun</span> h =&gt; h.<span class="const token" data-verso-hover="62">2</span></span>
+<span id="L100">  · <span class="kw">intro</span> h; <span class="kw">refine</span> ⟨⟨⟨?_, ?_⟩, ?_, ?_⟩, h⟩ &lt;;&gt; <span class="kw">omega</span></span>
+<span id="L101"></span>
+<span id="L102"><span class="kw">theorem</span> <span class="const token" data-verso-hover="232">ballFinset_nonempty</span> (R : <span class="const token" data-verso-hover="32">ℕ</span>) : (<span class="const token" data-verso-hover="199">ballFinset</span> R).<span class="const token" data-verso-hover="305">Nonempty</span> :=</span>
+<span id="L103">  ⟨<span class="nu">0</span>, <span class="const token" data-verso-hover="223">mem_ballFinset</span>.<span class="const token" data-verso-hover="64">2</span> (<span class="kw">by</span> <span class="kw">simp</span> [<span class="const token" data-verso-hover="31">dist</span>])⟩</span>
+<span id="L104"></span>
+<span id="L105"><span class="dc">/-- The uniform distribution on `B(R)`. -/</span></span>
+<span id="L106"><span class="kw">noncomputable</span> <span class="kw">def</span> <span class="const token" data-verso-hover="226">uniformBall</span> (R : <span class="const token" data-verso-hover="32">ℕ</span>) : <span class="const token" data-verso-hover="40">Measure</span> <span class="const token" data-verso-hover="29">Node</span> :=</span>
+<span id="L107">  (<span class="const token" data-verso-hover="306">PMF.uniformOfFinset</span> (<span class="const token" data-verso-hover="199">ballFinset</span> R) (<span class="const token" data-verso-hover="232">ballFinset_nonempty</span> R)).<span class="const token" data-verso-hover="307">toMeasure</span></span>
+<span id="L108"></span>
+<span id="L109"><span class="const token" data-verso-hover="308">instance</span> (R : <span class="const token" data-verso-hover="32">ℕ</span>) : <span class="const token" data-verso-hover="53">IsProbabilityMeasure</span> (<span class="const token" data-verso-hover="226">uniformBall</span> R) := <span class="kw">by</span></span>
+<span id="L110">  <span class="kw">unfold</span> <span class="const token" data-verso-hover="226">uniformBall</span>; <span class="kw">infer_instance</span></span>
+<span id="L111"></span>
+<span id="L112"><span class="kw">open</span> Classical <span class="kw">in</span></span>
+<span id="L113"><span class="kw">theorem</span> <span class="const token" data-verso-hover="228">uniformBall_apply</span> (R : <span class="const token" data-verso-hover="32">ℕ</span>) (A : <span class="const token" data-verso-hover="46">Set</span> <span class="const token" data-verso-hover="29">Node</span>) :</span>
+<span id="L114">    <span class="const token" data-verso-hover="226">uniformBall</span> R A = ((<span class="const token" data-verso-hover="199">ballFinset</span> R).<span class="const token" data-verso-hover="56">filter</span> (· ∈ A)).<span class="const token" data-verso-hover="57">card</span> / (<span class="const token" data-verso-hover="199">ballFinset</span> R).<span class="const token" data-verso-hover="57">card</span> := <span class="kw">by</span></span>
+<span id="L115">  <span class="kw">unfold</span> <span class="const token" data-verso-hover="226">uniformBall</span></span>
+<span id="L116">  <span class="kw">rw</span> [<span class="const token" data-verso-hover="309">PMF.toMeasure_uniformOfFinset_apply</span> _ _ A.<span class="const token" data-verso-hover="293">to_countable</span>.<span class="const token" data-verso-hover="294">measurableSet</span>]</span>
+<span id="L117"></span>
+<span id="L118"><span class="dc">/-- The success set of a phase with spiral length `t` (spiral constant `σ`) for treasure `τ`. -/</span></span>
+<span id="L119"><span class="kw">def</span> <span class="const token" data-verso-hover="227">spiralSucc</span> (σ : <span class="const token" data-verso-hover="32">ℕ</span>) (τ : <span class="const token" data-verso-hover="29">Node</span>) (t : <span class="const token" data-verso-hover="32">ℕ</span>) : <span class="const token" data-verso-hover="46">Set</span> <span class="const token" data-verso-hover="29">Node</span> := {u | σ * <span class="const token" data-verso-hover="31">dist</span> (u - τ) ^ <span class="nu">2</span> ≤ t}</span>
+<span id="L120"></span>
+<span id="L121"><span class="dc">/-- Duration bound of a phase: walk to `u ∈ B(R)`, spiral of length `t`, return. -/</span></span>
+<span id="L122"><span class="kw">def</span> <span class="const token" data-verso-hover="310">phaseDur</span> (R t : <span class="const token" data-verso-hover="32">ℕ</span>) : <span class="const token" data-verso-hover="32">ℕ</span> := <span class="nu">2</span> * R + <span class="nu">2</span> * t</span>
+<span id="L123"></span>
+<span id="L124"><span class="dc">/-! ### Phased searches with uniform choices in balls -/</span></span>
+<span id="L125"></span>
+<span id="L126"><span class="dc">/-- Duration bound of block `b` when phase `x` samples in `B(R x)` and agent `a` spirals for</span></span>
+<span id="L127"><span class="dc">`t (a, x)` steps: the sum over the phases of the maximum over the agents of the phase durations. -/</span></span>
+<span id="L128"><span class="kw">def</span> <span class="const token" data-verso-hover="311">blockDur</span> {k : <span class="const token" data-verso-hover="32">ℕ</span>} (R : (Σ b, P b) → <span class="const token" data-verso-hover="32">ℕ</span>) (t : <span class="const token" data-verso-hover="38">Fin</span> k × (Σ b, P b) → <span class="const token" data-verso-hover="32">ℕ</span>) (b : <span class="const token" data-verso-hover="32">ℕ</span>) : <span class="const token" data-verso-hover="32">ℕ</span> :=</span>
+<span id="L129">  ∑ p : P b, (<span class="const token" data-verso-hover="103">univ</span> : <span class="const token" data-verso-hover="54">Finset</span> (<span class="const token" data-verso-hover="38">Fin</span> k)).<span class="const token" data-verso-hover="312">sup</span> <span class="kw">fun</span> a =&gt; <span class="const token" data-verso-hover="310">phaseDur</span> (R ⟨b, p⟩) (t (a, ⟨b, p⟩))</span>
+<span id="L130"></span>
+<span id="L131"><span class="dc">/-- The expected running time (bound) of the phased search with `k` agents in which phase `x`</span></span>
+<span id="L132"><span class="dc">picks a uniform node of `B(R x)` and agent `a` then spirals for `t (a, x)` steps (spiral</span></span>
+<span id="L133"><span class="dc">constant `σ`), for the treasure at `τ`. -/</span></span>
+<span id="L134"><span class="kw">noncomputable</span> <span class="kw">def</span> <span class="const token" data-verso-hover="13">phasedTime</span> {k : <span class="const token" data-verso-hover="32">ℕ</span>} (σ : <span class="const token" data-verso-hover="32">ℕ</span>) (R : (Σ b, P b) → <span class="const token" data-verso-hover="32">ℕ</span>) (t : <span class="const token" data-verso-hover="38">Fin</span> k × (Σ b, P b) → <span class="const token" data-verso-hover="32">ℕ</span>)</span>
+<span id="L135">    (τ : <span class="const token" data-verso-hover="29">Node</span>) : <span class="const token" data-verso-hover="39">ℝ</span>≥0∞ :=</span>
+<span id="L136">  ∫⁻ ω, <span class="const token" data-verso-hover="284">timeBound</span> (<span class="kw">fun</span> i =&gt; <span class="const token" data-verso-hover="227">spiralSucc</span> σ τ (t i)) (<span class="kw">fun</span> b =&gt; (<span class="const token" data-verso-hover="311">blockDur</span> R t b : <span class="const token" data-verso-hover="39">ℝ</span>≥0∞)) ω</span>
+<span id="L137">    ∂(<span class="const token" data-verso-hover="12">Measure.infinitePi</span> <span class="kw">fun</span> i : <span class="const token" data-verso-hover="38">Fin</span> k × (Σ b, P b) =&gt; <span class="const token" data-verso-hover="226">uniformBall</span> (R i.<span class="const token" data-verso-hover="35">2</span>))</span>
+<span id="L138"></span>
+<span id="L139"><span class="dc">/-- The "not found during block `b`" factor. -/</span></span>
+<span id="L140"><span class="kw">noncomputable</span> <span class="kw">def</span> <span class="const token" data-verso-hover="313">blockFail</span> {k : <span class="const token" data-verso-hover="32">ℕ</span>} (σ : <span class="const token" data-verso-hover="32">ℕ</span>) (R : (Σ b, P b) → <span class="const token" data-verso-hover="32">ℕ</span>) (t : <span class="const token" data-verso-hover="38">Fin</span> k × (Σ b, P b) → <span class="const token" data-verso-hover="32">ℕ</span>)</span>
+<span id="L141">    (τ : <span class="const token" data-verso-hover="29">Node</span>) (b : <span class="const token" data-verso-hover="32">ℕ</span>) : <span class="const token" data-verso-hover="39">ℝ</span>≥0∞ :=</span>
+<span id="L142">  ∏ p : P b, ∏ a : <span class="const token" data-verso-hover="38">Fin</span> k, <span class="const token" data-verso-hover="226">uniformBall</span> (R ⟨b, p⟩) (<span class="const token" data-verso-hover="227">spiralSucc</span> σ τ (t (a, ⟨b, p⟩)))ᶜ</span>
+<span id="L143"></span>
+<span id="L144"><span class="kw">theorem</span> <span class="const token" data-verso-hover="314">phasedTime_eq</span> {k : <span class="const token" data-verso-hover="32">ℕ</span>} (σ : <span class="const token" data-verso-hover="32">ℕ</span>) (R : (Σ b, P b) → <span class="const token" data-verso-hover="32">ℕ</span>) (t : <span class="const token" data-verso-hover="38">Fin</span> k × (Σ b, P b) → <span class="const token" data-verso-hover="32">ℕ</span>)</span>
+<span id="L145">    (τ : <span class="const token" data-verso-hover="29">Node</span>) :</span>
+<span id="L146">    <span class="const token" data-verso-hover="13">phasedTime</span> σ R t τ = ∑' b, (<span class="const token" data-verso-hover="311">blockDur</span> R t b : <span class="const token" data-verso-hover="39">ℝ</span>≥0∞) * ∏ b' ∈ <span class="const token" data-verso-hover="49">range</span> b, <span class="const token" data-verso-hover="313">blockFail</span> σ R t τ b' := <span class="kw">by</span></span>
+<span id="L147">  <span class="kw">unfold</span> <span class="const token" data-verso-hover="13">phasedTime</span></span>
+<span id="L148">  <span class="kw">rw</span> [<span class="const token" data-verso-hover="14">lintegral_timeBound</span>]</span>
+<span id="L149">  <span class="kw">congr</span> <span class="nu">1</span>; <span class="kw">ext</span> b; <span class="kw">congr</span> <span class="nu">1</span></span>
+<span id="L150">  <span class="kw">rw</span> [<span class="const token" data-verso-hover="315">Finset.prod_comm</span>]</span>
+<span id="L151">  <span class="kw">unfold</span> <span class="const token" data-verso-hover="279">phasesBefore</span> <span class="const token" data-verso-hover="313">blockFail</span></span>
+<span id="L152">  <span class="kw">rw</span> [<span class="const token" data-verso-hover="316">Finset.prod_sigma</span>]</span>
+<span id="L153"></span>
+<span id="L154"><span class="kw">theorem</span> <span class="const token" data-verso-hover="317">blockFail_le_one</span> {k : <span class="const token" data-verso-hover="32">ℕ</span>} (σ : <span class="const token" data-verso-hover="32">ℕ</span>) (R : (Σ b, P b) → <span class="const token" data-verso-hover="32">ℕ</span>) (t : <span class="const token" data-verso-hover="38">Fin</span> k × (Σ b, P b) → <span class="const token" data-verso-hover="32">ℕ</span>)</span>
+<span id="L155">    (τ : <span class="const token" data-verso-hover="29">Node</span>) (b : <span class="const token" data-verso-hover="32">ℕ</span>) : <span class="const token" data-verso-hover="313">blockFail</span> σ R t τ b ≤ <span class="nu">1</span> :=</span>
+<span id="L156">  <span class="const token" data-verso-hover="318">Finset.prod_le_one</span> <span class="kw">fun</span> _ _ =&gt; <span class="const token" data-verso-hover="318">Finset.prod_le_one</span> <span class="kw">fun</span> _ _ =&gt; <span class="const token" data-verso-hover="319">prob_le_one</span></span>
+<span id="L157"></span>
+<span id="L158"><span class="kw">end</span> Podc.CollaborativeSearchPlane</span>
+<span id="L159"></span>
+</code></div>
+        <script>
+          window.versoHoversUrl = "PODC2012/CollaborativeSearchPlane/-hovers.json";</script>
+        <script src="static/lean/popper.js"></script>
+        <script src="static/lean/tippy.js"></script>
+        <script src="static/lean/marked.js"></script>
+        <script src="static/lean/highlighting.js"></script>
+        <script src="static/lean/lean.js"></script>
+        </article></main><footer class="site-footer"><div class="wrap">
+        Machine-checked formalizations of PODC papers in Lean 4. Generated with <a href="https://github.com/leanprover/verso">Verso</a> from the README files of <a href="https://github.com/vasnesterov/formal_podc">vasnesterov/formal_podc</a>.</div>
+      </footer></body>
+  </html>
+

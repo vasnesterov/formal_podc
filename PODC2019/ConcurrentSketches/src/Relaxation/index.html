@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="light dark">
+    <link rel="icon" href="data:,">
+    <title>ConcurrentSketches: Relaxation.lean · Formal PODC</title><base href="../../../.././"><link rel="stylesheet" href="static/lean/verso-vars.css">
+    <link rel="stylesheet" href="static/lean/highlighting.css">
+    <link rel="stylesheet" href="static/lean/tippy-border.css">
+    <link rel="stylesheet" href="static/style.css">
+    <script defer="defer" src="static/site.js"></script>
+    </head>
+  <body>
+    <header class="site-header">
+      <div class="wrap">
+        <a class="brand" href=".">Formal PODC</a><nav class="top">
+          <a href=".">Search</a><a href="about/">About</a><a href="https://github.com/vasnesterov/formal_podc">GitHub</a></nav>
+        </div>
+      </header>
+    <main class="wrap"><article><nav class="breadcrumbs" aria-label="Breadcrumb">
+          <a href=".">Search</a><span class="sep">›</span><a href="PODC2019/">PODC 2019</a><span class="sep">›</span><a href="PODC2019/ConcurrentSketches/">ConcurrentSketches</a><span class="sep">›</span><a href="PODC2019/ConcurrentSketches/src/">Lean source</a><span class="sep">›</span><span aria-current="page">Relaxation</span></nav>
+        <h1>
+          <code>Relaxation.lean</code></h1>
+        <div class="paper-links">
+          <p>
+            Source of <a href="PODC2019/ConcurrentSketches/">Fast Concurrent Data Sketches — PODC 2019</a> · <a href="https://github.com/vasnesterov/formal_podc/blob/main/Papers/PODC2019/ConcurrentSketches/Relaxation.lean">GitHub</a> · hover over a name for its type and documentation</p>
+          </div>
+        <div class="lean-code lean-src">
+          <code class="hl lean block" data-lean-context="Relaxation"><span id="L1"><span class="kw">import</span> Mathlib.Data.List.Infix</span>
+<span id="L2"><span class="kw">import</span> Mathlib.Data.List.Nodup</span>
+<span id="L3"><span class="kw">import</span> Mathlib.Data.Nat.Find</span>
+<span id="L4"></span>
+<span id="L5"><span class="dc">/-!</span></span>
+<span id="L6"><span class="dc"># Fast Concurrent Data Sketches (PODC 2019): the `r`-relaxation (Definition 2)</span></span>
+<span id="L7"></span>
+<span id="L8"><span class="dc">Arik Rinberg, Alexander Spiegelman, Edward Bortnikov, Eshcar Hillel, Idit Keidar, Lee Rhodes,</span></span>
+<span id="L9"><span class="dc">Hadar Serviansky. *Fast Concurrent Data Sketches.* PODC 2019 (brief announcement),</span></span>
+<span id="L10"><span class="dc">full version arXiv:1902.10995 / ACM TOPC 9(2), 2022.</span></span>
+<span id="L11"></span>
+<span id="L12"><span class="dc">Sequential histories are lists of entries (an operation instance with its invocation and</span></span>
+<span id="L13"><span class="dc">response). Definition 2 of the paper:</span></span>
+<span id="L14"></span>
+<span id="L15"><span class="dc">&gt; A sequential history `H` is an `r`-relaxation of a sequential history `H'` if `H` is comprised</span></span>
+<span id="L16"><span class="dc">&gt; of all but at most `r` of the invocations in `H'` and their responses, and each invocation in</span></span>
+<span id="L17"><span class="dc">&gt; `H` is preceded by all but at most `r` of the invocations that precede the same invocation in</span></span>
+<span id="L18"><span class="dc">&gt; `H'`.</span></span>
+<span id="L19"></span>
+<span id="L20"><span class="dc">* `AllButAtMost r S T`: all but at most `r` elements of `S` belong to `T`;</span></span>
+<span id="L21"><span class="dc">* `Prec H y x`: `y` precedes `x` in `H`;</span></span>
+<span id="L22"><span class="dc">* `IsRelaxation r H H'` (Definition 2);</span></span>
+<span id="L23"><span class="dc">* `isRelaxation_of_growing`: the abstract argument of Lemmas 4–7 of the full paper. If a</span></span>
+<span id="L24"><span class="dc">  "linearization" `L k` grows by at most one entry per step, a "visibility order" `V k` only grows,</span></span>
+<span id="L25"><span class="dc">  `V k ⊆ L k`, `L n` has no duplicates, and at every step all but at most `r` entries of `L k` are</span></span>
+<span id="L26"><span class="dc">  in `V k`, then `V n` is an `r`-relaxation of `L n`.</span></span>
+<span id="L27"><span class="dc">* `isRelaxation_future`: Definition 2 does **not** forbid a relaxed history to move operations</span></span>
+<span id="L28"><span class="dc">  that come *later* in `H'` in front of an entry: for any list `U` of updates, `U ++ [q]` is a</span></span>
+<span id="L29"><span class="dc">  `1`-relaxation of `q :: U`, so a query may reflect arbitrarily many *later* updates. The</span></span>
+<span id="L30"><span class="dc">  paper's error analysis assumes that a query only sees (a subset of) the operations preceding</span></span>
+<span id="L31"><span class="dc">  it; `PastOnly` states this extra property, and `pastOnly_of_growing` is the abstract argument</span></span>
+<span id="L32"><span class="dc">  establishing it.</span></span>
+<span id="L33"><span class="dc">-/</span></span>
+<span id="L34"></span>
+<span id="L35"><span class="kw">namespace</span> Podc.ConcurrentSketches</span>
+<span id="L36"></span>
+<span id="L37"><span class="kw">variable</span> {X : <span class="kw">Type</span>}</span>
+<span id="L38"></span>
+<span id="L39"><span class="dc">/-- All but at most `r` of the elements of `S` belong to `T`. -/</span></span>
+<span id="L40"><span class="kw">def</span> <span class="const token" data-verso-hover="419">AllButAtMost</span> (r : <span class="const token" data-verso-hover="30">ℕ</span>) (S T : <span class="const token" data-verso-hover="46">List</span> X) : <span class="kw">Prop</span> :=</span>
+<span id="L41">  ∃ D : <span class="const token" data-verso-hover="46">List</span> X, D.<span class="const token" data-verso-hover="48">length</span> ≤ r ∧ ∀ y ∈ S, y ∈ T ∨ y ∈ D</span>
+<span id="L42"></span>
+<span id="L43"><span class="dc">/-- `y` precedes `x` in the sequential history `H`. -/</span></span>
+<span id="L44"><span class="kw">def</span> <span class="const token" data-verso-hover="90">Prec</span> (H : <span class="const token" data-verso-hover="46">List</span> X) (y x : X) : <span class="kw">Prop</span> := [y, x].<span class="const token" data-verso-hover="607">Sublist</span> H</span>
+<span id="L45"></span>
+<span id="L46"><span class="dc">/-- **Definition 2 of the paper** (`r`-relaxed history): `H` is an `r`-relaxation of `H'`:</span></span>
+<span id="L47"><span class="dc">`H` consists of all but at most `r` entries of `H'`, and every entry `x` of `H` is preceded in</span></span>
+<span id="L48"><span class="dc">`H` by all but at most `r` of the entries preceding `x` in `H'`. -/</span></span>
+<span id="L49"><span class="kw">def</span> <span class="const token" data-verso-hover="596">IsRelaxation</span> (r : <span class="const token" data-verso-hover="30">ℕ</span>) (H H' : <span class="const token" data-verso-hover="46">List</span> X) : <span class="kw">Prop</span> :=</span>
+<span id="L50">  (∀ x ∈ H, x ∈ H') ∧ <span class="const token" data-verso-hover="419">AllButAtMost</span> r H' H ∧</span>
+<span id="L51">    ∀ x ∈ H, ∃ D : <span class="const token" data-verso-hover="46">List</span> X, D.<span class="const token" data-verso-hover="48">length</span> ≤ r ∧ ∀ y, <span class="const token" data-verso-hover="90">Prec</span> H' y x → <span class="const token" data-verso-hover="90">Prec</span> H y x ∨ y ∈ D</span>
+<span id="L52"></span>
+<span id="L53"><span class="dc">/-- The property that the paper's error analysis (Section 6) actually uses for an entry `x`</span></span>
+<span id="L54"><span class="dc">satisfying `Q` (a query): everything preceding `x` in the relaxed history `H` already preceded</span></span>
+<span id="L55"><span class="dc">it in `H'` ("a query may miss up to `r` preceding updates, but sees no later ones"). -/</span></span>
+<span id="L56"><span class="kw">def</span> <span class="const token" data-verso-hover="597">PastOnly</span> (Q : X → <span class="kw">Prop</span>) (H H' : <span class="const token" data-verso-hover="46">List</span> X) : <span class="kw">Prop</span> :=</span>
+<span id="L57">  ∀ x ∈ H, Q x → ∀ y, <span class="const token" data-verso-hover="90">Prec</span> H y x → <span class="const token" data-verso-hover="90">Prec</span> H' y x</span>
+<span id="L58"></span>
+<span id="L59"><span class="kw">lemma</span> <span class="const token" data-verso-hover="608">AllButAtMost.mono</span> {r : <span class="const token" data-verso-hover="30">ℕ</span>} {S S' T : <span class="const token" data-verso-hover="46">List</span> X} (h : <span class="const token" data-verso-hover="419">AllButAtMost</span> r S T) (hS : ∀ y ∈ S', y ∈ S) :</span>
+<span id="L60">    <span class="const token" data-verso-hover="419">AllButAtMost</span> r S' T := <span class="kw">by</span></span>
+<span id="L61">  <span class="kw">obtain</span> ⟨D, hD, h⟩ := h</span>
+<span id="L62">  <span class="kw">exact</span> ⟨D, hD, <span class="kw">fun</span> y hy =&gt; h y (hS y hy)⟩</span>
+<span id="L63"></span>
+<span id="L64"><span class="dc">/-- **Definition 2 admits arbitrarily many future operations.** For every list `U`, `U ++ [q]`</span></span>
+<span id="L65"><span class="dc">is a `1`-relaxation of `q :: U`: every entry of `U` loses only the</span></span>
+<span id="L66"><span class="dc">predecessor `q`. So in a history of `SeqSketch₁` a query `q` may reflect *all* the updates `U`</span></span>
+<span id="L67"><span class="dc">that follow it, however many there are. -/</span></span>
+<span id="L68"><span class="kw">theorem</span> <span class="const token" data-verso-hover="7">isRelaxation_future</span> (q : X) (U : <span class="const token" data-verso-hover="46">List</span> X) :</span>
+<span id="L69">    <span class="const token" data-verso-hover="596">IsRelaxation</span> <span class="nu">1</span> (U ++ [q]) (q :: U) := <span class="kw">by</span></span>
+<span id="L70">  <span class="kw">refine</span> ⟨?_, ⟨[], <span class="kw">by</span> <span class="kw">simp</span>, ?_⟩, ?_⟩</span>
+<span id="L71">  · <span class="kw">intro</span> x hx; <span class="kw">simp</span> only [<span class="const token" data-verso-hover="79">List.mem_append</span>, <span class="const token" data-verso-hover="609">List.mem_cons</span>] <span class="kw">at</span> hx ⊢; <span class="kw">tauto</span></span>
+<span id="L72">  · <span class="kw">intro</span> y hy; <span class="kw">left</span>; <span class="kw">simp</span> only [<span class="const token" data-verso-hover="79">List.mem_append</span>, <span class="const token" data-verso-hover="609">List.mem_cons</span>] <span class="kw">at</span> hy ⊢</span>
+<span id="L73">    <span class="kw">tauto</span></span>
+<span id="L74">  · <span class="kw">intro</span> x _</span>
+<span id="L75">    <span class="kw">refine</span> ⟨[q], <span class="kw">by</span> <span class="kw">simp</span>, <span class="kw">fun</span> y hy =&gt; ?_⟩</span>
+<span id="L76">    <span class="kw">simp</span> only [<span class="const token" data-verso-hover="90">Prec</span>] <span class="kw">at</span> hy ⊢</span>
+<span id="L77">    <span class="kw">rcases</span> <span class="const token" data-verso-hover="94">List.sublist_cons_iff</span>.<span class="const token" data-verso-hover="80">1</span> hy <span class="kw">with</span> h | ⟨r, h1, h2⟩</span>
+<span id="L78">    · <span class="kw">left</span>; <span class="kw">exact</span> h.<span class="const token" data-verso-hover="610">trans</span> (<span class="const token" data-verso-hover="478">List.sublist_append_left</span> _ _)</span>
+<span id="L79">    · <span class="kw">simp</span> only [<span class="const token" data-verso-hover="95">List.cons.injEq</span>] <span class="kw">at</span> h1</span>
+<span id="L80">      <span class="kw">obtain</span> ⟨<span class="kw">rfl</span>, <span class="kw">rfl</span>⟩ := h1</span>
+<span id="L81">      <span class="kw">right</span>; <span class="kw">simp</span></span>
+<span id="L82"></span>
+<span id="L83"><span class="dc">/-- **Definition 2 lets a relaxation drop an operation entirely**, in particular a query: `U`</span></span>
+<span id="L84"><span class="dc">is a `1`-relaxation of `x :: U`. So in a history of `SeqSketch_r` up to `r` queries may return</span></span>
+<span id="L85"><span class="dc">arbitrary values (they are simply absent from the witnessing history of `SeqSketch`). -/</span></span>
+<span id="L86"><span class="kw">theorem</span> <span class="const token" data-verso-hover="6">isRelaxation_drop</span> (x : X) (U : <span class="const token" data-verso-hover="46">List</span> X) : <span class="const token" data-verso-hover="596">IsRelaxation</span> <span class="nu">1</span> U (x :: U) := <span class="kw">by</span></span>
+<span id="L87">  <span class="kw">refine</span> ⟨<span class="kw">fun</span> y hy =&gt; <span class="const token" data-verso-hover="611">List.mem_cons_of_mem</span> _ hy, ⟨[x], <span class="kw">by</span> <span class="kw">simp</span>, <span class="kw">fun</span> y hy =&gt; ?_⟩, ?_⟩</span>
+<span id="L88">  · <span class="kw">rcases</span> <span class="const token" data-verso-hover="609">List.mem_cons</span>.<span class="const token" data-verso-hover="80">1</span> hy <span class="kw">with</span> <span class="kw">rfl</span> | hy</span>
+<span id="L89">    · <span class="kw">exact</span> <span class="const token" data-verso-hover="268">Or.inr</span> (<span class="kw">by</span> <span class="kw">simp</span>)</span>
+<span id="L90">    · <span class="kw">exact</span> <span class="const token" data-verso-hover="267">Or.inl</span> hy</span>
+<span id="L91">  · <span class="kw">intro</span> z _</span>
+<span id="L92">    <span class="kw">refine</span> ⟨[x], <span class="kw">by</span> <span class="kw">simp</span>, <span class="kw">fun</span> y hy =&gt; ?_⟩</span>
+<span id="L93">    <span class="kw">simp</span> only [<span class="const token" data-verso-hover="90">Prec</span>] <span class="kw">at</span> hy ⊢</span>
+<span id="L94">    <span class="kw">rcases</span> <span class="const token" data-verso-hover="94">List.sublist_cons_iff</span>.<span class="const token" data-verso-hover="80">1</span> hy <span class="kw">with</span> h | ⟨r, h1, -⟩</span>
+<span id="L95">    · <span class="kw">exact</span> <span class="const token" data-verso-hover="267">Or.inl</span> h</span>
+<span id="L96">    · <span class="kw">simp</span> only [<span class="const token" data-verso-hover="95">List.cons.injEq</span>] <span class="kw">at</span> h1</span>
+<span id="L97">      <span class="kw">exact</span> <span class="const token" data-verso-hover="268">Or.inr</span> (<span class="kw">by</span> <span class="kw">simp</span> [h1.<span class="const token" data-verso-hover="131">1</span>])</span>
+<span id="L98"></span>
+<span id="L99"><span class="dc">/-- In a list without duplicates, an element preceding `x` lies in the part before `x`. -/</span></span>
+<span id="L100"><span class="kw">lemma</span> <span class="const token" data-verso-hover="612">mem_of_sublist_of_nodup</span> {A B : <span class="const token" data-verso-hover="46">List</span> X} {x y : X} (hnd : (A ++ x :: B).<span class="const token" data-verso-hover="371">Nodup</span>)</span>
+<span id="L101">    (h : [y, x].<span class="const token" data-verso-hover="607">Sublist</span> (A ++ x :: B)) : y ∈ A := <span class="kw">by</span></span>
+<span id="L102">  <span class="kw">induction</span> A <span class="kw">with</span></span>
+<span id="L103">  | <span class="const token" data-verso-hover="49">nil</span> =&gt;</span>
+<span id="L104">    <span class="kw">simp</span> only [<span class="const token" data-verso-hover="93">List.nil_append</span>] <span class="kw">at</span> hnd h</span>
+<span id="L105">    <span class="kw">rcases</span> <span class="const token" data-verso-hover="94">List.sublist_cons_iff</span>.<span class="const token" data-verso-hover="80">1</span> h <span class="kw">with</span> h | ⟨r, h1, h2⟩</span>
+<span id="L106">    · <span class="kw">exact</span> <span class="const token" data-verso-hover="81">absurd</span> (h.<span class="const token" data-verso-hover="91">subset</span> (<span class="kw">by</span> <span class="kw">simp</span>)) (<span class="const token" data-verso-hover="613">List.nodup_cons</span>.<span class="const token" data-verso-hover="80">1</span> hnd).<span class="const token" data-verso-hover="131">1</span></span>
+<span id="L107">    · <span class="kw">simp</span> only [<span class="const token" data-verso-hover="95">List.cons.injEq</span>] <span class="kw">at</span> h1</span>
+<span id="L108">      <span class="kw">obtain</span> ⟨<span class="kw">rfl</span>, <span class="kw">rfl</span>⟩ := h1</span>
+<span id="L109">      <span class="kw">exact</span> <span class="const token" data-verso-hover="81">absurd</span> (h2.<span class="const token" data-verso-hover="91">subset</span> (<span class="kw">by</span> <span class="kw">simp</span>)) (<span class="const token" data-verso-hover="613">List.nodup_cons</span>.<span class="const token" data-verso-hover="80">1</span> hnd).<span class="const token" data-verso-hover="131">1</span></span>
+<span id="L110">  | <span class="const token" data-verso-hover="50">cons</span> a A ih =&gt;</span>
+<span id="L111">    <span class="kw">simp</span> only [<span class="const token" data-verso-hover="614">List.cons_append</span>] <span class="kw">at</span> hnd h</span>
+<span id="L112">    <span class="kw">rcases</span> <span class="const token" data-verso-hover="94">List.sublist_cons_iff</span>.<span class="const token" data-verso-hover="80">1</span> h <span class="kw">with</span> h | ⟨r, h1, h2⟩</span>
+<span id="L113">    · <span class="kw">exact</span> <span class="const token" data-verso-hover="611">List.mem_cons_of_mem</span> _ (ih (<span class="const token" data-verso-hover="613">List.nodup_cons</span>.<span class="const token" data-verso-hover="80">1</span> hnd).<span class="const token" data-verso-hover="132">2</span> h)</span>
+<span id="L114">    · <span class="kw">simp</span> only [<span class="const token" data-verso-hover="95">List.cons.injEq</span>] <span class="kw">at</span> h1</span>
+<span id="L115">      <span class="kw">obtain</span> ⟨<span class="kw">rfl</span>, <span class="kw">rfl</span>⟩ := h1</span>
+<span id="L116">      <span class="kw">exact</span> <span class="const token" data-verso-hover="615">List.mem_cons_self</span></span>
+<span id="L117"></span>
+<span id="L118"><span class="dc">/-- **The relaxation argument (Lemmas 4–7 of the full paper), abstractly.** `L k` (the</span></span>
+<span id="L119"><span class="dc">linearization after `k` steps) grows by at most one entry per step and starts empty; `V k` (the</span></span>
+<span id="L120"><span class="dc">visibility order) only grows; `V k ⊆ L k`; `L n` has no duplicates; and after every step all but</span></span>
+<span id="L121"><span class="dc">at most `r` entries of `L k` are in `V k`. Then `V n` is an `r`-relaxation of `L n`. -/</span></span>
+<span id="L122"><span class="kw">theorem</span> <span class="const token" data-verso-hover="440">isRelaxation_of_growing</span> {r n : <span class="const token" data-verso-hover="30">ℕ</span>} (L V : <span class="const token" data-verso-hover="30">ℕ</span> → <span class="const token" data-verso-hover="46">List</span> X) (hL0 : L <span class="nu">0</span> = [])</span>
+<span id="L123">    (hLstep : ∀ k &lt; n, ∃ c, L (k + <span class="nu">1</span>) = L k ++ c ∧ c.<span class="const token" data-verso-hover="48">length</span> ≤ <span class="nu">1</span>)</span>
+<span id="L124">    (hV : ∀ k ≤ n, V k &lt;+: V n) (hsub : ∀ k ≤ n, ∀ x ∈ V k, x ∈ L k)</span>
+<span id="L125">    (hnd : (L n).<span class="const token" data-verso-hover="371">Nodup</span>) (hcnt : ∀ k ≤ n, <span class="const token" data-verso-hover="419">AllButAtMost</span> r (L k) (V k)) :</span>
+<span id="L126">    <span class="const token" data-verso-hover="596">IsRelaxation</span> r (V n) (L n) := <span class="kw">by</span></span>
+<span id="L127">  <span class="kw">have</span> hLpre : ∀ k ≤ n, L k &lt;+: L n := <span class="kw">by</span></span>
+<span id="L128">    <span class="kw">intro</span> k hk</span>
+<span id="L129">    <span class="kw">induction</span> hk <span class="kw">using</span> <span class="const token" data-verso-hover="616">Nat.decreasingInduction</span> <span class="kw">with</span></span>
+<span id="L130">    | self =&gt; <span class="kw">exact</span> <span class="const token" data-verso-hover="468">List.prefix_refl</span> _</span>
+<span id="L131">    | of_succ k hk ih =&gt;</span>
+<span id="L132">      <span class="kw">obtain</span> ⟨c, hc, -⟩ := hLstep k hk</span>
+<span id="L133">      <span class="kw">exact</span> (hc ▸ <span class="const token" data-verso-hover="416">List.prefix_append</span> (L k) c).<span class="const token" data-verso-hover="415">trans</span> ih</span>
+<span id="L134">  <span class="kw">refine</span> ⟨hsub n <span class="const token" data-verso-hover="617">le_rfl</span>, hcnt n <span class="const token" data-verso-hover="617">le_rfl</span>, <span class="kw">fun</span> x hx =&gt; ?_⟩</span>
+<span id="L135">  <span class="kw">have</span> hex : ∃ k, k ≤ n ∧ x ∈ L k := ⟨n, <span class="const token" data-verso-hover="617">le_rfl</span>, hsub n <span class="const token" data-verso-hover="617">le_rfl</span> x hx⟩</span>
+<span id="L136">  <span class="kw">classical</span></span>
+<span id="L137">  <span class="kw">let</span> k := <span class="const token" data-verso-hover="618">Nat.find</span> hex</span>
+<span id="L138">  <span class="kw">have</span> hk : k ≤ n ∧ x ∈ L k := <span class="const token" data-verso-hover="619">Nat.find_spec</span> hex</span>
+<span id="L139">  <span class="kw">have</span> hk0 : k ≠ <span class="nu">0</span> := <span class="kw">by</span></span>
+<span id="L140">    <span class="kw">intro</span> h; <span class="kw">have</span> := hk.<span class="const token" data-verso-hover="132">2</span>; <span class="kw">rw</span> [h, hL0] <span class="kw">at</span> this; <span class="kw">simp</span> <span class="kw">at</span> this</span>
+<span id="L141">  <span class="kw">obtain</span> ⟨m, hm⟩ : ∃ m, k = m + <span class="nu">1</span> := ⟨k - <span class="nu">1</span>, <span class="kw">by</span> <span class="kw">omega</span>⟩</span>
+<span id="L142">  <span class="kw">have</span> hxm : x ∉ L m := <span class="kw">fun</span> h =&gt;</span>
+<span id="L143">    (<span class="const token" data-verso-hover="620">Nat.find_min</span> hex (<span class="kw">show</span> m &lt; k <span class="kw">by</span> <span class="kw">omega</span>)) ⟨<span class="kw">by</span> <span class="kw">omega</span>, h⟩</span>
+<span id="L144">  <span class="kw">obtain</span> ⟨c, hc, hc1⟩ := hLstep m (<span class="kw">by</span> <span class="kw">omega</span>)</span>
+<span id="L145">  <span class="kw">have</span> hcx : c = [x] := <span class="kw">by</span></span>
+<span id="L146">    <span class="kw">have</span> : x ∈ c := <span class="kw">by</span></span>
+<span id="L147">      <span class="kw">have</span> := hk.<span class="const token" data-verso-hover="132">2</span>; <span class="kw">rw</span> [hm, hc, <span class="const token" data-verso-hover="79">List.mem_append</span>] <span class="kw">at</span> this</span>
+<span id="L148">      <span class="kw">exact</span> this.<span class="const token" data-verso-hover="621">resolve_left</span> hxm</span>
+<span id="L149">    <span class="kw">match</span> c, hc1 <span class="kw">with</span></span>
+<span id="L150">    | [z], _ =&gt; <span class="kw">simp_all</span></span>
+<span id="L151">  <span class="kw">obtain</span> ⟨R, hR⟩ := hLpre (m + <span class="nu">1</span>) (<span class="kw">by</span> <span class="kw">omega</span>)</span>
+<span id="L152">  <span class="kw">rw</span> [hc, hcx] <span class="kw">at</span> hR</span>
+<span id="L153">  <span class="kw">obtain</span> ⟨D, hD, hDcov⟩ := hcnt m (<span class="kw">by</span> <span class="kw">omega</span>)</span>
+<span id="L154">  <span class="kw">refine</span> ⟨D, hD, <span class="kw">fun</span> y hy =&gt; ?_⟩</span>
+<span id="L155">  <span class="kw">have</span> hnd' : (L m ++ x :: R).<span class="const token" data-verso-hover="371">Nodup</span> := <span class="kw">by</span> <span class="kw">rw</span> [← hR] <span class="kw">at</span> hnd; <span class="kw">simpa</span> <span class="kw">using</span> hnd</span>
+<span id="L156">  <span class="kw">have</span> hy' : y ∈ L m := <span class="kw">by</span></span>
+<span id="L157">    <span class="kw">apply</span> <span class="const token" data-verso-hover="612">mem_of_sublist_of_nodup</span> hnd'</span>
+<span id="L158">    <span class="kw">unfold</span> <span class="const token" data-verso-hover="90">Prec</span> <span class="kw">at</span> hy; <span class="kw">rw</span> [← hR] <span class="kw">at</span> hy; <span class="kw">simpa</span> <span class="kw">using</span> hy</span>
+<span id="L159">  <span class="kw">rcases</span> hDcov y hy' <span class="kw">with</span> hyV | hyD</span>
+<span id="L160">  · <span class="kw">left</span></span>
+<span id="L161">    <span class="kw">obtain</span> ⟨W, hW⟩ := hV m (<span class="kw">by</span> <span class="kw">omega</span>)</span>
+<span id="L162">    <span class="kw">have</span> hxW : x ∈ W := <span class="kw">by</span></span>
+<span id="L163">      <span class="kw">have</span> h1 : x ∈ V m ++ W := hW ▸ hx</span>
+<span id="L164">      <span class="kw">rcases</span> <span class="const token" data-verso-hover="79">List.mem_append</span>.<span class="const token" data-verso-hover="80">1</span> h1 <span class="kw">with</span> h | h</span>
+<span id="L165">      · <span class="kw">exact</span> <span class="const token" data-verso-hover="81">absurd</span> (hsub m (<span class="kw">by</span> <span class="kw">omega</span>) x h) hxm</span>
+<span id="L166">      · <span class="kw">exact</span> h</span>
+<span id="L167">    <span class="kw">unfold</span> <span class="const token" data-verso-hover="90">Prec</span>; <span class="kw">rw</span> [← hW]</span>
+<span id="L168">    <span class="kw">exact</span> (<span class="const token" data-verso-hover="622">List.Sublist.append</span> (<span class="const token" data-verso-hover="623">List.singleton_sublist</span>.<span class="const token" data-verso-hover="144">2</span> hyV) (<span class="const token" data-verso-hover="623">List.singleton_sublist</span>.<span class="const token" data-verso-hover="144">2</span> hxW) :</span>
+<span id="L169">      <span class="const token" data-verso-hover="607">List.Sublist</span> ([y] ++ [x]) _)</span>
+<span id="L170">  · <span class="kw">exact</span> <span class="const token" data-verso-hover="268">Or.inr</span> hyD</span>
+<span id="L171"></span>
+<span id="L172"><span class="dc">/-- **Queries see only the past, abstractly.** Suppose that `V` and `L` grow along the steps,</span></span>
+<span id="L173"><span class="dc">`V k ⊆ L k`, and every entry `x` with `Q x` enters `V` alone and at the same step as it enters</span></span>
+<span id="L174"><span class="dc">`L`. Then every entry preceding such an `x` in `V n` precedes it in `L n`. -/</span></span>
+<span id="L175"><span class="kw">theorem</span> <span class="const token" data-verso-hover="444">pastOnly_of_growing</span> {n : <span class="const token" data-verso-hover="30">ℕ</span>} (Q : X → <span class="kw">Prop</span>) (L V : <span class="const token" data-verso-hover="30">ℕ</span> → <span class="const token" data-verso-hover="46">List</span> X) (hV0 : V <span class="nu">0</span> = [])</span>
+<span id="L176">    (hL : ∀ k ≤ n, L k &lt;+: L n)</span>
+<span id="L177">    (hV : ∀ k ≤ n, V k &lt;+: V n) (hsub : ∀ k ≤ n, ∀ x ∈ V k, x ∈ L k)</span>
+<span id="L178">    (hQ : ∀ k &lt; n, ∀ x, Q x → x ∈ V (k + <span class="nu">1</span>) → x ∉ V k → V (k + <span class="nu">1</span>) = V k ++ [x] ∧ x ∉ L k)</span>
+<span id="L179">    (hnd : (V n).<span class="const token" data-verso-hover="371">Nodup</span>) :</span>
+<span id="L180">    <span class="const token" data-verso-hover="597">PastOnly</span> Q (V n) (L n) := <span class="kw">by</span></span>
+<span id="L181">  <span class="kw">intro</span> x hx hQx y hy</span>
+<span id="L182">  <span class="kw">have</span> hex : ∃ k, k ≤ n ∧ x ∈ V k := ⟨n, <span class="const token" data-verso-hover="617">le_rfl</span>, hx⟩</span>
+<span id="L183">  <span class="kw">classical</span></span>
+<span id="L184">  <span class="kw">let</span> k := <span class="const token" data-verso-hover="618">Nat.find</span> hex</span>
+<span id="L185">  <span class="kw">have</span> hk : k ≤ n ∧ x ∈ V k := <span class="const token" data-verso-hover="619">Nat.find_spec</span> hex</span>
+<span id="L186">  <span class="kw">have</span> hk0 : k ≠ <span class="nu">0</span> := <span class="kw">by</span></span>
+<span id="L187">    <span class="kw">intro</span> h; <span class="kw">have</span> := hk.<span class="const token" data-verso-hover="132">2</span>; <span class="kw">rw</span> [h, hV0] <span class="kw">at</span> this; <span class="kw">simp</span> <span class="kw">at</span> this</span>
+<span id="L188">  <span class="kw">obtain</span> ⟨m, hm⟩ : ∃ m, k = m + <span class="nu">1</span> := ⟨k - <span class="nu">1</span>, <span class="kw">by</span> <span class="kw">omega</span>⟩</span>
+<span id="L189">  <span class="kw">have</span> hxm : x ∉ V m := <span class="kw">fun</span> h =&gt;</span>
+<span id="L190">    (<span class="const token" data-verso-hover="620">Nat.find_min</span> hex (<span class="kw">show</span> m &lt; k <span class="kw">by</span> <span class="kw">omega</span>)) ⟨<span class="kw">by</span> <span class="kw">omega</span>, h⟩</span>
+<span id="L191">  <span class="kw">obtain</span> ⟨hVx, hLx⟩ := hQ m (<span class="kw">by</span> <span class="kw">omega</span>) x hQx (hm ▸ hk.<span class="const token" data-verso-hover="132">2</span>) hxm</span>
+<span id="L192">  <span class="kw">obtain</span> ⟨R, hR⟩ := hV (m + <span class="nu">1</span>) (<span class="kw">by</span> <span class="kw">omega</span>)</span>
+<span id="L193">  <span class="kw">rw</span> [hVx] <span class="kw">at</span> hR</span>
+<span id="L194">  <span class="kw">have</span> hnd' : (V m ++ x :: R).<span class="const token" data-verso-hover="371">Nodup</span> := <span class="kw">by</span> <span class="kw">rw</span> [← hR] <span class="kw">at</span> hnd; <span class="kw">simpa</span> <span class="kw">using</span> hnd</span>
+<span id="L195">  <span class="kw">have</span> hyV : y ∈ V m := <span class="kw">by</span></span>
+<span id="L196">    <span class="kw">apply</span> <span class="const token" data-verso-hover="612">mem_of_sublist_of_nodup</span> hnd'</span>
+<span id="L197">    <span class="kw">unfold</span> <span class="const token" data-verso-hover="90">Prec</span> <span class="kw">at</span> hy; <span class="kw">rw</span> [← hR] <span class="kw">at</span> hy; <span class="kw">simpa</span> <span class="kw">using</span> hy</span>
+<span id="L198">  <span class="kw">have</span> hyL : y ∈ L m := hsub m (<span class="kw">by</span> <span class="kw">omega</span>) y hyV</span>
+<span id="L199">  <span class="kw">have</span> hxL : x ∈ L n := hsub n <span class="const token" data-verso-hover="617">le_rfl</span> x hx</span>
+<span id="L200">  <span class="kw">obtain</span> ⟨W, hW⟩ := hL m (<span class="kw">by</span> <span class="kw">omega</span>)</span>
+<span id="L201">  <span class="kw">have</span> hxW : x ∈ W := <span class="kw">by</span></span>
+<span id="L202">    <span class="kw">rw</span> [← hW] <span class="kw">at</span> hxL</span>
+<span id="L203">    <span class="kw">rcases</span> <span class="const token" data-verso-hover="79">List.mem_append</span>.<span class="const token" data-verso-hover="80">1</span> hxL <span class="kw">with</span> h | h</span>
+<span id="L204">    · <span class="kw">exact</span> <span class="const token" data-verso-hover="81">absurd</span> h hLx</span>
+<span id="L205">    · <span class="kw">exact</span> h</span>
+<span id="L206">  <span class="kw">unfold</span> <span class="const token" data-verso-hover="90">Prec</span>; <span class="kw">rw</span> [← hW]</span>
+<span id="L207">  <span class="kw">exact</span> (<span class="const token" data-verso-hover="622">List.Sublist.append</span> (<span class="const token" data-verso-hover="623">List.singleton_sublist</span>.<span class="const token" data-verso-hover="144">2</span> hyL) (<span class="const token" data-verso-hover="623">List.singleton_sublist</span>.<span class="const token" data-verso-hover="144">2</span> hxW) :</span>
+<span id="L208">    <span class="const token" data-verso-hover="607">List.Sublist</span> ([y] ++ [x]) _)</span>
+<span id="L209"></span>
+<span id="L210"><span class="kw">end</span> Podc.ConcurrentSketches</span>
+<span id="L211"></span>
+</code></div>
+        <script>
+          window.versoHoversUrl = "PODC2019/ConcurrentSketches/-hovers.json";</script>
+        <script src="static/lean/popper.js"></script>
+        <script src="static/lean/tippy.js"></script>
+        <script src="static/lean/marked.js"></script>
+        <script src="static/lean/highlighting.js"></script>
+        <script src="static/lean/lean.js"></script>
+        </article></main><footer class="site-footer"><div class="wrap">
+        Machine-checked formalizations of PODC papers in Lean 4. Generated with <a href="https://github.com/leanprover/verso">Verso</a> from the README files of <a href="https://github.com/vasnesterov/formal_podc">vasnesterov/formal_podc</a>.</div>
+      </footer></body>
+  </html>
+

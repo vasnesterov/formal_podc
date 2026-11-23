@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="light dark">
+    <link rel="icon" href="data:,">
+    <title>StoreCollectChurn: SnapshotModel.lean · Formal PODC</title><base href="../../../.././"><link rel="stylesheet" href="static/lean/verso-vars.css">
+    <link rel="stylesheet" href="static/lean/highlighting.css">
+    <link rel="stylesheet" href="static/lean/tippy-border.css">
+    <link rel="stylesheet" href="static/style.css">
+    <script defer="defer" src="static/site.js"></script>
+    </head>
+  <body>
+    <header class="site-header">
+      <div class="wrap">
+        <a class="brand" href=".">Formal PODC</a><nav class="top">
+          <a href=".">Search</a><a href="about/">About</a><a href="https://github.com/vasnesterov/formal_podc">GitHub</a></nav>
+        </div>
+      </header>
+    <main class="wrap"><article><nav class="breadcrumbs" aria-label="Breadcrumb">
+          <a href=".">Search</a><span class="sep">›</span><a href="PODC2020/">PODC 2020</a><span class="sep">›</span><a href="PODC2020/StoreCollectChurn/">StoreCollectChurn</a><span class="sep">›</span><a href="PODC2020/StoreCollectChurn/src/">Lean source</a><span class="sep">›</span><span aria-current="page">SnapshotModel</span></nav>
+        <h1>
+          <code>SnapshotModel.lean</code></h1>
+        <div class="paper-links">
+          <p>
+            Source of <a href="PODC2020/StoreCollectChurn/">Store-Collect in the Presence of Continuous Churn — PODC 2020</a> · <a href="https://github.com/vasnesterov/formal_podc/blob/main/Papers/PODC2020/StoreCollectChurn/SnapshotModel.lean">GitHub</a> · hover over a name for its type and documentation</p>
+          </div>
+        <div class="lean-code lean-src">
+          <code class="hl lean block" data-lean-context="SnapshotModel"><span id="L1"><span class="kw">import</span> Papers.PODC2020.StoreCollectChurn.Spec</span>
+<span id="L2"><span class="kw">import</span> Cslib.Computability.Distributed.SharedMemory.History</span>
+<span id="L3"></span>
+<span id="L4"><span class="dc">/-!</span></span>
+<span id="L5"><span class="dc"># Algorithm 7 (atomic snapshot from store-collect), Section 6.2 of the paper</span></span>
+<span id="L6"></span>
+<span id="L7"><span class="dc">We model Algorithm 7 on top of an **abstract** store-collect object: the only assumption on the</span></span>
+<span id="L8"><span class="dc">object is that the schedule of its invocations and responses satisfies `Regular` (Section 2,</span></span>
+<span id="L9"><span class="dc">`Spec.lean`).  This is exactly what the paper's proof uses ("The regularity of store-collect</span></span>
+<span id="L10"><span class="dc">ensures …").</span></span>
+<span id="L11"></span>
+<span id="L12"><span class="dc">* Nodes `P` (any type: under churn there may be infinitely many), snapshot values `V`.</span></span>
+<span id="L13"><span class="dc">* A store-collect value (`SCVal`) is the 5-tuple `⟨val, usqno, ssqno, sview, scounts⟩` of the</span></span>
+<span id="L14"><span class="dc">  paper (`ValSC = Val_AS × ℕ × ℕ × 𝒫(Π × Val_AS) × 𝒫(Π × ℕ)`); a snapshot view and the set</span></span>
+<span id="L15"><span class="dc">  `scounts` (pairs without duplicate node ids) are partial functions.</span></span>
+<span id="L16"><span class="dc">* An execution is a list of events `Ev`: high-level invocations/responses of `SCAN`/`UPDATE` and</span></span>
+<span id="L17"><span class="dc">  low-level store-collect events.  Every node runs the code of Algorithm 7 as a deterministic</span></span>
+<span id="L18"><span class="dc">  automaton (`lstep`); the environment chooses the interleaving and the views returned by</span></span>
+<span id="L19"><span class="dc">  collects.  The choice of `q` at Line 77 ("if ∃ q such that …") is an arbitrary choice</span></span>
+<span id="L20"><span class="dc">  function `Pick` (any rule is allowed).</span></span>
+<span id="L21"><span class="dc">* Line 71 stores `⟨−, −, ssqno, −, −⟩`, "with all the other components unchanged": we read the</span></span>
+<span id="L22"><span class="dc">  `−` components as those of the value the node stored last (`stored`).  With the other reading</span></span>
+<span id="L23"><span class="dc">  (the current local variables, where `scounts` was already overwritten at Line 79 of an</span></span>
+<span id="L24"><span class="dc">  enclosing `UPDATE`) the algorithm is not linearizable: see `differencies.md`.</span></span>
+<span id="L25"><span class="dc">-/</span></span>
+<span id="L26"></span>
+<span id="L27"><span class="kw">namespace</span> Podc.StoreCollectChurn.Snap</span>
+<span id="L28"></span>
+<span id="L29"><span class="kw">open</span> Cslib.SharedMemory</span>
+<span id="L30"></span>
+<span id="L31"><span class="kw">variable</span> (P V : <span class="kw">Type</span>)</span>
+<span id="L32"></span>
+<span id="L33"><span class="dc">/-- Values stored in the store-collect object (`Val_SC` of Section 6.2). -/</span></span>
+<span id="L34"><span class="kw">structure</span> <span class="const token" data-verso-hover="465">SCVal</span> <span class="kw">where</span></span>
+<span id="L35">  <span class="dc">/-- argument of the most recent update (`⊥` = `none`) -/</span></span>
+<span id="L36">  <span class="const token" data-verso-hover="472">val</span> : <span class="const token" data-verso-hover="39">Option</span> V</span>
+<span id="L37">  <span class="dc">/-- number of updates performed -/</span></span>
+<span id="L38">  <span class="const token" data-verso-hover="411">usqno</span> : <span class="const token" data-verso-hover="34">ℕ</span></span>
+<span id="L39">  <span class="dc">/-- number of scans performed -/</span></span>
+<span id="L40">  <span class="const token" data-verso-hover="567">ssqno</span> : <span class="const token" data-verso-hover="34">ℕ</span></span>
+<span id="L41">  <span class="dc">/-- snapshot view of a recent (embedded) scan -/</span></span>
+<span id="L42">  <span class="const token" data-verso-hover="563">sview</span> : P → <span class="const token" data-verso-hover="39">Option</span> V</span>
+<span id="L43">  <span class="dc">/-- scan counts of other nodes as observed (pairs `⟨q, n⟩` ↦ `scounts q = some n`) -/</span></span>
+<span id="L44">  <span class="const token" data-verso-hover="561">scounts</span> : P → <span class="const token" data-verso-hover="39">Option</span> <span class="const token" data-verso-hover="34">ℕ</span></span>
+<span id="L45"></span>
+<span id="L46"><span class="dc">/-- Store-collect views. -/</span></span>
+<span id="L47"><span class="kw">abbrev</span> <span class="const token" data-verso-hover="480">SCView</span> := P → <span class="const token" data-verso-hover="39">Option</span> (<span class="const token" data-verso-hover="465">SCVal</span> P V)</span>
+<span id="L48"></span>
+<span id="L49"><span class="dc">/-- High-level operations of node `p`. -/</span></span>
+<span id="L50"><span class="kw">inductive</span> <span class="const token" data-verso-hover="627">HOp</span> <span class="kw">where</span></span>
+<span id="L51">  | <span class="const token" data-verso-hover="569">scan</span></span>
+<span id="L52">  | <span class="const token" data-verso-hover="366">update</span> (v : V)</span>
+<span id="L53"></span>
+<span id="L54"><span class="dc">/-- Events of an execution of Algorithm 7. -/</span></span>
+<span id="L55"><span class="kw">inductive</span> <span class="const token" data-verso-hover="340">Ev</span> <span class="kw">where</span></span>
+<span id="L56">  <span class="dc">/-- invocation of `SCAN()` / `UPDATE(v)` at `p` -/</span></span>
+<span id="L57">  | <span class="const token" data-verso-hover="365">hinv</span> (p : P) (o : <span class="const token" data-verso-hover="627">HOp</span> V)</span>
+<span id="L58">  <span class="dc">/-- response at `p` (a snapshot view; `UPDATE` answers the empty view as `ACK`) -/</span></span>
+<span id="L59">  | <span class="const token" data-verso-hover="559">hret</span> (p : P) (r : P → <span class="const token" data-verso-hover="39">Option</span> V)</span>
+<span id="L60">  <span class="dc">/-- an invocation or response of the underlying store-collect object -/</span></span>
+<span id="L61">  | <span class="const token" data-verso-hover="486">sc</span> (e : <span class="const token" data-verso-hover="90">SCEv</span> P (<span class="const token" data-verso-hover="465">SCVal</span> P V))</span>
+<span id="L62"></span>
+<span id="L63"><span class="kw">variable</span> {P V}</span>
+<span id="L64"></span>
+<span id="L65"><span class="dc">/-- The node of an event. -/</span></span>
+<span id="L66"><span class="kw">def</span> <span class="const token" data-verso-hover="505">Ev.proc</span> : <span class="const token" data-verso-hover="340">Ev</span> P V → P</span>
+<span id="L67">  | <span class="const token" data-verso-hover="365">.</span>hinv p _ =&gt; p</span>
+<span id="L68">  | <span class="const token" data-verso-hover="559">.</span>hret p _ =&gt; p</span>
+<span id="L69">  | <span class="const token" data-verso-hover="486">.</span>sc e =&gt; e.<span class="const token" data-verso-hover="487">proc</span></span>
+<span id="L70"></span>
+<span id="L71"><span class="dc">/-- The store-collect part of an event. -/</span></span>
+<span id="L72"><span class="kw">def</span> <span class="const token" data-verso-hover="628">Ev.scOf</span> : <span class="const token" data-verso-hover="340">Ev</span> P V → <span class="const token" data-verso-hover="39">Option</span> (<span class="const token" data-verso-hover="90">SCEv</span> P (<span class="const token" data-verso-hover="465">SCVal</span> P V))</span>
+<span id="L73">  | <span class="const token" data-verso-hover="486">.</span>sc e =&gt; <span class="const token" data-verso-hover="42">some</span> e</span>
+<span id="L74">  | _ =&gt; <span class="const token" data-verso-hover="44">none</span></span>
+<span id="L75"></span>
+<span id="L76"><span class="dc">/-! ## Notation of Section 6.2 -/</span></span>
+<span id="L77"></span>
+<span id="L78"><span class="dc">/-- `r(V).usqno`: update sequence numbers of the entries with a real value. -/</span></span>
+<span id="L79"><span class="kw">def</span> <span class="const token" data-verso-hover="482">rU</span> (W : <span class="const token" data-verso-hover="480">SCView</span> P V) (r : P) : <span class="const token" data-verso-hover="39">Option</span> <span class="const token" data-verso-hover="34">ℕ</span> := (W r).<span class="const token" data-verso-hover="540">bind</span> <span class="kw">fun</span> x =&gt; x.<span class="const token" data-verso-hover="472">val</span>.<span class="const token" data-verso-hover="46">map</span> <span class="kw">fun</span> _ =&gt; x.<span class="const token" data-verso-hover="411">usqno</span></span>
+<span id="L80"></span>
+<span id="L81"><span class="dc">/-- `r(V).val`: the snapshot view made of the real values of a store-collect view. -/</span></span>
+<span id="L82"><span class="kw">def</span> <span class="const token" data-verso-hover="387">rVal</span> (W : <span class="const token" data-verso-hover="480">SCView</span> P V) (r : P) : <span class="const token" data-verso-hover="39">Option</span> V := (W r).<span class="const token" data-verso-hover="540">bind</span> (·.<span class="const token" data-verso-hover="472">val</span>)</span>
+<span id="L83"></span>
+<span id="L84"><span class="dc">/-- `V.ssqno`: the scan sequence numbers of a store-collect view (Line 79). -/</span></span>
+<span id="L85"><span class="kw">def</span> <span class="const token" data-verso-hover="562">ssqVec</span> (W : <span class="const token" data-verso-hover="480">SCView</span> P V) : P → <span class="const token" data-verso-hover="39">Option</span> <span class="const token" data-verso-hover="34">ℕ</span> := <span class="kw">fun</span> r =&gt; (W r).<span class="const token" data-verso-hover="46">map</span> (·.<span class="const token" data-verso-hover="567">ssqno</span>)</span>
+<span id="L86"></span>
+<span id="L87"><span class="dc">/-- The borrowed view `V₁(q).sview` (Line 78). -/</span></span>
+<span id="L88"><span class="kw">def</span> <span class="const token" data-verso-hover="629">sviewOf</span> (W : <span class="const token" data-verso-hover="480">SCView</span> P V) (q : P) : P → <span class="const token" data-verso-hover="39">Option</span> V := ((W q).<span class="const token" data-verso-hover="46">map</span> (·.<span class="const token" data-verso-hover="563">sview</span>)).<span class="const token" data-verso-hover="345">getD</span> <span class="kw">fun</span> _ =&gt; <span class="const token" data-verso-hover="44">none</span></span>
+<span id="L89"></span>
+<span id="L90"><span class="dc">/-! ## The automaton of a node -/</span></span>
+<span id="L91"></span>
+<span id="L92"><span class="dc">/-- Program counter of Algorithm 7.  `emb = some v`: the scan is embedded in `UPDATE(v)`. -/</span></span>
+<span id="L93"><span class="kw">inductive</span> <span class="const token" data-verso-hover="630">PC</span> <span class="kw">where</span></span>
+<span id="L94">  <span class="dc">/-- no pending operation -/</span></span>
+<span id="L95">  | <span class="const token" data-verso-hover="571">idle</span></span>
+<span id="L96">  <span class="dc">/-- next: Line 71 `STORE` -/</span></span>
+<span id="L97">  | <span class="const token" data-verso-hover="572">scStore</span> (emb : <span class="const token" data-verso-hover="39">Option</span> V)</span>
+<span id="L98">  <span class="dc">/-- waiting for the `ACK` of Line 71 -/</span></span>
+<span id="L99">  | <span class="const token" data-verso-hover="573">scStoreW</span> (emb : <span class="const token" data-verso-hover="39">Option</span> V)</span>
+<span id="L100">  <span class="dc">/-- next: Line 72 `COLLECT` -/</span></span>
+<span id="L101">  | <span class="const token" data-verso-hover="574">scCol1</span> (emb : <span class="const token" data-verso-hover="39">Option</span> V)</span>
+<span id="L102">  <span class="dc">/-- waiting for a collect of Line 72 (`first`) or Line 74 -/</span></span>
+<span id="L103">  | <span class="const token" data-verso-hover="575">scColW</span> (emb : <span class="const token" data-verso-hover="39">Option</span> V) (<span class="kw">first</span> : <span class="const token" data-verso-hover="66">Bool</span>)</span>
+<span id="L104">  <span class="dc">/-- next: Line 74 `COLLECT` -/</span></span>
+<span id="L105">  | <span class="const token" data-verso-hover="577">scColN</span> (emb : <span class="const token" data-verso-hover="39">Option</span> V)</span>
+<span id="L106">  <span class="dc">/-- a free-standing scan has decided `W`; next: return it -/</span></span>
+<span id="L107">  | <span class="const token" data-verso-hover="578">scRet</span> (W : P → <span class="const token" data-verso-hover="39">Option</span> V)</span>
+<span id="L108">  <span class="dc">/-- next: Line 79 `COLLECT` of `UPDATE(v)` -/</span></span>
+<span id="L109">  | <span class="const token" data-verso-hover="579">upCol</span> (v : V)</span>
+<span id="L110">  <span class="dc">/-- waiting for the collect of Line 79 -/</span></span>
+<span id="L111">  | <span class="const token" data-verso-hover="580">upColW</span> (v : V)</span>
+<span id="L112">  <span class="dc">/-- next: Line 83 `STORE` -/</span></span>
+<span id="L113">  | <span class="const token" data-verso-hover="581">upStore</span></span>
+<span id="L114">  <span class="dc">/-- waiting for the `ACK` of Line 83 -/</span></span>
+<span id="L115">  | <span class="const token" data-verso-hover="584">upStoreW</span></span>
+<span id="L116">  <span class="dc">/-- next: return `ACK` (Line 84) -/</span></span>
+<span id="L117">  | <span class="const token" data-verso-hover="585">upRet</span></span>
+<span id="L118"></span>
+<span id="L119"><span class="dc">/-- Local state of a node (the local variables of Algorithm 7 plus `stored`, the value it stored</span></span>
+<span id="L120"><span class="dc">last, whose components the `−` of Line 71 refers to). -/</span></span>
+<span id="L121"><span class="kw">structure</span> <span class="const token" data-verso-hover="528">LState</span> (P V : <span class="kw">Type</span>) <span class="kw">where</span></span>
+<span id="L122">  <span class="const token" data-verso-hover="538">pc</span> : <span class="const token" data-verso-hover="630">PC</span> (P := P) (V := V)</span>
+<span id="L123">  <span class="const token" data-verso-hover="568">ssqno</span> : <span class="const token" data-verso-hover="34">ℕ</span></span>
+<span id="L124">  <span class="const token" data-verso-hover="570">scounts</span> : P → <span class="const token" data-verso-hover="39">Option</span> <span class="const token" data-verso-hover="34">ℕ</span></span>
+<span id="L125">  <span class="const token" data-verso-hover="582">val</span> : <span class="const token" data-verso-hover="39">Option</span> V</span>
+<span id="L126">  <span class="const token" data-verso-hover="565">usqno</span> : <span class="const token" data-verso-hover="34">ℕ</span></span>
+<span id="L127">  <span class="const token" data-verso-hover="583">sview</span> : P → <span class="const token" data-verso-hover="39">Option</span> V</span>
+<span id="L128">  <span class="const token" data-verso-hover="576">V1</span> : <span class="const token" data-verso-hover="480">SCView</span> P V</span>
+<span id="L129">  <span class="const token" data-verso-hover="566">stored</span> : <span class="const token" data-verso-hover="465">SCVal</span> P V</span>
+<span id="L130"></span>
+<span id="L131"><span class="dc">/-- Initial local state. -/</span></span>
+<span id="L132"><span class="kw">def</span> <span class="const token" data-verso-hover="552">LState.init</span> : <span class="const token" data-verso-hover="528">LState</span> P V <span class="kw">where</span></span>
+<span id="L133">  <span class="const token" data-verso-hover="538">pc</span> := <span class="const token" data-verso-hover="571">.</span>idle</span>
+<span id="L134">  <span class="const token" data-verso-hover="568">ssqno</span> := <span class="nu">0</span></span>
+<span id="L135">  <span class="const token" data-verso-hover="570">scounts</span> := <span class="kw">fun</span> _ =&gt; <span class="const token" data-verso-hover="44">none</span></span>
+<span id="L136">  <span class="const token" data-verso-hover="582">val</span> := <span class="const token" data-verso-hover="44">none</span></span>
+<span id="L137">  <span class="const token" data-verso-hover="565">usqno</span> := <span class="nu">0</span></span>
+<span id="L138">  <span class="const token" data-verso-hover="583">sview</span> := <span class="kw">fun</span> _ =&gt; <span class="const token" data-verso-hover="44">none</span></span>
+<span id="L139">  <span class="const token" data-verso-hover="576">V1</span> := <span class="kw">fun</span> _ =&gt; <span class="const token" data-verso-hover="44">none</span></span>
+<span id="L140">  <span class="const token" data-verso-hover="566">stored</span> := ⟨<span class="const token" data-verso-hover="44">none</span>, <span class="nu">0</span>, <span class="nu">0</span>, <span class="kw">fun</span> _ =&gt; <span class="const token" data-verso-hover="44">none</span>, <span class="kw">fun</span> _ =&gt; <span class="const token" data-verso-hover="44">none</span>⟩</span>
+<span id="L141"></span>
+<span id="L142"><span class="dc">/-- The choice at Line 77: any rule returning some `q` with `⟨p, ssqno⟩ ∈ V₁(q).scounts`</span></span>
+<span id="L143"><span class="dc">whenever such a `q` exists. -/</span></span>
+<span id="L144"><span class="kw">structure</span> <span class="const token" data-verso-hover="375">Pick</span> (P V : <span class="kw">Type</span>) <span class="kw">where</span></span>
+<span id="L145">  <span class="const token" data-verso-hover="631">f</span> : <span class="const token" data-verso-hover="480">SCView</span> P V → P → <span class="const token" data-verso-hover="34">ℕ</span> → <span class="const token" data-verso-hover="39">Option</span> P</span>
+<span id="L146">  <span class="const token" data-verso-hover="632">spec</span> : ∀ W p s q, <span class="const token" data-verso-hover="631">f</span> W p s = <span class="const token" data-verso-hover="42">some</span> q → ∃ x, W q = <span class="const token" data-verso-hover="42">some</span> x ∧ x.<span class="const token" data-verso-hover="561">scounts</span> p = <span class="const token" data-verso-hover="42">some</span> s</span>
+<span id="L147">  <span class="const token" data-verso-hover="633">total</span> : ∀ W p s q x, W q = <span class="const token" data-verso-hover="42">some</span> x → x.<span class="const token" data-verso-hover="561">scounts</span> p = <span class="const token" data-verso-hover="42">some</span> s → <span class="const token" data-verso-hover="631">f</span> W p s ≠ <span class="const token" data-verso-hover="44">none</span></span>
+<span id="L148"></span>
+<span id="L149"><span class="dc">/-- End of a scan returning `W`: a free-standing scan returns it (Line 76/78); an embedded scan</span></span>
+<span id="L150"><span class="dc">continues with Lines 80–82 (`sview = W; val = v; usqno++`). -/</span></span>
+<span id="L151"><span class="kw">def</span> <span class="const token" data-verso-hover="634">finishScan</span> (s : <span class="const token" data-verso-hover="528">LState</span> P V) (emb : <span class="const token" data-verso-hover="39">Option</span> V) (W : P → <span class="const token" data-verso-hover="39">Option</span> V) : <span class="const token" data-verso-hover="528">LState</span> P V :=</span>
+<span id="L152">  <span class="kw">match</span> emb <span class="kw">with</span></span>
+<span id="L153">  | <span class="const token" data-verso-hover="44">none</span> =&gt; { s <span class="kw">with</span> <span class="const token" data-verso-hover="538">pc</span> := <span class="const token" data-verso-hover="578">.</span>scRet W }</span>
+<span id="L154">  | <span class="const token" data-verso-hover="42">some</span> v =&gt; { s <span class="kw">with</span> <span class="const token" data-verso-hover="538">pc</span> := <span class="const token" data-verso-hover="581">.</span>upStore, <span class="const token" data-verso-hover="583">sview</span> := W, <span class="const token" data-verso-hover="582">val</span> := <span class="const token" data-verso-hover="42">some</span> v, <span class="const token" data-verso-hover="565">usqno</span> := s.<span class="const token" data-verso-hover="565">usqno</span> + <span class="nu">1</span> }</span>
+<span id="L155"></span>
+<span id="L156"><span class="kw">open</span> Classical <span class="kw">in</span></span>
+<span id="L157"><span class="dc">/-- One step of node `p` on its event `e` (`none` = the event is not allowed by the code). -/</span></span>
+<span id="L158"><span class="kw">noncomputable</span> <span class="kw">def</span> <span class="const token" data-verso-hover="635">lstep</span> (pk : <span class="const token" data-verso-hover="375">Pick</span> P V) (p : P) (s : <span class="const token" data-verso-hover="528">LState</span> P V) (e : <span class="const token" data-verso-hover="340">Ev</span> P V) :</span>
+<span id="L159">    <span class="const token" data-verso-hover="39">Option</span> (<span class="const token" data-verso-hover="528">LState</span> P V) :=</span>
+<span id="L160">  <span class="kw">match</span> s.<span class="const token" data-verso-hover="538">pc</span>, e <span class="kw">with</span></span>
+<span id="L161">  <span class="cm">--</span><span class="cm"> Line 70</span></span>
+<span id="L162">  | <span class="const token" data-verso-hover="571">.</span>idle, <span class="const token" data-verso-hover="365">.</span>hinv _ <span class="const token" data-verso-hover="569">.</span>scan =&gt; <span class="const token" data-verso-hover="42">some</span> { s <span class="kw">with</span> <span class="const token" data-verso-hover="538">pc</span> := <span class="const token" data-verso-hover="572">.</span>scStore <span class="const token" data-verso-hover="44">none</span>, <span class="const token" data-verso-hover="568">ssqno</span> := s.<span class="const token" data-verso-hover="568">ssqno</span> + <span class="nu">1</span> }</span>
+<span id="L163">  | <span class="const token" data-verso-hover="571">.</span>idle, <span class="const token" data-verso-hover="365">.</span>hinv _ (<span class="const token" data-verso-hover="366">.</span>update v) =&gt; <span class="const token" data-verso-hover="42">some</span> { s <span class="kw">with</span> <span class="const token" data-verso-hover="538">pc</span> := <span class="const token" data-verso-hover="579">.</span>upCol v }</span>
+<span id="L164">  <span class="cm">--</span><span class="cm"> Line 71: `STORE_p(⟨−, −, ssqno, −, −⟩)`</span></span>
+<span id="L165">  | <span class="const token" data-verso-hover="572">.</span>scStore emb, <span class="const token" data-verso-hover="486">.</span>sc (<span class="const token" data-verso-hover="91">.</span>stInv _ x) =&gt;</span>
+<span id="L166">      <span class="kw">if</span> x = { s.<span class="const token" data-verso-hover="566">stored</span> <span class="kw">with</span> <span class="const token" data-verso-hover="567">ssqno</span> := s.<span class="const token" data-verso-hover="568">ssqno</span> } <span class="kw">then</span> <span class="const token" data-verso-hover="42">some</span> { s <span class="kw">with</span> <span class="const token" data-verso-hover="538">pc</span> := <span class="const token" data-verso-hover="573">.</span>scStoreW emb, <span class="const token" data-verso-hover="566">stored</span> := x }</span>
+<span id="L167">      <span class="kw">else</span> <span class="const token" data-verso-hover="44">none</span></span>
+<span id="L168">  <span class="cm">--</span><span class="cm"> Line 83: `STORE_p(⟨val, usqno, −, sview, scounts⟩)`</span></span>
+<span id="L169">  | <span class="const token" data-verso-hover="581">.</span>upStore, <span class="const token" data-verso-hover="486">.</span>sc (<span class="const token" data-verso-hover="91">.</span>stInv _ x) =&gt;</span>
+<span id="L170">      <span class="kw">if</span> x = ⟨s.<span class="const token" data-verso-hover="582">val</span>, s.<span class="const token" data-verso-hover="565">usqno</span>, s.<span class="const token" data-verso-hover="568">ssqno</span>, s.<span class="const token" data-verso-hover="583">sview</span>, s.<span class="const token" data-verso-hover="570">scounts</span>⟩ <span class="kw">then</span></span>
+<span id="L171">        <span class="const token" data-verso-hover="42">some</span> { s <span class="kw">with</span> <span class="const token" data-verso-hover="538">pc</span> := <span class="const token" data-verso-hover="584">.</span>upStoreW, <span class="const token" data-verso-hover="566">stored</span> := x }</span>
+<span id="L172">      <span class="kw">else</span> <span class="const token" data-verso-hover="44">none</span></span>
+<span id="L173">  | <span class="const token" data-verso-hover="573">.</span>scStoreW emb, <span class="const token" data-verso-hover="486">.</span>sc (<span class="const token" data-verso-hover="92">.</span>ack _) =&gt; <span class="const token" data-verso-hover="42">some</span> { s <span class="kw">with</span> <span class="const token" data-verso-hover="538">pc</span> := <span class="const token" data-verso-hover="574">.</span>scCol1 emb }</span>
+<span id="L174">  | <span class="const token" data-verso-hover="584">.</span>upStoreW, <span class="const token" data-verso-hover="486">.</span>sc (<span class="const token" data-verso-hover="92">.</span>ack _) =&gt; <span class="const token" data-verso-hover="42">some</span> { s <span class="kw">with</span> <span class="const token" data-verso-hover="538">pc</span> := <span class="const token" data-verso-hover="585">.</span>upRet }</span>
+<span id="L175">  <span class="cm">--</span><span class="cm"> Lines 72, 74, 79: invocations of `COLLECT`</span></span>
+<span id="L176">  | <span class="const token" data-verso-hover="574">.</span>scCol1 emb, <span class="const token" data-verso-hover="486">.</span>sc (<span class="const token" data-verso-hover="93">.</span>colInv _) =&gt; <span class="const token" data-verso-hover="42">some</span> { s <span class="kw">with</span> <span class="const token" data-verso-hover="538">pc</span> := <span class="const token" data-verso-hover="575">.</span>scColW emb <span class="const token" data-verso-hover="74">true</span> }</span>
+<span id="L177">  | <span class="const token" data-verso-hover="577">.</span>scColN emb, <span class="const token" data-verso-hover="486">.</span>sc (<span class="const token" data-verso-hover="93">.</span>colInv _) =&gt; <span class="const token" data-verso-hover="42">some</span> { s <span class="kw">with</span> <span class="const token" data-verso-hover="538">pc</span> := <span class="const token" data-verso-hover="575">.</span>scColW emb <span class="const token" data-verso-hover="7">false</span> }</span>
+<span id="L178">  | <span class="const token" data-verso-hover="579">.</span>upCol v, <span class="const token" data-verso-hover="486">.</span>sc (<span class="const token" data-verso-hover="93">.</span>colInv _) =&gt; <span class="const token" data-verso-hover="42">some</span> { s <span class="kw">with</span> <span class="const token" data-verso-hover="538">pc</span> := <span class="const token" data-verso-hover="580">.</span>upColW v }</span>
+<span id="L179">  <span class="cm">--</span><span class="cm"> Line 79 returns, then Line 80 starts the embedded scan (Line 70)</span></span>
+<span id="L180">  | <span class="const token" data-verso-hover="580">.</span>upColW v, <span class="const token" data-verso-hover="486">.</span>sc (<span class="const token" data-verso-hover="94">.</span>ret _ W) =&gt;</span>
+<span id="L181">      <span class="const token" data-verso-hover="42">some</span> { s <span class="kw">with</span> <span class="const token" data-verso-hover="538">pc</span> := <span class="const token" data-verso-hover="572">.</span>scStore (<span class="const token" data-verso-hover="42">some</span> v), <span class="const token" data-verso-hover="570">scounts</span> := <span class="const token" data-verso-hover="562">ssqVec</span> W, <span class="const token" data-verso-hover="568">ssqno</span> := s.<span class="const token" data-verso-hover="568">ssqno</span> + <span class="nu">1</span> }</span>
+<span id="L182">  <span class="cm">--</span><span class="cm"> Line 72 returns</span></span>
+<span id="L183">  | <span class="const token" data-verso-hover="575">.</span>scColW emb <span class="const token" data-verso-hover="74">true</span>, <span class="const token" data-verso-hover="486">.</span>sc (<span class="const token" data-verso-hover="94">.</span>ret _ W) =&gt; <span class="const token" data-verso-hover="42">some</span> { s <span class="kw">with</span> <span class="const token" data-verso-hover="538">pc</span> := <span class="const token" data-verso-hover="577">.</span>scColN emb, <span class="const token" data-verso-hover="576">V1</span> := W }</span>
+<span id="L184">  <span class="cm">--</span><span class="cm"> Line 74 returns; Lines 75–78</span></span>
+<span id="L185">  | <span class="const token" data-verso-hover="575">.</span>scColW emb <span class="const token" data-verso-hover="7">false</span>, <span class="const token" data-verso-hover="486">.</span>sc (<span class="const token" data-verso-hover="94">.</span>ret _ W) =&gt;</span>
+<span id="L186">      <span class="kw">if</span> ∀ r, <span class="const token" data-verso-hover="482">rU</span> W r = <span class="const token" data-verso-hover="482">rU</span> s.<span class="const token" data-verso-hover="576">V1</span> r <span class="kw">then</span> <span class="const token" data-verso-hover="42">some</span> (<span class="const token" data-verso-hover="634">finishScan</span> { s <span class="kw">with</span> <span class="const token" data-verso-hover="576">V1</span> := W } emb (<span class="const token" data-verso-hover="387">rVal</span> W))</span>
+<span id="L187">      <span class="kw">else</span> <span class="kw">match</span> pk.<span class="const token" data-verso-hover="631">f</span> W p s.<span class="const token" data-verso-hover="568">ssqno</span> <span class="kw">with</span></span>
+<span id="L188">        | <span class="const token" data-verso-hover="42">some</span> q =&gt; <span class="const token" data-verso-hover="42">some</span> (<span class="const token" data-verso-hover="634">finishScan</span> { s <span class="kw">with</span> <span class="const token" data-verso-hover="576">V1</span> := W } emb (<span class="const token" data-verso-hover="629">sviewOf</span> W q))</span>
+<span id="L189">        | <span class="const token" data-verso-hover="44">none</span> =&gt; <span class="const token" data-verso-hover="42">some</span> { s <span class="kw">with</span> <span class="const token" data-verso-hover="538">pc</span> := <span class="const token" data-verso-hover="577">.</span>scColN emb, <span class="const token" data-verso-hover="576">V1</span> := W }</span>
+<span id="L190">  | <span class="const token" data-verso-hover="578">.</span>scRet W, <span class="const token" data-verso-hover="559">.</span>hret _ r =&gt; <span class="kw">if</span> r = W <span class="kw">then</span> <span class="const token" data-verso-hover="42">some</span> { s <span class="kw">with</span> <span class="const token" data-verso-hover="538">pc</span> := <span class="const token" data-verso-hover="571">.</span>idle } <span class="kw">else</span> <span class="const token" data-verso-hover="44">none</span></span>
+<span id="L191">  | <span class="const token" data-verso-hover="585">.</span>upRet, <span class="const token" data-verso-hover="559">.</span>hret _ r =&gt; <span class="kw">if</span> r = (<span class="kw">fun</span> _ =&gt; <span class="const token" data-verso-hover="44">none</span>) <span class="kw">then</span> <span class="const token" data-verso-hover="42">some</span> { s <span class="kw">with</span> <span class="const token" data-verso-hover="538">pc</span> := <span class="const token" data-verso-hover="571">.</span>idle } <span class="kw">else</span> <span class="const token" data-verso-hover="44">none</span></span>
+<span id="L192">  | _, _ =&gt; <span class="const token" data-verso-hover="44">none</span></span>
+<span id="L193"></span>
+<span id="L194"><span class="kw">variable</span> [<span class="const token" data-verso-hover="57">DecidableEq</span> P]</span>
+<span id="L195"></span>
+<span id="L196"><span class="dc">/-- Configurations: the local states of all nodes. -/</span></span>
+<span id="L197"><span class="kw">abbrev</span> <span class="const token" data-verso-hover="636">Cfg</span> (P V : <span class="kw">Type</span>) := P → <span class="const token" data-verso-hover="528">LState</span> P V</span>
+<span id="L198"></span>
+<span id="L199"><span class="dc">/-- One global step: the node of the event takes its local step. -/</span></span>
+<span id="L200"><span class="kw">noncomputable</span> <span class="kw">def</span> <span class="const token" data-verso-hover="541">gstep</span> (pk : <span class="const token" data-verso-hover="375">Pick</span> P V) (c : <span class="const token" data-verso-hover="636">Cfg</span> P V) (e : <span class="const token" data-verso-hover="340">Ev</span> P V) : <span class="const token" data-verso-hover="39">Option</span> (<span class="const token" data-verso-hover="636">Cfg</span> P V) :=</span>
+<span id="L201">  (<span class="const token" data-verso-hover="635">lstep</span> pk e.<span class="const token" data-verso-hover="505">proc</span> (c e.<span class="const token" data-verso-hover="505">proc</span>) e).<span class="const token" data-verso-hover="46">map</span> (<span class="const token" data-verso-hover="128">Function.update</span> c e.<span class="const token" data-verso-hover="505">proc</span>)</span>
+<span id="L202"></span>
+<span id="L203"><span class="dc">/-- Run an execution from the initial configuration (`none` if some event is not allowed). -/</span></span>
+<span id="L204"><span class="kw">noncomputable</span> <span class="kw">def</span> <span class="const token" data-verso-hover="376">run</span> (pk : <span class="const token" data-verso-hover="375">Pick</span> P V) (E : <span class="const token" data-verso-hover="36">List</span> (<span class="const token" data-verso-hover="340">Ev</span> P V)) : <span class="const token" data-verso-hover="39">Option</span> (<span class="const token" data-verso-hover="636">Cfg</span> P V) :=</span>
+<span id="L205">  E.<span class="const token" data-verso-hover="132">foldl</span> (<span class="kw">fun</span> c e =&gt; c.<span class="const token" data-verso-hover="540">bind</span> (<span class="const token" data-verso-hover="541">gstep</span> pk · e)) (<span class="const token" data-verso-hover="42">some</span> <span class="kw">fun</span> _ =&gt; <span class="const token" data-verso-hover="552">LState.init</span>)</span>
+<span id="L206"></span>
+<span id="L207"><span class="dc">/-- The schedule of the underlying store-collect object. -/</span></span>
+<span id="L208"><span class="kw">def</span> <span class="const token" data-verso-hover="377">scSched</span> (E : <span class="const token" data-verso-hover="36">List</span> (<span class="const token" data-verso-hover="340">Ev</span> P V)) : <span class="const token" data-verso-hover="36">List</span> (<span class="const token" data-verso-hover="90">SCEv</span> P (<span class="const token" data-verso-hover="465">SCVal</span> P V)) := E.<span class="const token" data-verso-hover="466">filterMap</span> <span class="const token" data-verso-hover="628">Ev.scOf</span></span>
+<span id="L209"></span>
+<span id="L210"><span class="dc">/-! ## The implemented object: an atomic snapshot -/</span></span>
+<span id="L211"></span>
+<span id="L212"><span class="dc">/-- Snapshot operations as seen by the sequential specification (the updating node is part of</span></span>
+<span id="L213"><span class="dc">the operation, since a sequential specification does not see the caller). -/</span></span>
+<span id="L214"><span class="kw">inductive</span> <span class="const token" data-verso-hover="342">SnapOp</span> (P V : <span class="kw">Type</span>) <span class="kw">where</span></span>
+<span id="L215">  | <span class="const token" data-verso-hover="346">scan</span></span>
+<span id="L216">  | <span class="const token" data-verso-hover="362">update</span> (p : P) (v : V)</span>
+<span id="L217"></span>
+<span id="L218"><span class="const token" data-verso-hover="637">instance</span> : <span class="const token" data-verso-hover="638">Inhabited</span> (<span class="const token" data-verso-hover="342">SnapOp</span> P V) := ⟨<span class="const token" data-verso-hover="346">.</span>scan⟩</span>
+<span id="L219"></span>
+<span id="L220"><span class="dc">/-- Sequential specification of an atomic snapshot over nodes `P` (Section 6.2): a scan returns,</span></span>
+<span id="L221"><span class="dc">for each node, the value of its last preceding update (`none` if there is none). -/</span></span>
+<span id="L222"><span class="kw">abbrev</span> <span class="const token" data-verso-hover="383">snapSpec</span> (P V : <span class="kw">Type</span>) [<span class="const token" data-verso-hover="57">DecidableEq</span> P] : <span class="const token" data-verso-hover="639">ObjSpec</span> <span class="kw">where</span></span>
+<span id="L223">  <span class="const token" data-verso-hover="640">State</span> := P → <span class="const token" data-verso-hover="39">Option</span> V</span>
+<span id="L224">  <span class="const token" data-verso-hover="641">Op</span> := <span class="const token" data-verso-hover="342">SnapOp</span> P V</span>
+<span id="L225">  <span class="const token" data-verso-hover="642">Resp</span> := P → <span class="const token" data-verso-hover="39">Option</span> V</span>
+<span id="L226">  <span class="const token" data-verso-hover="385">init</span> := <span class="kw">fun</span> _ =&gt; <span class="const token" data-verso-hover="44">none</span></span>
+<span id="L227">  <span class="const token" data-verso-hover="643">δ</span> q o := <span class="kw">match</span> o <span class="kw">with</span></span>
+<span id="L228">    | <span class="const token" data-verso-hover="346">.</span>scan =&gt; (q, q)</span>
+<span id="L229">    | <span class="const token" data-verso-hover="362">.</span>update p v =&gt; (<span class="const token" data-verso-hover="128">Function.update</span> q p (<span class="const token" data-verso-hover="42">some</span> v), <span class="kw">fun</span> _ =&gt; <span class="const token" data-verso-hover="44">none</span>)</span>
+<span id="L230"></span>
+<span id="L231"><span class="dc">/-- The high-level history of an execution (store-collect events become internal steps). -/</span></span>
+<span id="L232"><span class="kw">def</span> <span class="const token" data-verso-hover="644">Ev.toLabel</span> : <span class="const token" data-verso-hover="340">Ev</span> P V → <span class="const token" data-verso-hover="645">Label</span> P (<span class="const token" data-verso-hover="383">snapSpec</span> P V)</span>
+<span id="L233">  | <span class="const token" data-verso-hover="365">.</span>hinv p <span class="const token" data-verso-hover="569">.</span>scan =&gt; <span class="const token" data-verso-hover="646">.</span>inv p <span class="const token" data-verso-hover="346">.</span>scan</span>
+<span id="L234">  | <span class="const token" data-verso-hover="365">.</span>hinv p (<span class="const token" data-verso-hover="366">.</span>update v) =&gt; <span class="const token" data-verso-hover="646">.</span>inv p (<span class="const token" data-verso-hover="362">.</span>update p v)</span>
+<span id="L235">  | <span class="const token" data-verso-hover="559">.</span>hret p r =&gt; <span class="const token" data-verso-hover="647">.</span>ret p r</span>
+<span id="L236">  | <span class="const token" data-verso-hover="486">.</span>sc e =&gt; <span class="const token" data-verso-hover="648">.</span>tau e.<span class="const token" data-verso-hover="487">proc</span></span>
+<span id="L237"></span>
+<span id="L238"><span class="dc">/-- The high-level history of an execution. -/</span></span>
+<span id="L239"><span class="kw">def</span> <span class="const token" data-verso-hover="344">hist</span> (E : <span class="const token" data-verso-hover="36">List</span> (<span class="const token" data-verso-hover="340">Ev</span> P V)) : <span class="const token" data-verso-hover="36">List</span> (<span class="const token" data-verso-hover="645">Label</span> P (<span class="const token" data-verso-hover="383">snapSpec</span> P V)) := E.<span class="const token" data-verso-hover="48">map</span> <span class="const token" data-verso-hover="644">Ev.toLabel</span></span>
+<span id="L240"></span>
+<span id="L241"><span class="kw">end</span> Podc.StoreCollectChurn.Snap</span>
+<span id="L242"></span>
+</code></div>
+        <script>
+          window.versoHoversUrl = "PODC2020/StoreCollectChurn/-hovers.json";</script>
+        <script src="static/lean/popper.js"></script>
+        <script src="static/lean/tippy.js"></script>
+        <script src="static/lean/marked.js"></script>
+        <script src="static/lean/highlighting.js"></script>
+        <script src="static/lean/lean.js"></script>
+        </article></main><footer class="site-footer"><div class="wrap">
+        Machine-checked formalizations of PODC papers in Lean 4. Generated with <a href="https://github.com/leanprover/verso">Verso</a> from the README files of <a href="https://github.com/vasnesterov/formal_podc">vasnesterov/formal_podc</a>.</div>
+      </footer></body>
+  </html>
+

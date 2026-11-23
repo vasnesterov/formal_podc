@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="light dark">
+    <link rel="icon" href="data:,">
+    <title>PaxosRaftRefinement: Paxos.lean · Formal PODC</title><base href="../../../.././"><link rel="stylesheet" href="static/lean/verso-vars.css">
+    <link rel="stylesheet" href="static/lean/highlighting.css">
+    <link rel="stylesheet" href="static/lean/tippy-border.css">
+    <link rel="stylesheet" href="static/style.css">
+    <script defer="defer" src="static/site.js"></script>
+    </head>
+  <body>
+    <header class="site-header">
+      <div class="wrap">
+        <a class="brand" href=".">Formal PODC</a><nav class="top">
+          <a href=".">Search</a><a href="about/">About</a><a href="https://github.com/vasnesterov/formal_podc">GitHub</a></nav>
+        </div>
+      </header>
+    <main class="wrap"><article><nav class="breadcrumbs" aria-label="Breadcrumb">
+          <a href=".">Search</a><span class="sep">›</span><a href="PODC2019/">PODC 2019</a><span class="sep">›</span><a href="PODC2019/PaxosRaftRefinement/">PaxosRaftRefinement</a><span class="sep">›</span><a href="PODC2019/PaxosRaftRefinement/src/">Lean source</a><span class="sep">›</span><span aria-current="page">Paxos</span></nav>
+        <h1>
+          <code>Paxos.lean</code></h1>
+        <div class="paper-links">
+          <p>
+            Source of <a href="PODC2019/PaxosRaftRefinement/">Paxos vs. Raft, and porting optimizations — PODC 2019</a> · <a href="https://github.com/vasnesterov/formal_podc/blob/main/Papers/PODC2019/PaxosRaftRefinement/Paxos.lean">GitHub</a> · hover over a name for its type and documentation</p>
+          </div>
+        <div class="lean-code lean-src">
+          <code class="hl lean block" data-lean-context="Paxos"><span id="L1"><span class="kw">import</span> Mathlib</span>
+<span id="L2"></span>
+<span id="L3"><span class="dc">/-!</span></span>
+<span id="L4"><span class="dc"># MultiPaxos (Figure 1 of [paper]), as an interleaving transition system</span></span>
+<span id="L5"></span>
+<span id="L6"><span class="dc">[paper]: Z. Wang, C. Zhao, S. Mu, H. Chen, J. Li. *On the Parallels between Paxos and Raft, and how</span></span>
+<span id="L7"><span class="dc">to Port Optimizations.* PODC 2019 (extended version with Appendices A–C).</span></span>
+<span id="L8"></span>
+<span id="L9"><span class="dc">Model (as in the paper's TLA+ appendix B.1 and in its proof, Appendix C):</span></span>
+<span id="L10"></span>
+<span id="L11"><span class="dc">* a finite set of servers `N`, each playing proposer, acceptor and learner; values `V`;</span></span>
+<span id="L12"><span class="dc">  ballots `ℕ` (initially `0`, `Phase1a` increments the ballot, as in Figure 1);</span></span>
+<span id="L13"><span class="dc">* asynchronous message passing over an unreliable network: every message ever sent stays in a set</span></span>
+<span id="L14"><span class="dc">  (`m1a`, `m1b`, `m2a`, `m2b`); a server "receives" a message by reading it from the set, so</span></span>
+<span id="L15"><span class="dc">  messages may be lost (never read), duplicated (read twice) and reordered. Crash-stop failures</span></span>
+<span id="L16"><span class="dc">  are servers that stop taking steps; no step is ever forced;</span></span>
+<span id="L17"><span class="dc">* each server keeps `ballot`, `leader` (`phase1Succeeded` in Figure 1), its log</span></span>
+<span id="L18"><span class="dc">  `inst : ℕ → Option (ℕ × V)` (`instances`, an entry is `(accepted ballot, value)`) and its</span></span>
+<span id="L19"><span class="dc">  `chosen` set (`chosenSet`);</span></span>
+<span id="L20"><span class="dc">* as in Appendix C, the `unchosen` optimisation of Figure 1 is dropped: `prepareOK` carries the</span></span>
+<span id="L21"><span class="dc">  whole log.</span></span>
+<span id="L22"></span>
+<span id="L23"><span class="dc">Repairs of Figure 1 (all recorded in `differencies.md`):</span></span>
+<span id="L24"></span>
+<span id="L25"><span class="dc">* `phase1a` resets `leader` (as `IncreaseHighestBallot` in the TLA+ spec) and also produces the</span></span>
+<span id="L26"><span class="dc">  proposer's own (implicit) `prepareOK`;</span></span>
+<span id="L27"><span class="dc">* `phase1Succeed` is guarded by `¬ leader` and needs the proposer's own report among the quorum's</span></span>
+<span id="L28"><span class="dc">  (both as `BecomeLeader` in the TLA+ spec); it sets the whole log to the safe entries (indices</span></span>
+<span id="L29"><span class="dc">  above the largest reported one become empty);</span></span>
+<span id="L30"><span class="dc">* `phase2a` may not propose a second value for the same instance and ballot (Figure 1 records</span></span>
+<span id="L31"><span class="dc">  nothing when proposing, so as written a leader can propose two values);</span></span>
+<span id="L32"><span class="dc">* `learn` only adds to `chosen` (Figure 1 also overwrites the instance with `(b, v)`); the</span></span>
+<span id="L33"><span class="dc">  `acceptOK` messages are visible to every learner (the paper's "notify other servers").</span></span>
+<span id="L34"></span>
+<span id="L35"><span class="dc">Quorums are any intersecting family (`QuorumSystem`); majorities are `QuorumSystem.majority`.</span></span>
+<span id="L36"><span class="dc">-/</span></span>
+<span id="L37"></span>
+<span id="L38"><span class="kw">namespace</span> Podc.PaxosRaftRefinement</span>
+<span id="L39"></span>
+<span id="L40"><span class="dc">/-- An intersecting quorum system on the servers `N`. -/</span></span>
+<span id="L41"><span class="kw">structure</span> <span class="const token" data-verso-hover="33">QuorumSystem</span> (N : <span class="kw">Type</span>*) <span class="kw">where</span></span>
+<span id="L42">  <span class="dc">/-- The quorums. -/</span></span>
+<span id="L43">  <span class="const token" data-verso-hover="82">IsQuorum</span> : <span class="const token" data-verso-hover="83">Finset</span> N → <span class="kw">Prop</span></span>
+<span id="L44">  <span class="dc">/-- Any two quorums intersect. -/</span></span>
+<span id="L45">  <span class="const token" data-verso-hover="84">inter</span> : ∀ Q₁ Q₂, <span class="const token" data-verso-hover="82">IsQuorum</span> Q₁ → <span class="const token" data-verso-hover="82">IsQuorum</span> Q₂ → ∃ a, a ∈ Q₁ ∧ a ∈ Q₂</span>
+<span id="L46"></span>
+<span id="L47"><span class="dc">/-- Majority quorums (`f + 1` out of `2f + 1`, or in general more than half of the servers). -/</span></span>
+<span id="L48"><span class="kw">def</span> <span class="const token" data-verso-hover="21">QuorumSystem.majority</span> (N : <span class="kw">Type</span>*) [<span class="const token" data-verso-hover="85">Fintype</span> N] [<span class="const token" data-verso-hover="86">DecidableEq</span> N] : <span class="const token" data-verso-hover="33">QuorumSystem</span> N <span class="kw">where</span></span>
+<span id="L49">  <span class="const token" data-verso-hover="82">IsQuorum</span> Q := <span class="const token" data-verso-hover="87">Fintype.card</span> N &lt; <span class="nu">2</span> * Q.<span class="const token" data-verso-hover="88">card</span></span>
+<span id="L50">  <span class="const token" data-verso-hover="84">inter</span> Q₁ Q₂ h₁ h₂ := <span class="kw">by</span></span>
+<span id="L51">    <span class="kw">by_contra</span> hc</span>
+<span id="L52">    push <span class="const token" data-verso-hover="89">Not</span> <span class="kw">at</span> hc</span>
+<span id="L53">    <span class="kw">have</span> h : Q₁ ∩ Q₂ = ∅ := <span class="kw">by</span></span>
+<span id="L54">      <span class="kw">ext</span> a; <span class="kw">simp</span> only [<span class="const token" data-verso-hover="90">Finset.mem_inter</span>, <span class="const token" data-verso-hover="91">Finset.notMem_empty</span>, <span class="const token" data-verso-hover="92">iff_false</span>, <span class="const token" data-verso-hover="93">not_and</span>]; <span class="kw">exact</span> hc a</span>
+<span id="L55">    <span class="kw">have</span> := <span class="const token" data-verso-hover="94">Finset.card_union_add_card_inter</span> Q₁ Q₂</span>
+<span id="L56">    <span class="kw">rw</span> [h, <span class="const token" data-verso-hover="95">Finset.card_empty</span>] <span class="kw">at</span> this</span>
+<span id="L57">    <span class="kw">have</span> := <span class="const token" data-verso-hover="96">Finset.card_le_univ</span> (Q₁ ∪ Q₂)</span>
+<span id="L58">    <span class="kw">omega</span></span>
+<span id="L59"></span>
+<span id="L60"><span class="kw">namespace</span> Paxos</span>
+<span id="L61"></span>
+<span id="L62"><span class="kw">variable</span> {N V : <span class="kw">Type</span>*}</span>
+<span id="L63"></span>
+<span id="L64"><span class="dc">/-- A `prepareOK` message `⟨src, dst, bal, log⟩`: `src` answers the `prepare` of `dst` for ballot</span></span>
+<span id="L65"><span class="dc">`bal`, reporting its whole log. -/</span></span>
+<span id="L66">@[<span class="kw">ext</span>]</span>
+<span id="L67"><span class="kw">structure</span> <span class="const token" data-verso-hover="97">Msg1b</span> (N V : <span class="kw">Type</span>*) <span class="kw">where</span></span>
+<span id="L68">  <span class="dc">/-- Sender (an acceptor). -/</span></span>
+<span id="L69">  <span class="const token" data-verso-hover="98">src</span> : N</span>
+<span id="L70">  <span class="dc">/-- Receiver (the proposer). -/</span></span>
+<span id="L71">  <span class="const token" data-verso-hover="99">dst</span> : N</span>
+<span id="L72">  <span class="dc">/-- The ballot of the `prepare`. -/</span></span>
+<span id="L73">  <span class="const token" data-verso-hover="100">bal</span> : <span class="const token" data-verso-hover="37">ℕ</span></span>
+<span id="L74">  <span class="dc">/-- The sender's log. -/</span></span>
+<span id="L75">  <span class="const token" data-verso-hover="101">log</span> : <span class="const token" data-verso-hover="37">ℕ</span> → <span class="const token" data-verso-hover="102">Option</span> (<span class="const token" data-verso-hover="37">ℕ</span> × V)</span>
+<span id="L76"></span>
+<span id="L77"><span class="dc">/-- Global state of MultiPaxos. -/</span></span>
+<span id="L78">@[<span class="kw">ext</span>]</span>
+<span id="L79"><span class="kw">structure</span> <span class="const token" data-verso-hover="103">State</span> (N V : <span class="kw">Type</span>*) <span class="kw">where</span></span>
+<span id="L80">  <span class="dc">/-- `s.ballot`. -/</span></span>
+<span id="L81">  <span class="const token" data-verso-hover="104">ballot</span> : N → <span class="const token" data-verso-hover="37">ℕ</span></span>
+<span id="L82">  <span class="dc">/-- `s.phase1Succeeded`. -/</span></span>
+<span id="L83">  <span class="const token" data-verso-hover="105">leader</span> : N → <span class="const token" data-verso-hover="38">Bool</span></span>
+<span id="L84">  <span class="dc">/-- `s.instances`: `inst s i = some (b, v)` — instance `i` holds value `v` accepted at ballot `b`. -/</span></span>
+<span id="L85">  <span class="const token" data-verso-hover="106">inst</span> : N → <span class="const token" data-verso-hover="37">ℕ</span> → <span class="const token" data-verso-hover="102">Option</span> (<span class="const token" data-verso-hover="37">ℕ</span> × V)</span>
+<span id="L86">  <span class="dc">/-- `s.chosenSet`, as pairs `(instance, value)`. -/</span></span>
+<span id="L87">  <span class="const token" data-verso-hover="107">chosen</span> : N → <span class="const token" data-verso-hover="108">Set</span> (<span class="const token" data-verso-hover="37">ℕ</span> × V)</span>
+<span id="L88">  <span class="dc">/-- `prepare` messages `(proposer, ballot)`. -/</span></span>
+<span id="L89">  <span class="const token" data-verso-hover="109">m1a</span> : <span class="const token" data-verso-hover="108">Set</span> (N × <span class="const token" data-verso-hover="37">ℕ</span>)</span>
+<span id="L90">  <span class="dc">/-- `prepareOK` messages. -/</span></span>
+<span id="L91">  <span class="const token" data-verso-hover="110">m1b</span> : <span class="const token" data-verso-hover="108">Set</span> (<span class="const token" data-verso-hover="97">Msg1b</span> N V)</span>
+<span id="L92">  <span class="dc">/-- `accept` messages `(instance, ballot, value)` (Phase 2a). -/</span></span>
+<span id="L93">  <span class="const token" data-verso-hover="111">m2a</span> : <span class="const token" data-verso-hover="108">Set</span> (<span class="const token" data-verso-hover="37">ℕ</span> × <span class="const token" data-verso-hover="37">ℕ</span> × V)</span>
+<span id="L94">  <span class="dc">/-- `acceptOK` messages `(acceptor, instance, ballot, value)` (Phase 2b). -/</span></span>
+<span id="L95">  <span class="const token" data-verso-hover="112">m2b</span> : <span class="const token" data-verso-hover="108">Set</span> (N × <span class="const token" data-verso-hover="37">ℕ</span> × <span class="const token" data-verso-hover="37">ℕ</span> × V)</span>
+<span id="L96"></span>
+<span id="L97"><span class="dc">/-- The initial state: ballots `0`, no leader, empty logs, no messages. -/</span></span>
+<span id="L98"><span class="kw">def</span> <span class="const token" data-verso-hover="113">init</span> : <span class="const token" data-verso-hover="103">State</span> N V <span class="kw">where</span></span>
+<span id="L99">  <span class="const token" data-verso-hover="104">ballot</span> _ := <span class="nu">0</span></span>
+<span id="L100">  <span class="const token" data-verso-hover="105">leader</span> _ := <span class="const token" data-verso-hover="57">false</span></span>
+<span id="L101">  <span class="const token" data-verso-hover="106">inst</span> _ _ := <span class="const token" data-verso-hover="114">none</span></span>
+<span id="L102">  <span class="const token" data-verso-hover="107">chosen</span> _ := ∅</span>
+<span id="L103">  <span class="const token" data-verso-hover="109">m1a</span> := ∅</span>
+<span id="L104">  <span class="const token" data-verso-hover="110">m1b</span> := ∅</span>
+<span id="L105">  <span class="const token" data-verso-hover="111">m2a</span> := ∅</span>
+<span id="L106">  <span class="const token" data-verso-hover="112">m2b</span> := ∅</span>
+<span id="L107"></span>
+<span id="L108"><span class="dc">/-- `e` is `safeEntry` of the reports `S` at instance `i` (Figure 1, line 23): an entry with the</span></span>
+<span id="L109"><span class="dc">highest ballot among the reported entries for `i`, or empty if nobody reported one. -/</span></span>
+<span id="L110"><span class="kw">def</span> <span class="const token" data-verso-hover="115">IsSafeEntry</span> (S : <span class="const token" data-verso-hover="83">Finset</span> (<span class="const token" data-verso-hover="97">Msg1b</span> N V)) (i : <span class="const token" data-verso-hover="37">ℕ</span>) : <span class="const token" data-verso-hover="102">Option</span> (<span class="const token" data-verso-hover="37">ℕ</span> × V) → <span class="kw">Prop</span></span>
+<span id="L111">  | <span class="const token" data-verso-hover="114">none</span> =&gt; ∀ m ∈ S, m.<span class="const token" data-verso-hover="101">log</span> i = <span class="const token" data-verso-hover="114">none</span></span>
+<span id="L112">  | <span class="const token" data-verso-hover="116">some</span> (c, v) =&gt; (∃ m ∈ S, m.<span class="const token" data-verso-hover="101">log</span> i = <span class="const token" data-verso-hover="116">some</span> (c, v)) ∧</span>
+<span id="L113">      ∀ m ∈ S, ∀ c' v', m.<span class="const token" data-verso-hover="101">log</span> i = <span class="const token" data-verso-hover="116">some</span> (c', v') → c' ≤ c</span>
+<span id="L114"></span>
+<span id="L115"><span class="kw">variable</span> [<span class="const token" data-verso-hover="86">DecidableEq</span> N]</span>
+<span id="L116"></span>
+<span id="L117"><span class="dc">/-- One step of MultiPaxos (Figure 1, repaired as explained in the module docstring). -/</span></span>
+<span id="L118"><span class="kw">inductive</span> <span class="const token" data-verso-hover="117">Step</span> (Q : <span class="const token" data-verso-hover="33">QuorumSystem</span> N) : <span class="const token" data-verso-hover="103">State</span> N V → <span class="const token" data-verso-hover="103">State</span> N V → <span class="kw">Prop</span></span>
+<span id="L119">  <span class="dc">/-- `Phase1a(s)`: increment the ballot, send `prepare` (and the implicit own `prepareOK`). -/</span></span>
+<span id="L120">  | <span class="const token" data-verso-hover="118">phase1a</span> (p : <span class="const token" data-verso-hover="103">State</span> N V) (s : N) :</span>
+<span id="L121">      <span class="const token" data-verso-hover="117">Step</span> Q p { p <span class="kw">with</span></span>
+<span id="L122">        <span class="const token" data-verso-hover="104">ballot</span> := <span class="const token" data-verso-hover="119">Function.update</span> p.<span class="const token" data-verso-hover="104">ballot</span> s (p.<span class="const token" data-verso-hover="104">ballot</span> s + <span class="nu">1</span>)</span>
+<span id="L123">        <span class="const token" data-verso-hover="105">leader</span> := <span class="const token" data-verso-hover="119">Function.update</span> p.<span class="const token" data-verso-hover="105">leader</span> s <span class="const token" data-verso-hover="57">false</span></span>
+<span id="L124">        <span class="const token" data-verso-hover="109">m1a</span> := <span class="const token" data-verso-hover="120">insert</span> (s, p.<span class="const token" data-verso-hover="104">ballot</span> s + <span class="nu">1</span>) p.<span class="const token" data-verso-hover="109">m1a</span></span>
+<span id="L125">        <span class="const token" data-verso-hover="110">m1b</span> := <span class="const token" data-verso-hover="120">insert</span> ⟨s, s, p.<span class="const token" data-verso-hover="104">ballot</span> s + <span class="nu">1</span>, p.<span class="const token" data-verso-hover="106">inst</span> s⟩ p.<span class="const token" data-verso-hover="110">m1b</span> }</span>
+<span id="L126">  <span class="dc">/-- `Phase1b(s)`: answer a `prepare` of `r` for a higher ballot `b`. -/</span></span>
+<span id="L127">  | <span class="const token" data-verso-hover="121">phase1b</span> (p : <span class="const token" data-verso-hover="103">State</span> N V) (s r : N) (b : <span class="const token" data-verso-hover="37">ℕ</span>) (hm : (r, b) ∈ p.<span class="const token" data-verso-hover="109">m1a</span>) (hb : p.<span class="const token" data-verso-hover="104">ballot</span> s &lt; b) :</span>
+<span id="L128">      <span class="const token" data-verso-hover="117">Step</span> Q p { p <span class="kw">with</span></span>
+<span id="L129">        <span class="const token" data-verso-hover="104">ballot</span> := <span class="const token" data-verso-hover="119">Function.update</span> p.<span class="const token" data-verso-hover="104">ballot</span> s b</span>
+<span id="L130">        <span class="const token" data-verso-hover="105">leader</span> := <span class="const token" data-verso-hover="119">Function.update</span> p.<span class="const token" data-verso-hover="105">leader</span> s <span class="const token" data-verso-hover="57">false</span></span>
+<span id="L131">        <span class="const token" data-verso-hover="110">m1b</span> := <span class="const token" data-verso-hover="120">insert</span> ⟨s, r, b, p.<span class="const token" data-verso-hover="106">inst</span> s⟩ p.<span class="const token" data-verso-hover="110">m1b</span> }</span>
+<span id="L132">  <span class="dc">/-- `Phase1Succeed(s)`: a quorum answered the current ballot; adopt the safe entries. -/</span></span>
+<span id="L133">  | <span class="const token" data-verso-hover="122">phase1Succeed</span> (p : <span class="const token" data-verso-hover="103">State</span> N V) (s : N) (S : <span class="const token" data-verso-hover="83">Finset</span> (<span class="const token" data-verso-hover="97">Msg1b</span> N V)) (newInst : <span class="const token" data-verso-hover="37">ℕ</span> → <span class="const token" data-verso-hover="102">Option</span> (<span class="const token" data-verso-hover="37">ℕ</span> × V))</span>
+<span id="L134">      (hl : p.<span class="const token" data-verso-hover="105">leader</span> s = <span class="const token" data-verso-hover="57">false</span>)</span>
+<span id="L135">      (hS : ∀ m ∈ S, m ∈ p.<span class="const token" data-verso-hover="110">m1b</span> ∧ m.<span class="const token" data-verso-hover="99">dst</span> = s ∧ m.<span class="const token" data-verso-hover="100">bal</span> = p.<span class="const token" data-verso-hover="104">ballot</span> s)</span>
+<span id="L136">      (hQ : Q.<span class="const token" data-verso-hover="82">IsQuorum</span> (S.<span class="const token" data-verso-hover="123">image</span> <span class="const token" data-verso-hover="98">Msg1b.src</span>))</span>
+<span id="L137">      (hself : ∃ m ∈ S, m.<span class="const token" data-verso-hover="98">src</span> = s)</span>
+<span id="L138">      (hsafe : ∀ i, <span class="const token" data-verso-hover="115">IsSafeEntry</span> S i (newInst i)) :</span>
+<span id="L139">      <span class="const token" data-verso-hover="117">Step</span> Q p { p <span class="kw">with</span></span>
+<span id="L140">        <span class="const token" data-verso-hover="106">inst</span> := <span class="const token" data-verso-hover="119">Function.update</span> p.<span class="const token" data-verso-hover="106">inst</span> s newInst</span>
+<span id="L141">        <span class="const token" data-verso-hover="105">leader</span> := <span class="const token" data-verso-hover="119">Function.update</span> p.<span class="const token" data-verso-hover="105">leader</span> s <span class="const token" data-verso-hover="56">true</span> }</span>
+<span id="L142">  <span class="dc">/-- `Phase2a(s, i, v)`: the leader proposes `v` for instance `i` in its ballot. -/</span></span>
+<span id="L143">  | <span class="const token" data-verso-hover="124">phase2a</span> (p : <span class="const token" data-verso-hover="103">State</span> N V) (s : N) (i : <span class="const token" data-verso-hover="37">ℕ</span>) (v : V)</span>
+<span id="L144">      (hl : p.<span class="const token" data-verso-hover="105">leader</span> s = <span class="const token" data-verso-hover="56">true</span>)</span>
+<span id="L145">      (hv : p.<span class="const token" data-verso-hover="106">inst</span> s i = <span class="const token" data-verso-hover="114">none</span> ∨ ∃ c, p.<span class="const token" data-verso-hover="106">inst</span> s i = <span class="const token" data-verso-hover="116">some</span> (c, v))</span>
+<span id="L146">      (huniq : ∀ w, (i, p.<span class="const token" data-verso-hover="104">ballot</span> s, w) ∈ p.<span class="const token" data-verso-hover="111">m2a</span> → w = v) :</span>
+<span id="L147">      <span class="const token" data-verso-hover="117">Step</span> Q p { p <span class="kw">with</span> <span class="const token" data-verso-hover="111">m2a</span> := <span class="const token" data-verso-hover="120">insert</span> (i, p.<span class="const token" data-verso-hover="104">ballot</span> s, v) p.<span class="const token" data-verso-hover="111">m2a</span> }</span>
+<span id="L148">  <span class="dc">/-- `Phase2b(s)`: accept a proposal of a ballot at least the own one. -/</span></span>
+<span id="L149">  | <span class="const token" data-verso-hover="125">phase2b</span> (p : <span class="const token" data-verso-hover="103">State</span> N V) (s : N) (i b : <span class="const token" data-verso-hover="37">ℕ</span>) (v : V)</span>
+<span id="L150">      (hm : (i, b, v) ∈ p.<span class="const token" data-verso-hover="111">m2a</span>) (hb : p.<span class="const token" data-verso-hover="104">ballot</span> s ≤ b) :</span>
+<span id="L151">      <span class="const token" data-verso-hover="117">Step</span> Q p { p <span class="kw">with</span></span>
+<span id="L152">        <span class="const token" data-verso-hover="104">ballot</span> := <span class="const token" data-verso-hover="119">Function.update</span> p.<span class="const token" data-verso-hover="104">ballot</span> s b</span>
+<span id="L153">        <span class="const token" data-verso-hover="105">leader</span> := <span class="const token" data-verso-hover="119">Function.update</span> p.<span class="const token" data-verso-hover="105">leader</span> s (<span class="kw">if</span> p.<span class="const token" data-verso-hover="104">ballot</span> s &lt; b <span class="kw">then</span> <span class="const token" data-verso-hover="57">false</span> <span class="kw">else</span> p.<span class="const token" data-verso-hover="105">leader</span> s)</span>
+<span id="L154">        <span class="const token" data-verso-hover="106">inst</span> := <span class="const token" data-verso-hover="119">Function.update</span> p.<span class="const token" data-verso-hover="106">inst</span> s (<span class="const token" data-verso-hover="119">Function.update</span> (p.<span class="const token" data-verso-hover="106">inst</span> s) i (<span class="const token" data-verso-hover="116">some</span> (b, v)))</span>
+<span id="L155">        <span class="const token" data-verso-hover="112">m2b</span> := <span class="const token" data-verso-hover="120">insert</span> (s, i, b, v) p.<span class="const token" data-verso-hover="112">m2b</span> }</span>
+<span id="L156">  <span class="dc">/-- `Learn(s)`: a quorum accepted `v` for instance `i` in ballot `b`. -/</span></span>
+<span id="L157">  | <span class="const token" data-verso-hover="126">learn</span> (p : <span class="const token" data-verso-hover="103">State</span> N V) (s : N) (i b : <span class="const token" data-verso-hover="37">ℕ</span>) (v : V) (A : <span class="const token" data-verso-hover="83">Finset</span> N)</span>
+<span id="L158">      (hA : Q.<span class="const token" data-verso-hover="82">IsQuorum</span> A) (hacc : ∀ a ∈ A, (a, i, b, v) ∈ p.<span class="const token" data-verso-hover="112">m2b</span>) :</span>
+<span id="L159">      <span class="const token" data-verso-hover="117">Step</span> Q p { p <span class="kw">with</span> <span class="const token" data-verso-hover="107">chosen</span> := <span class="const token" data-verso-hover="119">Function.update</span> p.<span class="const token" data-verso-hover="107">chosen</span> s (<span class="const token" data-verso-hover="120">insert</span> (i, v) (p.<span class="const token" data-verso-hover="107">chosen</span> s)) }</span>
+<span id="L160"></span>
+<span id="L161"><span class="dc">/-- Reachable states of MultiPaxos. -/</span></span>
+<span id="L162"><span class="kw">def</span> <span class="const token" data-verso-hover="127">Reachable</span> (Q : <span class="const token" data-verso-hover="33">QuorumSystem</span> N) (p : <span class="const token" data-verso-hover="103">State</span> N V) : <span class="kw">Prop</span> :=</span>
+<span id="L163">  <span class="const token" data-verso-hover="128">Relation.ReflTransGen</span> (<span class="const token" data-verso-hover="117">Step</span> Q) <span class="const token" data-verso-hover="113">init</span> p</span>
+<span id="L164"></span>
+<span id="L165"><span class="dc">/-- `v` is chosen for instance `i` in ballot `b`: a quorum accepted it (TLA+ `ChosenAt`). -/</span></span>
+<span id="L166"><span class="kw">def</span> <span class="const token" data-verso-hover="129">ChosenAt</span> (Q : <span class="const token" data-verso-hover="33">QuorumSystem</span> N) (p : <span class="const token" data-verso-hover="103">State</span> N V) (i b : <span class="const token" data-verso-hover="37">ℕ</span>) (v : V) : <span class="kw">Prop</span> :=</span>
+<span id="L167">  ∃ A, Q.<span class="const token" data-verso-hover="82">IsQuorum</span> A ∧ ∀ a ∈ A, (a, i, b, v) ∈ p.<span class="const token" data-verso-hover="112">m2b</span></span>
+<span id="L168"></span>
+<span id="L169"><span class="kw">end</span> Paxos</span>
+<span id="L170"></span>
+<span id="L171"><span class="kw">end</span> Podc.PaxosRaftRefinement</span>
+<span id="L172"></span>
+</code></div>
+        <script>
+          window.versoHoversUrl = "PODC2019/PaxosRaftRefinement/-hovers.json";</script>
+        <script src="static/lean/popper.js"></script>
+        <script src="static/lean/tippy.js"></script>
+        <script src="static/lean/marked.js"></script>
+        <script src="static/lean/highlighting.js"></script>
+        <script src="static/lean/lean.js"></script>
+        </article></main><footer class="site-footer"><div class="wrap">
+        Machine-checked formalizations of PODC papers in Lean 4. Generated with <a href="https://github.com/leanprover/verso">Verso</a> from the README files of <a href="https://github.com/vasnesterov/formal_podc">vasnesterov/formal_podc</a>.</div>
+      </footer></body>
+  </html>
+

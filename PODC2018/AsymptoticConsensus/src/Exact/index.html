@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="light dark">
+    <link rel="icon" href="data:,">
+    <title>AsymptoticConsensus: Exact.lean · Formal PODC</title><base href="../../../.././"><link rel="stylesheet" href="static/lean/verso-vars.css">
+    <link rel="stylesheet" href="static/lean/highlighting.css">
+    <link rel="stylesheet" href="static/lean/tippy-border.css">
+    <link rel="stylesheet" href="static/style.css">
+    <script defer="defer" src="static/site.js"></script>
+    </head>
+  <body>
+    <header class="site-header">
+      <div class="wrap">
+        <a class="brand" href=".">Formal PODC</a><nav class="top">
+          <a href=".">Search</a><a href="about/">About</a><a href="https://github.com/vasnesterov/formal_podc">GitHub</a></nav>
+        </div>
+      </header>
+    <main class="wrap"><article><nav class="breadcrumbs" aria-label="Breadcrumb">
+          <a href=".">Search</a><span class="sep">›</span><a href="PODC2018/">PODC 2018</a><span class="sep">›</span><a href="PODC2018/AsymptoticConsensus/">AsymptoticConsensus</a><span class="sep">›</span><a href="PODC2018/AsymptoticConsensus/src/">Lean source</a><span class="sep">›</span><span aria-current="page">Exact</span></nav>
+        <h1>
+          <code>Exact.lean</code></h1>
+        <div class="paper-links">
+          <p>
+            Source of <a href="PODC2018/AsymptoticConsensus/">Tight Bounds for Asymptotic and Approximate Consensus — PODC 2018</a> · <a href="https://github.com/vasnesterov/formal_podc/blob/main/Papers/PODC2018/AsymptoticConsensus/Exact.lean">GitHub</a> · hover over a name for its type and documentation</p>
+          </div>
+        <div class="lean-code lean-src">
+          <code class="hl lean block" data-lean-context="Exact"><span id="L1"><span class="kw">import</span> Papers.PODC2018.AsymptoticConsensus.Alpha</span>
+<span id="L2"><span class="kw">import</span> Cslib.Foundations.Data.Nat.Growth</span>
+<span id="L3"></span>
+<span id="L4"><span class="dc">/-!</span></span>
+<span id="L5"><span class="dc"># Exact consensus and valencies (Section 7 of FNS'18)</span></span>
+<span id="L6"></span>
+<span id="L7"><span class="dc">* `EAlg`, `EAlg.Solves` (exact consensus: termination, irrevocability, agreement, validity),</span></span>
+<span id="L8"><span class="dc">  `ExactSolvable α V N`.</span></span>
+<span id="L9"><span class="dc">* `toAsym`: the asymptotic consensus algorithm derived from an exact one (proof of Theorem 4 ⇒):</span></span>
+<span id="L10"><span class="dc">  output the initial value until deciding, then the decision.</span></span>
+<span id="L11"><span class="dc">* **Theorem 4 (⇒)** (`theorem4_mp`): if exact consensus is solvable, some asymptotic consensus</span></span>
+<span id="L12"><span class="dc">  algorithm has only singleton or disconnected valencies (`ValencyProp`).</span></span>
+<span id="L13"><span class="dc">* `rate_toAsym`: ... and it has contraction rate `0` (the paper's remark in the introduction).</span></span>
+<span id="L14"><span class="dc">* Consequences of the lower bounds for exact consensus: `not_exactSolvable_N3` (two agents with</span></span>
+<span id="L15"><span class="dc">  `H0, H1, H2`), `not_exactSolvable_deaf` (`n ≥ 3`, `deaf(G)`).</span></span>
+<span id="L16"><span class="dc">* Flooding (`exactSolvable_of_common_root`): a common root of all graphs makes exact consensus</span></span>
+<span id="L17"><span class="dc">  solvable. Hence `sourceIncompatible_of_not_exactSolvable`, and Theorem 5 / Corollary 23 / Lemma</span></span>
+<span id="L18"><span class="dc">  21 in the paper's form, with hypothesis "exact consensus is not solvable" (`theorem5_paper`).</span></span>
+<span id="L19"><span class="dc">-/</span></span>
+<span id="L20"></span>
+<span id="L21"><span class="kw">set_option</span> <span class="const token" data-verso-hover="468">linter.unusedSectionVars</span> false</span>
+<span id="L22"></span>
+<span id="L23"><span class="kw">namespace</span> AsymptoticConsensus</span>
+<span id="L24"></span>
+<span id="L25"><span class="kw">open</span> Cslib.HeardOf Cslib.HeardOf.Chain Filter Topology Set Classical</span>
+<span id="L26"><span class="kw">open</span> Cslib.DynNet (<span class="const token" data-verso-hover="184">IsRoot</span>)</span>
+<span id="L27"><span class="kw">open</span> <span class="kw">scoped</span> ENNReal</span>
+<span id="L28"></span>
+<span id="L29"><span class="kw">variable</span> {α σ : <span class="kw">Type</span>*} {V : <span class="kw">Type</span>} [<span class="const token" data-verso-hover="26">NormedAddCommGroup</span> V] [<span class="const token" data-verso-hover="27">NormedSpace</span> <span class="const token" data-verso-hover="28">ℝ</span> V]</span>
+<span id="L30"></span>
+<span id="L31"><span class="dc">/-- An exact consensus algorithm: initial states, transition function, decision variable</span></span>
+<span id="L32"><span class="dc">(a `Cslib.HeardOf.Algorithm` whose output is the decision, `none` while undecided). -/</span></span>
+<span id="L33"><span class="kw">abbrev</span> <span class="const token" data-verso-hover="23">EAlg</span> (α σ V : <span class="kw">Type</span>*) := <span class="const token" data-verso-hover="25">Algorithm</span> α σ V (<span class="const token" data-verso-hover="145">Option</span> V)</span>
+<span id="L34"></span>
+<span id="L35"><span class="kw">namespace</span> EAlg</span>
+<span id="L36"></span>
+<span id="L37"><span class="dc">/-- The decision variable (`none` = undecided). -/</span></span>
+<span id="L38"><span class="kw">abbrev</span> <span class="const token" data-verso-hover="281">dec</span> {α σ V : <span class="kw">Type</span>*} (B : <span class="const token" data-verso-hover="23">EAlg</span> α σ V) : σ → <span class="const token" data-verso-hover="145">Option</span> V := B.<span class="const token" data-verso-hover="469">out</span></span>
+<span id="L39"></span>
+<span id="L40"><span class="dc">/-- `B` solves exact consensus in `N`: in every execution every agent decides, decisions are</span></span>
+<span id="L41"><span class="dc">irrevocable, agree, and are initial values. -/</span></span>
+<span id="L42"><span class="kw">def</span> <span class="const token" data-verso-hover="470">Solves</span> (B : <span class="const token" data-verso-hover="23">EAlg</span> α σ V) (N : <span class="const token" data-verso-hover="34">Set</span> (<span class="const token" data-verso-hover="35">Graph</span> α)) : <span class="kw">Prop</span> :=</span>
+<span id="L43">  ∀ x : α → V, ∀ p ∈ <span class="const token" data-verso-hover="51">Pat</span> N,</span>
+<span id="L44">    (∀ i, ∃ t v, B.<span class="const token" data-verso-hover="281">dec</span> (<span class="const token" data-verso-hover="53">conf</span> B.<span class="const token" data-verso-hover="194">step</span> (B.<span class="const token" data-verso-hover="201">initC</span> x) p t i) = <span class="const token" data-verso-hover="282">some</span> v) ∧</span>
+<span id="L45">    (∀ i t v, B.<span class="const token" data-verso-hover="281">dec</span> (<span class="const token" data-verso-hover="53">conf</span> B.<span class="const token" data-verso-hover="194">step</span> (B.<span class="const token" data-verso-hover="201">initC</span> x) p t i) = <span class="const token" data-verso-hover="282">some</span> v →</span>
+<span id="L46">      ∀ s, t ≤ s → B.<span class="const token" data-verso-hover="281">dec</span> (<span class="const token" data-verso-hover="53">conf</span> B.<span class="const token" data-verso-hover="194">step</span> (B.<span class="const token" data-verso-hover="201">initC</span> x) p s i) = <span class="const token" data-verso-hover="282">some</span> v) ∧</span>
+<span id="L47">    (∀ i j t s v w, B.<span class="const token" data-verso-hover="281">dec</span> (<span class="const token" data-verso-hover="53">conf</span> B.<span class="const token" data-verso-hover="194">step</span> (B.<span class="const token" data-verso-hover="201">initC</span> x) p t i) = <span class="const token" data-verso-hover="282">some</span> v →</span>
+<span id="L48">      B.<span class="const token" data-verso-hover="281">dec</span> (<span class="const token" data-verso-hover="53">conf</span> B.<span class="const token" data-verso-hover="194">step</span> (B.<span class="const token" data-verso-hover="201">initC</span> x) p s j) = <span class="const token" data-verso-hover="282">some</span> w → v = w) ∧</span>
+<span id="L49">    (∀ i t v, B.<span class="const token" data-verso-hover="281">dec</span> (<span class="const token" data-verso-hover="53">conf</span> B.<span class="const token" data-verso-hover="194">step</span> (B.<span class="const token" data-verso-hover="201">initC</span> x) p t i) = <span class="const token" data-verso-hover="282">some</span> v → v ∈ <span class="const token" data-verso-hover="40">range</span> x)</span>
+<span id="L50"></span>
+<span id="L51"><span class="kw">theorem</span> <span class="const token" data-verso-hover="471">Solves.mono</span> {B : <span class="const token" data-verso-hover="23">EAlg</span> α σ V} {N N' : <span class="const token" data-verso-hover="34">Set</span> (<span class="const token" data-verso-hover="35">Graph</span> α)} (h : B.<span class="const token" data-verso-hover="470">Solves</span> N) (hN : N' ⊆ N) :</span>
+<span id="L52">    B.<span class="const token" data-verso-hover="470">Solves</span> N' := <span class="kw">fun</span> x p hp =&gt; h x p (<span class="const token" data-verso-hover="338">pat_mono</span> hN hp)</span>
+<span id="L53"></span>
+<span id="L54"><span class="kw">end</span> EAlg</span>
+<span id="L55"></span>
+<span id="L56"><span class="dc">/-- Exact consensus is solvable in `N` (agents `α`, values `V`). -/</span></span>
+<span id="L57"><span class="kw">def</span> <span class="const token" data-verso-hover="424">ExactSolvable</span> (α V : <span class="kw">Type</span>) [<span class="const token" data-verso-hover="26">NormedAddCommGroup</span> V] (N : <span class="const token" data-verso-hover="34">Set</span> (<span class="const token" data-verso-hover="35">Graph</span> α)) : <span class="kw">Prop</span> :=</span>
+<span id="L58">  ∃ (σ : <span class="kw">Type</span>) (B : <span class="const token" data-verso-hover="23">EAlg</span> α σ V), B.<span class="const token" data-verso-hover="470">Solves</span> N</span>
+<span id="L59"></span>
+<span id="L60"><span class="dc">/-- The asymptotic consensus algorithm derived from an exact one: keep the initial value, output</span></span>
+<span id="L61"><span class="dc">the decision once decided, the initial value before. -/</span></span>
+<span id="L62"><span class="kw">noncomputable</span> <span class="kw">def</span> <span class="const token" data-verso-hover="472">toAsym</span> (B : <span class="const token" data-verso-hover="23">EAlg</span> α σ V) : <span class="const token" data-verso-hover="31">Alg</span> α (σ × V) V <span class="kw">where</span></span>
+<span id="L63">  <span class="const token" data-verso-hover="473">init</span> i v := (B.<span class="const token" data-verso-hover="473">init</span> i v, v)</span>
+<span id="L64">  <span class="const token" data-verso-hover="194">step</span> i m := (B.<span class="const token" data-verso-hover="194">step</span> i <span class="kw">fun</span> j =&gt; (m j).<span class="const token" data-verso-hover="474">map</span> <span class="const token" data-verso-hover="475">Prod.fst</span>, ((m i).<span class="const token" data-verso-hover="474">map</span> <span class="const token" data-verso-hover="476">Prod.snd</span>).<span class="const token" data-verso-hover="108">getD</span> <span class="nu">0</span>)</span>
+<span id="L65">  <span class="const token" data-verso-hover="469">out</span> s := (B.<span class="const token" data-verso-hover="281">dec</span> s.<span class="const token" data-verso-hover="475">1</span>).<span class="const token" data-verso-hover="108">getD</span> s.<span class="const token" data-verso-hover="476">2</span></span>
+<span id="L66"></span>
+<span id="L67"><span class="kw">theorem</span> <span class="const token" data-verso-hover="477">conf_toAsym</span> (B : <span class="const token" data-verso-hover="23">EAlg</span> α σ V) (C : α → σ) (x : α → V) (p : <span class="const token" data-verso-hover="50">ℕ</span> → <span class="const token" data-verso-hover="35">Graph</span> α) (t : <span class="const token" data-verso-hover="50">ℕ</span>) :</span>
+<span id="L68">    <span class="const token" data-verso-hover="53">conf</span> (<span class="const token" data-verso-hover="472">toAsym</span> B).<span class="const token" data-verso-hover="194">step</span> (<span class="kw">fun</span> i =&gt; (C i, x i)) p t = <span class="kw">fun</span> i =&gt; (<span class="const token" data-verso-hover="53">conf</span> B.<span class="const token" data-verso-hover="194">step</span> C p t i, x i) := <span class="kw">by</span></span>
+<span id="L69">  <span class="kw">induction</span> t <span class="kw">with</span></span>
+<span id="L70">  | <span class="const token" data-verso-hover="56">zero</span> =&gt; <span class="kw">rfl</span></span>
+<span id="L71">  | <span class="const token" data-verso-hover="57">succ</span> t ih =&gt;</span>
+<span id="L72">    <span class="kw">rw</span> [<span class="const token" data-verso-hover="478">conf_succ</span>, ih, <span class="const token" data-verso-hover="478">conf_succ</span>]</span>
+<span id="L73">    <span class="kw">funext</span> i</span>
+<span id="L74">    <span class="kw">simp</span> only [<span class="const token" data-verso-hover="38">next</span>, <span class="const token" data-verso-hover="472">toAsym</span>, <span class="const token" data-verso-hover="118">msgs</span>]</span>
+<span id="L75">    <span class="kw">congr</span> <span class="nu">1</span></span>
+<span id="L76">    · <span class="kw">congr</span> <span class="nu">1</span>; <span class="kw">funext</span> j; <span class="kw">simp</span> only [<span class="const token" data-verso-hover="118">msgs</span>]; <span class="kw">split_ifs</span> &lt;;&gt; <span class="kw">rfl</span></span>
+<span id="L77">    · <span class="kw">simp</span> [<span class="const token" data-verso-hover="157">hears_self</span>]</span>
+<span id="L78"></span>
+<span id="L79"><span class="kw">theorem</span> <span class="const token" data-verso-hover="479">initC_toAsym</span> (B : <span class="const token" data-verso-hover="23">EAlg</span> α σ V) (x : α → V) :</span>
+<span id="L80">    (<span class="const token" data-verso-hover="472">toAsym</span> B).<span class="const token" data-verso-hover="201">initC</span> x = <span class="kw">fun</span> i =&gt; (B.<span class="const token" data-verso-hover="201">initC</span> x i, x i) := <span class="const token" data-verso-hover="67">rfl</span></span>
+<span id="L81"></span>
+<span id="L82"><span class="dc">/-- In every execution of an exact consensus algorithm, from some time on every agent has decided</span></span>
+<span id="L83"><span class="dc">the same initial value `v`. -/</span></span>
+<span id="L84"><span class="kw">theorem</span> <span class="const token" data-verso-hover="480">EAlg.Solves.eventually</span> [<span class="const token" data-verso-hover="59">Finite</span> α] [<span class="const token" data-verso-hover="60">Nonempty</span> α] {B : <span class="const token" data-verso-hover="23">EAlg</span> α σ V} {N : <span class="const token" data-verso-hover="34">Set</span> (<span class="const token" data-verso-hover="35">Graph</span> α)}</span>
+<span id="L85">    (hB : B.<span class="const token" data-verso-hover="470">Solves</span> N) (x : α → V) {p : <span class="const token" data-verso-hover="50">ℕ</span> → <span class="const token" data-verso-hover="35">Graph</span> α} (hp : p ∈ <span class="const token" data-verso-hover="51">Pat</span> N) :</span>
+<span id="L86">    ∃ T v, v ∈ <span class="const token" data-verso-hover="40">range</span> x ∧ ∀ s, T ≤ s → ∀ i, B.<span class="const token" data-verso-hover="281">dec</span> (<span class="const token" data-verso-hover="53">conf</span> B.<span class="const token" data-verso-hover="194">step</span> (B.<span class="const token" data-verso-hover="201">initC</span> x) p s i) = <span class="const token" data-verso-hover="282">some</span> v := <span class="kw">by</span></span>
+<span id="L87">  <span class="kw">have</span> := <span class="const token" data-verso-hover="330">Fintype.ofFinite</span> α</span>
+<span id="L88">  <span class="kw">obtain</span> ⟨hterm, hirr, hagr, hval⟩ := hB x p hp</span>
+<span id="L89">  <span class="kw">choose</span> t v hv <span class="kw">using</span> hterm</span>
+<span id="L90">  <span class="kw">let</span> i₀ := <span class="const token" data-verso-hover="71">Classical.arbitrary</span> α</span>
+<span id="L91">  <span class="kw">refine</span> ⟨<span class="const token" data-verso-hover="147">Finset.univ</span>.<span class="const token" data-verso-hover="481">sup</span> t, v i₀, hval i₀ _ _ (hv i₀), <span class="kw">fun</span> s hs i =&gt; ?_⟩</span>
+<span id="L92">  <span class="kw">have</span> := hirr i (t i) (v i) (hv i) s ((<span class="const token" data-verso-hover="482">Finset.le_sup</span> (<span class="const token" data-verso-hover="241">Finset.mem_univ</span> i)).<span class="const token" data-verso-hover="98">trans</span> hs)</span>
+<span id="L93">  <span class="kw">rwa</span> [hagr i i₀ _ _ _ _ (hv i) (hv i₀)] <span class="kw">at</span> this</span>
+<span id="L94"></span>
+<span id="L95"><span class="kw">theorem</span> <span class="const token" data-verso-hover="483">toAsym_solves</span> [<span class="const token" data-verso-hover="59">Finite</span> α] [<span class="const token" data-verso-hover="60">Nonempty</span> α] {B : <span class="const token" data-verso-hover="23">EAlg</span> α σ V} {N : <span class="const token" data-verso-hover="34">Set</span> (<span class="const token" data-verso-hover="35">Graph</span> α)}</span>
+<span id="L96">    (hB : B.<span class="const token" data-verso-hover="470">Solves</span> N) : (<span class="const token" data-verso-hover="472">toAsym</span> B).<span class="const token" data-verso-hover="91">Solves</span> N := <span class="kw">by</span></span>
+<span id="L97">  <span class="kw">intro</span> x p hp</span>
+<span id="L98">  <span class="kw">obtain</span> ⟨T, v, hv, hdec⟩ := hB.<span class="const token" data-verso-hover="480">eventually</span> x hp</span>
+<span id="L99">  <span class="kw">refine</span> ⟨v, <span class="const token" data-verso-hover="66">subset_convexHull</span> <span class="const token" data-verso-hover="28">ℝ</span> _ hv, <span class="kw">fun</span> i =&gt; <span class="const token" data-verso-hover="484">tendsto_atTop_of_eventually_const</span> (i₀ := T)</span>
+<span id="L100">    <span class="kw">fun</span> s hs =&gt; ?_⟩</span>
+<span id="L101">  <span class="kw">rw</span> [<span class="const token" data-verso-hover="479">initC_toAsym</span>, <span class="const token" data-verso-hover="477">conf_toAsym</span>]</span>
+<span id="L102">  <span class="kw">simp</span> [<span class="const token" data-verso-hover="472">toAsym</span>, hdec s hs i]</span>
+<span id="L103"></span>
+<span id="L104"><span class="dc">/-- Limits of the derived algorithm are initial values. -/</span></span>
+<span id="L105"><span class="kw">theorem</span> <span class="const token" data-verso-hover="485">toAsym_limit_mem</span> [<span class="const token" data-verso-hover="59">Finite</span> α] [<span class="const token" data-verso-hover="60">Nonempty</span> α] {B : <span class="const token" data-verso-hover="23">EAlg</span> α σ V} {N : <span class="const token" data-verso-hover="34">Set</span> (<span class="const token" data-verso-hover="35">Graph</span> α)}</span>
+<span id="L106">    (hB : B.<span class="const token" data-verso-hover="470">Solves</span> N) (x : α → V) {p : <span class="const token" data-verso-hover="50">ℕ</span> → <span class="const token" data-verso-hover="35">Graph</span> α} (hp : p ∈ <span class="const token" data-verso-hover="51">Pat</span> N) {z : V}</span>
+<span id="L107">    (hz : (<span class="const token" data-verso-hover="472">toAsym</span> B).<span class="const token" data-verso-hover="486">HasLimit</span> ((<span class="const token" data-verso-hover="472">toAsym</span> B).<span class="const token" data-verso-hover="201">initC</span> x) p z) : z ∈ <span class="const token" data-verso-hover="40">range</span> x := <span class="kw">by</span></span>
+<span id="L108">  <span class="kw">obtain</span> ⟨T, v, hv, hdec⟩ := hB.<span class="const token" data-verso-hover="480">eventually</span> x hp</span>
+<span id="L109">  <span class="kw">have</span> hlim : (<span class="const token" data-verso-hover="472">toAsym</span> B).<span class="const token" data-verso-hover="486">HasLimit</span> ((<span class="const token" data-verso-hover="472">toAsym</span> B).<span class="const token" data-verso-hover="201">initC</span> x) p v := <span class="kw">fun</span> i =&gt;</span>
+<span id="L110">    <span class="const token" data-verso-hover="484">tendsto_atTop_of_eventually_const</span> (i₀ := T) <span class="kw">fun</span> s hs =&gt; <span class="kw">by</span></span>
+<span id="L111">      <span class="kw">rw</span> [<span class="const token" data-verso-hover="479">initC_toAsym</span>, <span class="const token" data-verso-hover="477">conf_toAsym</span>]; <span class="kw">simp</span> [<span class="const token" data-verso-hover="472">toAsym</span>, hdec s hs i]</span>
+<span id="L112">  <span class="kw">rwa</span> [hz.<span class="const token" data-verso-hover="94">unique</span> hlim]</span>
+<span id="L113"></span>
+<span id="L114"><span class="dc">/-- "Singleton or disconnected" valencies of all initial configurations in all submodels. -/</span></span>
+<span id="L115"><span class="kw">def</span> <span class="const token" data-verso-hover="487">ValencyProp</span> {σ : <span class="kw">Type</span>*} (A : <span class="const token" data-verso-hover="31">Alg</span> α σ V) (N : <span class="const token" data-verso-hover="34">Set</span> (<span class="const token" data-verso-hover="35">Graph</span> α)) : <span class="kw">Prop</span> :=</span>
+<span id="L116">  ∀ N' ⊆ N, N'.<span class="const token" data-verso-hover="195">Nonempty</span> → ∀ x : α → V,</span>
+<span id="L117">    (∃ z, A.<span class="const token" data-verso-hover="93">val</span> (<span class="const token" data-verso-hover="51">Pat</span> N') (A.<span class="const token" data-verso-hover="201">initC</span> x) = {z}) ∨ ¬ <span class="const token" data-verso-hover="488">IsPreconnected</span> (A.<span class="const token" data-verso-hover="93">val</span> (<span class="const token" data-verso-hover="51">Pat</span> N') (A.<span class="const token" data-verso-hover="201">initC</span> x))</span>
+<span id="L118"></span>
+<span id="L119"><span class="kw">theorem</span> <span class="const token" data-verso-hover="489">singleton_or_not_preconnected_of_finite</span> {S : <span class="const token" data-verso-hover="34">Set</span> V} (hfin : S.<span class="const token" data-verso-hover="223">Finite</span>)</span>
+<span id="L120">    (hne : S.<span class="const token" data-verso-hover="195">Nonempty</span>) : (∃ z, S = {z}) ∨ ¬ <span class="const token" data-verso-hover="488">IsPreconnected</span> S := <span class="kw">by</span></span>
+<span id="L121">  <span class="kw">by_cases</span> h : <span class="const token" data-verso-hover="488">IsPreconnected</span> S</span>
+<span id="L122">  · <span class="kw">left</span></span>
+<span id="L123">    <span class="kw">obtain</span> ⟨z, hz⟩ := hne</span>
+<span id="L124">    <span class="kw">exact</span> ⟨z, ((h.<span class="const token" data-verso-hover="490">isDiscrete_iff_subsingleton</span>.<span class="const token" data-verso-hover="159">1</span> hfin.<span class="const token" data-verso-hover="491">isDiscrete</span>).<span class="const token" data-verso-hover="492">eq_singleton_of_mem</span> hz)⟩</span>
+<span id="L125">  · <span class="kw">exact</span> <span class="const token" data-verso-hover="86">Or.inr</span> h</span>
+<span id="L126"></span>
+<span id="L127"><span class="dc">/-- **Theorem 4 (⇒) of FNS'18.** If exact consensus is solvable in `N`, there is an asymptotic</span></span>
+<span id="L128"><span class="dc">consensus algorithm for `N` all of whose valencies `Y*_{N'}(C₀)` (`N' ⊆ N`) are singletons or</span></span>
+<span id="L129"><span class="dc">disconnected. -/</span></span>
+<span id="L130"><span class="kw">theorem</span> <span class="const token" data-verso-hover="12">theorem4_mp</span> [<span class="const token" data-verso-hover="59">Finite</span> α] [<span class="const token" data-verso-hover="60">Nonempty</span> α] {N : <span class="const token" data-verso-hover="34">Set</span> (<span class="const token" data-verso-hover="35">Graph</span> α)} {B : <span class="const token" data-verso-hover="23">EAlg</span> α σ V}</span>
+<span id="L131">    (hB : B.<span class="const token" data-verso-hover="470">Solves</span> N) : (<span class="const token" data-verso-hover="472">toAsym</span> B).<span class="const token" data-verso-hover="91">Solves</span> N ∧ <span class="const token" data-verso-hover="487">ValencyProp</span> (<span class="const token" data-verso-hover="472">toAsym</span> B) N := <span class="kw">by</span></span>
+<span id="L132">  <span class="kw">refine</span> ⟨<span class="const token" data-verso-hover="483">toAsym_solves</span> hB, <span class="kw">fun</span> N' hN' hne x =&gt; <span class="const token" data-verso-hover="489">singleton_or_not_preconnected_of_finite</span></span>
+<span id="L133">    ((<span class="const token" data-verso-hover="63">finite_range</span> x).<span class="const token" data-verso-hover="493">subset</span> ?_) ((<span class="const token" data-verso-hover="483">toAsym_solves</span> (hB.<span class="const token" data-verso-hover="471">mono</span> hN')).<span class="const token" data-verso-hover="494">val_nonempty</span> hne</span>
+<span id="L134">      (<span class="const token" data-verso-hover="203">Alg.Reach.initC</span> hne x))⟩</span>
+<span id="L135">  <span class="kw">rintro</span> z ⟨q, hq, hz⟩</span>
+<span id="L136">  <span class="kw">exact</span> <span class="const token" data-verso-hover="485">toAsym_limit_mem</span> hB x (<span class="const token" data-verso-hover="338">pat_mono</span> hN' hq) hz</span>
+<span id="L137"></span>
+<span id="L138"><span class="dc">/-- If in every execution some valency vanishes, the contraction rate is `0`. -/</span></span>
+<span id="L139"><span class="kw">theorem</span> <span class="const token" data-verso-hover="495">rate_eq_zero_of</span> {σ : <span class="kw">Type</span>*} {A : <span class="const token" data-verso-hover="31">Alg</span> α σ V} {N : <span class="const token" data-verso-hover="34">Set</span> (<span class="const token" data-verso-hover="35">Graph</span> α)}</span>
+<span id="L140">    (h : ∀ x : α → V, ∀ p ∈ <span class="const token" data-verso-hover="51">Pat</span> N, ∃ T, A.<span class="const token" data-verso-hover="96">δ</span> N (<span class="const token" data-verso-hover="53">conf</span> A.<span class="const token" data-verso-hover="194">step</span> (A.<span class="const token" data-verso-hover="201">initC</span> x) p T) = <span class="nu">0</span>) :</span>
+<span id="L141">    A.<span class="const token" data-verso-hover="101">rate</span> N = <span class="nu">0</span> := <span class="kw">by</span></span>
+<span id="L142">  <span class="kw">refine</span> <span class="const token" data-verso-hover="138">le_antisymm</span> (<span class="const token" data-verso-hover="102">iSup_le</span> <span class="kw">fun</span> x =&gt; <span class="const token" data-verso-hover="103">iSup₂_le</span> <span class="kw">fun</span> p hp =&gt; ?_) <span class="const token" data-verso-hover="433">bot_le</span></span>
+<span id="L143">  <span class="kw">obtain</span> ⟨T, hT⟩ := h x p hp</span>
+<span id="L144">  <span class="kw">calc</span> <span class="const token" data-verso-hover="496">limsup</span> (<span class="kw">fun</span> t : <span class="const token" data-verso-hover="50">ℕ</span> =&gt; A.<span class="const token" data-verso-hover="96">δ</span> N (<span class="const token" data-verso-hover="53">conf</span> A.<span class="const token" data-verso-hover="194">step</span> (A.<span class="const token" data-verso-hover="201">initC</span> x) p t) ^ ((t : <span class="const token" data-verso-hover="28">ℝ</span>)⁻¹)) <span class="const token" data-verso-hover="62">atTop</span></span>
+<span id="L145">      ≤ <span class="const token" data-verso-hover="496">limsup</span> (<span class="kw">fun</span> _ : <span class="const token" data-verso-hover="50">ℕ</span> =&gt; (<span class="nu">0</span> : <span class="const token" data-verso-hover="36">ℝ</span>≥0∞)) <span class="const token" data-verso-hover="62">atTop</span> := <span class="kw">by</span></span>
+<span id="L146">        <span class="kw">refine</span> <span class="const token" data-verso-hover="497">limsup_le_limsup</span> ?_</span>
+<span id="L147">        <span class="kw">filter_upwards</span> [<span class="const token" data-verso-hover="498">eventually_ge_atTop</span> (T + <span class="nu">1</span>)] <span class="kw">with</span> t ht</span>
+<span id="L148">        <span class="kw">have</span> h0 : A.<span class="const token" data-verso-hover="96">δ</span> N (<span class="const token" data-verso-hover="53">conf</span> A.<span class="const token" data-verso-hover="194">step</span> (A.<span class="const token" data-verso-hover="201">initC</span> x) p t) = <span class="nu">0</span> :=</span>
+<span id="L149">          <span class="const token" data-verso-hover="138">le_antisymm</span> ((<span class="const token" data-verso-hover="458">Alg.δ_conf_antitone</span> hp _ (<span class="kw">by</span> <span class="kw">omega</span>)).<span class="const token" data-verso-hover="98">trans</span> hT.<span class="const token" data-verso-hover="99">le</span>) <span class="const token" data-verso-hover="433">bot_le</span></span>
+<span id="L150">        <span class="kw">rw</span> [h0, <span class="const token" data-verso-hover="499">ENNReal.zero_rpow_of_pos</span> (<span class="const token" data-verso-hover="500">inv_pos</span>.<span class="const token" data-verso-hover="47">2</span> (<span class="kw">by</span> <span class="kw">exact_mod_cast</span> (<span class="kw">by</span> <span class="kw">omega</span> : <span class="nu">0</span> &lt; t)))]</span>
+<span id="L151">    _ ≤ <span class="nu">0</span> := <span class="kw">by</span> <span class="kw">simp</span></span>
+<span id="L152"></span>
+<span id="L153"><span class="dc">/-- In every execution of the derived algorithm the valency diameter eventually vanishes: after</span></span>
+<span id="L154"><span class="dc">all agents have decided, the valency is a singleton. -/</span></span>
+<span id="L155"><span class="kw">theorem</span> <span class="const token" data-verso-hover="501">δ_toAsym_eventually_zero</span> [<span class="const token" data-verso-hover="59">Finite</span> α] [<span class="const token" data-verso-hover="60">Nonempty</span> α] {N : <span class="const token" data-verso-hover="34">Set</span> (<span class="const token" data-verso-hover="35">Graph</span> α)} {B : <span class="const token" data-verso-hover="23">EAlg</span> α σ V}</span>
+<span id="L156">    (hB : B.<span class="const token" data-verso-hover="470">Solves</span> N) (x : α → V) {p : <span class="const token" data-verso-hover="50">ℕ</span> → <span class="const token" data-verso-hover="35">Graph</span> α} (hp : p ∈ <span class="const token" data-verso-hover="51">Pat</span> N) :</span>
+<span id="L157">    ∃ T, (<span class="const token" data-verso-hover="472">toAsym</span> B).<span class="const token" data-verso-hover="96">δ</span> N (<span class="const token" data-verso-hover="53">conf</span> (<span class="const token" data-verso-hover="472">toAsym</span> B).<span class="const token" data-verso-hover="194">step</span> ((<span class="const token" data-verso-hover="472">toAsym</span> B).<span class="const token" data-verso-hover="201">initC</span> x) p T) = <span class="nu">0</span> := <span class="kw">by</span></span>
+<span id="L158">  <span class="kw">obtain</span> ⟨T, v, -, hdec⟩ := hB.<span class="const token" data-verso-hover="480">eventually</span> x hp</span>
+<span id="L159">  <span class="kw">refine</span> ⟨T, <span class="const token" data-verso-hover="502">Metric.ediam_subsingleton</span> (<span class="const token" data-verso-hover="503">Set.subsingleton_of_subset_singleton</span> (a := v) ?_)⟩</span>
+<span id="L160">  <span class="kw">rintro</span> z ⟨q, hq, hz⟩</span>
+<span id="L161">  <span class="kw">rw</span> [← <span class="const token" data-verso-hover="504">Alg.hasLimit_splice</span>] <span class="kw">at</span> hz</span>
+<span id="L162">  <span class="cm">--</span><span class="cm"> in the spliced execution all agents have decided `v` at time `T`</span></span>
+<span id="L163">  <span class="kw">obtain</span> ⟨-, hirr, -, -⟩ := hB x (<span class="const token" data-verso-hover="288">splice</span> p T q) (<span class="const token" data-verso-hover="289">splice_mem_pat</span> hp hq T)</span>
+<span id="L164">  <span class="kw">have</span> hlim : (<span class="const token" data-verso-hover="472">toAsym</span> B).<span class="const token" data-verso-hover="486">HasLimit</span> ((<span class="const token" data-verso-hover="472">toAsym</span> B).<span class="const token" data-verso-hover="201">initC</span> x) (<span class="const token" data-verso-hover="288">splice</span> p T q) v := <span class="kw">fun</span> i =&gt;</span>
+<span id="L165">    <span class="const token" data-verso-hover="484">tendsto_atTop_of_eventually_const</span> (i₀ := T) <span class="kw">fun</span> s hs =&gt; <span class="kw">by</span></span>
+<span id="L166">      <span class="kw">have</span> hT : B.<span class="const token" data-verso-hover="281">dec</span> (<span class="const token" data-verso-hover="53">conf</span> B.<span class="const token" data-verso-hover="194">step</span> (B.<span class="const token" data-verso-hover="201">initC</span> x) (<span class="const token" data-verso-hover="288">splice</span> p T q) T i) = <span class="const token" data-verso-hover="282">some</span> v := <span class="kw">by</span></span>
+<span id="L167">        <span class="kw">rw</span> [<span class="const token" data-verso-hover="505">conf_splice_le</span> _ _ _ <span class="const token" data-verso-hover="262">le_rfl</span>]; <span class="kw">exact</span> hdec T <span class="const token" data-verso-hover="262">le_rfl</span> i</span>
+<span id="L168">      <span class="kw">rw</span> [<span class="const token" data-verso-hover="479">initC_toAsym</span>, <span class="const token" data-verso-hover="477">conf_toAsym</span>]; <span class="kw">simp</span> [<span class="const token" data-verso-hover="472">toAsym</span>, hirr i T v hT s hs]</span>
+<span id="L169">  <span class="kw">exact</span> hz.<span class="const token" data-verso-hover="94">unique</span> hlim</span>
+<span id="L170"></span>
+<span id="L171"><span class="dc">/-- The asymptotic algorithm derived from an exact consensus algorithm has contraction rate `0`</span></span>
+<span id="L172"><span class="dc">("if exact consensus is solvable in `N`, an optimal contraction rate of `0` can be achieved"). -/</span></span>
+<span id="L173"><span class="kw">theorem</span> <span class="const token" data-verso-hover="506">rate_toAsym</span> [<span class="const token" data-verso-hover="59">Finite</span> α] [<span class="const token" data-verso-hover="60">Nonempty</span> α] {N : <span class="const token" data-verso-hover="34">Set</span> (<span class="const token" data-verso-hover="35">Graph</span> α)} {B : <span class="const token" data-verso-hover="23">EAlg</span> α σ V}</span>
+<span id="L174">    (hB : B.<span class="const token" data-verso-hover="470">Solves</span> N) : (<span class="const token" data-verso-hover="472">toAsym</span> B).<span class="const token" data-verso-hover="101">rate</span> N = <span class="nu">0</span> :=</span>
+<span id="L175">  <span class="const token" data-verso-hover="495">rate_eq_zero_of</span> <span class="kw">fun</span> x _ hp =&gt; <span class="const token" data-verso-hover="501">δ_toAsym_eventually_zero</span> hB x hp</span>
+<span id="L176"></span>
+<span id="L177"><span class="dc">/-- If exact consensus is solvable in `N`, some asymptotic consensus algorithm has rate `0`. -/</span></span>
+<span id="L178"><span class="kw">theorem</span> <span class="const token" data-verso-hover="507">exists_rate_zero_of_exactSolvable</span> {α : <span class="kw">Type</span>} [<span class="const token" data-verso-hover="59">Finite</span> α] [<span class="const token" data-verso-hover="60">Nonempty</span> α]</span>
+<span id="L179">    {N : <span class="const token" data-verso-hover="34">Set</span> (<span class="const token" data-verso-hover="35">Graph</span> α)} (h : <span class="const token" data-verso-hover="424">ExactSolvable</span> α V N) :</span>
+<span id="L180">    ∃ (σ : <span class="kw">Type</span>) (A : <span class="const token" data-verso-hover="31">Alg</span> α σ V), A.<span class="const token" data-verso-hover="91">Solves</span> N ∧ A.<span class="const token" data-verso-hover="101">rate</span> N = <span class="nu">0</span> := <span class="kw">by</span></span>
+<span id="L181">  <span class="kw">obtain</span> ⟨σ, B, hB⟩ := h</span>
+<span id="L182">  <span class="kw">exact</span> ⟨σ × V, <span class="const token" data-verso-hover="472">toAsym</span> B, <span class="const token" data-verso-hover="483">toAsym_solves</span> hB, <span class="const token" data-verso-hover="506">rate_toAsym</span> hB⟩</span>
+<span id="L183"></span>
+<span id="L184"><span class="dc">/-- Exact consensus is not solvable for two agents in a model containing `H₀, H₁, H₂` (via</span></span>
+<span id="L185"><span class="dc">Theorem 1). -/</span></span>
+<span id="L186"><span class="kw">theorem</span> <span class="const token" data-verso-hover="425">not_exactSolvable_N3</span> [<span class="const token" data-verso-hover="137">Nontrivial</span> V] {N : <span class="const token" data-verso-hover="34">Set</span> (<span class="const token" data-verso-hover="35">Graph</span> (<span class="const token" data-verso-hover="106">Fin</span> <span class="nu">2</span>))}</span>
+<span id="L187">    (hN : ({<span class="const token" data-verso-hover="112">H0</span>, <span class="const token" data-verso-hover="113">H1</span>, <span class="const token" data-verso-hover="114">H2</span>} : <span class="const token" data-verso-hover="34">Set</span> (<span class="const token" data-verso-hover="35">Graph</span> (<span class="const token" data-verso-hover="106">Fin</span> <span class="nu">2</span>))) ⊆ N) : ¬ <span class="const token" data-verso-hover="424">ExactSolvable</span> (<span class="const token" data-verso-hover="106">Fin</span> <span class="nu">2</span>) V N := <span class="kw">by</span></span>
+<span id="L188">  <span class="kw">rintro</span> h</span>
+<span id="L189">  <span class="kw">obtain</span> ⟨σ, A, hA, h0⟩ := <span class="const token" data-verso-hover="507">exists_rate_zero_of_exactSolvable</span> h</span>
+<span id="L190">  <span class="kw">have</span> := <span class="const token" data-verso-hover="8">theorem1</span> A hN hA</span>
+<span id="L191">  <span class="kw">rw</span> [h0] <span class="kw">at</span> this</span>
+<span id="L192">  <span class="kw">exact</span> <span class="const token" data-verso-hover="134">absurd</span> this (<span class="kw">by</span> <span class="kw">simp</span>)</span>
+<span id="L193"></span>
+<span id="L194"><span class="dc">/-- Exact consensus is not solvable with `n ≥ 3` agents in a model containing three deaf graphs</span></span>
+<span id="L195"><span class="dc">`F_i` (via Theorem 2). -/</span></span>
+<span id="L196"><span class="kw">theorem</span> <span class="const token" data-verso-hover="508">not_exactSolvable_deaf</span> [<span class="const token" data-verso-hover="137">Nontrivial</span> V] {α : <span class="kw">Type</span>} [<span class="const token" data-verso-hover="143">Fintype</span> α] (G : <span class="const token" data-verso-hover="35">Graph</span> α)</span>
+<span id="L197">    (S : <span class="const token" data-verso-hover="146">Finset</span> α) (hS : <span class="nu">3</span> ≤ S.<span class="const token" data-verso-hover="233">card</span>) {N : <span class="const token" data-verso-hover="34">Set</span> (<span class="const token" data-verso-hover="35">Graph</span> α)} (hN : ∀ i ∈ S, <span class="const token" data-verso-hover="353">deafG</span> G i ∈ N) :</span>
+<span id="L198">    ¬ <span class="const token" data-verso-hover="424">ExactSolvable</span> α V N := <span class="kw">by</span></span>
+<span id="L199">  <span class="kw">rintro</span> h</span>
+<span id="L200">  <span class="kw">have</span> : <span class="const token" data-verso-hover="60">Nonempty</span> α := <span class="kw">by</span></span>
+<span id="L201">    <span class="kw">obtain</span> ⟨i, -⟩ : S.<span class="const token" data-verso-hover="151">Nonempty</span> := <span class="const token" data-verso-hover="509">Finset.card_pos</span>.<span class="const token" data-verso-hover="159">1</span> (<span class="kw">by</span> <span class="kw">omega</span>)</span>
+<span id="L202">    <span class="kw">exact</span> ⟨i⟩</span>
+<span id="L203">  <span class="kw">obtain</span> ⟨σ, A, hA, h0⟩ := <span class="const token" data-verso-hover="507">exists_rate_zero_of_exactSolvable</span> h</span>
+<span id="L204">  <span class="kw">have</span> := <span class="const token" data-verso-hover="9">theorem2</span> A G S hS hN hA</span>
+<span id="L205">  <span class="kw">rw</span> [h0] <span class="kw">at</span> this</span>
+<span id="L206">  <span class="kw">exact</span> <span class="const token" data-verso-hover="134">absurd</span> this (<span class="kw">by</span> <span class="kw">simp</span>)</span>
+<span id="L207"></span>
+<span id="L208"><span class="dc">/-! ### Flooding: a common root makes exact consensus solvable -/</span></span>
+<span id="L209"></span>
+<span id="L210"><span class="dc">/-- Flooding of the root's value: agent `r` starts with `some x_r`, everybody adopts any value it</span></span>
+<span id="L211"><span class="dc">receives, and decides it. -/</span></span>
+<span id="L212"><span class="kw">noncomputable</span> <span class="kw">def</span> <span class="const token" data-verso-hover="510">flood</span> (r : α) : <span class="const token" data-verso-hover="23">EAlg</span> α (<span class="const token" data-verso-hover="145">Option</span> V) V <span class="kw">where</span></span>
+<span id="L213">  <span class="const token" data-verso-hover="473">init</span> i v := <span class="kw">if</span> i = r <span class="kw">then</span> <span class="const token" data-verso-hover="282">some</span> v <span class="kw">else</span> <span class="const token" data-verso-hover="511">none</span></span>
+<span id="L214">  <span class="const token" data-verso-hover="194">step</span> i m := <span class="kw">if</span> h : ∃ j v, m j = <span class="const token" data-verso-hover="282">some</span> (<span class="const token" data-verso-hover="282">some</span> v) <span class="kw">then</span> <span class="const token" data-verso-hover="282">some</span> h.<span class="const token" data-verso-hover="512">choose_spec</span>.<span class="const token" data-verso-hover="513">choose</span> <span class="kw">else</span> <span class="const token" data-verso-hover="511">none</span></span>
+<span id="L215">  <span class="const token" data-verso-hover="469">out</span> s := s</span>
+<span id="L216"></span>
+<span id="L217"><span class="kw">theorem</span> <span class="const token" data-verso-hover="514">flood_dec_apply</span> (r : α) (s : <span class="const token" data-verso-hover="145">Option</span> V) : (<span class="const token" data-verso-hover="510">flood</span> r).<span class="const token" data-verso-hover="281">dec</span> s = s := <span class="const token" data-verso-hover="67">rfl</span></span>
+<span id="L218"></span>
+<span id="L219"><span class="kw">theorem</span> <span class="const token" data-verso-hover="515">flood_step_eq</span> (r : α) (i : α) (m : α → <span class="const token" data-verso-hover="145">Option</span> (<span class="const token" data-verso-hover="145">Option</span> V)) :</span>
+<span id="L220">    (<span class="const token" data-verso-hover="510">flood</span> r).<span class="const token" data-verso-hover="194">step</span> i m = <span class="kw">if</span> h : ∃ j v, m j = <span class="const token" data-verso-hover="282">some</span> (<span class="const token" data-verso-hover="282">some</span> v) <span class="kw">then</span> <span class="const token" data-verso-hover="282">some</span> h.<span class="const token" data-verso-hover="512">choose_spec</span>.<span class="const token" data-verso-hover="513">choose</span></span>
+<span id="L221">      <span class="kw">else</span> <span class="const token" data-verso-hover="511">none</span> := <span class="const token" data-verso-hover="67">rfl</span></span>
+<span id="L222"></span>
+<span id="L223"><span class="kw">theorem</span> <span class="const token" data-verso-hover="516">flood_step_cases</span> (r i : α) (m : α → <span class="const token" data-verso-hover="145">Option</span> (<span class="const token" data-verso-hover="145">Option</span> V)) :</span>
+<span id="L224">    (<span class="const token" data-verso-hover="510">flood</span> r).<span class="const token" data-verso-hover="194">step</span> i m = <span class="const token" data-verso-hover="511">none</span> ∨ ∃ j v, m j = <span class="const token" data-verso-hover="282">some</span> (<span class="const token" data-verso-hover="282">some</span> v) ∧ (<span class="const token" data-verso-hover="510">flood</span> r).<span class="const token" data-verso-hover="194">step</span> i m = <span class="const token" data-verso-hover="282">some</span> v := <span class="kw">by</span></span>
+<span id="L225">  <span class="kw">rw</span> [<span class="const token" data-verso-hover="515">flood_step_eq</span>]</span>
+<span id="L226">  <span class="kw">split_ifs</span> <span class="kw">with</span> h</span>
+<span id="L227">  · <span class="kw">exact</span> <span class="const token" data-verso-hover="86">Or.inr</span> ⟨h.<span class="const token" data-verso-hover="513">choose</span>, h.<span class="const token" data-verso-hover="512">choose_spec</span>.<span class="const token" data-verso-hover="513">choose</span>, h.<span class="const token" data-verso-hover="512">choose_spec</span>.<span class="const token" data-verso-hover="512">choose_spec</span>, <span class="const token" data-verso-hover="67">rfl</span>⟩</span>
+<span id="L228">  · <span class="kw">exact</span> <span class="const token" data-verso-hover="375">Or.inl</span> <span class="const token" data-verso-hover="67">rfl</span></span>
+<span id="L229"></span>
+<span id="L230"><span class="kw">theorem</span> <span class="const token" data-verso-hover="517">flood_inv</span> {r : α} (x : α → V) (p : <span class="const token" data-verso-hover="50">ℕ</span> → <span class="const token" data-verso-hover="35">Graph</span> α) :</span>
+<span id="L231">    ∀ t i, <span class="const token" data-verso-hover="53">conf</span> (<span class="const token" data-verso-hover="510">flood</span> r).<span class="const token" data-verso-hover="194">step</span> ((<span class="const token" data-verso-hover="510">flood</span> r).<span class="const token" data-verso-hover="201">initC</span> x) p t i = <span class="const token" data-verso-hover="511">none</span> ∨</span>
+<span id="L232">      <span class="const token" data-verso-hover="53">conf</span> (<span class="const token" data-verso-hover="510">flood</span> r).<span class="const token" data-verso-hover="194">step</span> ((<span class="const token" data-verso-hover="510">flood</span> r).<span class="const token" data-verso-hover="201">initC</span> x) p t i = <span class="const token" data-verso-hover="282">some</span> (x r) := <span class="kw">by</span></span>
+<span id="L233">  <span class="kw">intro</span> t</span>
+<span id="L234">  <span class="kw">induction</span> t <span class="kw">with</span></span>
+<span id="L235">  | <span class="const token" data-verso-hover="56">zero</span> =&gt; <span class="kw">intro</span> i; <span class="kw">by_cases</span> h : i = r &lt;;&gt; <span class="kw">simp</span> [<span class="const token" data-verso-hover="510">flood</span>, h]</span>
+<span id="L236">  | <span class="const token" data-verso-hover="57">succ</span> t ih =&gt;</span>
+<span id="L237">    <span class="kw">intro</span> i</span>
+<span id="L238">    <span class="kw">rw</span> [<span class="const token" data-verso-hover="478">conf_succ</span>]</span>
+<span id="L239">    <span class="kw">simp</span> only [<span class="const token" data-verso-hover="38">next</span>]</span>
+<span id="L240">    <span class="kw">rcases</span> <span class="const token" data-verso-hover="516">flood_step_cases</span> r i (<span class="const token" data-verso-hover="118">msgs</span> (p t) (<span class="const token" data-verso-hover="53">conf</span> (<span class="const token" data-verso-hover="510">flood</span> r).<span class="const token" data-verso-hover="194">step</span> ((<span class="const token" data-verso-hover="510">flood</span> r).<span class="const token" data-verso-hover="201">initC</span> x) p t) i) <span class="kw">with</span></span>
+<span id="L241">      h | ⟨j, v, hj, hstep⟩</span>
+<span id="L242">    · <span class="kw">exact</span> <span class="const token" data-verso-hover="375">Or.inl</span> h</span>
+<span id="L243">    · <span class="kw">right</span></span>
+<span id="L244">      <span class="kw">rw</span> [hstep]</span>
+<span id="L245">      <span class="kw">unfold</span> <span class="const token" data-verso-hover="118">msgs</span> <span class="kw">at</span> hj</span>
+<span id="L246">      <span class="kw">split_ifs</span> <span class="kw">at</span> hj</span>
+<span id="L247">      · <span class="kw">have</span> hj' := <span class="const token" data-verso-hover="518">Option.some.inj</span> hj</span>
+<span id="L248">        <span class="kw">rcases</span> ih j <span class="kw">with</span> h' | h'</span>
+<span id="L249">        · <span class="kw">exact</span> <span class="const token" data-verso-hover="134">absurd</span> (hj'.<span class="const token" data-verso-hover="222">symm</span>.<span class="const token" data-verso-hover="257">trans</span> h') (<span class="kw">by</span> <span class="kw">simp</span>)</span>
+<span id="L250">        · <span class="kw">exact</span> hj'.<span class="const token" data-verso-hover="222">symm</span>.<span class="const token" data-verso-hover="257">trans</span> h'</span>
+<span id="L251"></span>
+<span id="L252"><span class="kw">theorem</span> <span class="const token" data-verso-hover="519">flood_mono</span> {r : α} (x : α → V) (p : <span class="const token" data-verso-hover="50">ℕ</span> → <span class="const token" data-verso-hover="35">Graph</span> α) {t : <span class="const token" data-verso-hover="50">ℕ</span>} {i : α} {j : α}</span>
+<span id="L253">    (hj : <span class="const token" data-verso-hover="119">Hears</span> (p t) i j) (h : <span class="const token" data-verso-hover="53">conf</span> (<span class="const token" data-verso-hover="510">flood</span> r).<span class="const token" data-verso-hover="194">step</span> ((<span class="const token" data-verso-hover="510">flood</span> r).<span class="const token" data-verso-hover="201">initC</span> x) p t j ≠ <span class="const token" data-verso-hover="511">none</span>) :</span>
+<span id="L254">    <span class="const token" data-verso-hover="53">conf</span> (<span class="const token" data-verso-hover="510">flood</span> r).<span class="const token" data-verso-hover="194">step</span> ((<span class="const token" data-verso-hover="510">flood</span> r).<span class="const token" data-verso-hover="201">initC</span> x) p (t + <span class="nu">1</span>) i ≠ <span class="const token" data-verso-hover="511">none</span> := <span class="kw">by</span></span>
+<span id="L255">  <span class="kw">obtain</span> ⟨v, hv⟩ := <span class="const token" data-verso-hover="520">Option.ne_none_iff_exists'</span>.<span class="const token" data-verso-hover="159">1</span> h</span>
+<span id="L256">  <span class="kw">rw</span> [<span class="const token" data-verso-hover="478">conf_succ</span>]</span>
+<span id="L257">  <span class="kw">simp</span> only [<span class="const token" data-verso-hover="38">next</span>]</span>
+<span id="L258">  <span class="kw">have</span> hex : ∃ j' v', <span class="const token" data-verso-hover="118">msgs</span> (p t) (<span class="const token" data-verso-hover="53">conf</span> (<span class="const token" data-verso-hover="510">flood</span> r).<span class="const token" data-verso-hover="194">step</span> ((<span class="const token" data-verso-hover="510">flood</span> r).<span class="const token" data-verso-hover="201">initC</span> x) p t) i j' =</span>
+<span id="L259">      <span class="const token" data-verso-hover="282">some</span> (<span class="const token" data-verso-hover="282">some</span> v') := ⟨j, v, <span class="kw">by</span> <span class="kw">simp</span> [<span class="const token" data-verso-hover="118">msgs</span>, hj, hv]⟩</span>
+<span id="L260">  <span class="kw">rw</span> [<span class="const token" data-verso-hover="515">flood_step_eq</span>]</span>
+<span id="L261">  <span class="kw">simp</span> [hex]</span>
+<span id="L262"></span>
+<span id="L263"><span class="dc">/-- **Common root ⇒ exact consensus solvable** (the easy direction of [12]). -/</span></span>
+<span id="L264"><span class="kw">theorem</span> <span class="const token" data-verso-hover="521">exactSolvable_of_common_root</span> {α : <span class="kw">Type</span>} [<span class="const token" data-verso-hover="143">Fintype</span> α] {N : <span class="const token" data-verso-hover="34">Set</span> (<span class="const token" data-verso-hover="35">Graph</span> α)} {r : α}</span>
+<span id="L265">    (hr : ∀ G ∈ N, <span class="const token" data-verso-hover="184">IsRoot</span> G r) : <span class="const token" data-verso-hover="424">ExactSolvable</span> α V N := <span class="kw">by</span></span>
+<span id="L266">  <span class="kw">refine</span> ⟨<span class="const token" data-verso-hover="145">Option</span> V, <span class="const token" data-verso-hover="510">flood</span> r, <span class="kw">fun</span> x p hp =&gt; ?_⟩</span>
+<span id="L267">  <span class="kw">have</span> hinv := <span class="const token" data-verso-hover="517">flood_inv</span> (r := r) x p</span>
+<span id="L268">  <span class="cm">--</span><span class="cm"> informed agents</span></span>
+<span id="L269">  <span class="kw">let</span> S : <span class="const token" data-verso-hover="50">ℕ</span> → <span class="const token" data-verso-hover="146">Finset</span> α := <span class="kw">fun</span> t =&gt; <span class="const token" data-verso-hover="147">Finset.univ</span>.<span class="const token" data-verso-hover="232">filter</span> <span class="kw">fun</span> i =&gt;</span>
+<span id="L270">    <span class="const token" data-verso-hover="53">conf</span> (<span class="const token" data-verso-hover="510">flood</span> r).<span class="const token" data-verso-hover="194">step</span> ((<span class="const token" data-verso-hover="510">flood</span> r).<span class="const token" data-verso-hover="201">initC</span> x) p t i ≠ <span class="const token" data-verso-hover="511">none</span></span>
+<span id="L271">  <span class="kw">have</span> memS : ∀ t i, i ∈ S t ↔ <span class="const token" data-verso-hover="53">conf</span> (<span class="const token" data-verso-hover="510">flood</span> r).<span class="const token" data-verso-hover="194">step</span> ((<span class="const token" data-verso-hover="510">flood</span> r).<span class="const token" data-verso-hover="201">initC</span> x) p t i ≠ <span class="const token" data-verso-hover="511">none</span> := <span class="kw">by</span></span>
+<span id="L272">    <span class="kw">intro</span> t i; <span class="kw">simp</span> [S]</span>
+<span id="L273">  <span class="kw">have</span> hS0 : r ∈ S <span class="nu">0</span> := <span class="kw">by</span> <span class="kw">rw</span> [memS]; <span class="kw">simp</span> [<span class="const token" data-verso-hover="201">Algorithm.initC</span>, <span class="const token" data-verso-hover="510">flood</span>]</span>
+<span id="L274">  <span class="kw">have</span> hSmono : ∀ t, S t ⊆ S (t + <span class="nu">1</span>) := <span class="kw">fun</span> t i hi =&gt; <span class="kw">by</span></span>
+<span id="L275">    <span class="kw">rw</span> [memS] <span class="kw">at</span> hi ⊢; <span class="kw">exact</span> <span class="const token" data-verso-hover="519">flood_mono</span> x p (<span class="const token" data-verso-hover="157">hears_self</span> _ i) hi</span>
+<span id="L276">  <span class="kw">have</span> hrS : ∀ t, r ∈ S t := <span class="kw">by</span></span>
+<span id="L277">    <span class="kw">intro</span> t; <span class="kw">induction</span> t <span class="kw">with</span></span>
+<span id="L278">    | <span class="const token" data-verso-hover="56">zero</span> =&gt; <span class="kw">exact</span> hS0</span>
+<span id="L279">    | <span class="const token" data-verso-hover="57">succ</span> t ih =&gt; <span class="kw">exact</span> hSmono t ih</span>
+<span id="L280">  <span class="kw">have</span> hgrow : ∀ t, <span class="const token" data-verso-hover="522">min</span> (t + <span class="nu">1</span>) (<span class="const token" data-verso-hover="181">Fintype.card</span> α) ≤ (S t).<span class="const token" data-verso-hover="233">card</span> := <span class="kw">by</span></span>
+<span id="L281">    <span class="kw">intro</span> t</span>
+<span id="L282">    <span class="kw">have</span> h0 := <span class="const token" data-verso-hover="509">Finset.card_pos</span>.<span class="const token" data-verso-hover="47">2</span> ⟨r, hS0⟩</span>
+<span id="L283">    <span class="kw">have</span> := <span class="const token" data-verso-hover="523">Nat.min_add_le_of_grow</span> (f := <span class="kw">fun</span> t =&gt; (S t).<span class="const token" data-verso-hover="233">card</span>) (n := <span class="const token" data-verso-hover="181">Fintype.card</span> α) (K := t)</span>
+<span id="L284">      (<span class="kw">fun</span> i _ =&gt; <span class="const token" data-verso-hover="248">Finset.card_le_card</span> (hSmono i)) <span class="kw">fun</span> i _ hlt =&gt; <span class="kw">by</span></span>
+<span id="L285">        <span class="kw">obtain</span> ⟨y, hy⟩ : ∃ y, y ∉ S i := <span class="kw">by</span></span>
+<span id="L286">          <span class="kw">by_contra</span> h; push <span class="const token" data-verso-hover="255">Not</span> <span class="kw">at</span> h</span>
+<span id="L287">          <span class="kw">exact</span> hlt.<span class="const token" data-verso-hover="524">ne</span> (<span class="kw">by</span> <span class="kw">rw</span> [<span class="const token" data-verso-hover="525">Finset.eq_univ_of_forall</span> h, <span class="const token" data-verso-hover="249">Finset.card_univ</span>])</span>
+<span id="L288">        <span class="kw">obtain</span> ⟨z, w, hzw, hz, hw⟩ := <span class="const token" data-verso-hover="526">Cslib.DynNet.exists_edge_cross</span></span>
+<span id="L289">          (S := <span class="kw">fun</span> j =&gt; j ∉ S i) (hr (p i) (hp i) y) (<span class="kw">by</span> <span class="kw">simpa</span> <span class="kw">using</span> hrS i) hy</span>
+<span id="L290">        <span class="kw">have</span> hz' : z ∈ S i := <span class="const token" data-verso-hover="527">not_not</span>.<span class="const token" data-verso-hover="159">1</span> hz</span>
+<span id="L291">        <span class="kw">have</span> hw' : w ∈ S (i + <span class="nu">1</span>) := <span class="kw">by</span></span>
+<span id="L292">          <span class="kw">rw</span> [memS] <span class="kw">at</span> hz' ⊢; <span class="kw">exact</span> <span class="const token" data-verso-hover="519">flood_mono</span> x p (<span class="const token" data-verso-hover="86">Or.inr</span> hzw) hz'</span>
+<span id="L293">        <span class="kw">exact</span> <span class="const token" data-verso-hover="334">Finset.card_lt_card</span> (<span class="const token" data-verso-hover="335">Finset.ssubset_iff_subset_ne</span>.<span class="const token" data-verso-hover="47">2</span> ⟨hSmono i, <span class="kw">fun</span> h =&gt; hw (h ▸ hw')⟩)</span>
+<span id="L294">    <span class="kw">omega</span></span>
+<span id="L295">  <span class="kw">have</span> hall : ∀ i, <span class="const token" data-verso-hover="53">conf</span> (<span class="const token" data-verso-hover="510">flood</span> r).<span class="const token" data-verso-hover="194">step</span> ((<span class="const token" data-verso-hover="510">flood</span> r).<span class="const token" data-verso-hover="201">initC</span> x) p (<span class="const token" data-verso-hover="181">Fintype.card</span> α) i = <span class="const token" data-verso-hover="282">some</span> (x r) := <span class="kw">by</span></span>
+<span id="L296">    <span class="kw">intro</span> i</span>
+<span id="L297">    <span class="kw">have</span> h1 := hgrow (<span class="const token" data-verso-hover="181">Fintype.card</span> α)</span>
+<span id="L298">    <span class="kw">have</span> hS : S (<span class="const token" data-verso-hover="181">Fintype.card</span> α) = <span class="const token" data-verso-hover="147">Finset.univ</span> :=</span>
+<span id="L299">      <span class="const token" data-verso-hover="528">Finset.eq_univ_of_card</span> _ (<span class="const token" data-verso-hover="138">le_antisymm</span> (<span class="const token" data-verso-hover="529">Finset.card_le_univ</span> _) (<span class="kw">by</span> <span class="kw">omega</span>))</span>
+<span id="L300">    <span class="kw">have</span> hi : i ∈ S (<span class="const token" data-verso-hover="181">Fintype.card</span> α) := hS ▸ <span class="const token" data-verso-hover="241">Finset.mem_univ</span> i</span>
+<span id="L301">    <span class="kw">rw</span> [memS] <span class="kw">at</span> hi</span>
+<span id="L302">    <span class="kw">exact</span> (hinv _ i).<span class="const token" data-verso-hover="530">resolve_left</span> hi</span>
+<span id="L303">  <span class="kw">have</span> hdec : ∀ t i v, (<span class="const token" data-verso-hover="510">flood</span> r).<span class="const token" data-verso-hover="281">dec</span> (<span class="const token" data-verso-hover="53">conf</span> (<span class="const token" data-verso-hover="510">flood</span> r).<span class="const token" data-verso-hover="194">step</span> ((<span class="const token" data-verso-hover="510">flood</span> r).<span class="const token" data-verso-hover="201">initC</span> x) p t i) = <span class="const token" data-verso-hover="282">some</span> v →</span>
+<span id="L304">      <span class="const token" data-verso-hover="53">conf</span> (<span class="const token" data-verso-hover="510">flood</span> r).<span class="const token" data-verso-hover="194">step</span> ((<span class="const token" data-verso-hover="510">flood</span> r).<span class="const token" data-verso-hover="201">initC</span> x) p t i = <span class="const token" data-verso-hover="282">some</span> (x r) ∧ v = x r := <span class="kw">by</span></span>
+<span id="L305">    <span class="kw">intro</span> t i v hv</span>
+<span id="L306">    <span class="kw">rw</span> [<span class="const token" data-verso-hover="514">flood_dec_apply</span>] <span class="kw">at</span> hv</span>
+<span id="L307">    <span class="kw">rcases</span> hinv t i <span class="kw">with</span> h | h</span>
+<span id="L308">    · <span class="kw">rw</span> [h] <span class="kw">at</span> hv; <span class="kw">exact</span> <span class="const token" data-verso-hover="134">absurd</span> hv (<span class="kw">by</span> <span class="kw">simp</span>)</span>
+<span id="L309">    · <span class="kw">rw</span> [h] <span class="kw">at</span> hv; <span class="kw">exact</span> ⟨h, (<span class="const token" data-verso-hover="518">Option.some.inj</span> hv).<span class="const token" data-verso-hover="222">symm</span>⟩</span>
+<span id="L310">  <span class="kw">refine</span> ⟨<span class="kw">fun</span> i =&gt; ⟨_, _, <span class="kw">by</span> <span class="kw">rw</span> [<span class="const token" data-verso-hover="514">flood_dec_apply</span>]; <span class="kw">exact</span> hall i⟩, ?_, ?_, ?_⟩</span>
+<span id="L311">  · <span class="kw">intro</span> i t v hv s hs</span>
+<span id="L312">    <span class="kw">obtain</span> ⟨hc, <span class="kw">rfl</span>⟩ := hdec t i v hv</span>
+<span id="L313">    <span class="kw">obtain</span> ⟨k, <span class="kw">rfl</span>⟩ := <span class="const token" data-verso-hover="531">Nat.exists_eq_add_of_le</span> hs</span>
+<span id="L314">    <span class="kw">rw</span> [<span class="const token" data-verso-hover="514">flood_dec_apply</span>]</span>
+<span id="L315">    <span class="kw">induction</span> k <span class="kw">with</span></span>
+<span id="L316">    | <span class="const token" data-verso-hover="56">zero</span> =&gt; <span class="kw">exact</span> hc</span>
+<span id="L317">    | <span class="const token" data-verso-hover="57">succ</span> k ih =&gt;</span>
+<span id="L318">      <span class="kw">have</span> := <span class="const token" data-verso-hover="519">flood_mono</span> x p (<span class="const token" data-verso-hover="157">hears_self</span> _ i) (<span class="kw">by</span> <span class="kw">rw</span> [ih (<span class="kw">by</span> <span class="kw">omega</span>)]; <span class="kw">simp</span>)</span>
+<span id="L319">      <span class="kw">rw</span> [← <span class="const token" data-verso-hover="532">add_assoc</span>]</span>
+<span id="L320">      <span class="kw">exact</span> (hinv _ i).<span class="const token" data-verso-hover="530">resolve_left</span> this</span>
+<span id="L321">  · <span class="kw">intro</span> i j t s v w hv hw</span>
+<span id="L322">    <span class="kw">exact</span> (hdec t i v hv).<span class="const token" data-verso-hover="228">2</span>.<span class="const token" data-verso-hover="257">trans</span> (hdec s j w hw).<span class="const token" data-verso-hover="228">2</span>.<span class="const token" data-verso-hover="222">symm</span></span>
+<span id="L323">  · <span class="kw">intro</span> i t v hv</span>
+<span id="L324">    <span class="kw">exact</span> ⟨r, (hdec t i v hv).<span class="const token" data-verso-hover="228">2</span>.<span class="const token" data-verso-hover="222">symm</span>⟩</span>
+<span id="L325"></span>
+<span id="L326"><span class="dc">/-- If exact consensus is not solvable, `N` is source-incompatible. -/</span></span>
+<span id="L327"><span class="kw">theorem</span> <span class="const token" data-verso-hover="533">sourceIncompatible_of_not_exactSolvable</span> {α : <span class="kw">Type</span>} [<span class="const token" data-verso-hover="143">Fintype</span> α] {N : <span class="const token" data-verso-hover="34">Set</span> (<span class="const token" data-verso-hover="35">Graph</span> α)}</span>
+<span id="L328">    (h : ¬ <span class="const token" data-verso-hover="424">ExactSolvable</span> α V N) : <span class="const token" data-verso-hover="186">SourceIncompatible</span> N := <span class="kw">by</span></span>
+<span id="L329">  <span class="kw">intro</span> r</span>
+<span id="L330">  <span class="kw">by_contra</span> hr; push <span class="const token" data-verso-hover="255">Not</span> <span class="kw">at</span> hr</span>
+<span id="L331">  <span class="kw">exact</span> h (<span class="const token" data-verso-hover="521">exactSolvable_of_common_root</span> <span class="kw">fun</span> G hG =&gt; hr G hG)</span>
+<span id="L332"></span>
+<span id="L333"><span class="dc">/-- **Theorem 5 of FNS'18** (paper form): if exact consensus is not solvable in `N` and the</span></span>
+<span id="L334"><span class="dc">α-diameter of `N` is at most `D`, every asymptotic consensus algorithm has contraction rate at least</span></span>
+<span id="L335"><span class="dc">`1/(D+1)`. -/</span></span>
+<span id="L336"><span class="kw">theorem</span> <span class="const token" data-verso-hover="17">theorem5_paper</span> [<span class="const token" data-verso-hover="137">Nontrivial</span> V] {n : <span class="const token" data-verso-hover="50">ℕ</span>} (hn : <span class="nu">2</span> ≤ n) {A : <span class="const token" data-verso-hover="31">Alg</span> (<span class="const token" data-verso-hover="106">Fin</span> n) σ V}</span>
+<span id="L337">    {N : <span class="const token" data-verso-hover="34">Set</span> (<span class="const token" data-verso-hover="35">Graph</span> (<span class="const token" data-verso-hover="106">Fin</span> n))} (hA : A.<span class="const token" data-verso-hover="91">Solves</span> N) (hN : ¬ <span class="const token" data-verso-hover="424">ExactSolvable</span> (<span class="const token" data-verso-hover="106">Fin</span> n) V N) {D : <span class="const token" data-verso-hover="50">ℕ</span>}</span>
+<span id="L338">    (hD : <span class="const token" data-verso-hover="190">AlphaDiamLE</span> <span class="const token" data-verso-hover="187">AlphaRel</span> N D) : ((D : <span class="const token" data-verso-hover="36">ℝ</span>≥0∞) + <span class="nu">1</span>)⁻¹ ≤ A.<span class="const token" data-verso-hover="101">rate</span> N :=</span>
+<span id="L339">  <span class="const token" data-verso-hover="16">Alg.theorem5</span> hn hA (<span class="const token" data-verso-hover="533">sourceIncompatible_of_not_exactSolvable</span> hN) hD</span>
+<span id="L340"></span>
+<span id="L341"><span class="dc">/-- **Lemma 21 of FNS'18** (paper form, with `1/(n-1)` instead of `1/n`). -/</span></span>
+<span id="L342"><span class="kw">theorem</span> <span class="const token" data-verso-hover="534">lemma21_paper</span> [<span class="const token" data-verso-hover="137">Nontrivial</span> V] {n : <span class="const token" data-verso-hover="50">ℕ</span>} (hn : <span class="nu">2</span> ≤ n) {A : <span class="const token" data-verso-hover="31">Alg</span> (<span class="const token" data-verso-hover="106">Fin</span> n) σ V}</span>
+<span id="L343">    {N : <span class="const token" data-verso-hover="34">Set</span> (<span class="const token" data-verso-hover="35">Graph</span> (<span class="const token" data-verso-hover="106">Fin</span> n))} (hA : A.<span class="const token" data-verso-hover="91">Solves</span> N) (hN : ¬ <span class="const token" data-verso-hover="424">ExactSolvable</span> (<span class="const token" data-verso-hover="106">Fin</span> n) V N) (v : V) :</span>
+<span id="L344">    ∃ x : <span class="const token" data-verso-hover="106">Fin</span> n → V, (∀ i, x i = <span class="nu">0</span> ∨ x i = v) ∧ <span class="const token" data-verso-hover="68">edist</span> <span class="nu">0</span> v ≤ (n - <span class="nu">1</span> : <span class="const token" data-verso-hover="50">ℕ</span>) * A.<span class="const token" data-verso-hover="96">δ</span> N (A.<span class="const token" data-verso-hover="201">initC</span> x) :=</span>
+<span id="L345">  <span class="const token" data-verso-hover="15">Alg.lemma21</span> hn hA (<span class="const token" data-verso-hover="533">sourceIncompatible_of_not_exactSolvable</span> hN) v</span>
+<span id="L346"></span>
+<span id="L347"><span class="dc">/-- Conversely, by Theorem 5, exact consensus is not solvable in a source-incompatible model of</span></span>
+<span id="L348"><span class="dc">finite α-diameter. -/</span></span>
+<span id="L349"><span class="kw">theorem</span> <span class="const token" data-verso-hover="535">not_exactSolvable_of_sourceIncompatible</span> [<span class="const token" data-verso-hover="137">Nontrivial</span> V] {n : <span class="const token" data-verso-hover="50">ℕ</span>} (hn : <span class="nu">2</span> ≤ n)</span>
+<span id="L350">    {N : <span class="const token" data-verso-hover="34">Set</span> (<span class="const token" data-verso-hover="35">Graph</span> (<span class="const token" data-verso-hover="106">Fin</span> n))} (hSI : <span class="const token" data-verso-hover="186">SourceIncompatible</span> N) {D : <span class="const token" data-verso-hover="50">ℕ</span>}</span>
+<span id="L351">    (hD : <span class="const token" data-verso-hover="190">AlphaDiamLE</span> <span class="const token" data-verso-hover="187">AlphaRel</span> N D) : ¬ <span class="const token" data-verso-hover="424">ExactSolvable</span> (<span class="const token" data-verso-hover="106">Fin</span> n) V N := <span class="kw">by</span></span>
+<span id="L352">  <span class="kw">rintro</span> h</span>
+<span id="L353">  <span class="kw">have</span> : <span class="const token" data-verso-hover="60">Nonempty</span> (<span class="const token" data-verso-hover="106">Fin</span> n) := ⟨⟨<span class="nu">0</span>, <span class="kw">by</span> <span class="kw">omega</span>⟩⟩</span>
+<span id="L354">  <span class="kw">obtain</span> ⟨σ, A, hA, h0⟩ := <span class="const token" data-verso-hover="507">exists_rate_zero_of_exactSolvable</span> h</span>
+<span id="L355">  <span class="kw">have</span> := <span class="const token" data-verso-hover="16">Alg.theorem5</span> hn hA hSI hD</span>
+<span id="L356">  <span class="kw">rw</span> [h0] <span class="kw">at</span> this</span>
+<span id="L357">  <span class="kw">exact</span> <span class="const token" data-verso-hover="134">absurd</span> this (<span class="kw">by</span> <span class="kw">simp</span>)</span>
+<span id="L358"></span>
+<span id="L359"><span class="kw">end</span> AsymptoticConsensus</span>
+<span id="L360"></span>
+</code></div>
+        <script>
+          window.versoHoversUrl = "PODC2018/AsymptoticConsensus/-hovers.json";</script>
+        <script src="static/lean/popper.js"></script>
+        <script src="static/lean/tippy.js"></script>
+        <script src="static/lean/marked.js"></script>
+        <script src="static/lean/highlighting.js"></script>
+        <script src="static/lean/lean.js"></script>
+        </article></main><footer class="site-footer"><div class="wrap">
+        Machine-checked formalizations of PODC papers in Lean 4. Generated with <a href="https://github.com/leanprover/verso">Verso</a> from the README files of <a href="https://github.com/vasnesterov/formal_podc">vasnesterov/formal_podc</a>.</div>
+      </footer></body>
+  </html>
+

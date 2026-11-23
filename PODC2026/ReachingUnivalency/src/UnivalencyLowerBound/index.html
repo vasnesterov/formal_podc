@@ -1,0 +1,435 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="light dark">
+    <link rel="icon" href="data:,">
+    <title>ReachingUnivalency: UnivalencyLowerBound.lean · Formal PODC</title><base href="../../../.././"><link rel="stylesheet" href="static/lean/verso-vars.css">
+    <link rel="stylesheet" href="static/lean/highlighting.css">
+    <link rel="stylesheet" href="static/lean/tippy-border.css">
+    <link rel="stylesheet" href="static/style.css">
+    <script defer="defer" src="static/site.js"></script>
+    </head>
+  <body>
+    <header class="site-header">
+      <div class="wrap">
+        <a class="brand" href=".">Formal PODC</a><nav class="top">
+          <a href=".">Search</a><a href="about/">About</a><a href="https://github.com/vasnesterov/formal_podc">GitHub</a></nav>
+        </div>
+      </header>
+    <main class="wrap"><article><nav class="breadcrumbs" aria-label="Breadcrumb">
+          <a href=".">Search</a><span class="sep">›</span><a href="PODC2026/">PODC 2026</a><span class="sep">›</span><a href="PODC2026/ReachingUnivalency/">ReachingUnivalency</a><span class="sep">›</span><a href="PODC2026/ReachingUnivalency/src/">Lean source</a><span class="sep">›</span><span aria-current="page">UnivalencyLowerBound</span></nav>
+        <h1>
+          <code>UnivalencyLowerBound.lean</code></h1>
+        <div class="paper-links">
+          <p>
+            Source of <a href="PODC2026/ReachingUnivalency/">Reaching Univalency with Subquadratic Communication — PODC 2026</a> · <a href="https://github.com/vasnesterov/formal_podc/blob/main/Papers/PODC2026/ReachingUnivalency/UnivalencyLowerBound.lean">GitHub</a> · hover over a name for its type and documentation</p>
+          </div>
+        <div class="lean-code lean-src">
+          <code class="hl lean block" data-lean-context="UnivalencyLowerBound"><span id="L1"><span class="kw">import</span> Cslib.Computability.Distributed.Byzantine.PartialSync.Omission</span>
+<span id="L2"></span>
+<span id="L3"><span class="dc">/-!</span></span>
+<span id="L4"><span class="dc"># Reaching Univalency — Appendix B: reaching univalency requires `Ω(f)` messages</span></span>
+<span id="L5"></span>
+<span id="L6"><span class="dc">Appendix B of [Lewis-Pye, *Reaching Univalency with Subquadratic Communication*, PODC 2026].</span></span>
+<span id="L7"></span>
+<span id="L8"><span class="dc">**Model.** Synchronous (lock-step) message passing with **crash** faults, as executions of CSLib's</span></span>
+<span id="L9"><span class="dc">`OmExec` (inputs + delivered batches; message batches sent at time `τ` are received at time `τ`</span></span>
+<span id="L10"><span class="dc">and processed into the state at time `τ + 1`). `CrashAdm E F`: every omitted batch is sent by a</span></span>
+<span id="L11"><span class="dc">process `q ∈ F` to another process, and after its first omitted batch (its crash) `q` delivers</span></span>
+<span id="L12"><span class="dc">nothing any more. So a process crashing at time `τ` sends an arbitrary subset of its time-`τ`</span></span>
+<span id="L13"><span class="dc">messages and nothing afterwards, as in the paper. (Crashed processes keep computing states in</span></span>
+<span id="L14"><span class="dc">`OmExec`; this is irrelevant since nobody receives from them.)</span></span>
+<span id="L15"></span>
+<span id="L16"><span class="dc">The paper composes a protocol `P₁` (univalency) that ends at time `t*` with a dissemination protocol</span></span>
+<span id="L17"><span class="dc">`P₂`. We model the composition as a single deterministic algorithm `A` with binary inputs and</span></span>
+<span id="L18"><span class="dc">outputs whose first phase consists of the times `&lt; t*`:</span></span>
+<span id="L19"></span>
+<span id="L20"><span class="dc">* `CrashBA f A` : `A` solves binary Byzantine Agreement with at most `f` crash faults;</span></span>
+<span id="L21"><span class="dc">* `ReachesUnivalency A f t*` : for every admissible execution `E`, all correct processes decide the</span></span>
+<span id="L22"><span class="dc">  same value `v` in *every* admissible execution that agrees with `E` at all times `&lt; t*` (same</span></span>
+<span id="L23"><span class="dc">  inputs, same deliveries) — "`P₁` achieves univalency".</span></span>
+<span id="L24"></span>
+<span id="L25"><span class="dc">**Result** (`appendixB`): at least `f` processes send or receive a message during the first phase</span></span>
+<span id="L26"><span class="dc">of one of the two fault-free executions with uniform inputs (all-`0` and all-`1`); hence one of them</span></span>
+<span id="L27"><span class="dc">has `≥ f/2` such processes (the paper's statement) and `≥ f/4` messages before `t*`</span></span>
+<span id="L28"><span class="dc">(`appendixB_messages`), i.e. message complexity `Ω(f)`.</span></span>
+<span id="L29"><span class="dc">-/</span></span>
+<span id="L30"></span>
+<span id="L31"><span class="kw">namespace</span> ReachingUnivalency</span>
+<span id="L32"></span>
+<span id="L33"><span class="kw">open</span> Finset Cslib.Byzantine.PartialSync</span>
+<span id="L34"></span>
+<span id="L35"><span class="kw">variable</span> {P M S VI : <span class="kw">Type</span>*} [<span class="const token" data-verso-hover="248">Fintype</span> P] [<span class="const token" data-verso-hover="201">DecidableEq</span> P]</span>
+<span id="L36"></span>
+<span id="L37"><span class="dc">/-- `F` is a legal set of **crash**-faulty processes for `E`: omitted batches are sent by a process</span></span>
+<span id="L38"><span class="dc">of `F` to another process, and after the first omitted batch of `q` (its crash) all later batches of</span></span>
+<span id="L39"><span class="dc">`q` are omitted. -/</span></span>
+<span id="L40"><span class="kw">def</span> <span class="const token" data-verso-hover="10">CrashAdm</span> (E : <span class="const token" data-verso-hover="8">OmExec</span> P VI) (F : <span class="const token" data-verso-hover="35">Finset</span> P) : <span class="kw">Prop</span> :=</span>
+<span id="L41">  ∀ τ q p, E.<span class="const token" data-verso-hover="485">ok</span> τ q p = <span class="const token" data-verso-hover="59">false</span> → q ≠ p ∧ q ∈ F ∧ ∀ τ' &gt; τ, ∀ p', p' ≠ q → E.<span class="const token" data-verso-hover="485">ok</span> τ' q p' = <span class="const token" data-verso-hover="59">false</span></span>
+<span id="L42"></span>
+<span id="L43"><span class="dc">/-- Binary Byzantine Agreement in the synchronous crash model with at most `f` faults. -/</span></span>
+<span id="L44"><span class="kw">structure</span> <span class="const token" data-verso-hover="486">CrashBA</span> (f : <span class="const token" data-verso-hover="31">ℕ</span>) (A : <span class="const token" data-verso-hover="250">Algorithm</span> P M S <span class="const token" data-verso-hover="38">Bool</span> <span class="const token" data-verso-hover="38">Bool</span>) : <span class="kw">Prop</span> <span class="kw">where</span></span>
+<span id="L45">  <span class="dc">/-- Every correct process decides. -/</span></span>
+<span id="L46">  <span class="const token" data-verso-hover="487">termination</span> : ∀ (E : <span class="const token" data-verso-hover="8">OmExec</span> P <span class="const token" data-verso-hover="38">Bool</span>) (F : <span class="const token" data-verso-hover="35">Finset</span> P), <span class="const token" data-verso-hover="10">CrashAdm</span> E F → F.<span class="const token" data-verso-hover="44">card</span> ≤ f →</span>
+<span id="L47">    ∀ p ∉ F, ∃ v, E.<span class="const token" data-verso-hover="488">Decides</span> A p v</span>
+<span id="L48">  <span class="dc">/-- No two correct processes decide differently. -/</span></span>
+<span id="L49">  <span class="const token" data-verso-hover="489">agreement</span> : ∀ (E : <span class="const token" data-verso-hover="8">OmExec</span> P <span class="const token" data-verso-hover="38">Bool</span>) (F : <span class="const token" data-verso-hover="35">Finset</span> P), <span class="const token" data-verso-hover="10">CrashAdm</span> E F → F.<span class="const token" data-verso-hover="44">card</span> ≤ f →</span>
+<span id="L50">    ∀ p ∉ F, ∀ q ∉ F, ∀ v w, E.<span class="const token" data-verso-hover="488">Decides</span> A p v → E.<span class="const token" data-verso-hover="488">Decides</span> A q w → v = w</span>
+<span id="L51">  <span class="dc">/-- If all correct processes have input `v`, then `v` is their decision. -/</span></span>
+<span id="L52">  <span class="const token" data-verso-hover="490">validity</span> : ∀ (E : <span class="const token" data-verso-hover="8">OmExec</span> P <span class="const token" data-verso-hover="38">Bool</span>) (F : <span class="const token" data-verso-hover="35">Finset</span> P), <span class="const token" data-verso-hover="10">CrashAdm</span> E F → F.<span class="const token" data-verso-hover="44">card</span> ≤ f →</span>
+<span id="L53">    ∀ v, (∀ p ∉ F, E.<span class="const token" data-verso-hover="491">inp</span> p = v) → ∀ p ∉ F, ∀ w, E.<span class="const token" data-verso-hover="488">Decides</span> A p w → w = v</span>
+<span id="L54"></span>
+<span id="L55"><span class="dc">/-- `E'` extends the prefix of `E` before time `k` (the paper's "`E'` extends the run `r`"): same</span></span>
+<span id="L56"><span class="dc">inputs and the same deliveries at all times `&lt; k`. -/</span></span>
+<span id="L57"><span class="kw">def</span> <span class="const token" data-verso-hover="492">Extends</span> (E' E : <span class="const token" data-verso-hover="8">OmExec</span> P VI) (k : <span class="const token" data-verso-hover="31">ℕ</span>) : <span class="kw">Prop</span> :=</span>
+<span id="L58">  E'.<span class="const token" data-verso-hover="491">inp</span> = E.<span class="const token" data-verso-hover="491">inp</span> ∧ ∀ τ &lt; k, E'.<span class="const token" data-verso-hover="485">ok</span> τ = E.<span class="const token" data-verso-hover="485">ok</span> τ</span>
+<span id="L59"></span>
+<span id="L60"><span class="dc">/-- The prefix of `E` before time `k` is **univalent**: some `v` is the only value decided by</span></span>
+<span id="L61"><span class="dc">correct processes in all admissible executions extending it. -/</span></span>
+<span id="L62"><span class="kw">def</span> <span class="const token" data-verso-hover="493">UnivalentAt</span> (A : <span class="const token" data-verso-hover="250">Algorithm</span> P M S <span class="const token" data-verso-hover="38">Bool</span> <span class="const token" data-verso-hover="38">Bool</span>) (f k : <span class="const token" data-verso-hover="31">ℕ</span>) (E : <span class="const token" data-verso-hover="8">OmExec</span> P <span class="const token" data-verso-hover="38">Bool</span>) : <span class="kw">Prop</span> :=</span>
+<span id="L63">  ∃ v, ∀ (E' : <span class="const token" data-verso-hover="8">OmExec</span> P <span class="const token" data-verso-hover="38">Bool</span>) (F' : <span class="const token" data-verso-hover="35">Finset</span> P), <span class="const token" data-verso-hover="10">CrashAdm</span> E' F' → F'.<span class="const token" data-verso-hover="44">card</span> ≤ f → <span class="const token" data-verso-hover="492">Extends</span> E' E k →</span>
+<span id="L64">    ∀ p ∉ F', ∀ w, E'.<span class="const token" data-verso-hover="488">Decides</span> A p w → w = v</span>
+<span id="L65"></span>
+<span id="L66"><span class="dc">/-- The first phase (times `&lt; t*`) of `A` **reaches univalency**: the prefix before `t*` of every</span></span>
+<span id="L67"><span class="dc">admissible execution is univalent. -/</span></span>
+<span id="L68"><span class="kw">def</span> <span class="const token" data-verso-hover="494">ReachesUnivalency</span> (A : <span class="const token" data-verso-hover="250">Algorithm</span> P M S <span class="const token" data-verso-hover="38">Bool</span> <span class="const token" data-verso-hover="38">Bool</span>) (f tstar : <span class="const token" data-verso-hover="31">ℕ</span>) : <span class="kw">Prop</span> :=</span>
+<span id="L69">  ∀ (E : <span class="const token" data-verso-hover="8">OmExec</span> P <span class="const token" data-verso-hover="38">Bool</span>) (F : <span class="const token" data-verso-hover="35">Finset</span> P), <span class="const token" data-verso-hover="10">CrashAdm</span> E F → F.<span class="const token" data-verso-hover="44">card</span> ≤ f → <span class="const token" data-verso-hover="493">UnivalentAt</span> A f tstar E</span>
+<span id="L70"></span>
+<span id="L71"><span class="dc">/-- The fault-free execution with all inputs equal to `b`. -/</span></span>
+<span id="L72"><span class="kw">abbrev</span> <span class="const token" data-verso-hover="495">ffExec</span> (b : <span class="const token" data-verso-hover="38">Bool</span>) : <span class="const token" data-verso-hover="8">OmExec</span> P <span class="const token" data-verso-hover="38">Bool</span> := <span class="const token" data-verso-hover="26">OmExec.ff</span> <span class="kw">fun</span> _ =&gt; b</span>
+<span id="L73"></span>
+<span id="L74"><span class="dc">/-- Processes that send a message to, or receive a message from, another process at some time</span></span>
+<span id="L75"><span class="dc">`&lt; k` in `E` (non-empty batches; in fault-free executions every batch is delivered). -/</span></span>
+<span id="L76"><span class="kw">def</span> <span class="const token" data-verso-hover="496">active</span> {VO : <span class="kw">Type</span>*} (A : <span class="const token" data-verso-hover="250">Algorithm</span> P M S VI VO) (E : <span class="const token" data-verso-hover="8">OmExec</span> P VI) (k : <span class="const token" data-verso-hover="31">ℕ</span>) : <span class="const token" data-verso-hover="35">Finset</span> P :=</span>
+<span id="L77">  <span class="const token" data-verso-hover="41">univ</span>.<span class="const token" data-verso-hover="42">filter</span> <span class="kw">fun</span> p =&gt; ∃ τ &lt; k, ∃ q, q ≠ p ∧</span>
+<span id="L78">    (A.<span class="const token" data-verso-hover="278">send</span> p (E.<span class="const token" data-verso-hover="279">st</span> A τ p) q ≠ [] ∨ A.<span class="const token" data-verso-hover="278">send</span> q (E.<span class="const token" data-verso-hover="279">st</span> A τ q) p ≠ [])</span>
+<span id="L79"></span>
+<span id="L80"><span class="kw">section</span> proof</span>
+<span id="L81"></span>
+<span id="L82"><span class="kw">variable</span> {A : <span class="const token" data-verso-hover="250">Algorithm</span> P M S <span class="const token" data-verso-hover="38">Bool</span> <span class="const token" data-verso-hover="38">Bool</span>} {f tstar : <span class="const token" data-verso-hover="31">ℕ</span>}</span>
+<span id="L83"></span>
+<span id="L84"><span class="dc">/-- Executions of the proof: the processes of `Z` crash at time `0` sending nothing; optionally the</span></span>
+<span id="L85"><span class="dc">process `x` crashes at time `t*` sending nothing. -/</span></span>
+<span id="L86"><span class="kw">def</span> <span class="const token" data-verso-hover="497">zExec</span> (Z : <span class="const token" data-verso-hover="35">Finset</span> P) (inp : P → <span class="const token" data-verso-hover="38">Bool</span>) (x : <span class="const token" data-verso-hover="37">Option</span> P) (tstar : <span class="const token" data-verso-hover="31">ℕ</span>) : <span class="const token" data-verso-hover="8">OmExec</span> P <span class="const token" data-verso-hover="38">Bool</span> <span class="kw">where</span></span>
+<span id="L87">  <span class="const token" data-verso-hover="491">inp</span> := inp</span>
+<span id="L88">  <span class="const token" data-verso-hover="485">ok</span> τ q p := !<span class="const token" data-verso-hover="213">decide</span> (q ≠ p ∧ (q ∈ Z ∨ (x = <span class="const token" data-verso-hover="72">some</span> q ∧ tstar ≤ τ)))</span>
+<span id="L89"></span>
+<span id="L90"><span class="kw">omit</span> [<span class="const token" data-verso-hover="248">Fintype</span> P] <span class="kw">in</span></span>
+<span id="L91"><span class="kw">lemma</span> <span class="const token" data-verso-hover="498">zExec_crashAdm</span> (Z : <span class="const token" data-verso-hover="35">Finset</span> P) (inp : P → <span class="const token" data-verso-hover="38">Bool</span>) (x : <span class="const token" data-verso-hover="37">Option</span> P) :</span>
+<span id="L92">    <span class="const token" data-verso-hover="10">CrashAdm</span> (<span class="const token" data-verso-hover="497">zExec</span> Z inp x tstar) (<span class="kw">match</span> x <span class="kw">with</span> | <span class="const token" data-verso-hover="11">none</span> =&gt; Z | <span class="const token" data-verso-hover="72">some</span> x =&gt; <span class="const token" data-verso-hover="298">insert</span> x Z) := <span class="kw">by</span></span>
+<span id="L93">  <span class="kw">intro</span> τ q p h</span>
+<span id="L94">  <span class="kw">simp</span> only [<span class="const token" data-verso-hover="497">zExec</span>, <span class="const token" data-verso-hover="265">Bool.not_eq_eq_eq_not</span>, <span class="const token" data-verso-hover="88">Bool.not_false</span>, <span class="const token" data-verso-hover="266">decide_eq_true_eq</span>] <span class="kw">at</span> h</span>
+<span id="L95">  <span class="kw">obtain</span> ⟨hqp, h⟩ := h</span>
+<span id="L96">  <span class="kw">refine</span> ⟨hqp, ?_, <span class="kw">fun</span> τ' hτ' p' hp' =&gt; ?_⟩</span>
+<span id="L97">  · <span class="kw">rcases</span> h <span class="kw">with</span> h | ⟨<span class="kw">rfl</span>, -⟩</span>
+<span id="L98">    · <span class="kw">cases</span> x &lt;;&gt; <span class="kw">simp</span> [h]</span>
+<span id="L99">    · <span class="kw">simp</span></span>
+<span id="L100">  · <span class="kw">simp</span> only [<span class="const token" data-verso-hover="497">zExec</span>, <span class="const token" data-verso-hover="265">Bool.not_eq_eq_eq_not</span>, <span class="const token" data-verso-hover="88">Bool.not_false</span>, <span class="const token" data-verso-hover="266">decide_eq_true_eq</span>]</span>
+<span id="L101">    <span class="kw">exact</span> ⟨<span class="const token" data-verso-hover="301">Ne.symm</span> hp', h.<span class="const token" data-verso-hover="499">imp</span> <span class="const token" data-verso-hover="500">id</span> <span class="kw">fun</span> h =&gt; ⟨h.<span class="const token" data-verso-hover="55">1</span>, <span class="kw">by</span> <span class="kw">omega</span>⟩⟩</span>
+<span id="L102"></span>
+<span id="L103"><span class="dc">/-- Processes outside `Z := active(all-0) ∪ active(all-1)` behave, before `t*`, exactly as in the</span></span>
+<span id="L104"><span class="dc">fault-free execution with uniform input equal to their own input, as long as `Z` is silent. -/</span></span>
+<span id="L105"><span class="kw">lemma</span> <span class="const token" data-verso-hover="501">st_eq_ff</span> (Z : <span class="const token" data-verso-hover="35">Finset</span> P) (hZ : <span class="const token" data-verso-hover="496">active</span> A (<span class="const token" data-verso-hover="495">ffExec</span> <span class="const token" data-verso-hover="59">false</span>) tstar ∪ <span class="const token" data-verso-hover="496">active</span> A (<span class="const token" data-verso-hover="495">ffExec</span> <span class="const token" data-verso-hover="58">true</span>) tstar ⊆ Z)</span>
+<span id="L106">    (E : <span class="const token" data-verso-hover="8">OmExec</span> P <span class="const token" data-verso-hover="38">Bool</span>) (hsil : ∀ τ q p, q ∈ Z → q ≠ p → E.<span class="const token" data-verso-hover="485">ok</span> τ q p = <span class="const token" data-verso-hover="59">false</span>)</span>
+<span id="L107">    (hself : ∀ τ q, E.<span class="const token" data-verso-hover="485">ok</span> τ q q = <span class="const token" data-verso-hover="58">true</span>) (hout : ∀ τ q p, q ∉ Z → E.<span class="const token" data-verso-hover="485">ok</span> τ q p = <span class="const token" data-verso-hover="58">true</span>) :</span>
+<span id="L108">    ∀ τ ≤ tstar, ∀ r ∉ Z, E.<span class="const token" data-verso-hover="279">st</span> A τ r = (<span class="const token" data-verso-hover="495">ffExec</span> (E.<span class="const token" data-verso-hover="491">inp</span> r)).<span class="const token" data-verso-hover="279">st</span> A τ r := <span class="kw">by</span></span>
+<span id="L109">  <span class="cm">--</span><span class="cm"> outside `Z`, nobody sends or receives anything before `t*` in the uniform executions</span></span>
+<span id="L110">  <span class="kw">have</span> quiet : ∀ b : <span class="const token" data-verso-hover="38">Bool</span>, ∀ τ &lt; tstar, ∀ r ∉ Z, ∀ q, q ≠ r →</span>
+<span id="L111">      A.<span class="const token" data-verso-hover="278">send</span> r ((<span class="const token" data-verso-hover="495">ffExec</span> b).<span class="const token" data-verso-hover="279">st</span> A τ r) q = [] ∧ A.<span class="const token" data-verso-hover="278">send</span> q ((<span class="const token" data-verso-hover="495">ffExec</span> b).<span class="const token" data-verso-hover="279">st</span> A τ q) r = [] := <span class="kw">by</span></span>
+<span id="L112">    <span class="kw">intro</span> b τ hτ r hr q hq</span>
+<span id="L113">    <span class="kw">have</span> hna : r ∉ <span class="const token" data-verso-hover="496">active</span> A (<span class="const token" data-verso-hover="495">ffExec</span> b) tstar := <span class="kw">fun</span> h =&gt;</span>
+<span id="L114">      hr (hZ (<span class="kw">by</span> <span class="kw">cases</span> b &lt;;&gt; <span class="kw">simp</span> [h]))</span>
+<span id="L115">    <span class="kw">simp</span> only [<span class="const token" data-verso-hover="496">active</span>, <span class="const token" data-verso-hover="46">mem_filter</span>, <span class="const token" data-verso-hover="47">mem_univ</span>, <span class="const token" data-verso-hover="48">true_and</span>, <span class="const token" data-verso-hover="502">not_exists</span>, <span class="const token" data-verso-hover="193">not_and</span>, <span class="const token" data-verso-hover="211">not_or</span>,</span>
+<span id="L116">      <span class="const token" data-verso-hover="194">not_not</span>] <span class="kw">at</span> hna</span>
+<span id="L117">    <span class="kw">exact</span> hna τ hτ q hq</span>
+<span id="L118">  <span class="kw">intro</span> τ</span>
+<span id="L119">  <span class="kw">induction</span> τ <span class="kw">with</span></span>
+<span id="L120">  | <span class="const token" data-verso-hover="503">zero</span> =&gt; <span class="kw">intro</span> _ r _; <span class="kw">rfl</span></span>
+<span id="L121">  | <span class="const token" data-verso-hover="504">succ</span> τ ih =&gt;</span>
+<span id="L122">    <span class="kw">intro</span> hτ r hr</span>
+<span id="L123">    <span class="kw">rw</span> [<span class="const token" data-verso-hover="505">OmExec.st_succ</span>, <span class="const token" data-verso-hover="505">OmExec.st_succ</span>, ih (<span class="kw">by</span> <span class="kw">omega</span>) r hr]</span>
+<span id="L124">    <span class="kw">congr</span> <span class="nu">1</span></span>
+<span id="L125">    <span class="kw">funext</span> q</span>
+<span id="L126">    <span class="kw">unfold</span> <span class="const token" data-verso-hover="251">OmExec.inbox</span></span>
+<span id="L127">    <span class="kw">by_cases</span> hqr : q = r</span>
+<span id="L128">    · <span class="kw">subst</span> hqr</span>
+<span id="L129">      <span class="kw">simp</span> [hself, <span class="const token" data-verso-hover="495">ffExec</span>, ih (<span class="kw">by</span> <span class="kw">omega</span>) q hr]</span>
+<span id="L130">    · <span class="kw">have</span> h2 := (quiet (E.<span class="const token" data-verso-hover="491">inp</span> r) τ (<span class="kw">by</span> <span class="kw">omega</span>) r hr q hqr).<span class="const token" data-verso-hover="56">2</span></span>
+<span id="L131">      <span class="kw">have</span> hff : (<span class="const token" data-verso-hover="495">ffExec</span> (P := P) (E.<span class="const token" data-verso-hover="491">inp</span> r)).<span class="const token" data-verso-hover="485">ok</span> τ q r = <span class="const token" data-verso-hover="58">true</span> := <span class="const token" data-verso-hover="186">rfl</span></span>
+<span id="L132">      <span class="kw">simp</span> only [hff, ↓<span class="const token" data-verso-hover="52">reduceIte</span>, h2]</span>
+<span id="L133">      <span class="kw">by_cases</span> hqZ : q ∈ Z</span>
+<span id="L134">      · <span class="kw">simp</span> [hsil τ q r hqZ hqr]</span>
+<span id="L135">      · <span class="kw">simp</span> only [hout τ q r hqZ, ↓<span class="const token" data-verso-hover="52">reduceIte</span>, ih (<span class="kw">by</span> <span class="kw">omega</span>) q hqZ]</span>
+<span id="L136">        <span class="kw">exact</span> (quiet (E.<span class="const token" data-verso-hover="491">inp</span> q) τ (<span class="kw">by</span> <span class="kw">omega</span>) q hqZ r (<span class="const token" data-verso-hover="301">Ne.symm</span> hqr)).<span class="const token" data-verso-hover="55">1</span></span>
+<span id="L137"></span>
+<span id="L138"><span class="kw">end</span> proof</span>
+<span id="L139"></span>
+<span id="L140"><span class="dc">/-- **Appendix B** of the paper. If `A` solves binary BA with `f &lt; n` crash faults and its first</span></span>
+<span id="L141"><span class="dc">phase (times `&lt; t*`) reaches univalency, then at least `f` processes send or receive a message</span></span>
+<span id="L142"><span class="dc">before `t*` in one of the two fault-free executions with uniform inputs.</span></span>
+<span id="L143"><span class="dc">(The paper phrases the contrapositive: "fewer than `f/2` correct processors send or receive a</span></span>
+<span id="L144"><span class="dc">message in every execution of `P₁`" is impossible; only these two executions are needed.) -/</span></span>
+<span id="L145"><span class="kw">theorem</span> <span class="const token" data-verso-hover="14">appendixB</span> (A : <span class="const token" data-verso-hover="250">Algorithm</span> P M S <span class="const token" data-verso-hover="38">Bool</span> <span class="const token" data-verso-hover="38">Bool</span>) {f tstar : <span class="const token" data-verso-hover="31">ℕ</span>} (hf : f &lt; <span class="const token" data-verso-hover="254">Fintype.card</span> P)</span>
+<span id="L146">    (hBA : <span class="const token" data-verso-hover="486">CrashBA</span> f A) (hU : <span class="const token" data-verso-hover="494">ReachesUnivalency</span> A f tstar) :</span>
+<span id="L147">    f ≤ (<span class="const token" data-verso-hover="496">active</span> A (<span class="const token" data-verso-hover="495">ffExec</span> <span class="const token" data-verso-hover="59">false</span>) tstar ∪ <span class="const token" data-verso-hover="496">active</span> A (<span class="const token" data-verso-hover="495">ffExec</span> <span class="const token" data-verso-hover="58">true</span>) tstar).<span class="const token" data-verso-hover="44">card</span> := <span class="kw">by</span></span>
+<span id="L148">  <span class="kw">classical</span></span>
+<span id="L149">  <span class="kw">obtain</span> ⟨Z, hZdef⟩ : ∃ Z, Z = <span class="const token" data-verso-hover="496">active</span> A (<span class="const token" data-verso-hover="495">ffExec</span> <span class="const token" data-verso-hover="59">false</span>) tstar ∪ <span class="const token" data-verso-hover="496">active</span> A (<span class="const token" data-verso-hover="495">ffExec</span> <span class="const token" data-verso-hover="58">true</span>) tstar :=</span>
+<span id="L150">    ⟨_, <span class="const token" data-verso-hover="186">rfl</span>⟩</span>
+<span id="L151">  <span class="kw">rw</span> [← hZdef]</span>
+<span id="L152">  <span class="kw">by_contra</span> hlt</span>
+<span id="L153">  push <span class="const token" data-verso-hover="169">Not</span> <span class="kw">at</span> hlt</span>
+<span id="L154">  <span class="kw">set</span> O := <span class="const token" data-verso-hover="41">univ</span> \ Z <span class="kw">with</span> hO</span>
+<span id="L155">  <span class="kw">have</span> hOcard : O.<span class="const token" data-verso-hover="44">card</span> + Z.<span class="const token" data-verso-hover="44">card</span> = <span class="const token" data-verso-hover="254">Fintype.card</span> P := <span class="kw">by</span></span>
+<span id="L156">    <span class="kw">rw</span> [hO, <span class="const token" data-verso-hover="306">card_sdiff_of_subset</span> (<span class="const token" data-verso-hover="307">subset_univ</span> _), <span class="const token" data-verso-hover="165">card_univ</span>]</span>
+<span id="L157">    <span class="kw">have</span> := <span class="const token" data-verso-hover="61">card_le_univ</span> Z</span>
+<span id="L158">    <span class="kw">omega</span></span>
+<span id="L159">  <span class="cm">--</span><span class="cm"> the executions `E_S`: inputs `1` exactly on `S ⊆ O`, `Z` crashed at time `0`</span></span>
+<span id="L160">  <span class="kw">let</span> ES : <span class="const token" data-verso-hover="35">Finset</span> P → <span class="const token" data-verso-hover="8">OmExec</span> P <span class="const token" data-verso-hover="38">Bool</span> := <span class="kw">fun</span> S =&gt; <span class="const token" data-verso-hover="497">zExec</span> Z (<span class="kw">fun</span> p =&gt; <span class="const token" data-verso-hover="213">decide</span> (p ∈ S)) <span class="const token" data-verso-hover="11">none</span> tstar</span>
+<span id="L161">  <span class="kw">have</span> hESadm : ∀ S, <span class="const token" data-verso-hover="10">CrashAdm</span> (ES S) Z := <span class="kw">fun</span> S =&gt; <span class="const token" data-verso-hover="498">zExec_crashAdm</span> (tstar := tstar) Z _ <span class="const token" data-verso-hover="11">none</span></span>
+<span id="L162">  <span class="kw">have</span> hval : ∀ S, <span class="const token" data-verso-hover="493">UnivalentAt</span> A f tstar (ES S) := <span class="kw">fun</span> S =&gt; hU _ Z (hESadm S) hlt.<span class="const token" data-verso-hover="110">le</span></span>
+<span id="L163">  <span class="kw">choose</span> v hv <span class="kw">using</span> hval</span>
+<span id="L164">  <span class="cm">--</span><span class="cm"> generic facts on the executions `zExec Z inp x`</span></span>
+<span id="L165">  <span class="kw">have</span> props : ∀ (inp : P → <span class="const token" data-verso-hover="38">Bool</span>) (x : <span class="const token" data-verso-hover="37">Option</span> P),</span>
+<span id="L166">      (∀ τ q p, q ∈ Z → q ≠ p → (<span class="const token" data-verso-hover="497">zExec</span> Z inp x tstar).<span class="const token" data-verso-hover="485">ok</span> τ q p = <span class="const token" data-verso-hover="59">false</span>) ∧</span>
+<span id="L167">      (∀ τ q, (<span class="const token" data-verso-hover="497">zExec</span> Z inp x tstar).<span class="const token" data-verso-hover="485">ok</span> τ q q = <span class="const token" data-verso-hover="58">true</span>) := <span class="kw">by</span></span>
+<span id="L168">    <span class="kw">intro</span> inp x</span>
+<span id="L169">    <span class="kw">refine</span> ⟨<span class="kw">fun</span> τ q p hq hqp =&gt; ?_, <span class="kw">fun</span> τ q =&gt; ?_⟩</span>
+<span id="L170">    · <span class="kw">simp</span> [<span class="const token" data-verso-hover="497">zExec</span>, hq, hqp]</span>
+<span id="L171">    · <span class="kw">simp</span> [<span class="const token" data-verso-hover="497">zExec</span>]</span>
+<span id="L172">  <span class="cm">--</span><span class="cm"> before `t*`, processes outside `Z` are in the same state as in a uniform execution</span></span>
+<span id="L173">  <span class="kw">have</span> early : ∀ (inp : P → <span class="const token" data-verso-hover="38">Bool</span>) (x : <span class="const token" data-verso-hover="37">Option</span> P), ∀ τ ≤ tstar, ∀ r ∉ Z,</span>
+<span id="L174">      (<span class="const token" data-verso-hover="497">zExec</span> Z inp x tstar).<span class="const token" data-verso-hover="279">st</span> A τ r = (<span class="const token" data-verso-hover="495">ffExec</span> (inp r)).<span class="const token" data-verso-hover="279">st</span> A τ r := <span class="kw">by</span></span>
+<span id="L175">    <span class="kw">intro</span> inp x τ hτ r hr</span>
+<span id="L176">    <span class="cm">--</span><span class="cm"> the prefix before `t*` does not depend on the crash of `x` at `t*`</span></span>
+<span id="L177">    <span class="kw">have</span> hpre : ∀ τ ≤ tstar, ∀ r, (<span class="const token" data-verso-hover="497">zExec</span> Z inp x tstar).<span class="const token" data-verso-hover="279">st</span> A τ r =</span>
+<span id="L178">        (<span class="const token" data-verso-hover="497">zExec</span> Z inp <span class="const token" data-verso-hover="11">none</span> tstar).<span class="const token" data-verso-hover="279">st</span> A τ r := <span class="kw">by</span></span>
+<span id="L179">      <span class="kw">intro</span> τ hτ</span>
+<span id="L180">      <span class="kw">induction</span> τ <span class="kw">with</span></span>
+<span id="L181">      | <span class="const token" data-verso-hover="503">zero</span> =&gt; <span class="kw">intro</span> r; <span class="kw">rfl</span></span>
+<span id="L182">      | <span class="const token" data-verso-hover="504">succ</span> τ ih =&gt;</span>
+<span id="L183">        <span class="kw">intro</span> r</span>
+<span id="L184">        <span class="kw">rw</span> [<span class="const token" data-verso-hover="505">OmExec.st_succ</span>, <span class="const token" data-verso-hover="505">OmExec.st_succ</span>]</span>
+<span id="L185">        <span class="kw">have</span> ih' := ih (<span class="kw">by</span> <span class="kw">omega</span>)</span>
+<span id="L186">        <span class="kw">rw</span> [ih' r]</span>
+<span id="L187">        <span class="kw">congr</span> <span class="nu">1</span></span>
+<span id="L188">        <span class="kw">funext</span> q</span>
+<span id="L189">        <span class="kw">unfold</span> <span class="const token" data-verso-hover="251">OmExec.inbox</span></span>
+<span id="L190">        <span class="kw">have</span> : (<span class="const token" data-verso-hover="497">zExec</span> Z inp x tstar).<span class="const token" data-verso-hover="485">ok</span> τ q r = (<span class="const token" data-verso-hover="497">zExec</span> Z inp <span class="const token" data-verso-hover="11">none</span> tstar).<span class="const token" data-verso-hover="485">ok</span> τ q r := <span class="kw">by</span></span>
+<span id="L191">          <span class="kw">simp</span> only [<span class="const token" data-verso-hover="497">zExec</span>]</span>
+<span id="L192">          <span class="kw">congr</span> <span class="nu">2</span></span>
+<span id="L193">          <span class="kw">apply</span> <span class="const token" data-verso-hover="22">propext</span></span>
+<span id="L194">          <span class="kw">constructor</span></span>
+<span id="L195">          · <span class="kw">rintro</span> ⟨h1, h2 | ⟨-, h3⟩⟩</span>
+<span id="L196">            · <span class="kw">exact</span> ⟨h1, <span class="const token" data-verso-hover="53">Or.inl</span> h2⟩</span>
+<span id="L197">            · <span class="kw">omega</span></span>
+<span id="L198">          · <span class="kw">rintro</span> ⟨h1, h2 | ⟨h3, -⟩⟩</span>
+<span id="L199">            · <span class="kw">exact</span> ⟨h1, <span class="const token" data-verso-hover="53">Or.inl</span> h2⟩</span>
+<span id="L200">            · <span class="kw">simp</span> <span class="kw">at</span> h3</span>
+<span id="L201">        <span class="kw">rw</span> [this, ih' q]</span>
+<span id="L202">    <span class="kw">rw</span> [hpre τ hτ r]</span>
+<span id="L203">    <span class="kw">refine</span> <span class="const token" data-verso-hover="501">st_eq_ff</span> Z hZdef.<span class="const token" data-verso-hover="328">symm</span>.<span class="const token" data-verso-hover="506">subset</span> _ (props inp <span class="const token" data-verso-hover="11">none</span>).<span class="const token" data-verso-hover="55">1</span> (props inp <span class="const token" data-verso-hover="11">none</span>).<span class="const token" data-verso-hover="56">2</span> ?_ τ hτ r hr</span>
+<span id="L204">    <span class="kw">intro</span> τ q p hq</span>
+<span id="L205">    <span class="kw">simp</span> [<span class="const token" data-verso-hover="497">zExec</span>, hq]</span>
+<span id="L206">  <span class="cm">--</span><span class="cm"> outside `Z`, nobody sends to another process before `t*`</span></span>
+<span id="L207">  <span class="kw">have</span> quiet : ∀ (inp : P → <span class="const token" data-verso-hover="38">Bool</span>) (x : <span class="const token" data-verso-hover="37">Option</span> P), ∀ τ &lt; tstar, ∀ r ∉ Z, ∀ q, q ≠ r →</span>
+<span id="L208">      A.<span class="const token" data-verso-hover="278">send</span> r ((<span class="const token" data-verso-hover="497">zExec</span> Z inp x tstar).<span class="const token" data-verso-hover="279">st</span> A τ r) q = [] := <span class="kw">by</span></span>
+<span id="L209">    <span class="kw">intro</span> inp x τ hτ r hr q hq</span>
+<span id="L210">    <span class="kw">rw</span> [early inp x τ hτ.<span class="const token" data-verso-hover="110">le</span> r hr]</span>
+<span id="L211">    <span class="kw">have</span> hna : r ∉ <span class="const token" data-verso-hover="496">active</span> A (<span class="const token" data-verso-hover="495">ffExec</span> (inp r)) tstar := <span class="kw">fun</span> h =&gt; <span class="kw">by</span></span>
+<span id="L212">      <span class="kw">apply</span> hr</span>
+<span id="L213">      <span class="kw">rw</span> [hZdef]</span>
+<span id="L214">      <span class="kw">cases</span> hb : inp r &lt;;&gt; <span class="kw">rw</span> [hb] <span class="kw">at</span> h &lt;;&gt; <span class="kw">simp</span> [h]</span>
+<span id="L215">    <span class="kw">simp</span> only [<span class="const token" data-verso-hover="496">active</span>, <span class="const token" data-verso-hover="46">mem_filter</span>, <span class="const token" data-verso-hover="47">mem_univ</span>, <span class="const token" data-verso-hover="48">true_and</span>, <span class="const token" data-verso-hover="502">not_exists</span>, <span class="const token" data-verso-hover="193">not_and</span>, <span class="const token" data-verso-hover="211">not_or</span>,</span>
+<span id="L216">      <span class="const token" data-verso-hover="194">not_not</span>] <span class="kw">at</span> hna</span>
+<span id="L217">    <span class="kw">exact</span> (hna τ hτ q hq).<span class="const token" data-verso-hover="55">1</span></span>
+<span id="L218">  <span class="cm">--</span><span class="cm"> key step: adding one process of `O` to `S` does not change the valency</span></span>
+<span id="L219">  <span class="kw">have</span> step : ∀ S ⊆ O, ∀ x ∈ O, x ∉ S → v S = v (<span class="const token" data-verso-hover="298">insert</span> x S) := <span class="kw">by</span></span>
+<span id="L220">    <span class="kw">intro</span> S hS x hxO hxS</span>
+<span id="L221">    <span class="kw">have</span> hxZ : x ∉ Z := (<span class="const token" data-verso-hover="163">mem_sdiff</span>.<span class="const token" data-verso-hover="67">mp</span> hxO).<span class="const token" data-verso-hover="56">2</span></span>
+<span id="L222">    <span class="cm">--</span><span class="cm"> a correct process other than `x`</span></span>
+<span id="L223">    <span class="kw">obtain</span> ⟨r, hr⟩ : ∃ r, r ∉ <span class="const token" data-verso-hover="298">insert</span> x Z := <span class="kw">by</span></span>
+<span id="L224">      <span class="kw">by_contra</span> h</span>
+<span id="L225">      push <span class="const token" data-verso-hover="169">Not</span> <span class="kw">at</span> h</span>
+<span id="L226">      <span class="kw">have</span> : (<span class="const token" data-verso-hover="298">insert</span> x Z).<span class="const token" data-verso-hover="44">card</span> = <span class="const token" data-verso-hover="254">Fintype.card</span> P := <span class="kw">by</span></span>
+<span id="L227">        <span class="kw">rw</span> [← <span class="const token" data-verso-hover="165">card_univ</span>]; <span class="kw">congr</span> <span class="nu">1</span>; <span class="kw">ext</span> p; <span class="kw">simp</span> [h p]</span>
+<span id="L228">      <span class="kw">have</span> := <span class="const token" data-verso-hover="299">card_insert_le</span> x Z</span>
+<span id="L229">      <span class="kw">omega</span></span>
+<span id="L230">    <span class="kw">have</span> hrZ : r ∉ Z := <span class="kw">fun</span> h =&gt; hr (<span class="const token" data-verso-hover="507">mem_insert_of_mem</span> h)</span>
+<span id="L231">    <span class="kw">have</span> hrx : r ≠ x := <span class="kw">fun</span> h =&gt; hr (h ▸ <span class="const token" data-verso-hover="508">mem_insert_self</span> _ _)</span>
+<span id="L232">    <span class="kw">let</span> E₁ := <span class="const token" data-verso-hover="497">zExec</span> Z (<span class="kw">fun</span> p =&gt; <span class="const token" data-verso-hover="213">decide</span> (p ∈ S)) (<span class="const token" data-verso-hover="72">some</span> x) tstar</span>
+<span id="L233">    <span class="kw">let</span> E₂ := <span class="const token" data-verso-hover="497">zExec</span> Z (<span class="kw">fun</span> p =&gt; <span class="const token" data-verso-hover="213">decide</span> (p ∈ <span class="const token" data-verso-hover="298">insert</span> x S)) (<span class="const token" data-verso-hover="72">some</span> x) tstar</span>
+<span id="L234">    <span class="kw">have</span> hadm₁ : <span class="const token" data-verso-hover="10">CrashAdm</span> E₁ (<span class="const token" data-verso-hover="298">insert</span> x Z) := <span class="const token" data-verso-hover="498">zExec_crashAdm</span> Z _ (<span class="const token" data-verso-hover="72">some</span> x)</span>
+<span id="L235">    <span class="kw">have</span> hadm₂ : <span class="const token" data-verso-hover="10">CrashAdm</span> E₂ (<span class="const token" data-verso-hover="298">insert</span> x Z) := <span class="const token" data-verso-hover="498">zExec_crashAdm</span> Z _ (<span class="const token" data-verso-hover="72">some</span> x)</span>
+<span id="L236">    <span class="kw">have</span> hcard : (<span class="const token" data-verso-hover="298">insert</span> x Z).<span class="const token" data-verso-hover="44">card</span> ≤ f := (<span class="const token" data-verso-hover="299">card_insert_le</span> x Z).<span class="const token" data-verso-hover="62">trans</span> (<span class="kw">by</span> <span class="kw">omega</span>)</span>
+<span id="L237">    <span class="kw">have</span> hext₁ : <span class="const token" data-verso-hover="492">Extends</span> E₁ (ES S) tstar := <span class="kw">by</span></span>
+<span id="L238">      <span class="kw">refine</span> ⟨<span class="const token" data-verso-hover="186">rfl</span>, <span class="kw">fun</span> τ hτ =&gt; ?_⟩</span>
+<span id="L239">      <span class="kw">funext</span> q p</span>
+<span id="L240">      <span class="kw">simp</span> only [E₁, ES, <span class="const token" data-verso-hover="497">zExec</span>]</span>
+<span id="L241">      <span class="kw">congr</span> <span class="nu">2</span>; <span class="kw">apply</span> <span class="const token" data-verso-hover="22">propext</span></span>
+<span id="L242">      <span class="kw">constructor</span></span>
+<span id="L243">      · <span class="kw">rintro</span> ⟨h1, h2 | ⟨-, h3⟩⟩</span>
+<span id="L244">        · <span class="kw">exact</span> ⟨h1, <span class="const token" data-verso-hover="53">Or.inl</span> h2⟩</span>
+<span id="L245">        · <span class="kw">omega</span></span>
+<span id="L246">      · <span class="kw">rintro</span> ⟨h1, h2 | ⟨h3, -⟩⟩</span>
+<span id="L247">        · <span class="kw">exact</span> ⟨h1, <span class="const token" data-verso-hover="53">Or.inl</span> h2⟩</span>
+<span id="L248">        · <span class="kw">simp</span> <span class="kw">at</span> h3</span>
+<span id="L249">    <span class="kw">have</span> hext₂ : <span class="const token" data-verso-hover="492">Extends</span> E₂ (ES (<span class="const token" data-verso-hover="298">insert</span> x S)) tstar := <span class="kw">by</span></span>
+<span id="L250">      <span class="kw">refine</span> ⟨<span class="const token" data-verso-hover="186">rfl</span>, <span class="kw">fun</span> τ hτ =&gt; ?_⟩</span>
+<span id="L251">      <span class="kw">funext</span> q p</span>
+<span id="L252">      <span class="kw">simp</span> only [E₂, ES, <span class="const token" data-verso-hover="497">zExec</span>]</span>
+<span id="L253">      <span class="kw">congr</span> <span class="nu">2</span>; <span class="kw">apply</span> <span class="const token" data-verso-hover="22">propext</span></span>
+<span id="L254">      <span class="kw">constructor</span></span>
+<span id="L255">      · <span class="kw">rintro</span> ⟨h1, h2 | ⟨-, h3⟩⟩</span>
+<span id="L256">        · <span class="kw">exact</span> ⟨h1, <span class="const token" data-verso-hover="53">Or.inl</span> h2⟩</span>
+<span id="L257">        · <span class="kw">omega</span></span>
+<span id="L258">      · <span class="kw">rintro</span> ⟨h1, h2 | ⟨h3, -⟩⟩</span>
+<span id="L259">        · <span class="kw">exact</span> ⟨h1, <span class="const token" data-verso-hover="53">Or.inl</span> h2⟩</span>
+<span id="L260">        · <span class="kw">simp</span> <span class="kw">at</span> h3</span>
+<span id="L261">    <span class="cm">--</span><span class="cm"> `r` cannot distinguish `E₁` from `E₂`</span></span>
+<span id="L262">    <span class="kw">have</span> hind : ∀ τ, ∀ p ∈ ({p | p ∉ <span class="const token" data-verso-hover="298">insert</span> x Z} : <span class="const token" data-verso-hover="509">Set</span> P), E₁.<span class="const token" data-verso-hover="279">st</span> A τ p = E₂.<span class="const token" data-verso-hover="279">st</span> A τ p := <span class="kw">by</span></span>
+<span id="L263">      <span class="kw">refine</span> <span class="const token" data-verso-hover="510">OmExec.st_eq_of_inbox_eq</span> (<span class="kw">fun</span> _ =&gt; <span class="const token" data-verso-hover="511">subset_rfl</span>) ?_ ?_</span>
+<span id="L264">      · <span class="kw">intro</span> p hp</span>
+<span id="L265">        <span class="kw">simp</span> only [<span class="const token" data-verso-hover="325">Set.mem_ofPred_eq</span>, <span class="const token" data-verso-hover="300">mem_insert</span>, <span class="const token" data-verso-hover="211">not_or</span>] <span class="kw">at</span> hp</span>
+<span id="L266">        <span class="kw">simp</span> [E₁, E₂, <span class="const token" data-verso-hover="497">zExec</span>, hp.<span class="const token" data-verso-hover="55">1</span>]</span>
+<span id="L267">      · <span class="kw">intro</span> τ hst p hp</span>
+<span id="L268">        <span class="kw">simp</span> only [<span class="const token" data-verso-hover="325">Set.mem_ofPred_eq</span>, <span class="const token" data-verso-hover="300">mem_insert</span>, <span class="const token" data-verso-hover="211">not_or</span>] <span class="kw">at</span> hp</span>
+<span id="L269">        <span class="kw">funext</span> q</span>
+<span id="L270">        <span class="kw">unfold</span> <span class="const token" data-verso-hover="251">OmExec.inbox</span></span>
+<span id="L271">        <span class="kw">by_cases</span> hqp : q = p</span>
+<span id="L272">        · <span class="kw">subst</span> hqp</span>
+<span id="L273">          <span class="kw">rw</span> [(props _ _).<span class="const token" data-verso-hover="56">2</span>, (props _ _).<span class="const token" data-verso-hover="56">2</span>, hst q (<span class="kw">by</span> <span class="kw">simp</span> [hp.<span class="const token" data-verso-hover="55">1</span>, hp.<span class="const token" data-verso-hover="56">2</span>])]</span>
+<span id="L274">        <span class="kw">by_cases</span> hqZ : q ∈ Z</span>
+<span id="L275">        · <span class="kw">rw</span> [(props _ _).<span class="const token" data-verso-hover="55">1</span> τ q p hqZ hqp, (props _ _).<span class="const token" data-verso-hover="55">1</span> τ q p hqZ hqp]</span>
+<span id="L276">          <span class="kw">simp</span></span>
+<span id="L277">        <span class="kw">by_cases</span> hqx : q = x</span>
+<span id="L278">        · <span class="kw">subst</span> hqx</span>
+<span id="L279">          <span class="kw">by_cases</span> hτ : tstar ≤ τ</span>
+<span id="L280">          · <span class="kw">have</span> h1 : E₁.<span class="const token" data-verso-hover="485">ok</span> τ q p = <span class="const token" data-verso-hover="59">false</span> := <span class="kw">by</span> <span class="kw">simp</span> [E₁, <span class="const token" data-verso-hover="497">zExec</span>, hqp, hτ]</span>
+<span id="L281">            <span class="kw">have</span> h2 : E₂.<span class="const token" data-verso-hover="485">ok</span> τ q p = <span class="const token" data-verso-hover="59">false</span> := <span class="kw">by</span> <span class="kw">simp</span> [E₂, <span class="const token" data-verso-hover="497">zExec</span>, hqp, hτ]</span>
+<span id="L282">            <span class="kw">rw</span> [h1, h2]</span>
+<span id="L283">            <span class="kw">simp</span></span>
+<span id="L284">          · push <span class="const token" data-verso-hover="169">Not</span> <span class="kw">at</span> hτ</span>
+<span id="L285">            <span class="kw">rw</span> [quiet _ _ τ hτ q hqZ p (<span class="const token" data-verso-hover="301">Ne.symm</span> hqp), quiet _ _ τ hτ q hqZ p (<span class="const token" data-verso-hover="301">Ne.symm</span> hqp)]</span>
+<span id="L286">            <span class="kw">simp</span></span>
+<span id="L287">        · <span class="kw">have</span> hxq : ¬x = q := <span class="kw">fun</span> h =&gt; hqx h.<span class="const token" data-verso-hover="328">symm</span></span>
+<span id="L288">          <span class="kw">have</span> h1 : E₁.<span class="const token" data-verso-hover="485">ok</span> τ q p = <span class="const token" data-verso-hover="58">true</span> := <span class="kw">by</span> <span class="kw">simp</span> [E₁, <span class="const token" data-verso-hover="497">zExec</span>, hqZ, hxq]</span>
+<span id="L289">          <span class="kw">have</span> h2 : E₂.<span class="const token" data-verso-hover="485">ok</span> τ q p = <span class="const token" data-verso-hover="58">true</span> := <span class="kw">by</span> <span class="kw">simp</span> [E₂, <span class="const token" data-verso-hover="497">zExec</span>, hqZ, hxq]</span>
+<span id="L290">          <span class="kw">simp</span> only [h1, h2, ↓<span class="const token" data-verso-hover="52">reduceIte</span>, hst q (<span class="kw">by</span> <span class="kw">simp</span> [hqZ, hqx])]</span>
+<span id="L291">    <span class="kw">obtain</span> ⟨w, hw⟩ := hBA.<span class="const token" data-verso-hover="487">termination</span> E₁ _ hadm₁ hcard r hr</span>
+<span id="L292">    <span class="kw">have</span> hw₂ : E₂.<span class="const token" data-verso-hover="488">Decides</span> A r w := <span class="kw">by</span></span>
+<span id="L293">      <span class="kw">obtain</span> ⟨τ, hτ⟩ := hw</span>
+<span id="L294">      <span class="kw">exact</span> ⟨τ, <span class="kw">by</span> <span class="kw">rw</span> [← hind τ r hr]; <span class="kw">exact</span> hτ⟩</span>
+<span id="L295">    <span class="kw">have</span> e₁ := hv S E₁ _ hadm₁ hcard hext₁ r hr w hw</span>
+<span id="L296">    <span class="kw">have</span> e₂ := hv (<span class="const token" data-verso-hover="298">insert</span> x S) E₂ _ hadm₂ hcard hext₂ r hr w hw₂</span>
+<span id="L297">    <span class="kw">rw</span> [← e₁, ← e₂]</span>
+<span id="L298">  <span class="cm">--</span><span class="cm"> all valencies are equal ...</span></span>
+<span id="L299">  <span class="kw">have</span> hall : ∀ S ⊆ O, v S = v ∅ := <span class="kw">by</span></span>
+<span id="L300">    <span class="kw">intro</span> S</span>
+<span id="L301">    <span class="kw">induction</span> S <span class="kw">using</span> <span class="const token" data-verso-hover="512">Finset.induction_on</span> <span class="kw">with</span></span>
+<span id="L302">    | <span class="const token" data-verso-hover="513">empty</span> =&gt; <span class="kw">intro</span> _; <span class="kw">rfl</span></span>
+<span id="L303">    | insert x S hxS ih =&gt;</span>
+<span id="L304">      <span class="kw">intro</span> hsub</span>
+<span id="L305">      <span class="kw">rw</span> [← step S ((<span class="const token" data-verso-hover="514">subset_insert</span> x S).<span class="const token" data-verso-hover="62">trans</span> hsub) x (hsub (<span class="const token" data-verso-hover="508">mem_insert_self</span> x S)) hxS]</span>
+<span id="L306">      <span class="kw">exact</span> ih ((<span class="const token" data-verso-hover="514">subset_insert</span> x S).<span class="const token" data-verso-hover="62">trans</span> hsub)</span>
+<span id="L307">  <span class="cm">--</span><span class="cm"> ... but validity forces `v ∅ = false` and `v O = true`</span></span>
+<span id="L308">  <span class="kw">obtain</span> ⟨r, hrO⟩ : O.<span class="const token" data-verso-hover="459">Nonempty</span> := <span class="kw">by</span></span>
+<span id="L309">    <span class="kw">rw</span> [← <span class="const token" data-verso-hover="446">card_pos</span>]; <span class="kw">omega</span></span>
+<span id="L310">  <span class="kw">have</span> hrZ : r ∉ Z := (<span class="const token" data-verso-hover="163">mem_sdiff</span>.<span class="const token" data-verso-hover="67">mp</span> hrO).<span class="const token" data-verso-hover="56">2</span></span>
+<span id="L311">  <span class="kw">have</span> valency : ∀ S ⊆ O, ∀ b : <span class="const token" data-verso-hover="38">Bool</span>, (∀ p ∉ Z, <span class="const token" data-verso-hover="213">decide</span> (p ∈ S) = b) → v S = b := <span class="kw">by</span></span>
+<span id="L312">    <span class="kw">intro</span> S _ b hb</span>
+<span id="L313">    <span class="kw">obtain</span> ⟨w, hw⟩ := hBA.<span class="const token" data-verso-hover="487">termination</span> (ES S) Z (hESadm S) hlt.<span class="const token" data-verso-hover="110">le</span> r hrZ</span>
+<span id="L314">    <span class="kw">have</span> h1 := hBA.<span class="const token" data-verso-hover="490">validity</span> (ES S) Z (hESadm S) hlt.<span class="const token" data-verso-hover="110">le</span> b hb r hrZ w hw</span>
+<span id="L315">    <span class="kw">have</span> h2 := hv S (ES S) Z (hESadm S) hlt.<span class="const token" data-verso-hover="110">le</span> ⟨<span class="const token" data-verso-hover="186">rfl</span>, <span class="kw">fun</span> _ _ =&gt; <span class="const token" data-verso-hover="186">rfl</span>⟩ r hrZ w hw</span>
+<span id="L316">    <span class="kw">rw</span> [← h2, h1]</span>
+<span id="L317">  <span class="kw">have</span> h0 := valency ∅ (<span class="const token" data-verso-hover="317">empty_subset</span> _) <span class="const token" data-verso-hover="59">false</span> (<span class="kw">fun</span> p _ =&gt; <span class="kw">by</span> <span class="kw">simp</span>)</span>
+<span id="L318">  <span class="kw">have</span> h1 := valency O <span class="const token" data-verso-hover="511">subset_rfl</span> <span class="const token" data-verso-hover="58">true</span> (<span class="kw">fun</span> p hp =&gt; <span class="kw">by</span> <span class="kw">simp</span> [hO, hp])</span>
+<span id="L319">  <span class="kw">have</span> := hall O <span class="const token" data-verso-hover="511">subset_rfl</span></span>
+<span id="L320">  <span class="kw">rw</span> [h1, h0] <span class="kw">at</span> this</span>
+<span id="L321">  <span class="kw">exact</span> <span class="const token" data-verso-hover="515">Bool.noConfusion</span> this</span>
+<span id="L322"></span>
+<span id="L323"><span class="dc">/-- Each message has one sender and one receiver: the number of processes that send or receive a</span></span>
+<span id="L324"><span class="dc">message before time `k` is at most twice the number of messages sent before `k`. -/</span></span>
+<span id="L325"><span class="kw">theorem</span> <span class="const token" data-verso-hover="516">card_active_le</span> {VO : <span class="kw">Type</span>*} (A : <span class="const token" data-verso-hover="250">Algorithm</span> P M S VI VO) (E : <span class="const token" data-verso-hover="8">OmExec</span> P VI) (k : <span class="const token" data-verso-hover="31">ℕ</span>) :</span>
+<span id="L326">    (<span class="const token" data-verso-hover="496">active</span> A E k).<span class="const token" data-verso-hover="44">card</span> ≤ <span class="nu">2</span> * E.<span class="const token" data-verso-hover="255">msgsUpTo</span> A ∅ k := <span class="kw">by</span></span>
+<span id="L327">  <span class="kw">classical</span></span>
+<span id="L328">  <span class="kw">let</span> len : <span class="const token" data-verso-hover="31">ℕ</span> → P → P → <span class="const token" data-verso-hover="31">ℕ</span> := <span class="kw">fun</span> τ q p =&gt; (A.<span class="const token" data-verso-hover="278">send</span> q (E.<span class="const token" data-verso-hover="279">st</span> A τ q) p).<span class="const token" data-verso-hover="280">length</span></span>
+<span id="L329">  <span class="cm">--</span><span class="cm"> the message count, summed by sender and by receiver</span></span>
+<span id="L330">  <span class="kw">have</span> hsend : E.<span class="const token" data-verso-hover="255">msgsUpTo</span> A ∅ k = ∑ q : P, ∑ τ ∈ <span class="const token" data-verso-hover="277">range</span> k, ∑ p ∈ <span class="const token" data-verso-hover="41">univ</span>.<span class="const token" data-verso-hover="42">filter</span> (· ≠ q), len τ q p := <span class="kw">by</span></span>
+<span id="L331">    <span class="kw">unfold</span> <span class="const token" data-verso-hover="255">OmExec.msgsUpTo</span></span>
+<span id="L332">    <span class="kw">rw</span> [<span class="const token" data-verso-hover="288">sum_comm</span>]</span>
+<span id="L333">    <span class="kw">simp</span> [len]</span>
+<span id="L334">  <span class="kw">have</span> hrecv : E.<span class="const token" data-verso-hover="255">msgsUpTo</span> A ∅ k = ∑ p : P, ∑ τ ∈ <span class="const token" data-verso-hover="277">range</span> k, ∑ q ∈ <span class="const token" data-verso-hover="41">univ</span>.<span class="const token" data-verso-hover="42">filter</span> (· ≠ p), len τ q p := <span class="kw">by</span></span>
+<span id="L335">    <span class="kw">unfold</span> <span class="const token" data-verso-hover="255">OmExec.msgsUpTo</span></span>
+<span id="L336">    conv_rhs =&gt; <span class="kw">rw</span> [<span class="const token" data-verso-hover="288">sum_comm</span>]</span>
+<span id="L337">    <span class="kw">refine</span> <span class="const token" data-verso-hover="289">sum_congr</span> <span class="const token" data-verso-hover="186">rfl</span> <span class="kw">fun</span> τ _ =&gt; ?_</span>
+<span id="L338">    <span class="kw">rw</span> [<span class="const token" data-verso-hover="290">sum_comm'</span> (t' := <span class="const token" data-verso-hover="41">univ</span>.<span class="const token" data-verso-hover="42">filter</span> (· ∉ (∅ : <span class="const token" data-verso-hover="35">Finset</span> P))) (s' := <span class="kw">fun</span> q =&gt; <span class="const token" data-verso-hover="41">univ</span>.<span class="const token" data-verso-hover="42">filter</span> (· ≠ q))]</span>
+<span id="L339">    · <span class="kw">simp</span> [len]</span>
+<span id="L340">    · <span class="kw">intro</span> p q</span>
+<span id="L341">      <span class="kw">simp</span> [<span class="const token" data-verso-hover="291">ne_comm</span>]</span>
+<span id="L342">  <span class="cm">--</span><span class="cm"> a process with a non-empty batch contributes at least one to the corresponding sum</span></span>
+<span id="L343">  <span class="kw">have</span> one : ∀ (g : P → <span class="const token" data-verso-hover="31">ℕ</span> → P → <span class="const token" data-verso-hover="31">ℕ</span>) (p : P), (∃ τ &lt; k, ∃ q, q ≠ p ∧ g p τ q ≠ <span class="nu">0</span>) →</span>
+<span id="L344">      <span class="nu">1</span> ≤ ∑ τ ∈ <span class="const token" data-verso-hover="277">range</span> k, ∑ q ∈ <span class="const token" data-verso-hover="41">univ</span>.<span class="const token" data-verso-hover="42">filter</span> (· ≠ p), g p τ q := <span class="kw">by</span></span>
+<span id="L345">    <span class="kw">rintro</span> g p ⟨τ, hτ, q, hq, hne⟩</span>
+<span id="L346">    <span class="kw">calc</span> <span class="nu">1</span> ≤ g p τ q := <span class="const token" data-verso-hover="517">Nat.one_le_iff_ne_zero</span>.<span class="const token" data-verso-hover="90">mpr</span> hne</span>
+<span id="L347">      _ ≤ ∑ q ∈ <span class="const token" data-verso-hover="41">univ</span>.<span class="const token" data-verso-hover="42">filter</span> (· ≠ p), g p τ q :=</span>
+<span id="L348">          <span class="const token" data-verso-hover="285">single_le_sum</span> (f := <span class="kw">fun</span> q =&gt; g p τ q) (<span class="kw">fun</span> _ _ =&gt; <span class="const token" data-verso-hover="286">Nat.zero_le</span> _) (<span class="kw">by</span> <span class="kw">simp</span> [hq])</span>
+<span id="L349">      _ ≤ _ := <span class="const token" data-verso-hover="285">single_le_sum</span> (f := <span class="kw">fun</span> τ =&gt; ∑ q ∈ <span class="const token" data-verso-hover="41">univ</span>.<span class="const token" data-verso-hover="42">filter</span> (· ≠ p), g p τ q)</span>
+<span id="L350">          (<span class="kw">fun</span> _ _ =&gt; <span class="const token" data-verso-hover="286">Nat.zero_le</span> _) (<span class="const token" data-verso-hover="287">mem_range</span>.<span class="const token" data-verso-hover="90">mpr</span> hτ)</span>
+<span id="L351">  <span class="kw">let</span> Snd := <span class="const token" data-verso-hover="41">univ</span>.<span class="const token" data-verso-hover="42">filter</span> <span class="kw">fun</span> p =&gt; ∃ τ &lt; k, ∃ q, q ≠ p ∧ len τ p q ≠ <span class="nu">0</span></span>
+<span id="L352">  <span class="kw">let</span> Rcv := <span class="const token" data-verso-hover="41">univ</span>.<span class="const token" data-verso-hover="42">filter</span> <span class="kw">fun</span> p =&gt; ∃ τ &lt; k, ∃ q, q ≠ p ∧ len τ q p ≠ <span class="nu">0</span></span>
+<span id="L353">  <span class="kw">have</span> hsub : <span class="const token" data-verso-hover="496">active</span> A E k ⊆ Snd ∪ Rcv := <span class="kw">by</span></span>
+<span id="L354">    <span class="kw">intro</span> p hp</span>
+<span id="L355">    <span class="kw">simp</span> only [<span class="const token" data-verso-hover="496">active</span>, <span class="const token" data-verso-hover="46">mem_filter</span>, <span class="const token" data-verso-hover="47">mem_univ</span>, <span class="const token" data-verso-hover="48">true_and</span>] <span class="kw">at</span> hp</span>
+<span id="L356">    <span class="kw">obtain</span> ⟨τ, hτ, q, hq, h | h⟩ := hp</span>
+<span id="L357">    · <span class="kw">exact</span> <span class="const token" data-verso-hover="195">mem_union_left</span> _ (<span class="kw">by</span> <span class="kw">simp</span> [Snd, len]; <span class="kw">exact</span> ⟨τ, hτ, q, hq, h⟩)</span>
+<span id="L358">    · <span class="kw">exact</span> <span class="const token" data-verso-hover="196">mem_union_right</span> _ (<span class="kw">by</span> <span class="kw">simp</span> [Rcv, len]; <span class="kw">exact</span> ⟨τ, hτ, q, hq, h⟩)</span>
+<span id="L359">  <span class="kw">have</span> hS : Snd.<span class="const token" data-verso-hover="44">card</span> ≤ E.<span class="const token" data-verso-hover="255">msgsUpTo</span> A ∅ k := <span class="kw">by</span></span>
+<span id="L360">    <span class="kw">rw</span> [hsend, <span class="const token" data-verso-hover="518">card_eq_sum_ones</span>]</span>
+<span id="L361">    <span class="kw">calc</span> ∑ _p ∈ Snd, <span class="nu">1</span> ≤ ∑ p ∈ Snd, ∑ τ ∈ <span class="const token" data-verso-hover="277">range</span> k, ∑ q ∈ <span class="const token" data-verso-hover="41">univ</span>.<span class="const token" data-verso-hover="42">filter</span> (· ≠ p), len τ p q :=</span>
+<span id="L362">          <span class="const token" data-verso-hover="205">sum_le_sum</span> <span class="kw">fun</span> p hp =&gt; one (<span class="kw">fun</span> p τ q =&gt; len τ p q) p (<span class="const token" data-verso-hover="46">mem_filter</span>.<span class="const token" data-verso-hover="67">mp</span> hp).<span class="const token" data-verso-hover="56">2</span></span>
+<span id="L363">      _ ≤ _ := <span class="const token" data-verso-hover="519">sum_le_sum_of_subset</span> (<span class="const token" data-verso-hover="307">subset_univ</span> _)</span>
+<span id="L364">  <span class="kw">have</span> hR : Rcv.<span class="const token" data-verso-hover="44">card</span> ≤ E.<span class="const token" data-verso-hover="255">msgsUpTo</span> A ∅ k := <span class="kw">by</span></span>
+<span id="L365">    <span class="kw">rw</span> [hrecv, <span class="const token" data-verso-hover="518">card_eq_sum_ones</span>]</span>
+<span id="L366">    <span class="kw">calc</span> ∑ _p ∈ Rcv, <span class="nu">1</span> ≤ ∑ p ∈ Rcv, ∑ τ ∈ <span class="const token" data-verso-hover="277">range</span> k, ∑ q ∈ <span class="const token" data-verso-hover="41">univ</span>.<span class="const token" data-verso-hover="42">filter</span> (· ≠ p), len τ q p :=</span>
+<span id="L367">          <span class="const token" data-verso-hover="205">sum_le_sum</span> <span class="kw">fun</span> p hp =&gt; one (<span class="kw">fun</span> p τ q =&gt; len τ q p) p (<span class="const token" data-verso-hover="46">mem_filter</span>.<span class="const token" data-verso-hover="67">mp</span> hp).<span class="const token" data-verso-hover="56">2</span></span>
+<span id="L368">      _ ≤ _ := <span class="const token" data-verso-hover="519">sum_le_sum_of_subset</span> (<span class="const token" data-verso-hover="307">subset_univ</span> _)</span>
+<span id="L369">  <span class="kw">calc</span> (<span class="const token" data-verso-hover="496">active</span> A E k).<span class="const token" data-verso-hover="44">card</span> ≤ (Snd ∪ Rcv).<span class="const token" data-verso-hover="44">card</span> := <span class="const token" data-verso-hover="45">card_le_card</span> hsub</span>
+<span id="L370">    _ ≤ Snd.<span class="const token" data-verso-hover="44">card</span> + Rcv.<span class="const token" data-verso-hover="44">card</span> := <span class="const token" data-verso-hover="197">card_union_le</span> _ _</span>
+<span id="L371">    _ ≤ _ := <span class="kw">by</span> <span class="kw">omega</span></span>
+<span id="L372"></span>
+<span id="L373"><span class="dc">/-- **Appendix B, as stated in the paper**: in one of the two fault-free executions with uniform</span></span>
+<span id="L374"><span class="dc">inputs, at least `f/2` processes send or receive a message during the first phase. -/</span></span>
+<span id="L375"><span class="kw">theorem</span> <span class="const token" data-verso-hover="15">appendixB_half</span> (A : <span class="const token" data-verso-hover="250">Algorithm</span> P M S <span class="const token" data-verso-hover="38">Bool</span> <span class="const token" data-verso-hover="38">Bool</span>) {f tstar : <span class="const token" data-verso-hover="31">ℕ</span>} (hf : f &lt; <span class="const token" data-verso-hover="254">Fintype.card</span> P)</span>
+<span id="L376">    (hBA : <span class="const token" data-verso-hover="486">CrashBA</span> f A) (hU : <span class="const token" data-verso-hover="494">ReachesUnivalency</span> A f tstar) :</span>
+<span id="L377">    ∃ b : <span class="const token" data-verso-hover="38">Bool</span>, f ≤ <span class="nu">2</span> * (<span class="const token" data-verso-hover="496">active</span> A (<span class="const token" data-verso-hover="495">ffExec</span> b) tstar).<span class="const token" data-verso-hover="44">card</span> := <span class="kw">by</span></span>
+<span id="L378">  <span class="kw">have</span> h := <span class="const token" data-verso-hover="14">appendixB</span> A hf hBA hU</span>
+<span id="L379">  <span class="kw">have</span> := <span class="const token" data-verso-hover="197">card_union_le</span> (<span class="const token" data-verso-hover="496">active</span> A (<span class="const token" data-verso-hover="495">ffExec</span> <span class="const token" data-verso-hover="59">false</span>) tstar) (<span class="const token" data-verso-hover="496">active</span> A (<span class="const token" data-verso-hover="495">ffExec</span> <span class="const token" data-verso-hover="58">true</span>) tstar)</span>
+<span id="L380">  <span class="kw">by_cases</span> h0 : f ≤ <span class="nu">2</span> * (<span class="const token" data-verso-hover="496">active</span> A (<span class="const token" data-verso-hover="495">ffExec</span> <span class="const token" data-verso-hover="59">false</span>) tstar).<span class="const token" data-verso-hover="44">card</span></span>
+<span id="L381">  · <span class="kw">exact</span> ⟨<span class="const token" data-verso-hover="59">false</span>, h0⟩</span>
+<span id="L382">  · <span class="kw">exact</span> ⟨<span class="const token" data-verso-hover="58">true</span>, <span class="kw">by</span> <span class="kw">omega</span>⟩</span>
+<span id="L383"></span>
+<span id="L384"><span class="dc">/-- **Appendix B: reaching univalency requires `Ω(f)` messages.** Some fault-free execution sends at</span></span>
+<span id="L385"><span class="dc">least `f/4` messages during the first phase (times `&lt; t*`). -/</span></span>
+<span id="L386"><span class="kw">theorem</span> <span class="const token" data-verso-hover="7">appendixB_messages</span> (A : <span class="const token" data-verso-hover="250">Algorithm</span> P M S <span class="const token" data-verso-hover="38">Bool</span> <span class="const token" data-verso-hover="38">Bool</span>) {f tstar : <span class="const token" data-verso-hover="31">ℕ</span>}</span>
+<span id="L387">    (hf : f &lt; <span class="const token" data-verso-hover="254">Fintype.card</span> P) (hBA : <span class="const token" data-verso-hover="486">CrashBA</span> f A) (hU : <span class="const token" data-verso-hover="494">ReachesUnivalency</span> A f tstar) :</span>
+<span id="L388">    ∃ b : <span class="const token" data-verso-hover="38">Bool</span>, f ≤ <span class="nu">4</span> * (<span class="const token" data-verso-hover="495">ffExec</span> b).<span class="const token" data-verso-hover="255">msgsUpTo</span> A ∅ tstar := <span class="kw">by</span></span>
+<span id="L389">  <span class="kw">obtain</span> ⟨b, hb⟩ := <span class="const token" data-verso-hover="15">appendixB_half</span> A hf hBA hU</span>
+<span id="L390">  <span class="kw">exact</span> ⟨b, <span class="kw">by</span> <span class="kw">have</span> := <span class="const token" data-verso-hover="516">card_active_le</span> A (<span class="const token" data-verso-hover="495">ffExec</span> (P := P) b) tstar; <span class="kw">omega</span>⟩</span>
+<span id="L391"></span>
+<span id="L392"><span class="kw">end</span> ReachingUnivalency</span>
+<span id="L393"></span>
+</code></div>
+        <script>
+          window.versoHoversUrl = "PODC2026/ReachingUnivalency/-hovers.json";</script>
+        <script src="static/lean/popper.js"></script>
+        <script src="static/lean/tippy.js"></script>
+        <script src="static/lean/marked.js"></script>
+        <script src="static/lean/highlighting.js"></script>
+        <script src="static/lean/lean.js"></script>
+        </article></main><footer class="site-footer"><div class="wrap">
+        Machine-checked formalizations of PODC papers in Lean 4. Generated with <a href="https://github.com/leanprover/verso">Verso</a> from the README files of <a href="https://github.com/vasnesterov/formal_podc">vasnesterov/formal_podc</a>.</div>
+      </footer></body>
+  </html>
+

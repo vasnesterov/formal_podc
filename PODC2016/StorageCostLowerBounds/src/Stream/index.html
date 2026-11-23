@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="light dark">
+    <link rel="icon" href="data:,">
+    <title>StorageCostLowerBounds: Stream.lean · Formal PODC</title><base href="../../../.././"><link rel="stylesheet" href="static/lean/verso-vars.css">
+    <link rel="stylesheet" href="static/lean/highlighting.css">
+    <link rel="stylesheet" href="static/lean/tippy-border.css">
+    <link rel="stylesheet" href="static/style.css">
+    <script defer="defer" src="static/site.js"></script>
+    </head>
+  <body>
+    <header class="site-header">
+      <div class="wrap">
+        <a class="brand" href=".">Formal PODC</a><nav class="top">
+          <a href=".">Search</a><a href="about/">About</a><a href="https://github.com/vasnesterov/formal_podc">GitHub</a></nav>
+        </div>
+      </header>
+    <main class="wrap"><article><nav class="breadcrumbs" aria-label="Breadcrumb">
+          <a href=".">Search</a><span class="sep">›</span><a href="PODC2016/">PODC 2016</a><span class="sep">›</span><a href="PODC2016/StorageCostLowerBounds/">StorageCostLowerBounds</a><span class="sep">›</span><a href="PODC2016/StorageCostLowerBounds/src/">Lean source</a><span class="sep">›</span><span aria-current="page">Stream</span></nav>
+        <h1>
+          <code>Stream.lean</code></h1>
+        <div class="paper-links">
+          <p>
+            Source of <a href="PODC2016/StorageCostLowerBounds/">Storage-Cost Lower Bounds for Shared Memory Emulation — PODC 2016</a> · <a href="https://github.com/vasnesterov/formal_podc/blob/main/Papers/PODC2016/StorageCostLowerBounds/Stream.lean">GitHub</a> · hover over a name for its type and documentation</p>
+          </div>
+        <div class="lean-code lean-src">
+          <code class="hl lean block" data-lean-context="Stream"><span id="L1"><span class="kw">import</span> Papers.PODC2016.StorageCostLowerBounds.Model</span>
+<span id="L2"></span>
+<span id="L3"><span class="dc">/-!</span></span>
+<span id="L4"><span class="dc"># The streaming relay: an I/O-automaton-faithful counterexample</span></span>
+<span id="L5"></span>
+<span id="L6"><span class="dc">In the paper's I/O-automaton model every send is a separate output action, so a server must keep</span></span>
+<span id="L7"><span class="dc">in its state the messages it still has to send. `IOASends` formalizes this: a server step that</span></span>
+<span id="L8"><span class="dc">receives a message (or an invocation) sends nothing, and a spontaneous step sends at most one</span></span>
+<span id="L9"><span class="dc">message. The relay algorithm of `Relay.lean` does not satisfy it. The **streaming relay** does,</span></span>
+<span id="L10"><span class="dc">and its servers still have only `36` states, independent of the value set.</span></span>
+<span id="L11"></span>
+<span id="L12"><span class="dc">Values are bit vectors `V = Fin B → Bool`; the writer streams the bits of its values, in order,</span></span>
+<span id="L13"><span class="dc">one bit at a time to every server (stop-and-wait per server).</span></span>
+<span id="L14"><span class="dc">* Writer: keeps the whole stream `strm` (bits of all written values) and, per server, the number</span></span>
+<span id="L15"><span class="dc">  of bits sent (`sentc`) and acknowledged (`ackc`). A server is sent the next bit `W b` when its</span></span>
+<span id="L16"><span class="dc">  previous bit is acknowledged. Write `K` returns once `qs` servers acknowledged the whole stream.</span></span>
+<span id="L17"><span class="dc">* Server, state `(pf, pa, pd, turn)`: receiving `W b` sets `pf := some b`, `pa := true`; receiving</span></span>
+<span id="L18"><span class="dc">  the query `Q` sets `pd := true`. Spontaneous steps take turns: turn 0 sends `F b` to the reader</span></span>
+<span id="L19"><span class="dc">  (if `pf = some b`), turn 1 sends the acknowledgement `A` to the writer (if `pa` and the bit was</span></span>
+<span id="L20"><span class="dc">  forwarded), turn 2 sends the answer `D` to the reader (if `pd`).</span></span>
+<span id="L21"><span class="dc">* Reader: keeps all bits received from each server (`got`); whenever a server's bits complete a</span></span>
+<span id="L22"><span class="dc">  block of `B` bits, block number `t`, and `t &gt; best`, it records `best := t` and the decoded value.</span></span>
+<span id="L23"><span class="dc">  Read `q` sends `Q` to every server without an outstanding query (`sentAt i = none`). An answer</span></span>
+<span id="L24"><span class="dc">  `D` to a query of the current read counts; an answer to an older query triggers a new `Q`. The</span></span>
+<span id="L25"><span class="dc">  read returns the recorded value once `qs` servers answered.</span></span>
+<span id="L26"><span class="dc">-/</span></span>
+<span id="L27"></span>
+<span id="L28"><span class="kw">namespace</span> Podc.StorageCost.Stream</span>
+<span id="L29"></span>
+<span id="L30"><span class="kw">open</span> Cslib.ChannelFailures Cslib.SharedMemory</span>
+<span id="L31"></span>
+<span id="L32"><span class="kw">variable</span> {n B : <span class="const token" data-verso-hover="44">ℕ</span>}</span>
+<span id="L33"></span>
+<span id="L34"><span class="dc">/-- Values: bit vectors of length `B`. -/</span></span>
+<span id="L35"><span class="kw">abbrev</span> <span class="const token" data-verso-hover="218">Val</span> (B : <span class="const token" data-verso-hover="44">ℕ</span>) := <span class="const token" data-verso-hover="49">Fin</span> B → <span class="const token" data-verso-hover="236">Bool</span></span>
+<span id="L36"></span>
+<span id="L37"><span class="dc">/-- The bits of a value. -/</span></span>
+<span id="L38"><span class="kw">def</span> <span class="const token" data-verso-hover="468">bits</span> (v : <span class="const token" data-verso-hover="218">Val</span> B) : <span class="const token" data-verso-hover="122">List</span> <span class="const token" data-verso-hover="236">Bool</span> := <span class="const token" data-verso-hover="469">List.ofFn</span> v</span>
+<span id="L39"></span>
+<span id="L40"><span class="dc">/-- Decoding a block of bits. -/</span></span>
+<span id="L41"><span class="kw">def</span> <span class="const token" data-verso-hover="470">decode</span> (l : <span class="const token" data-verso-hover="122">List</span> <span class="const token" data-verso-hover="236">Bool</span>) : <span class="const token" data-verso-hover="218">Val</span> B := <span class="kw">fun</span> j =&gt; l.<span class="const token" data-verso-hover="471">getD</span> j <span class="const token" data-verso-hover="232">false</span></span>
+<span id="L42"></span>
+<span id="L43">@[<span class="kw">simp</span>] <span class="kw">lemma</span> <span class="const token" data-verso-hover="472">length_bits</span> (v : <span class="const token" data-verso-hover="218">Val</span> B) : (<span class="const token" data-verso-hover="468">bits</span> v).<span class="const token" data-verso-hover="125">length</span> = B := <span class="kw">by</span> <span class="kw">simp</span> [<span class="const token" data-verso-hover="468">bits</span>]</span>
+<span id="L44"></span>
+<span id="L45">@[<span class="kw">simp</span>] <span class="kw">lemma</span> <span class="const token" data-verso-hover="473">decode_bits</span> (v : <span class="const token" data-verso-hover="218">Val</span> B) : <span class="const token" data-verso-hover="470">decode</span> (<span class="const token" data-verso-hover="468">bits</span> v) = v := <span class="kw">by</span></span>
+<span id="L46">  <span class="kw">funext</span> j; <span class="kw">simp</span> [<span class="const token" data-verso-hover="470">decode</span>, <span class="const token" data-verso-hover="468">bits</span>]</span>
+<span id="L47"></span>
+<span id="L48"><span class="dc">/-- Writer state. -/</span></span>
+<span id="L49"><span class="kw">structure</span> <span class="const token" data-verso-hover="474">WSt</span> (n B : <span class="const token" data-verso-hover="44">ℕ</span>) <span class="kw">where</span></span>
+<span id="L50">  <span class="dc">/-- Number of writes invoked. -/</span></span>
+<span id="L51">  <span class="const token" data-verso-hover="475">K</span> : <span class="const token" data-verso-hover="44">ℕ</span></span>
+<span id="L52">  <span class="dc">/-- A write is pending. -/</span></span>
+<span id="L53">  <span class="const token" data-verso-hover="476">busy</span> : <span class="const token" data-verso-hover="236">Bool</span></span>
+<span id="L54">  <span class="dc">/-- Value of the last write. -/</span></span>
+<span id="L55">  <span class="const token" data-verso-hover="477">cur</span> : <span class="const token" data-verso-hover="218">Val</span> B</span>
+<span id="L56">  <span class="dc">/-- The bits of all written values. -/</span></span>
+<span id="L57">  <span class="const token" data-verso-hover="478">strm</span> : <span class="const token" data-verso-hover="122">List</span> <span class="const token" data-verso-hover="236">Bool</span></span>
+<span id="L58">  <span class="dc">/-- Bits sent to each server. -/</span></span>
+<span id="L59">  <span class="const token" data-verso-hover="479">sentc</span> : <span class="const token" data-verso-hover="49">Fin</span> n → <span class="const token" data-verso-hover="44">ℕ</span></span>
+<span id="L60">  <span class="dc">/-- Bits acknowledged by each server. -/</span></span>
+<span id="L61">  <span class="const token" data-verso-hover="480">ackc</span> : <span class="const token" data-verso-hover="49">Fin</span> n → <span class="const token" data-verso-hover="44">ℕ</span></span>
+<span id="L62"></span>
+<span id="L63"><span class="dc">/-- Reader state. -/</span></span>
+<span id="L64"><span class="kw">structure</span> <span class="const token" data-verso-hover="481">RSt</span> (n B : <span class="const token" data-verso-hover="44">ℕ</span>) <span class="kw">where</span></span>
+<span id="L65">  <span class="dc">/-- Number of reads invoked. -/</span></span>
+<span id="L66">  <span class="const token" data-verso-hover="482">q</span> : <span class="const token" data-verso-hover="44">ℕ</span></span>
+<span id="L67">  <span class="dc">/-- A read is pending. -/</span></span>
+<span id="L68">  <span class="const token" data-verso-hover="483">busy</span> : <span class="const token" data-verso-hover="236">Bool</span></span>
+<span id="L69">  <span class="dc">/-- Bits received from each server. -/</span></span>
+<span id="L70">  <span class="const token" data-verso-hover="484">got</span> : <span class="const token" data-verso-hover="49">Fin</span> n → <span class="const token" data-verso-hover="122">List</span> <span class="const token" data-verso-hover="236">Bool</span></span>
+<span id="L71">  <span class="dc">/-- Largest complete block received. -/</span></span>
+<span id="L72">  <span class="const token" data-verso-hover="485">best</span> : <span class="const token" data-verso-hover="44">ℕ</span></span>
+<span id="L73">  <span class="dc">/-- Its value. -/</span></span>
+<span id="L74">  <span class="const token" data-verso-hover="486">val</span> : <span class="const token" data-verso-hover="218">Val</span> B</span>
+<span id="L75">  <span class="dc">/-- The read for which the outstanding query to a server was sent. -/</span></span>
+<span id="L76">  <span class="const token" data-verso-hover="487">sentAt</span> : <span class="const token" data-verso-hover="49">Fin</span> n → <span class="const token" data-verso-hover="255">Option</span> <span class="const token" data-verso-hover="44">ℕ</span></span>
+<span id="L77">  <span class="dc">/-- Servers that answered the current read. -/</span></span>
+<span id="L78">  <span class="const token" data-verso-hover="488">resp</span> : <span class="const token" data-verso-hover="50">Finset</span> (<span class="const token" data-verso-hover="49">Fin</span> n)</span>
+<span id="L79"></span>
+<span id="L80"><span class="dc">/-- Server state: pending forward, pending acknowledgement, pending answer, turn. -/</span></span>
+<span id="L81"><span class="kw">abbrev</span> <span class="const token" data-verso-hover="489">SSt</span> := <span class="const token" data-verso-hover="255">Option</span> <span class="const token" data-verso-hover="236">Bool</span> × <span class="const token" data-verso-hover="236">Bool</span> × <span class="const token" data-verso-hover="236">Bool</span> × <span class="const token" data-verso-hover="49">Fin</span> <span class="nu">3</span></span>
+<span id="L82"></span>
+<span id="L83"><span class="dc">/-- Messages. -/</span></span>
+<span id="L84"><span class="kw">inductive</span> <span class="const token" data-verso-hover="490">Msg</span> <span class="kw">where</span></span>
+<span id="L85">  <span class="dc">/-- Writer to server: next bit. -/</span></span>
+<span id="L86">  | <span class="const token" data-verso-hover="491">W</span> (b : <span class="const token" data-verso-hover="236">Bool</span>)</span>
+<span id="L87">  <span class="dc">/-- Server to writer: acknowledgement of the last bit. -/</span></span>
+<span id="L88">  | <span class="const token" data-verso-hover="492">A</span></span>
+<span id="L89">  <span class="dc">/-- Server to reader: forwarded bit. -/</span></span>
+<span id="L90">  | <span class="const token" data-verso-hover="493">F</span> (b : <span class="const token" data-verso-hover="236">Bool</span>)</span>
+<span id="L91">  <span class="dc">/-- Reader to server: query. -/</span></span>
+<span id="L92">  | <span class="const token" data-verso-hover="494">Q</span></span>
+<span id="L93">  <span class="dc">/-- Server to reader: answer. -/</span></span>
+<span id="L94">  | <span class="const token" data-verso-hover="495">D</span></span>
+<span id="L95">  <span class="kw">deriving</span> <span class="const token" data-verso-hover="90">DecidableEq</span></span>
+<span id="L96"></span>
+<span id="L97"><span class="dc">/-- Local states (every node carries all three components, each node uses its own). -/</span></span>
+<span id="L98"><span class="kw">abbrev</span> <span class="const token" data-verso-hover="227">LSt</span> (n B : <span class="const token" data-verso-hover="44">ℕ</span>) := <span class="const token" data-verso-hover="474">WSt</span> n B × <span class="const token" data-verso-hover="481">RSt</span> n B × <span class="const token" data-verso-hover="489">SSt</span></span>
+<span id="L99"></span>
+<span id="L100"><span class="kw">variable</span> (qs : <span class="const token" data-verso-hover="44">ℕ</span>)</span>
+<span id="L101"></span>
+<span id="L102"><span class="dc">/-- Writer: invocation of `write v`. -/</span></span>
+<span id="L103"><span class="kw">def</span> <span class="const token" data-verso-hover="496">wInvoke</span> (w : <span class="const token" data-verso-hover="474">WSt</span> n B) (v : <span class="const token" data-verso-hover="218">Val</span> B) : <span class="const token" data-verso-hover="474">WSt</span> n B × <span class="const token" data-verso-hover="122">List</span> (<span class="const token" data-verso-hover="46">Node</span> n × <span class="const token" data-verso-hover="490">Msg</span>) :=</span>
+<span id="L104">  <span class="kw">let</span> s := w.<span class="const token" data-verso-hover="478">strm</span> ++ <span class="const token" data-verso-hover="468">bits</span> v</span>
+<span id="L105">  (⟨w.<span class="const token" data-verso-hover="475">K</span> + <span class="nu">1</span>, <span class="const token" data-verso-hover="257">true</span>, v, s, <span class="kw">fun</span> i =&gt; <span class="kw">if</span> w.<span class="const token" data-verso-hover="479">sentc</span> i = w.<span class="const token" data-verso-hover="480">ackc</span> i <span class="kw">then</span> w.<span class="const token" data-verso-hover="479">sentc</span> i + <span class="nu">1</span> <span class="kw">else</span> w.<span class="const token" data-verso-hover="479">sentc</span> i,</span>
+<span id="L106">    w.<span class="const token" data-verso-hover="480">ackc</span>⟩,</span>
+<span id="L107">   (<span class="const token" data-verso-hover="201">List.finRange</span> n).<span class="const token" data-verso-hover="497">filterMap</span> <span class="kw">fun</span> i =&gt;</span>
+<span id="L108">     <span class="kw">if</span> w.<span class="const token" data-verso-hover="479">sentc</span> i = w.<span class="const token" data-verso-hover="480">ackc</span> i <span class="kw">then</span> <span class="const token" data-verso-hover="127">some</span> (<span class="const token" data-verso-hover="115">.</span>srv i, <span class="const token" data-verso-hover="491">.</span>W (s.<span class="const token" data-verso-hover="471">getD</span> (w.<span class="const token" data-verso-hover="480">ackc</span> i) <span class="const token" data-verso-hover="232">false</span>)) <span class="kw">else</span> <span class="const token" data-verso-hover="143">none</span>)</span>
+<span id="L109"></span>
+<span id="L110"><span class="dc">/-- Writer: acknowledgement from server `i`. -/</span></span>
+<span id="L111"><span class="kw">def</span> <span class="const token" data-verso-hover="498">wAck</span> (w : <span class="const token" data-verso-hover="474">WSt</span> n B) (i : <span class="const token" data-verso-hover="49">Fin</span> n) : <span class="const token" data-verso-hover="474">WSt</span> n B × <span class="const token" data-verso-hover="122">List</span> (<span class="const token" data-verso-hover="46">Node</span> n × <span class="const token" data-verso-hover="490">Msg</span>) × <span class="const token" data-verso-hover="255">Option</span> (<span class="const token" data-verso-hover="218">Val</span> B) :=</span>
+<span id="L112">  <span class="kw">let</span> a := <span class="const token" data-verso-hover="402">Function.update</span> w.<span class="const token" data-verso-hover="480">ackc</span> i (w.<span class="const token" data-verso-hover="480">ackc</span> i + <span class="nu">1</span>)</span>
+<span id="L113">  <span class="kw">let</span> more := <span class="const token" data-verso-hover="306">decide</span> (w.<span class="const token" data-verso-hover="480">ackc</span> i + <span class="nu">1</span> &lt; w.<span class="const token" data-verso-hover="478">strm</span>.<span class="const token" data-verso-hover="125">length</span>)</span>
+<span id="L114">  <span class="kw">let</span> sc := <span class="kw">if</span> more <span class="kw">then</span> <span class="const token" data-verso-hover="402">Function.update</span> w.<span class="const token" data-verso-hover="479">sentc</span> i (w.<span class="const token" data-verso-hover="479">sentc</span> i + <span class="nu">1</span>) <span class="kw">else</span> w.<span class="const token" data-verso-hover="479">sentc</span></span>
+<span id="L115">  <span class="kw">let</span> out := <span class="kw">if</span> more <span class="kw">then</span> [(<span class="const token" data-verso-hover="115">.</span>srv i, <span class="const token" data-verso-hover="491">.</span>W (w.<span class="const token" data-verso-hover="478">strm</span>.<span class="const token" data-verso-hover="471">getD</span> (w.<span class="const token" data-verso-hover="480">ackc</span> i + <span class="nu">1</span>) <span class="const token" data-verso-hover="232">false</span>))] <span class="kw">else</span> []</span>
+<span id="L116">  <span class="kw">if</span> w.<span class="const token" data-verso-hover="476">busy</span> = <span class="const token" data-verso-hover="257">true</span> ∧ qs ≤ (<span class="const token" data-verso-hover="101">Finset.univ</span>.<span class="const token" data-verso-hover="136">filter</span> <span class="kw">fun</span> j =&gt; w.<span class="const token" data-verso-hover="478">strm</span>.<span class="const token" data-verso-hover="125">length</span> ≤ a j).<span class="const token" data-verso-hover="52">card</span> <span class="kw">then</span></span>
+<span id="L117">    (⟨w.<span class="const token" data-verso-hover="475">K</span>, <span class="const token" data-verso-hover="232">false</span>, w.<span class="const token" data-verso-hover="477">cur</span>, w.<span class="const token" data-verso-hover="478">strm</span>, sc, a⟩, out, <span class="const token" data-verso-hover="127">some</span> w.<span class="const token" data-verso-hover="477">cur</span>)</span>
+<span id="L118">  <span class="kw">else</span> (⟨w.<span class="const token" data-verso-hover="475">K</span>, w.<span class="const token" data-verso-hover="476">busy</span>, w.<span class="const token" data-verso-hover="477">cur</span>, w.<span class="const token" data-verso-hover="478">strm</span>, sc, a⟩, out, <span class="const token" data-verso-hover="143">none</span>)</span>
+<span id="L119"></span>
+<span id="L120"><span class="dc">/-- Reader: invocation of `read`. -/</span></span>
+<span id="L121"><span class="kw">def</span> <span class="const token" data-verso-hover="499">rInvoke</span> (r : <span class="const token" data-verso-hover="481">RSt</span> n B) : <span class="const token" data-verso-hover="481">RSt</span> n B × <span class="const token" data-verso-hover="122">List</span> (<span class="const token" data-verso-hover="46">Node</span> n × <span class="const token" data-verso-hover="490">Msg</span>) :=</span>
+<span id="L122">  (⟨r.<span class="const token" data-verso-hover="482">q</span> + <span class="nu">1</span>, <span class="const token" data-verso-hover="257">true</span>, r.<span class="const token" data-verso-hover="484">got</span>, r.<span class="const token" data-verso-hover="485">best</span>, r.<span class="const token" data-verso-hover="486">val</span>,</span>
+<span id="L123">    <span class="kw">fun</span> i =&gt; <span class="kw">if</span> r.<span class="const token" data-verso-hover="487">sentAt</span> i = <span class="const token" data-verso-hover="143">none</span> <span class="kw">then</span> <span class="const token" data-verso-hover="127">some</span> (r.<span class="const token" data-verso-hover="482">q</span> + <span class="nu">1</span>) <span class="kw">else</span> r.<span class="const token" data-verso-hover="487">sentAt</span> i, ∅⟩,</span>
+<span id="L124">   (<span class="const token" data-verso-hover="201">List.finRange</span> n).<span class="const token" data-verso-hover="497">filterMap</span> <span class="kw">fun</span> i =&gt; <span class="kw">if</span> r.<span class="const token" data-verso-hover="487">sentAt</span> i = <span class="const token" data-verso-hover="143">none</span> <span class="kw">then</span> <span class="const token" data-verso-hover="127">some</span> (<span class="const token" data-verso-hover="115">.</span>srv i, <span class="const token" data-verso-hover="494">.</span>Q) <span class="kw">else</span> <span class="const token" data-verso-hover="143">none</span>)</span>
+<span id="L125"></span>
+<span id="L126"><span class="dc">/-- Reader: forwarded bit `b` from server `i`. -/</span></span>
+<span id="L127"><span class="kw">def</span> <span class="const token" data-verso-hover="500">rBit</span> (r : <span class="const token" data-verso-hover="481">RSt</span> n B) (i : <span class="const token" data-verso-hover="49">Fin</span> n) (b : <span class="const token" data-verso-hover="236">Bool</span>) : <span class="const token" data-verso-hover="481">RSt</span> n B :=</span>
+<span id="L128">  <span class="kw">let</span> l := r.<span class="const token" data-verso-hover="484">got</span> i ++ [b]</span>
+<span id="L129">  <span class="kw">if</span> l.<span class="const token" data-verso-hover="125">length</span> % B = <span class="nu">0</span> ∧ r.<span class="const token" data-verso-hover="485">best</span> &lt; l.<span class="const token" data-verso-hover="125">length</span> / B <span class="kw">then</span></span>
+<span id="L130">    ⟨r.<span class="const token" data-verso-hover="482">q</span>, r.<span class="const token" data-verso-hover="483">busy</span>, <span class="const token" data-verso-hover="402">Function.update</span> r.<span class="const token" data-verso-hover="484">got</span> i l, l.<span class="const token" data-verso-hover="125">length</span> / B, <span class="const token" data-verso-hover="470">decode</span> (l.<span class="const token" data-verso-hover="501">drop</span> (l.<span class="const token" data-verso-hover="125">length</span> - B)),</span>
+<span id="L131">      r.<span class="const token" data-verso-hover="487">sentAt</span>, r.<span class="const token" data-verso-hover="488">resp</span>⟩</span>
+<span id="L132">  <span class="kw">else</span> ⟨r.<span class="const token" data-verso-hover="482">q</span>, r.<span class="const token" data-verso-hover="483">busy</span>, <span class="const token" data-verso-hover="402">Function.update</span> r.<span class="const token" data-verso-hover="484">got</span> i l, r.<span class="const token" data-verso-hover="485">best</span>, r.<span class="const token" data-verso-hover="486">val</span>, r.<span class="const token" data-verso-hover="487">sentAt</span>, r.<span class="const token" data-verso-hover="488">resp</span>⟩</span>
+<span id="L133"></span>
+<span id="L134"><span class="dc">/-- Reader: answer from server `i`. -/</span></span>
+<span id="L135"><span class="kw">def</span> <span class="const token" data-verso-hover="502">rAns</span> (r : <span class="const token" data-verso-hover="481">RSt</span> n B) (i : <span class="const token" data-verso-hover="49">Fin</span> n) : <span class="const token" data-verso-hover="481">RSt</span> n B × <span class="const token" data-verso-hover="122">List</span> (<span class="const token" data-verso-hover="46">Node</span> n × <span class="const token" data-verso-hover="490">Msg</span>) × <span class="const token" data-verso-hover="255">Option</span> (<span class="const token" data-verso-hover="218">Val</span> B) :=</span>
+<span id="L136">  <span class="kw">if</span> r.<span class="const token" data-verso-hover="483">busy</span> = <span class="const token" data-verso-hover="257">true</span> <span class="kw">then</span></span>
+<span id="L137">    <span class="kw">if</span> r.<span class="const token" data-verso-hover="487">sentAt</span> i = <span class="const token" data-verso-hover="127">some</span> r.<span class="const token" data-verso-hover="482">q</span> <span class="kw">then</span></span>
+<span id="L138">      <span class="kw">if</span> qs ≤ (<span class="const token" data-verso-hover="258">insert</span> i r.<span class="const token" data-verso-hover="488">resp</span>).<span class="const token" data-verso-hover="52">card</span> <span class="kw">then</span></span>
+<span id="L139">        (⟨r.<span class="const token" data-verso-hover="482">q</span>, <span class="const token" data-verso-hover="232">false</span>, r.<span class="const token" data-verso-hover="484">got</span>, r.<span class="const token" data-verso-hover="485">best</span>, r.<span class="const token" data-verso-hover="486">val</span>, <span class="const token" data-verso-hover="402">Function.update</span> r.<span class="const token" data-verso-hover="487">sentAt</span> i <span class="const token" data-verso-hover="143">none</span>, <span class="const token" data-verso-hover="258">insert</span> i r.<span class="const token" data-verso-hover="488">resp</span>⟩,</span>
+<span id="L140">          [], <span class="const token" data-verso-hover="127">some</span> r.<span class="const token" data-verso-hover="486">val</span>)</span>
+<span id="L141">      <span class="kw">else</span> (⟨r.<span class="const token" data-verso-hover="482">q</span>, <span class="const token" data-verso-hover="257">true</span>, r.<span class="const token" data-verso-hover="484">got</span>, r.<span class="const token" data-verso-hover="485">best</span>, r.<span class="const token" data-verso-hover="486">val</span>, <span class="const token" data-verso-hover="402">Function.update</span> r.<span class="const token" data-verso-hover="487">sentAt</span> i <span class="const token" data-verso-hover="143">none</span>, <span class="const token" data-verso-hover="258">insert</span> i r.<span class="const token" data-verso-hover="488">resp</span>⟩,</span>
+<span id="L142">          [], <span class="const token" data-verso-hover="143">none</span>)</span>
+<span id="L143">    <span class="kw">else</span> (⟨r.<span class="const token" data-verso-hover="482">q</span>, <span class="const token" data-verso-hover="257">true</span>, r.<span class="const token" data-verso-hover="484">got</span>, r.<span class="const token" data-verso-hover="485">best</span>, r.<span class="const token" data-verso-hover="486">val</span>, <span class="const token" data-verso-hover="402">Function.update</span> r.<span class="const token" data-verso-hover="487">sentAt</span> i (<span class="const token" data-verso-hover="127">some</span> r.<span class="const token" data-verso-hover="482">q</span>), r.<span class="const token" data-verso-hover="488">resp</span>⟩,</span>
+<span id="L144">          [(<span class="const token" data-verso-hover="115">.</span>srv i, <span class="const token" data-verso-hover="494">.</span>Q)], <span class="const token" data-verso-hover="143">none</span>)</span>
+<span id="L145">  <span class="kw">else</span> (⟨r.<span class="const token" data-verso-hover="482">q</span>, <span class="const token" data-verso-hover="232">false</span>, r.<span class="const token" data-verso-hover="484">got</span>, r.<span class="const token" data-verso-hover="485">best</span>, r.<span class="const token" data-verso-hover="486">val</span>, <span class="const token" data-verso-hover="402">Function.update</span> r.<span class="const token" data-verso-hover="487">sentAt</span> i <span class="const token" data-verso-hover="143">none</span>, r.<span class="const token" data-verso-hover="488">resp</span>⟩, [], <span class="const token" data-verso-hover="143">none</span>)</span>
+<span id="L146"></span>
+<span id="L147"><span class="dc">/-- Server: spontaneous step. -/</span></span>
+<span id="L148"><span class="kw">def</span> <span class="const token" data-verso-hover="503">sTick</span> : <span class="const token" data-verso-hover="489">SSt</span> → <span class="const token" data-verso-hover="489">SSt</span> × <span class="const token" data-verso-hover="122">List</span> (<span class="const token" data-verso-hover="46">Node</span> n × <span class="const token" data-verso-hover="490">Msg</span>)</span>
+<span id="L149">  | (<span class="const token" data-verso-hover="127">some</span> b, pa, pd, <span class="nu">0</span>) =&gt; ((<span class="const token" data-verso-hover="143">none</span>, pa, pd, <span class="nu">1</span>), [(<span class="const token" data-verso-hover="117">.</span>rd, <span class="const token" data-verso-hover="493">.</span>F b)])</span>
+<span id="L150">  | (<span class="const token" data-verso-hover="143">none</span>, pa, pd, <span class="nu">0</span>) =&gt; ((<span class="const token" data-verso-hover="143">none</span>, pa, pd, <span class="nu">1</span>), [])</span>
+<span id="L151">  | (pf, <span class="const token" data-verso-hover="257">true</span>, pd, <span class="nu">1</span>) =&gt;</span>
+<span id="L152">    <span class="kw">if</span> pf = <span class="const token" data-verso-hover="143">none</span> <span class="kw">then</span> ((pf, <span class="const token" data-verso-hover="232">false</span>, pd, <span class="nu">2</span>), [(<span class="const token" data-verso-hover="116">.</span>wr, <span class="const token" data-verso-hover="492">.</span>A)]) <span class="kw">else</span> ((pf, <span class="const token" data-verso-hover="257">true</span>, pd, <span class="nu">2</span>), [])</span>
+<span id="L153">  | (pf, <span class="const token" data-verso-hover="232">false</span>, pd, <span class="nu">1</span>) =&gt; ((pf, <span class="const token" data-verso-hover="232">false</span>, pd, <span class="nu">2</span>), [])</span>
+<span id="L154">  | (pf, pa, <span class="const token" data-verso-hover="257">true</span>, <span class="nu">2</span>) =&gt; ((pf, pa, <span class="const token" data-verso-hover="232">false</span>, <span class="nu">0</span>), [(<span class="const token" data-verso-hover="117">.</span>rd, <span class="const token" data-verso-hover="495">.</span>D)])</span>
+<span id="L155">  | (pf, pa, <span class="const token" data-verso-hover="232">false</span>, <span class="nu">2</span>) =&gt; ((pf, pa, <span class="const token" data-verso-hover="232">false</span>, <span class="nu">0</span>), [])</span>
+<span id="L156"></span>
+<span id="L157"><span class="dc">/-- The transition function. -/</span></span>
+<span id="L158"><span class="kw">def</span> <span class="const token" data-verso-hover="504">handle</span> : <span class="const token" data-verso-hover="46">Node</span> n → <span class="const token" data-verso-hover="253">Input</span> (<span class="const token" data-verso-hover="46">Node</span> n) (<span class="const token" data-verso-hover="254">RWOp</span> (<span class="const token" data-verso-hover="218">Val</span> B)) <span class="const token" data-verso-hover="490">Msg</span> → <span class="const token" data-verso-hover="227">LSt</span> n B →</span>
+<span id="L159">    <span class="const token" data-verso-hover="227">LSt</span> n B × <span class="const token" data-verso-hover="122">List</span> (<span class="const token" data-verso-hover="46">Node</span> n × <span class="const token" data-verso-hover="490">Msg</span>) × <span class="const token" data-verso-hover="255">Option</span> (<span class="const token" data-verso-hover="218">Val</span> B)</span>
+<span id="L160">  | <span class="const token" data-verso-hover="116">.</span>wr, <span class="const token" data-verso-hover="256">.</span>invoke (<span class="const token" data-verso-hover="186">.</span>write v), (w, r, s) =&gt; (((<span class="const token" data-verso-hover="496">wInvoke</span> w v).<span class="const token" data-verso-hover="149">1</span>, r, s), (<span class="const token" data-verso-hover="496">wInvoke</span> w v).<span class="const token" data-verso-hover="148">2</span>, <span class="const token" data-verso-hover="143">none</span>)</span>
+<span id="L161">  | <span class="const token" data-verso-hover="116">.</span>wr, <span class="const token" data-verso-hover="153">.</span>recv (<span class="const token" data-verso-hover="115">.</span>srv i) <span class="const token" data-verso-hover="492">.</span>A, (w, r, s) =&gt; (((<span class="const token" data-verso-hover="498">wAck</span> qs w i).<span class="const token" data-verso-hover="149">1</span>, r, s), (<span class="const token" data-verso-hover="498">wAck</span> qs w i).<span class="const token" data-verso-hover="148">2</span><span class="nu">.</span><span class="const token" data-verso-hover="149">1</span>, (<span class="const token" data-verso-hover="498">wAck</span> qs w i).<span class="const token" data-verso-hover="148">2</span><span class="nu">.</span><span class="const token" data-verso-hover="148">2</span>)</span>
+<span id="L162">  | <span class="const token" data-verso-hover="117">.</span>rd, <span class="const token" data-verso-hover="256">.</span>invoke <span class="const token" data-verso-hover="259">.</span>read, (w, r, s) =&gt; ((w, (<span class="const token" data-verso-hover="499">rInvoke</span> r).<span class="const token" data-verso-hover="149">1</span>, s), (<span class="const token" data-verso-hover="499">rInvoke</span> r).<span class="const token" data-verso-hover="148">2</span>, <span class="const token" data-verso-hover="143">none</span>)</span>
+<span id="L163">  | <span class="const token" data-verso-hover="117">.</span>rd, <span class="const token" data-verso-hover="153">.</span>recv (<span class="const token" data-verso-hover="115">.</span>srv i) (<span class="const token" data-verso-hover="493">.</span>F b), (w, r, s) =&gt; ((w, <span class="const token" data-verso-hover="500">rBit</span> r i b, s), [], <span class="const token" data-verso-hover="143">none</span>)</span>
+<span id="L164">  | <span class="const token" data-verso-hover="117">.</span>rd, <span class="const token" data-verso-hover="153">.</span>recv (<span class="const token" data-verso-hover="115">.</span>srv i) <span class="const token" data-verso-hover="495">.</span>D, (w, r, s) =&gt; ((w, (<span class="const token" data-verso-hover="502">rAns</span> qs r i).<span class="const token" data-verso-hover="149">1</span>, s), (<span class="const token" data-verso-hover="502">rAns</span> qs r i).<span class="const token" data-verso-hover="148">2</span><span class="nu">.</span><span class="const token" data-verso-hover="149">1</span>, (<span class="const token" data-verso-hover="502">rAns</span> qs r i).<span class="const token" data-verso-hover="148">2</span><span class="nu">.</span><span class="const token" data-verso-hover="148">2</span>)</span>
+<span id="L165">  | <span class="const token" data-verso-hover="115">.</span>srv _, <span class="const token" data-verso-hover="153">.</span>recv <span class="const token" data-verso-hover="116">.</span>wr (<span class="const token" data-verso-hover="491">.</span>W b), (w, r, s) =&gt; ((w, r, (<span class="const token" data-verso-hover="127">some</span> b, <span class="const token" data-verso-hover="257">true</span>, s.<span class="const token" data-verso-hover="148">2</span><span class="nu">.</span><span class="const token" data-verso-hover="148">2</span>)), [], <span class="const token" data-verso-hover="143">none</span>)</span>
+<span id="L166">  | <span class="const token" data-verso-hover="115">.</span>srv _, <span class="const token" data-verso-hover="153">.</span>recv <span class="const token" data-verso-hover="117">.</span>rd <span class="const token" data-verso-hover="494">.</span>Q, (w, r, s) =&gt; ((w, r, (s.<span class="const token" data-verso-hover="149">1</span>, s.<span class="const token" data-verso-hover="148">2</span><span class="nu">.</span><span class="const token" data-verso-hover="149">1</span>, <span class="const token" data-verso-hover="257">true</span>, s.<span class="const token" data-verso-hover="148">2</span><span class="nu">.</span><span class="const token" data-verso-hover="148">2</span><span class="nu">.</span><span class="const token" data-verso-hover="148">2</span>)), [], <span class="const token" data-verso-hover="143">none</span>)</span>
+<span id="L167">  | <span class="const token" data-verso-hover="115">.</span>srv _, <span class="const token" data-verso-hover="425">.</span>tick _, (w, r, s) =&gt; ((w, r, (<span class="const token" data-verso-hover="503">sTick</span> (n := n) s).<span class="const token" data-verso-hover="149">1</span>), (<span class="const token" data-verso-hover="503">sTick</span> (n := n) s).<span class="const token" data-verso-hover="148">2</span>, <span class="const token" data-verso-hover="143">none</span>)</span>
+<span id="L168">  | _, _, l =&gt; (l, [], <span class="const token" data-verso-hover="143">none</span>)</span>
+<span id="L169"></span>
+<span id="L170"><span class="dc">/-- Initial local state. -/</span></span>
+<span id="L171"><span class="kw">def</span> <span class="const token" data-verso-hover="505">lInit</span> : <span class="const token" data-verso-hover="227">LSt</span> n B :=</span>
+<span id="L172">  (⟨<span class="nu">0</span>, <span class="const token" data-verso-hover="232">false</span>, <span class="kw">fun</span> _ =&gt; <span class="const token" data-verso-hover="232">false</span>, [], <span class="kw">fun</span> _ =&gt; <span class="nu">0</span>, <span class="kw">fun</span> _ =&gt; <span class="nu">0</span>⟩,</span>
+<span id="L173">   ⟨<span class="nu">0</span>, <span class="const token" data-verso-hover="232">false</span>, <span class="kw">fun</span> _ =&gt; [], <span class="nu">0</span>, <span class="kw">fun</span> _ =&gt; <span class="const token" data-verso-hover="232">false</span>, <span class="kw">fun</span> _ =&gt; <span class="const token" data-verso-hover="143">none</span>, ∅⟩, (<span class="const token" data-verso-hover="143">none</span>, <span class="const token" data-verso-hover="232">false</span>, <span class="const token" data-verso-hover="232">false</span>, <span class="nu">0</span>))</span>
+<span id="L174"></span>
+<span id="L175"><span class="dc">/-- The streaming relay with quorum size `qs`. -/</span></span>
+<span id="L176"><span class="kw">def</span> <span class="const token" data-verso-hover="208">alg</span> : <span class="const token" data-verso-hover="45">Algorithm</span> (<span class="const token" data-verso-hover="46">Node</span> n) (<span class="const token" data-verso-hover="47">register</span> (<span class="const token" data-verso-hover="218">Val</span> B) (<span class="kw">fun</span> _ =&gt; <span class="const token" data-verso-hover="232">false</span>)) <span class="const token" data-verso-hover="490">Msg</span> (<span class="const token" data-verso-hover="227">LSt</span> n B) <span class="kw">where</span></span>
+<span id="L177">  <span class="const token" data-verso-hover="260">init</span> _ := <span class="const token" data-verso-hover="505">lInit</span></span>
+<span id="L178">  <span class="const token" data-verso-hover="147">handle</span> := <span class="const token" data-verso-hover="504">handle</span> qs</span>
+<span id="L179"></span>
+<span id="L180"><span class="dc">/-- **The I/O-automaton restriction for servers**: a step processing an input (invocation or</span></span>
+<span id="L181"><span class="dc">received message) sends nothing; a spontaneous step sends at most one message. (Client states are</span></span>
+<span id="L182"><span class="dc">not counted, so clients may buffer outputs for free; they are not restricted.) -/</span></span>
+<span id="L183"><span class="kw">def</span> <span class="const token" data-verso-hover="10">IOASends</span> {M L : <span class="kw">Type</span>} {V : <span class="kw">Type</span>} {v₀ : V} (A : <span class="const token" data-verso-hover="45">Algorithm</span> (<span class="const token" data-verso-hover="46">Node</span> n) (<span class="const token" data-verso-hover="47">register</span> V v₀) M L) :</span>
+<span id="L184">    <span class="kw">Prop</span> :=</span>
+<span id="L185">  ∀ i inp l, ((∀ c, inp ≠ <span class="const token" data-verso-hover="425">.</span>tick c) → (A.<span class="const token" data-verso-hover="147">handle</span> (<span class="const token" data-verso-hover="115">.</span>srv i) inp l).<span class="const token" data-verso-hover="148">2</span><span class="nu">.</span><span class="const token" data-verso-hover="149">1</span> = []) ∧</span>
+<span id="L186">    (A.<span class="const token" data-verso-hover="147">handle</span> (<span class="const token" data-verso-hover="115">.</span>srv i) inp l).<span class="const token" data-verso-hover="148">2</span><span class="nu">.</span><span class="const token" data-verso-hover="149">1</span>.<span class="const token" data-verso-hover="125">length</span> ≤ <span class="nu">1</span></span>
+<span id="L187"></span>
+<span id="L188"><span class="kw">theorem</span> <span class="const token" data-verso-hover="34">ioaSends</span> : <span class="const token" data-verso-hover="10">IOASends</span> (<span class="const token" data-verso-hover="208">alg</span> (n := n) (B := B) qs) := <span class="kw">by</span></span>
+<span id="L189">  <span class="kw">intro</span> i inp l</span>
+<span id="L190">  <span class="kw">obtain</span> ⟨w, r, s⟩ := l</span>
+<span id="L191">  <span class="kw">rcases</span> inp <span class="kw">with</span> o | c | ⟨q, m⟩</span>
+<span id="L192">  · <span class="kw">simp</span> [<span class="const token" data-verso-hover="208">alg</span>, <span class="const token" data-verso-hover="504">handle</span>]</span>
+<span id="L193">  · <span class="kw">refine</span> ⟨<span class="kw">fun</span> h =&gt; <span class="const token" data-verso-hover="100">absurd</span> <span class="const token" data-verso-hover="194">rfl</span> (h c), ?_⟩</span>
+<span id="L194">    <span class="kw">obtain</span> ⟨pf, pa, pd, t⟩ := s</span>
+<span id="L195">    <span class="kw">simp</span> only [<span class="const token" data-verso-hover="208">alg</span>, <span class="const token" data-verso-hover="504">handle</span>]</span>
+<span id="L196">    <span class="kw">rcases</span> pf <span class="kw">with</span> _ | b &lt;;&gt; <span class="kw">rcases</span> pa &lt;;&gt; <span class="kw">rcases</span> pd &lt;;&gt; <span class="kw">fin_cases</span> t &lt;;&gt; <span class="kw">simp</span> [<span class="const token" data-verso-hover="503">sTick</span>]</span>
+<span id="L197">  · <span class="kw">rcases</span> q <span class="kw">with</span> _ | _ | _ &lt;;&gt; <span class="kw">rcases</span> m &lt;;&gt; <span class="kw">simp</span> [<span class="const token" data-verso-hover="208">alg</span>, <span class="const token" data-verso-hover="504">handle</span>]</span>
+<span id="L198"></span>
+<span id="L199"><span class="dc">/-- The streaming relay does not gossip. -/</span></span>
+<span id="L200"><span class="kw">theorem</span> <span class="const token" data-verso-hover="211">noGossip</span> : <span class="const token" data-verso-hover="21">NoGossip</span> (<span class="const token" data-verso-hover="208">alg</span> (n := n) (B := B) qs) := <span class="kw">by</span></span>
+<span id="L201">  <span class="kw">intro</span> i inp l x hx j</span>
+<span id="L202">  <span class="kw">obtain</span> ⟨w, r, s⟩ := l</span>
+<span id="L203">  <span class="kw">rcases</span> inp <span class="kw">with</span> o | c | ⟨q, m⟩</span>
+<span id="L204">  · <span class="kw">simp</span> [<span class="const token" data-verso-hover="208">alg</span>, <span class="const token" data-verso-hover="504">handle</span>] <span class="kw">at</span> hx</span>
+<span id="L205">  · <span class="kw">obtain</span> ⟨pf, pa, pd, t⟩ := s</span>
+<span id="L206">    <span class="kw">simp</span> only [<span class="const token" data-verso-hover="208">alg</span>, <span class="const token" data-verso-hover="504">handle</span>] <span class="kw">at</span> hx</span>
+<span id="L207">    <span class="kw">rcases</span> pf <span class="kw">with</span> _ | b &lt;;&gt; <span class="kw">rcases</span> pa &lt;;&gt; <span class="kw">rcases</span> pd &lt;;&gt; <span class="kw">fin_cases</span> t &lt;;&gt;</span>
+<span id="L208">      <span class="kw">simp</span> [<span class="const token" data-verso-hover="503">sTick</span>] <span class="kw">at</span> hx &lt;;&gt; <span class="kw">subst</span> hx &lt;;&gt; <span class="kw">simp</span></span>
+<span id="L209">  · <span class="kw">rcases</span> q <span class="kw">with</span> _ | _ | _ &lt;;&gt; <span class="kw">rcases</span> m &lt;;&gt; <span class="kw">simp</span> [<span class="const token" data-verso-hover="208">alg</span>, <span class="const token" data-verso-hover="504">handle</span>] <span class="kw">at</span> hx</span>
+<span id="L210"></span>
+<span id="L211"><span class="dc">/-- Servers only change their own component. -/</span></span>
+<span id="L212"><span class="kw">theorem</span> <span class="const token" data-verso-hover="506">srv_loc</span> (E : <span class="const token" data-verso-hover="122">List</span> (<span class="const token" data-verso-hover="118">Event</span> (<span class="const token" data-verso-hover="46">Node</span> n) (<span class="const token" data-verso-hover="47">register</span> (<span class="const token" data-verso-hover="218">Val</span> B) (<span class="kw">fun</span> _ =&gt; <span class="const token" data-verso-hover="232">false</span>)))) (i : <span class="const token" data-verso-hover="49">Fin</span> n) :</span>
+<span id="L213">    ∃ s : <span class="const token" data-verso-hover="489">SSt</span>, ((<span class="const token" data-verso-hover="208">alg</span> qs).<span class="const token" data-verso-hover="145">run</span> (<span class="const token" data-verso-hover="208">alg</span> qs).<span class="const token" data-verso-hover="132">initCfg</span> E).<span class="const token" data-verso-hover="146">loc</span> (<span class="const token" data-verso-hover="115">.</span>srv i) = (<span class="const token" data-verso-hover="505">lInit</span>.<span class="const token" data-verso-hover="149">1</span>, <span class="const token" data-verso-hover="505">lInit</span>.<span class="const token" data-verso-hover="148">2</span><span class="nu">.</span><span class="const token" data-verso-hover="149">1</span>, s) := <span class="kw">by</span></span>
+<span id="L214">  <span class="kw">suffices</span> h : ∀ C : <span class="const token" data-verso-hover="262">Config</span> (<span class="const token" data-verso-hover="46">Node</span> n) (<span class="const token" data-verso-hover="47">register</span> (<span class="const token" data-verso-hover="218">Val</span> B) (<span class="kw">fun</span> _ =&gt; <span class="const token" data-verso-hover="232">false</span>)) <span class="const token" data-verso-hover="490">Msg</span> (<span class="const token" data-verso-hover="227">LSt</span> n B),</span>
+<span id="L215">      (∃ s : <span class="const token" data-verso-hover="489">SSt</span>, C.<span class="const token" data-verso-hover="146">loc</span> (<span class="const token" data-verso-hover="115">.</span>srv i) = (<span class="const token" data-verso-hover="505">lInit</span>.<span class="const token" data-verso-hover="149">1</span>, <span class="const token" data-verso-hover="505">lInit</span>.<span class="const token" data-verso-hover="148">2</span><span class="nu">.</span><span class="const token" data-verso-hover="149">1</span>, s)) →</span>
+<span id="L216">      ∃ s : <span class="const token" data-verso-hover="489">SSt</span>, ((<span class="const token" data-verso-hover="208">alg</span> qs).<span class="const token" data-verso-hover="145">run</span> C E).<span class="const token" data-verso-hover="146">loc</span> (<span class="const token" data-verso-hover="115">.</span>srv i) = (<span class="const token" data-verso-hover="505">lInit</span>.<span class="const token" data-verso-hover="149">1</span>, <span class="const token" data-verso-hover="505">lInit</span>.<span class="const token" data-verso-hover="148">2</span><span class="nu">.</span><span class="const token" data-verso-hover="149">1</span>, s) <span class="kw">from</span> h _ ⟨_, <span class="const token" data-verso-hover="194">rfl</span>⟩</span>
+<span id="L217">  <span class="kw">intro</span> C hC</span>
+<span id="L218">  <span class="kw">induction</span> E generalizing C <span class="kw">with</span></span>
+<span id="L219">  | <span class="const token" data-verso-hover="263">nil</span> =&gt; <span class="kw">exact</span> hC</span>
+<span id="L220">  | <span class="const token" data-verso-hover="264">cons</span> e E ih =&gt;</span>
+<span id="L221">    <span class="kw">refine</span> ih _ ?_</span>
+<span id="L222">    <span class="kw">by_cases</span> ho : e.<span class="const token" data-verso-hover="150">owner</span> = <span class="const token" data-verso-hover="115">.</span>srv i</span>
+<span id="L223">    · <span class="kw">obtain</span> ⟨s, hs⟩ := hC</span>
+<span id="L224">      <span class="kw">have</span> key : ∀ (C' : <span class="const token" data-verso-hover="262">Config</span> (<span class="const token" data-verso-hover="46">Node</span> n) (<span class="const token" data-verso-hover="47">register</span> (<span class="const token" data-verso-hover="218">Val</span> B) (<span class="kw">fun</span> _ =&gt; <span class="const token" data-verso-hover="232">false</span>)) <span class="const token" data-verso-hover="490">Msg</span> (<span class="const token" data-verso-hover="227">LSt</span> n B))</span>
+<span id="L225">          (inp : <span class="const token" data-verso-hover="253">Input</span> (<span class="const token" data-verso-hover="46">Node</span> n) (<span class="const token" data-verso-hover="254">RWOp</span> (<span class="const token" data-verso-hover="218">Val</span> B)) <span class="const token" data-verso-hover="490">Msg</span>), C'.<span class="const token" data-verso-hover="146">loc</span> (<span class="const token" data-verso-hover="115">.</span>srv i) = (<span class="const token" data-verso-hover="505">lInit</span>.<span class="const token" data-verso-hover="149">1</span>, <span class="const token" data-verso-hover="505">lInit</span>.<span class="const token" data-verso-hover="148">2</span><span class="nu">.</span><span class="const token" data-verso-hover="149">1</span>, s) →</span>
+<span id="L226">          ∃ s' : <span class="const token" data-verso-hover="489">SSt</span>, (C'.<span class="const token" data-verso-hover="197">apply</span> (<span class="const token" data-verso-hover="115">.</span>srv i) (<span class="const token" data-verso-hover="504">handle</span> qs (<span class="const token" data-verso-hover="115">.</span>srv i) inp (C'.<span class="const token" data-verso-hover="146">loc</span> (<span class="const token" data-verso-hover="115">.</span>srv i)))).<span class="const token" data-verso-hover="149">1</span>.<span class="const token" data-verso-hover="146">loc</span></span>
+<span id="L227">            (<span class="const token" data-verso-hover="115">.</span>srv i) = (<span class="const token" data-verso-hover="505">lInit</span>.<span class="const token" data-verso-hover="149">1</span>, <span class="const token" data-verso-hover="505">lInit</span>.<span class="const token" data-verso-hover="148">2</span><span class="nu">.</span><span class="const token" data-verso-hover="149">1</span>, s') := <span class="kw">by</span></span>
+<span id="L228">        <span class="kw">intro</span> C' inp h</span>
+<span id="L229">        <span class="kw">simp</span> only [<span class="const token" data-verso-hover="197">Config.apply</span>, <span class="const token" data-verso-hover="265">Function.update_self</span>]</span>
+<span id="L230">        <span class="kw">rw</span> [h]</span>
+<span id="L231">        <span class="kw">rcases</span> inp <span class="kw">with</span> o | c | ⟨q, m⟩</span>
+<span id="L232">        · <span class="kw">exact</span> ⟨s, <span class="const token" data-verso-hover="194">rfl</span>⟩</span>
+<span id="L233">        · <span class="kw">exact</span> ⟨_, <span class="const token" data-verso-hover="194">rfl</span>⟩</span>
+<span id="L234">        · <span class="kw">rcases</span> q <span class="kw">with</span> _ | _ | _ &lt;;&gt; <span class="kw">rcases</span> m &lt;;&gt; <span class="kw">exact</span> ⟨_, <span class="const token" data-verso-hover="194">rfl</span>⟩</span>
+<span id="L235">      <span class="kw">cases</span> e <span class="kw">with</span></span>
+<span id="L236">      | <span class="const token" data-verso-hover="119">invoke</span> p o =&gt;</span>
+<span id="L237">        <span class="kw">simp</span> only [<span class="const token" data-verso-hover="150">Event.owner</span>] <span class="kw">at</span> ho; <span class="kw">subst</span> ho</span>
+<span id="L238">        <span class="kw">simp</span> only [<span class="const token" data-verso-hover="196">Algorithm.step</span>]</span>
+<span id="L239">        <span class="kw">split</span></span>
+<span id="L240">        · <span class="kw">exact</span> ⟨s, hs⟩</span>
+<span id="L241">        · <span class="kw">exact</span> key _ _ hs</span>
+<span id="L242">      | <span class="const token" data-verso-hover="266">tick</span> p c =&gt;</span>
+<span id="L243">        <span class="kw">simp</span> only [<span class="const token" data-verso-hover="150">Event.owner</span>] <span class="kw">at</span> ho; <span class="kw">subst</span> ho</span>
+<span id="L244">        <span class="kw">exact</span> key _ _ hs</span>
+<span id="L245">      | <span class="const token" data-verso-hover="187">deliver</span> a p =&gt;</span>
+<span id="L246">        <span class="kw">simp</span> only [<span class="const token" data-verso-hover="150">Event.owner</span>] <span class="kw">at</span> ho; <span class="kw">subst</span> ho</span>
+<span id="L247">        <span class="kw">simp</span> only [<span class="const token" data-verso-hover="196">Algorithm.step</span>]</span>
+<span id="L248">        <span class="kw">split</span></span>
+<span id="L249">        · <span class="kw">exact</span> ⟨s, hs⟩</span>
+<span id="L250">        · <span class="kw">exact</span> key _ _ hs</span>
+<span id="L251">    · <span class="kw">rw</span> [<span class="const token" data-verso-hover="267">loc_step_ne</span> _ _ _ (<span class="const token" data-verso-hover="268">Ne.symm</span> ho)]; <span class="kw">exact</span> hC</span>
+<span id="L252"></span>
+<span id="L253"><span class="dc">/-- The 36 server states. -/</span></span>
+<span id="L254"><span class="kw">def</span> <span class="const token" data-verso-hover="209">srvStates</span> : <span class="const token" data-verso-hover="49">Fin</span> n → <span class="const token" data-verso-hover="50">Finset</span> (<span class="const token" data-verso-hover="227">LSt</span> n B) := <span class="kw">fun</span> _ =&gt;</span>
+<span id="L255">  (<span class="const token" data-verso-hover="101">Finset.univ</span> : <span class="const token" data-verso-hover="50">Finset</span> <span class="const token" data-verso-hover="489">SSt</span>).<span class="const token" data-verso-hover="507">map</span> ⟨<span class="kw">fun</span> s =&gt; (<span class="const token" data-verso-hover="505">lInit</span>.<span class="const token" data-verso-hover="149">1</span>, <span class="const token" data-verso-hover="505">lInit</span>.<span class="const token" data-verso-hover="148">2</span><span class="nu">.</span><span class="const token" data-verso-hover="149">1</span>, s), <span class="kw">fun</span> a b h =&gt; <span class="kw">by</span></span>
+<span id="L256">    <span class="kw">simpa</span> <span class="kw">using</span> h⟩</span>
+<span id="L257"></span>
+<span id="L258"><span class="kw">theorem</span> <span class="const token" data-verso-hover="213">card_srvStates</span> (i : <span class="const token" data-verso-hover="49">Fin</span> n) : (<span class="const token" data-verso-hover="209">srvStates</span> (n := n) (B := B) i).<span class="const token" data-verso-hover="52">card</span> = <span class="nu">36</span> := <span class="kw">by</span></span>
+<span id="L259">  <span class="kw">simp</span> [<span class="const token" data-verso-hover="209">srvStates</span>]</span>
+<span id="L260"></span>
+<span id="L261"><span class="kw">theorem</span> <span class="const token" data-verso-hover="212">stateBound</span> : <span class="const token" data-verso-hover="51">StateBound</span> (<span class="const token" data-verso-hover="208">alg</span> (n := n) (B := B) qs) <span class="const token" data-verso-hover="209">srvStates</span> := <span class="kw">by</span></span>
+<span id="L262">  <span class="kw">intro</span> E _ i</span>
+<span id="L263">  <span class="kw">obtain</span> ⟨s, hs⟩ := <span class="const token" data-verso-hover="506">srv_loc</span> qs E i</span>
+<span id="L264">  <span class="kw">rw</span> [hs]; <span class="kw">exact</span> <span class="const token" data-verso-hover="508">Finset.mem_map_of_mem</span> _ (<span class="const token" data-verso-hover="107">Finset.mem_univ</span> s)</span>
+<span id="L265"></span>
+<span id="L266"><span class="kw">end</span> Podc.StorageCost.Stream</span>
+<span id="L267"></span>
+</code></div>
+        <script>
+          window.versoHoversUrl = "PODC2016/StorageCostLowerBounds/-hovers.json";</script>
+        <script src="static/lean/popper.js"></script>
+        <script src="static/lean/tippy.js"></script>
+        <script src="static/lean/marked.js"></script>
+        <script src="static/lean/highlighting.js"></script>
+        <script src="static/lean/lean.js"></script>
+        </article></main><footer class="site-footer"><div class="wrap">
+        Machine-checked formalizations of PODC papers in Lean 4. Generated with <a href="https://github.com/leanprover/verso">Verso</a> from the README files of <a href="https://github.com/vasnesterov/formal_podc">vasnesterov/formal_podc</a>.</div>
+      </footer></body>
+  </html>
+

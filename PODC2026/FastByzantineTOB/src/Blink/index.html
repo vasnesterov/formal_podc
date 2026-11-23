@@ -1,0 +1,560 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="light dark">
+    <link rel="icon" href="data:,">
+    <title>FastByzantineTOB: Blink.lean · Formal PODC</title><base href="../../../.././"><link rel="stylesheet" href="static/lean/verso-vars.css">
+    <link rel="stylesheet" href="static/lean/highlighting.css">
+    <link rel="stylesheet" href="static/lean/tippy-border.css">
+    <link rel="stylesheet" href="static/style.css">
+    <script defer="defer" src="static/site.js"></script>
+    </head>
+  <body>
+    <header class="site-header">
+      <div class="wrap">
+        <a class="brand" href=".">Formal PODC</a><nav class="top">
+          <a href=".">Search</a><a href="about/">About</a><a href="https://github.com/vasnesterov/formal_podc">GitHub</a></nav>
+        </div>
+      </header>
+    <main class="wrap"><article><nav class="breadcrumbs" aria-label="Breadcrumb">
+          <a href=".">Search</a><span class="sep">›</span><a href="PODC2026/">PODC 2026</a><span class="sep">›</span><a href="PODC2026/FastByzantineTOB/">FastByzantineTOB</a><span class="sep">›</span><a href="PODC2026/FastByzantineTOB/src/">Lean source</a><span class="sep">›</span><span aria-current="page">Blink</span></nav>
+        <h1>
+          <code>Blink.lean</code></h1>
+        <div class="paper-links">
+          <p>
+            Source of <a href="PODC2026/FastByzantineTOB/">Fast Byzantine Total Order Broadcast — PODC 2026</a> · <a href="https://github.com/vasnesterov/formal_podc/blob/main/Papers/PODC2026/FastByzantineTOB/Blink.lean">GitHub</a> · hover over a name for its type and documentation</p>
+          </div>
+        <div class="lean-code lean-src">
+          <code class="hl lean block" data-lean-context="Blink"><span id="L1"><span class="kw">import</span> Mathlib</span>
+<span id="L2"></span>
+<span id="L3"><span class="kw">set_option</span> <span class="const token" data-verso-hover="38">linter.unusedSectionVars</span> false</span>
+<span id="L4"></span>
+<span id="L5"><span class="dc">/-!</span></span>
+<span id="L6"><span class="dc"># Blink (Algorithm 1): Representative Binary Consensus on top of a black-box Binary Consensus</span></span>
+<span id="L7"></span>
+<span id="L8"><span class="dc">Monti, Camaioni, Roman. *Fast Byzantine Total Order Broadcast.* PODC 2026 (arXiv:2412.14061v2).</span></span>
+<span id="L9"></span>
+<span id="L10"><span class="dc">## Model</span></span>
+<span id="L11"></span>
+<span id="L12"><span class="dc">* `P` is the finite set of servers, `F : Finset P` the (static) set of Byzantine servers.</span></span>
+<span id="L13"><span class="dc">* Asynchronous interleaving semantics: a run is a sequence of global states `st : ℕ → P → LState P`;</span></span>
+<span id="L14"><span class="dc">  at each step either nothing happens (stutter) or one correct server performs one *action* whose</span></span>
+<span id="L15"><span class="dc">  guard holds. Safety does not depend on timing, so no clocks are needed.</span></span>
+<span id="L16"><span class="dc">* Authenticated links: a correct server records `suggestions[σ] = v` only if `σ` is Byzantine (who may</span></span>
+<span id="L17"><span class="dc">  send anything, any number of times, also changing its mind) or `σ` is correct and proposed `v`</span></span>
+<span id="L18"><span class="dc">  (correct servers send `[Suggest, v]` to all upon proposing, so "`σ` sent `[Suggest, v]`" is exactly</span></span>
+<span id="L19"><span class="dc">  "`σ.input = some v`"; messages may be delivered several times — harmless, only more general).</span></span>
+<span id="L20"><span class="dc">* The underlying Binary Consensus `dep` is a black box: `dep.Decide` events reach correct servers as</span></span>
+<span id="L21"><span class="dc">  unconstrained environment actions (`Act.depDecide`). Its specification (`DepValidity`,</span></span>
+<span id="L22"><span class="dc">  `DepAgreement`, …) is a hypothesis about the whole run. Validity is stated over the whole run (a</span></span>
+<span id="L23"><span class="dc">  value may be decided before it is proposed): this is the weakest reading of a black-box spec.</span></span>
+<span id="L24"><span class="dc">* The algorithm's thresholds are parameters: `W` (suggestions needed before proposing to `dep`;</span></span>
+<span id="L25"><span class="dc">  `4f+1` in the paper), `M` (majority threshold, `2f+1`) and `Q` (fast-path threshold, `4f+1`). The</span></span>
+<span id="L26"><span class="dc">  choice "the value suggested at least `2f+1` times" (line 16) is modelled by a nondeterministic guard;</span></span>
+<span id="L27"><span class="dc">  for `W = 2M - 1` (as in the paper) there is exactly one such value.</span></span>
+<span id="L28"></span>
+<span id="L29"><span class="dc">The state records history variables: `input` (the `con.Propose` value), `depProp` (the</span></span>
+<span id="L30"><span class="dc">`dep.Propose` value), `depDecs` (all `dep.Decide` events), `decs` (all `con.Decide` events).</span></span>
+<span id="L31"><span class="dc">-/</span></span>
+<span id="L32"></span>
+<span id="L33"><span class="kw">namespace</span> Podc.FastByzantineTOB.Blink</span>
+<span id="L34"></span>
+<span id="L35"><span class="kw">open</span> Finset</span>
+<span id="L36"></span>
+<span id="L37"><span class="kw">variable</span> {P : <span class="kw">Type</span>*}</span>
+<span id="L38"></span>
+<span id="L39"><span class="dc">/-- Local state of a server running Blink (Algorithm 1), with history variables. -/</span></span>
+<span id="L40"><span class="kw">structure</span> <span class="const token" data-verso-hover="39">LState</span> (P : <span class="kw">Type</span>*) <span class="kw">where</span></span>
+<span id="L41">  <span class="dc">/-- The value proposed via `con.Propose` (each correct server proposes at most once). -/</span></span>
+<span id="L42">  <span class="const token" data-verso-hover="40">input</span> : <span class="const token" data-verso-hover="41">Option</span> <span class="const token" data-verso-hover="42">Bool</span></span>
+<span id="L43">  <span class="dc">/-- The `suggestions` map (line 7). -/</span></span>
+<span id="L44">  <span class="const token" data-verso-hover="43">sugg</span> : P → <span class="const token" data-verso-hover="41">Option</span> <span class="const token" data-verso-hover="42">Bool</span></span>
+<span id="L45">  <span class="dc">/-- The `proposed` flag (line 8). -/</span></span>
+<span id="L46">  <span class="const token" data-verso-hover="44">proposed</span> : <span class="const token" data-verso-hover="42">Bool</span></span>
+<span id="L47">  <span class="dc">/-- The `decided` flag (line 9). -/</span></span>
+<span id="L48">  <span class="const token" data-verso-hover="45">decided</span> : <span class="const token" data-verso-hover="42">Bool</span></span>
+<span id="L49">  <span class="dc">/-- History: the value proposed to `dep` (line 17). -/</span></span>
+<span id="L50">  <span class="const token" data-verso-hover="46">depProp</span> : <span class="const token" data-verso-hover="41">Option</span> <span class="const token" data-verso-hover="42">Bool</span></span>
+<span id="L51">  <span class="dc">/-- History: all `dep.Decide` events received (line 23). -/</span></span>
+<span id="L52">  <span class="const token" data-verso-hover="47">depDecs</span> : <span class="const token" data-verso-hover="48">List</span> <span class="const token" data-verso-hover="42">Bool</span></span>
+<span id="L53">  <span class="dc">/-- History: all `con.Decide` events triggered (lines 21, 25). -/</span></span>
+<span id="L54">  <span class="const token" data-verso-hover="49">decs</span> : <span class="const token" data-verso-hover="48">List</span> <span class="const token" data-verso-hover="42">Bool</span></span>
+<span id="L55"></span>
+<span id="L56"><span class="dc">/-- Initial state (lines 6–9). -/</span></span>
+<span id="L57"><span class="kw">def</span> <span class="const token" data-verso-hover="50">LState.init</span> : <span class="const token" data-verso-hover="39">LState</span> P := ⟨<span class="const token" data-verso-hover="51">none</span>, <span class="kw">fun</span> _ =&gt; <span class="const token" data-verso-hover="51">none</span>, <span class="const token" data-verso-hover="52">false</span>, <span class="const token" data-verso-hover="52">false</span>, <span class="const token" data-verso-hover="51">none</span>, [], []⟩</span>
+<span id="L58"></span>
+<span id="L59"><span class="dc">/-- Trigger `con.Decide v` unless already decided (lines 20–22 and 24–26). -/</span></span>
+<span id="L60"><span class="kw">def</span> <span class="const token" data-verso-hover="31">LState.decide</span> (s : <span class="const token" data-verso-hover="39">LState</span> P) (v : <span class="const token" data-verso-hover="42">Bool</span>) : <span class="const token" data-verso-hover="39">LState</span> P :=</span>
+<span id="L61">  <span class="kw">if</span> s.<span class="const token" data-verso-hover="45">decided</span> <span class="kw">then</span> s <span class="kw">else</span> { s <span class="kw">with</span> <span class="const token" data-verso-hover="45">decided</span> := <span class="const token" data-verso-hover="53">true</span>, <span class="const token" data-verso-hover="49">decs</span> := s.<span class="const token" data-verso-hover="49">decs</span> ++ [v] }</span>
+<span id="L62"></span>
+<span id="L63"><span class="dc">/-- Actions of a correct server. -/</span></span>
+<span id="L64"><span class="kw">inductive</span> <span class="const token" data-verso-hover="54">Act</span> (P : <span class="kw">Type</span>*)</span>
+<span id="L65">  <span class="dc">/-- `con.Propose v` (line 10): send `[Suggest, v]` to all. -/</span></span>
+<span id="L66">  | <span class="const token" data-verso-hover="55">propose</span> (v : <span class="const token" data-verso-hover="42">Bool</span>)</span>
+<span id="L67">  <span class="dc">/-- Delivery of `[Suggest, v]` from `σ` (line 13). -/</span></span>
+<span id="L68">  | <span class="const token" data-verso-hover="56">recv</span> (σ : P) (v : <span class="const token" data-verso-hover="42">Bool</span>)</span>
+<span id="L69">  <span class="dc">/-- Proposal of the majority value `v` to `dep` (line 15). -/</span></span>
+<span id="L70">  | <span class="const token" data-verso-hover="57">depPropose</span> (v : <span class="const token" data-verso-hover="42">Bool</span>)</span>
+<span id="L71">  <span class="dc">/-- Fast path: `4f+1` suggestions for `v` (line 19). -/</span></span>
+<span id="L72">  | <span class="const token" data-verso-hover="58">fast</span> (v : <span class="const token" data-verso-hover="42">Bool</span>)</span>
+<span id="L73">  <span class="dc">/-- `dep.Decide v` (line 23); an environment event of the black box. -/</span></span>
+<span id="L74">  | <span class="const token" data-verso-hover="59">depDecide</span> (v : <span class="const token" data-verso-hover="42">Bool</span>)</span>
+<span id="L75">  <span class="kw">deriving</span> <span class="const token" data-verso-hover="60">DecidableEq</span></span>
+<span id="L76"></span>
+<span id="L77"><span class="kw">variable</span> [<span class="const token" data-verso-hover="61">Fintype</span> P] [<span class="const token" data-verso-hover="60">DecidableEq</span> P]</span>
+<span id="L78"></span>
+<span id="L79"><span class="dc">/-- Number of servers whose suggestion is `v`. -/</span></span>
+<span id="L80"><span class="kw">def</span> <span class="const token" data-verso-hover="62">count</span> (s : P → <span class="const token" data-verso-hover="41">Option</span> <span class="const token" data-verso-hover="42">Bool</span>) (v : <span class="const token" data-verso-hover="42">Bool</span>) : <span class="const token" data-verso-hover="63">ℕ</span> := #{q | s q = <span class="const token" data-verso-hover="64">some</span> v}</span>
+<span id="L81"></span>
+<span id="L82"><span class="dc">/-- Number of keys of the suggestions map. -/</span></span>
+<span id="L83"><span class="kw">def</span> <span class="const token" data-verso-hover="65">keys</span> (s : P → <span class="const token" data-verso-hover="41">Option</span> <span class="const token" data-verso-hover="42">Bool</span>) : <span class="const token" data-verso-hover="63">ℕ</span> := #{q | (s q).<span class="const token" data-verso-hover="66">isSome</span>}</span>
+<span id="L84"></span>
+<span id="L85"><span class="dc">/-- Thresholds of Blink. -/</span></span>
+<span id="L86"><span class="kw">structure</span> <span class="const token" data-verso-hover="67">Thresholds</span> <span class="kw">where</span></span>
+<span id="L87">  <span class="dc">/-- Suggestions needed before proposing to `dep` (paper: `4f+1`). -/</span></span>
+<span id="L88">  <span class="const token" data-verso-hover="68">W</span> : <span class="const token" data-verso-hover="63">ℕ</span></span>
+<span id="L89">  <span class="dc">/-- Majority threshold (paper: `2f+1`). -/</span></span>
+<span id="L90">  <span class="const token" data-verso-hover="69">M</span> : <span class="const token" data-verso-hover="63">ℕ</span></span>
+<span id="L91">  <span class="dc">/-- Fast-path threshold (paper: `4f+1`). -/</span></span>
+<span id="L92">  <span class="const token" data-verso-hover="70">Q</span> : <span class="const token" data-verso-hover="63">ℕ</span></span>
+<span id="L93"></span>
+<span id="L94"><span class="dc">/-- The paper's thresholds for a given `f`. -/</span></span>
+<span id="L95"><span class="kw">def</span> <span class="const token" data-verso-hover="71">paperThresholds</span> (f : <span class="const token" data-verso-hover="63">ℕ</span>) : <span class="const token" data-verso-hover="67">Thresholds</span> := ⟨<span class="nu">4</span> * f + <span class="nu">1</span>, <span class="nu">2</span> * f + <span class="nu">1</span>, <span class="nu">4</span> * f + <span class="nu">1</span>⟩</span>
+<span id="L96"></span>
+<span id="L97"><span class="dc">/-- Guard of an action of server `p` in global state `g`. -/</span></span>
+<span id="L98"><span class="kw">def</span> <span class="const token" data-verso-hover="72">guard</span> (F : <span class="const token" data-verso-hover="73">Finset</span> P) (θ : <span class="const token" data-verso-hover="67">Thresholds</span>) (g : P → <span class="const token" data-verso-hover="39">LState</span> P) (p : P) : <span class="const token" data-verso-hover="54">Act</span> P → <span class="kw">Prop</span></span>
+<span id="L99">  | <span class="const token" data-verso-hover="55">.</span>propose _ =&gt; (g p).<span class="const token" data-verso-hover="40">input</span> = <span class="const token" data-verso-hover="51">none</span></span>
+<span id="L100">  | <span class="const token" data-verso-hover="56">.</span>recv σ v =&gt; σ ∈ F ∨ (g σ).<span class="const token" data-verso-hover="40">input</span> = <span class="const token" data-verso-hover="64">some</span> v</span>
+<span id="L101">  | <span class="const token" data-verso-hover="57">.</span>depPropose v =&gt; θ.<span class="const token" data-verso-hover="68">W</span> ≤ <span class="const token" data-verso-hover="65">keys</span> (g p).<span class="const token" data-verso-hover="43">sugg</span> ∧ (g p).<span class="const token" data-verso-hover="44">proposed</span> = <span class="const token" data-verso-hover="52">false</span> ∧ θ.<span class="const token" data-verso-hover="69">M</span> ≤ <span class="const token" data-verso-hover="62">count</span> (g p).<span class="const token" data-verso-hover="43">sugg</span> v</span>
+<span id="L102">  | <span class="const token" data-verso-hover="58">.</span>fast v =&gt; θ.<span class="const token" data-verso-hover="70">Q</span> ≤ <span class="const token" data-verso-hover="62">count</span> (g p).<span class="const token" data-verso-hover="43">sugg</span> v</span>
+<span id="L103">  | <span class="const token" data-verso-hover="59">.</span>depDecide _ =&gt; <span class="const token" data-verso-hover="2">True</span></span>
+<span id="L104"></span>
+<span id="L105"><span class="const token" data-verso-hover="74">instance</span> (F : <span class="const token" data-verso-hover="73">Finset</span> P) (θ : <span class="const token" data-verso-hover="67">Thresholds</span>) (g : P → <span class="const token" data-verso-hover="39">LState</span> P) (p : P) (a : <span class="const token" data-verso-hover="54">Act</span> P) :</span>
+<span id="L106">    <span class="const token" data-verso-hover="75">Decidable</span> (<span class="const token" data-verso-hover="72">guard</span> F θ g p a) := <span class="kw">by</span></span>
+<span id="L107">  <span class="kw">cases</span> a &lt;;&gt; <span class="kw">unfold</span> <span class="const token" data-verso-hover="72">guard</span> &lt;;&gt; <span class="kw">infer_instance</span></span>
+<span id="L108"></span>
+<span id="L109"><span class="dc">/-- Effect of an action. -/</span></span>
+<span id="L110"><span class="kw">def</span> <span class="const token" data-verso-hover="76">LState.apply</span> (s : <span class="const token" data-verso-hover="39">LState</span> P) : <span class="const token" data-verso-hover="54">Act</span> P → <span class="const token" data-verso-hover="39">LState</span> P</span>
+<span id="L111">  | <span class="const token" data-verso-hover="55">.</span>propose v =&gt; { s <span class="kw">with</span> <span class="const token" data-verso-hover="40">input</span> := <span class="const token" data-verso-hover="64">some</span> v }</span>
+<span id="L112">  | <span class="const token" data-verso-hover="56">.</span>recv σ v =&gt; { s <span class="kw">with</span> <span class="const token" data-verso-hover="43">sugg</span> := <span class="const token" data-verso-hover="77">Function.update</span> s.<span class="const token" data-verso-hover="43">sugg</span> σ (<span class="const token" data-verso-hover="64">some</span> v) }</span>
+<span id="L113">  | <span class="const token" data-verso-hover="57">.</span>depPropose v =&gt; { s <span class="kw">with</span> <span class="const token" data-verso-hover="44">proposed</span> := <span class="const token" data-verso-hover="53">true</span>, <span class="const token" data-verso-hover="46">depProp</span> := <span class="const token" data-verso-hover="64">some</span> v }</span>
+<span id="L114">  | <span class="const token" data-verso-hover="58">.</span>fast v =&gt; s.<span class="const token" data-verso-hover="31">decide</span> v</span>
+<span id="L115">  | <span class="const token" data-verso-hover="59">.</span>depDecide v =&gt; { s.<span class="const token" data-verso-hover="31">decide</span> v <span class="kw">with</span> <span class="const token" data-verso-hover="47">depDecs</span> := s.<span class="const token" data-verso-hover="47">depDecs</span> ++ [v] }</span>
+<span id="L116"></span>
+<span id="L117"><span class="dc">/-- One global step: a stutter, or one action of one correct server whose guard holds. -/</span></span>
+<span id="L118"><span class="kw">def</span> <span class="const token" data-verso-hover="78">Step</span> (F : <span class="const token" data-verso-hover="73">Finset</span> P) (θ : <span class="const token" data-verso-hover="67">Thresholds</span>) (g g' : P → <span class="const token" data-verso-hover="39">LState</span> P) : <span class="kw">Prop</span> :=</span>
+<span id="L119">  g' = g ∨ ∃ p ∉ F, ∃ a, <span class="const token" data-verso-hover="72">guard</span> F θ g p a ∧ g' = <span class="const token" data-verso-hover="77">Function.update</span> g p ((g p).<span class="const token" data-verso-hover="76">apply</span> a)</span>
+<span id="L120"></span>
+<span id="L121"><span class="dc">/-- A run of Blink with Byzantine set `F` and thresholds `θ`. -/</span></span>
+<span id="L122"><span class="kw">structure</span> <span class="const token" data-verso-hover="79">Run</span> (F : <span class="const token" data-verso-hover="73">Finset</span> P) (θ : <span class="const token" data-verso-hover="67">Thresholds</span>) <span class="kw">where</span></span>
+<span id="L123">  <span class="dc">/-- Global state at time `k`. -/</span></span>
+<span id="L124">  <span class="const token" data-verso-hover="80">st</span> : <span class="const token" data-verso-hover="63">ℕ</span> → P → <span class="const token" data-verso-hover="39">LState</span> P</span>
+<span id="L125">  <span class="const token" data-verso-hover="81">init</span> : <span class="const token" data-verso-hover="80">st</span> <span class="nu">0</span> = <span class="kw">fun</span> _ =&gt; <span class="const token" data-verso-hover="50">LState.init</span></span>
+<span id="L126">  <span class="const token" data-verso-hover="82">step</span> : ∀ k, <span class="const token" data-verso-hover="78">Step</span> F θ (<span class="const token" data-verso-hover="80">st</span> k) (<span class="const token" data-verso-hover="80">st</span> (k + <span class="nu">1</span>))</span>
+<span id="L127"></span>
+<span id="L128"><span class="dc">/-! ### Specification of the black box `dep` (Binary Consensus, safety part) -/</span></span>
+<span id="L129"></span>
+<span id="L130"><span class="kw">section</span> Spec</span>
+<span id="L131"></span>
+<span id="L132"><span class="kw">variable</span> {F : <span class="const token" data-verso-hover="73">Finset</span> P} {θ : <span class="const token" data-verso-hover="67">Thresholds</span>} (R : <span class="const token" data-verso-hover="79">Run</span> F θ)</span>
+<span id="L133"></span>
+<span id="L134"><span class="dc">/-- Validity of `dep`: a value decided by `dep` at a correct server was proposed to `dep` by some</span></span>
+<span id="L135"><span class="dc">correct server (at some time of the run). -/</span></span>
+<span id="L136"><span class="kw">def</span> <span class="const token" data-verso-hover="83">DepValidity</span> : <span class="kw">Prop</span> :=</span>
+<span id="L137">  ∀ k p v, p ∉ F → v ∈ (R.<span class="const token" data-verso-hover="80">st</span> k p).<span class="const token" data-verso-hover="47">depDecs</span> → ∃ k' q, q ∉ F ∧ (R.<span class="const token" data-verso-hover="80">st</span> k' q).<span class="const token" data-verso-hover="46">depProp</span> = <span class="const token" data-verso-hover="64">some</span> v</span>
+<span id="L138"></span>
+<span id="L139"><span class="dc">/-- Agreement of `dep` (over all pairs of correct servers, including `p = q`). -/</span></span>
+<span id="L140"><span class="kw">def</span> <span class="const token" data-verso-hover="84">DepAgreement</span> : <span class="kw">Prop</span> :=</span>
+<span id="L141">  ∀ k k' p q v w, p ∉ F → q ∉ F → v ∈ (R.<span class="const token" data-verso-hover="80">st</span> k p).<span class="const token" data-verso-hover="47">depDecs</span> → w ∈ (R.<span class="const token" data-verso-hover="80">st</span> k' q).<span class="const token" data-verso-hover="47">depDecs</span> → v = w</span>
+<span id="L142"></span>
+<span id="L143"><span class="dc">/-- Integrity of `dep`: no correct server receives more than one decision. -/</span></span>
+<span id="L144"><span class="kw">def</span> <span class="const token" data-verso-hover="85">DepIntegrity</span> : <span class="kw">Prop</span> := ∀ k p, p ∉ F → ((R.<span class="const token" data-verso-hover="80">st</span> k p).<span class="const token" data-verso-hover="47">depDecs</span>).<span class="const token" data-verso-hover="86">length</span> ≤ <span class="nu">1</span></span>
+<span id="L145"></span>
+<span id="L146"><span class="dc">/-- Number of correct servers that proposed `v` to `con`, at time `k`. -/</span></span>
+<span id="L147"><span class="kw">def</span> <span class="const token" data-verso-hover="87">nProp</span> (k : <span class="const token" data-verso-hover="63">ℕ</span>) (v : <span class="const token" data-verso-hover="42">Bool</span>) : <span class="const token" data-verso-hover="63">ℕ</span> := #{q | q ∉ F ∧ (R.<span class="const token" data-verso-hover="80">st</span> k q).<span class="const token" data-verso-hover="40">input</span> = <span class="const token" data-verso-hover="64">some</span> v}</span>
+<span id="L148"></span>
+<span id="L149"><span class="dc">/-- Integrity of Representative Binary Consensus: no correct server decides more than once. -/</span></span>
+<span id="L150"><span class="kw">def</span> <span class="const token" data-verso-hover="88">Integrity</span> : <span class="kw">Prop</span> := ∀ k p, p ∉ F → ((R.<span class="const token" data-verso-hover="80">st</span> k p).<span class="const token" data-verso-hover="49">decs</span>).<span class="const token" data-verso-hover="86">length</span> ≤ <span class="nu">1</span></span>
+<span id="L151"></span>
+<span id="L152"><span class="dc">/-- Agreement of Representative Binary Consensus. -/</span></span>
+<span id="L153"><span class="kw">def</span> <span class="const token" data-verso-hover="89">Agreement</span> : <span class="kw">Prop</span> :=</span>
+<span id="L154">  ∀ k k' p q v w, p ∉ F → q ∉ F → v ∈ (R.<span class="const token" data-verso-hover="80">st</span> k p).<span class="const token" data-verso-hover="49">decs</span> → w ∈ (R.<span class="const token" data-verso-hover="80">st</span> k' q).<span class="const token" data-verso-hover="49">decs</span> → v = w</span>
+<span id="L155"></span>
+<span id="L156"><span class="dc">/-- Representative Validity: a decided value was proposed by at least `f + 1` correct servers. -/</span></span>
+<span id="L157"><span class="kw">def</span> <span class="const token" data-verso-hover="90">RepValidity</span> (f : <span class="const token" data-verso-hover="63">ℕ</span>) : <span class="kw">Prop</span> :=</span>
+<span id="L158">  ∀ k p v, p ∉ F → v ∈ (R.<span class="const token" data-verso-hover="80">st</span> k p).<span class="const token" data-verso-hover="49">decs</span> → ∃ k', f + <span class="nu">1</span> ≤ <span class="const token" data-verso-hover="87">nProp</span> R k' v</span>
+<span id="L159"></span>
+<span id="L160"><span class="kw">end</span> Spec</span>
+<span id="L161"></span>
+<span id="L162"><span class="dc">/-! ### Invariants -/</span></span>
+<span id="L163"></span>
+<span id="L164"><span class="kw">section</span> Invariants</span>
+<span id="L165"></span>
+<span id="L166"><span class="kw">variable</span> {F : <span class="const token" data-verso-hover="73">Finset</span> P} {θ : <span class="const token" data-verso-hover="67">Thresholds</span>}</span>
+<span id="L167"></span>
+<span id="L168"><span class="dc">/-- Number of correct servers with input `v` in global state `g`. -/</span></span>
+<span id="L169"><span class="kw">def</span> <span class="const token" data-verso-hover="91">cntIn</span> (F : <span class="const token" data-verso-hover="73">Finset</span> P) (g : P → <span class="const token" data-verso-hover="39">LState</span> P) (v : <span class="const token" data-verso-hover="42">Bool</span>) : <span class="const token" data-verso-hover="63">ℕ</span> := #{q | q ∉ F ∧ (g q).<span class="const token" data-verso-hover="40">input</span> = <span class="const token" data-verso-hover="64">some</span> v}</span>
+<span id="L170"></span>
+<span id="L171"><span class="dc">/-- The inductive invariant of Blink. -/</span></span>
+<span id="L172"><span class="kw">structure</span> <span class="const token" data-verso-hover="92">Inv</span> (F : <span class="const token" data-verso-hover="73">Finset</span> P) (θ : <span class="const token" data-verso-hover="67">Thresholds</span>) (g : P → <span class="const token" data-verso-hover="39">LState</span> P) : <span class="kw">Prop</span> <span class="kw">where</span></span>
+<span id="L173">  <span class="dc">/-- Observation 1 + authenticated links: suggestions of correct servers are genuine. -/</span></span>
+<span id="L174">  <span class="const token" data-verso-hover="93">sugg</span> : ∀ p q v, p ∉ F → q ∉ F → (g p).<span class="const token" data-verso-hover="43">sugg</span> q = <span class="const token" data-verso-hover="64">some</span> v → (g q).<span class="const token" data-verso-hover="40">input</span> = <span class="const token" data-verso-hover="64">some</span> v</span>
+<span id="L175">  <span class="dc">/-- A value proposed to `dep` was suggested by `M` servers. -/</span></span>
+<span id="L176">  <span class="const token" data-verso-hover="94">depProp</span> : ∀ p v, p ∉ F → (g p).<span class="const token" data-verso-hover="46">depProp</span> = <span class="const token" data-verso-hover="64">some</span> v → θ.<span class="const token" data-verso-hover="69">M</span> ≤ F.<span class="const token" data-verso-hover="95">card</span> + <span class="const token" data-verso-hover="91">cntIn</span> F g v</span>
+<span id="L177">  <span class="dc">/-- A decided value was fast-path justified or decided by `dep`. -/</span></span>
+<span id="L178">  <span class="const token" data-verso-hover="96">decs</span> : ∀ p v, p ∉ F → v ∈ (g p).<span class="const token" data-verso-hover="49">decs</span> → θ.<span class="const token" data-verso-hover="70">Q</span> ≤ F.<span class="const token" data-verso-hover="95">card</span> + <span class="const token" data-verso-hover="91">cntIn</span> F g v ∨ v ∈ (g p).<span class="const token" data-verso-hover="47">depDecs</span></span>
+<span id="L179">  <span class="dc">/-- At most one decision, and only once the `decided` flag is set. -/</span></span>
+<span id="L180">  <span class="const token" data-verso-hover="97">decided</span> : ∀ p, p ∉ F → ((g p).<span class="const token" data-verso-hover="49">decs</span>.<span class="const token" data-verso-hover="86">length</span> ≤ <span class="kw">if</span> (g p).<span class="const token" data-verso-hover="45">decided</span> <span class="kw">then</span> <span class="nu">1</span> <span class="kw">else</span> <span class="nu">0</span>)</span>
+<span id="L181"></span>
+<span id="L182"><span class="kw">lemma</span> <span class="const token" data-verso-hover="98">count_le</span> (F : <span class="const token" data-verso-hover="73">Finset</span> P) (s : P → <span class="const token" data-verso-hover="41">Option</span> <span class="const token" data-verso-hover="42">Bool</span>) (v : <span class="const token" data-verso-hover="42">Bool</span>) :</span>
+<span id="L183">    <span class="const token" data-verso-hover="62">count</span> s v ≤ F.<span class="const token" data-verso-hover="95">card</span> + #{q | q ∉ F ∧ s q = <span class="const token" data-verso-hover="64">some</span> v} := <span class="kw">by</span></span>
+<span id="L184">  <span class="kw">unfold</span> <span class="const token" data-verso-hover="62">count</span></span>
+<span id="L185">  <span class="kw">calc</span> #{q | s q = <span class="const token" data-verso-hover="64">some</span> v} ≤ #(F ∪ ({q | q ∉ F ∧ s q = <span class="const token" data-verso-hover="64">some</span> v} : <span class="const token" data-verso-hover="73">Finset</span> P)) := <span class="kw">by</span></span>
+<span id="L186">        <span class="kw">apply</span> <span class="const token" data-verso-hover="99">card_le_card</span></span>
+<span id="L187">        <span class="kw">intro</span> q hq</span>
+<span id="L188">        <span class="kw">by_cases</span> h : q ∈ F</span>
+<span id="L189">        · <span class="kw">exact</span> <span class="const token" data-verso-hover="100">mem_union_left</span> _ h</span>
+<span id="L190">        · <span class="kw">exact</span> <span class="const token" data-verso-hover="101">mem_union_right</span> _ (<span class="kw">by</span> <span class="kw">simp_all</span>)</span>
+<span id="L191">    _ ≤ _ := <span class="const token" data-verso-hover="102">card_union_le</span> _ _</span>
+<span id="L192"></span>
+<span id="L193"><span class="kw">lemma</span> <span class="const token" data-verso-hover="103">count_le_cntIn</span> {g : P → <span class="const token" data-verso-hover="39">LState</span> P} (hI : <span class="const token" data-verso-hover="92">Inv</span> F θ g) {p : P} (hp : p ∉ F) (v : <span class="const token" data-verso-hover="42">Bool</span>) :</span>
+<span id="L194">    <span class="const token" data-verso-hover="62">count</span> (g p).<span class="const token" data-verso-hover="43">sugg</span> v ≤ F.<span class="const token" data-verso-hover="95">card</span> + <span class="const token" data-verso-hover="91">cntIn</span> F g v := <span class="kw">by</span></span>
+<span id="L195">  <span class="kw">refine</span> (<span class="const token" data-verso-hover="98">count_le</span> F _ v).<span class="const token" data-verso-hover="104">trans</span> (<span class="const token" data-verso-hover="105">Nat.add_le_add_left</span> (<span class="const token" data-verso-hover="99">card_le_card</span> ?_) _)</span>
+<span id="L196">  <span class="kw">intro</span> q hq</span>
+<span id="L197">  <span class="kw">simp</span> only [<span class="const token" data-verso-hover="106">mem_filter</span>, <span class="const token" data-verso-hover="107">mem_univ</span>, <span class="const token" data-verso-hover="108">true_and</span>] <span class="kw">at</span> hq ⊢</span>
+<span id="L198">  <span class="kw">exact</span> ⟨hq.<span class="const token" data-verso-hover="109">1</span>, hI.<span class="const token" data-verso-hover="93">sugg</span> p q v hp hq.<span class="const token" data-verso-hover="109">1</span> hq.<span class="const token" data-verso-hover="110">2</span>⟩</span>
+<span id="L199"></span>
+<span id="L200"><span class="dc">/-! Local effects of actions. -/</span></span>
+<span id="L201"></span>
+<span id="L202"><span class="kw">lemma</span> <span class="const token" data-verso-hover="111">LState.input_apply</span> (s : <span class="const token" data-verso-hover="39">LState</span> P) (a : <span class="const token" data-verso-hover="54">Act</span> P) (v : <span class="const token" data-verso-hover="42">Bool</span>) (h : s.<span class="const token" data-verso-hover="40">input</span> = <span class="const token" data-verso-hover="64">some</span> v)</span>
+<span id="L203">    (ha : ∀ w, a ≠ <span class="const token" data-verso-hover="55">.</span>propose w) : (s.<span class="const token" data-verso-hover="76">apply</span> a).<span class="const token" data-verso-hover="40">input</span> = <span class="const token" data-verso-hover="64">some</span> v := <span class="kw">by</span></span>
+<span id="L204">  <span class="kw">cases</span> a &lt;;&gt; <span class="kw">simp</span> only [<span class="const token" data-verso-hover="76">apply</span>, <span class="const token" data-verso-hover="31">decide</span>] &lt;;&gt; (<span class="kw">try</span> <span class="kw">split_ifs</span>) &lt;;&gt; <span class="kw">simp_all</span></span>
+<span id="L205"></span>
+<span id="L206"><span class="kw">lemma</span> <span class="const token" data-verso-hover="112">LState.sugg_apply</span> (s : <span class="const token" data-verso-hover="39">LState</span> P) (a : <span class="const token" data-verso-hover="54">Act</span> P) (q : P) (v : <span class="const token" data-verso-hover="42">Bool</span>)</span>
+<span id="L207">    (h : (s.<span class="const token" data-verso-hover="76">apply</span> a).<span class="const token" data-verso-hover="43">sugg</span> q = <span class="const token" data-verso-hover="64">some</span> v) : s.<span class="const token" data-verso-hover="43">sugg</span> q = <span class="const token" data-verso-hover="64">some</span> v ∨ a = <span class="const token" data-verso-hover="56">.</span>recv q v := <span class="kw">by</span></span>
+<span id="L208">  <span class="kw">cases</span> a <span class="kw">with</span></span>
+<span id="L209">  | <span class="const token" data-verso-hover="56">recv</span> σ w =&gt;</span>
+<span id="L210">    <span class="kw">simp</span> only [<span class="const token" data-verso-hover="76">apply</span>] <span class="kw">at</span> h</span>
+<span id="L211">    <span class="kw">by_cases</span> hq : q = σ</span>
+<span id="L212">    · <span class="kw">subst</span> hq; <span class="kw">simp</span> <span class="kw">at</span> h; <span class="kw">simp</span> [h]</span>
+<span id="L213">    · <span class="kw">rw</span> [<span class="const token" data-verso-hover="113">Function.update_of_ne</span> hq] <span class="kw">at</span> h; <span class="kw">exact</span> <span class="const token" data-verso-hover="114">Or.inl</span> h</span>
+<span id="L214">  | <span class="const token" data-verso-hover="59">_</span> =&gt; <span class="kw">simp</span> only [<span class="const token" data-verso-hover="76">apply</span>, <span class="const token" data-verso-hover="31">decide</span>] <span class="kw">at</span> h &lt;;&gt; (<span class="kw">try</span> <span class="kw">split_ifs</span> <span class="kw">at</span> h) &lt;;&gt; <span class="kw">simp_all</span></span>
+<span id="L215"></span>
+<span id="L216"><span class="kw">lemma</span> <span class="const token" data-verso-hover="115">LState.depProp_apply</span> (s : <span class="const token" data-verso-hover="39">LState</span> P) (a : <span class="const token" data-verso-hover="54">Act</span> P) (v : <span class="const token" data-verso-hover="42">Bool</span>)</span>
+<span id="L217">    (h : (s.<span class="const token" data-verso-hover="76">apply</span> a).<span class="const token" data-verso-hover="46">depProp</span> = <span class="const token" data-verso-hover="64">some</span> v) : s.<span class="const token" data-verso-hover="46">depProp</span> = <span class="const token" data-verso-hover="64">some</span> v ∨ a = <span class="const token" data-verso-hover="57">.</span>depPropose v := <span class="kw">by</span></span>
+<span id="L218">  <span class="kw">cases</span> a &lt;;&gt; <span class="kw">simp</span> only [<span class="const token" data-verso-hover="76">apply</span>, <span class="const token" data-verso-hover="31">decide</span>] <span class="kw">at</span> h &lt;;&gt; (<span class="kw">try</span> <span class="kw">split_ifs</span> <span class="kw">at</span> h) &lt;;&gt; <span class="kw">simp_all</span></span>
+<span id="L219"></span>
+<span id="L220"><span class="kw">lemma</span> <span class="const token" data-verso-hover="116">LState.decs_apply</span> (s : <span class="const token" data-verso-hover="39">LState</span> P) (a : <span class="const token" data-verso-hover="54">Act</span> P) (v : <span class="const token" data-verso-hover="42">Bool</span>) (h : v ∈ (s.<span class="const token" data-verso-hover="76">apply</span> a).<span class="const token" data-verso-hover="49">decs</span>) :</span>
+<span id="L221">    v ∈ s.<span class="const token" data-verso-hover="49">decs</span> ∨ a = <span class="const token" data-verso-hover="58">.</span>fast v ∨ a = <span class="const token" data-verso-hover="59">.</span>depDecide v := <span class="kw">by</span></span>
+<span id="L222">  <span class="kw">cases</span> a &lt;;&gt; <span class="kw">simp</span> only [<span class="const token" data-verso-hover="76">apply</span>, <span class="const token" data-verso-hover="31">decide</span>] <span class="kw">at</span> h &lt;;&gt; (<span class="kw">try</span> <span class="kw">split_ifs</span> <span class="kw">at</span> h) &lt;;&gt; <span class="kw">simp_all</span> &lt;;&gt; <span class="kw">tauto</span></span>
+<span id="L223"></span>
+<span id="L224"><span class="kw">lemma</span> <span class="const token" data-verso-hover="117">LState.depDecs_prefix_apply</span> (s : <span class="const token" data-verso-hover="39">LState</span> P) (a : <span class="const token" data-verso-hover="54">Act</span> P) :</span>
+<span id="L225">    s.<span class="const token" data-verso-hover="47">depDecs</span> &lt;+: (s.<span class="const token" data-verso-hover="76">apply</span> a).<span class="const token" data-verso-hover="47">depDecs</span> := <span class="kw">by</span></span>
+<span id="L226">  <span class="kw">cases</span> a &lt;;&gt; <span class="kw">simp</span> only [<span class="const token" data-verso-hover="76">apply</span>, <span class="const token" data-verso-hover="31">decide</span>] &lt;;&gt; (<span class="kw">try</span> <span class="kw">split_ifs</span>) &lt;;&gt; <span class="kw">simp</span></span>
+<span id="L227"></span>
+<span id="L228"><span class="kw">lemma</span> <span class="const token" data-verso-hover="118">LState.depDecs_apply</span> (s : <span class="const token" data-verso-hover="39">LState</span> P) (a : <span class="const token" data-verso-hover="54">Act</span> P) : s.<span class="const token" data-verso-hover="47">depDecs</span> ⊆ (s.<span class="const token" data-verso-hover="76">apply</span> a).<span class="const token" data-verso-hover="47">depDecs</span> :=</span>
+<span id="L229">  (s.<span class="const token" data-verso-hover="117">depDecs_prefix_apply</span> a).<span class="const token" data-verso-hover="119">subset</span></span>
+<span id="L230"></span>
+<span id="L231"><span class="kw">lemma</span> <span class="const token" data-verso-hover="120">LState.mem_depDecs_apply</span> (s : <span class="const token" data-verso-hover="39">LState</span> P) (v : <span class="const token" data-verso-hover="42">Bool</span>) :</span>
+<span id="L232">    v ∈ (s.<span class="const token" data-verso-hover="76">apply</span> (<span class="const token" data-verso-hover="59">.</span>depDecide v)).<span class="const token" data-verso-hover="47">depDecs</span> := <span class="kw">by</span></span>
+<span id="L233">  <span class="kw">simp</span> [<span class="const token" data-verso-hover="76">apply</span>]</span>
+<span id="L234"></span>
+<span id="L235"><span class="kw">lemma</span> <span class="const token" data-verso-hover="121">LState.decided_apply</span> (s : <span class="const token" data-verso-hover="39">LState</span> P) (a : <span class="const token" data-verso-hover="54">Act</span> P)</span>
+<span id="L236">    (h : s.<span class="const token" data-verso-hover="49">decs</span>.<span class="const token" data-verso-hover="86">length</span> ≤ <span class="kw">if</span> s.<span class="const token" data-verso-hover="45">decided</span> <span class="kw">then</span> <span class="nu">1</span> <span class="kw">else</span> <span class="nu">0</span>) :</span>
+<span id="L237">    (s.<span class="const token" data-verso-hover="76">apply</span> a).<span class="const token" data-verso-hover="49">decs</span>.<span class="const token" data-verso-hover="86">length</span> ≤ <span class="kw">if</span> (s.<span class="const token" data-verso-hover="76">apply</span> a).<span class="const token" data-verso-hover="45">decided</span> <span class="kw">then</span> <span class="nu">1</span> <span class="kw">else</span> <span class="nu">0</span> := <span class="kw">by</span></span>
+<span id="L238">  <span class="kw">cases</span> a &lt;;&gt; <span class="kw">simp</span> only [<span class="const token" data-verso-hover="76">apply</span>, <span class="const token" data-verso-hover="31">decide</span>] &lt;;&gt; (<span class="kw">try</span> <span class="kw">split_ifs</span> <span class="kw">at</span> h ⊢) &lt;;&gt; <span class="kw">simp_all</span></span>
+<span id="L239"></span>
+<span id="L240"><span class="dc">/-- Inputs only change from `none` to `some`. -/</span></span>
+<span id="L241"><span class="kw">lemma</span> <span class="const token" data-verso-hover="122">input_step</span> {g g' : P → <span class="const token" data-verso-hover="39">LState</span> P} (h : <span class="const token" data-verso-hover="78">Step</span> F θ g g') (q : P) (v : <span class="const token" data-verso-hover="42">Bool</span>)</span>
+<span id="L242">    (hq : (g q).<span class="const token" data-verso-hover="40">input</span> = <span class="const token" data-verso-hover="64">some</span> v) : (g' q).<span class="const token" data-verso-hover="40">input</span> = <span class="const token" data-verso-hover="64">some</span> v := <span class="kw">by</span></span>
+<span id="L243">  <span class="kw">rcases</span> h <span class="kw">with</span> <span class="kw">rfl</span> | ⟨p, -, a, hg, <span class="kw">rfl</span>⟩</span>
+<span id="L244">  · <span class="kw">exact</span> hq</span>
+<span id="L245">  <span class="kw">by_cases</span> hpq : q = p</span>
+<span id="L246">  · <span class="kw">subst</span> hpq</span>
+<span id="L247">    <span class="kw">rw</span> [<span class="const token" data-verso-hover="123">Function.update_self</span>]</span>
+<span id="L248">    <span class="kw">refine</span> <span class="const token" data-verso-hover="111">LState.input_apply</span> _ a v hq ?_</span>
+<span id="L249">    <span class="kw">rintro</span> w <span class="kw">rfl</span></span>
+<span id="L250">    <span class="kw">simp</span> [<span class="const token" data-verso-hover="72">guard</span>, hq] <span class="kw">at</span> hg</span>
+<span id="L251">  · <span class="kw">simpa</span> [<span class="const token" data-verso-hover="113">Function.update_of_ne</span> hpq] <span class="kw">using</span> hq</span>
+<span id="L252"></span>
+<span id="L253"><span class="kw">lemma</span> <span class="const token" data-verso-hover="124">cntIn_mono_step</span> {g g' : P → <span class="const token" data-verso-hover="39">LState</span> P} (h : <span class="const token" data-verso-hover="78">Step</span> F θ g g') (v : <span class="const token" data-verso-hover="42">Bool</span>) :</span>
+<span id="L254">    <span class="const token" data-verso-hover="91">cntIn</span> F g v ≤ <span class="const token" data-verso-hover="91">cntIn</span> F g' v := <span class="kw">by</span></span>
+<span id="L255">  <span class="kw">apply</span> <span class="const token" data-verso-hover="99">card_le_card</span></span>
+<span id="L256">  <span class="kw">intro</span> q hq</span>
+<span id="L257">  <span class="kw">simp</span> only [<span class="const token" data-verso-hover="106">mem_filter</span>, <span class="const token" data-verso-hover="107">mem_univ</span>, <span class="const token" data-verso-hover="108">true_and</span>] <span class="kw">at</span> hq ⊢</span>
+<span id="L258">  <span class="kw">exact</span> ⟨hq.<span class="const token" data-verso-hover="109">1</span>, <span class="const token" data-verso-hover="122">input_step</span> h q v hq.<span class="const token" data-verso-hover="110">2</span>⟩</span>
+<span id="L259"></span>
+<span id="L260"><span class="kw">lemma</span> <span class="const token" data-verso-hover="125">Inv.init</span> : <span class="const token" data-verso-hover="92">Inv</span> F θ (<span class="kw">fun</span> _ =&gt; (<span class="const token" data-verso-hover="50">LState.init</span> : <span class="const token" data-verso-hover="39">LState</span> P)) <span class="kw">where</span></span>
+<span id="L261">  <span class="const token" data-verso-hover="93">sugg</span> := <span class="kw">by</span> <span class="kw">simp</span> [<span class="const token" data-verso-hover="50">LState.init</span>]</span>
+<span id="L262">  <span class="const token" data-verso-hover="94">depProp</span> := <span class="kw">by</span> <span class="kw">simp</span> [<span class="const token" data-verso-hover="50">LState.init</span>]</span>
+<span id="L263">  <span class="const token" data-verso-hover="96">decs</span> := <span class="kw">by</span> <span class="kw">simp</span> [<span class="const token" data-verso-hover="50">LState.init</span>]</span>
+<span id="L264">  <span class="const token" data-verso-hover="97">decided</span> := <span class="kw">by</span> <span class="kw">simp</span> [<span class="const token" data-verso-hover="50">LState.init</span>]</span>
+<span id="L265"></span>
+<span id="L266"><span class="kw">lemma</span> <span class="const token" data-verso-hover="126">Inv.step</span> {g g' : P → <span class="const token" data-verso-hover="39">LState</span> P} (hI : <span class="const token" data-verso-hover="92">Inv</span> F θ g) (h : <span class="const token" data-verso-hover="78">Step</span> F θ g g') : <span class="const token" data-verso-hover="92">Inv</span> F θ g' := <span class="kw">by</span></span>
+<span id="L267">  <span class="kw">have</span> hmono := <span class="const token" data-verso-hover="124">cntIn_mono_step</span> h</span>
+<span id="L268">  <span class="kw">have</span> hin := <span class="const token" data-verso-hover="122">input_step</span> h</span>
+<span id="L269">  <span class="kw">rcases</span> h <span class="kw">with</span> <span class="kw">rfl</span> | ⟨p, hp, a, hg, <span class="kw">rfl</span>⟩</span>
+<span id="L270">  · <span class="kw">exact</span> hI</span>
+<span id="L271">  <span class="kw">constructor</span></span>
+<span id="L272">  · <span class="kw">intro</span> r q v hr hq hs</span>
+<span id="L273">    <span class="kw">by_cases</span> hrp : r = p</span>
+<span id="L274">    · <span class="kw">subst</span> hrp</span>
+<span id="L275">      <span class="kw">rw</span> [<span class="const token" data-verso-hover="123">Function.update_self</span>] <span class="kw">at</span> hs</span>
+<span id="L276">      <span class="kw">rcases</span> <span class="const token" data-verso-hover="112">LState.sugg_apply</span> _ a q v hs <span class="kw">with</span> hs | <span class="kw">rfl</span></span>
+<span id="L277">      · <span class="kw">exact</span> hin q v (hI.<span class="const token" data-verso-hover="93">sugg</span> r q v hr hq hs)</span>
+<span id="L278">      · <span class="kw">simp</span> only [<span class="const token" data-verso-hover="72">guard</span>, hq, <span class="const token" data-verso-hover="127">false_or</span>] <span class="kw">at</span> hg</span>
+<span id="L279">        <span class="kw">exact</span> hin q v hg</span>
+<span id="L280">    · <span class="kw">rw</span> [<span class="const token" data-verso-hover="113">Function.update_of_ne</span> hrp] <span class="kw">at</span> hs</span>
+<span id="L281">      <span class="kw">exact</span> hin q v (hI.<span class="const token" data-verso-hover="93">sugg</span> r q v hr hq hs)</span>
+<span id="L282">  · <span class="kw">intro</span> r v hr hd</span>
+<span id="L283">    <span class="kw">by_cases</span> hrp : r = p</span>
+<span id="L284">    · <span class="kw">subst</span> hrp</span>
+<span id="L285">      <span class="kw">rw</span> [<span class="const token" data-verso-hover="123">Function.update_self</span>] <span class="kw">at</span> hd</span>
+<span id="L286">      <span class="kw">rcases</span> <span class="const token" data-verso-hover="115">LState.depProp_apply</span> _ a v hd <span class="kw">with</span> hd | <span class="kw">rfl</span></span>
+<span id="L287">      · <span class="kw">exact</span> (hI.<span class="const token" data-verso-hover="94">depProp</span> r v hr hd).<span class="const token" data-verso-hover="104">trans</span> (<span class="const token" data-verso-hover="105">Nat.add_le_add_left</span> (hmono _) _)</span>
+<span id="L288">      · <span class="kw">exact</span> ((hg.<span class="const token" data-verso-hover="110">2</span><span class="nu">.</span><span class="const token" data-verso-hover="110">2</span>).<span class="const token" data-verso-hover="104">trans</span> (<span class="const token" data-verso-hover="103">count_le_cntIn</span> hI hr _)).<span class="const token" data-verso-hover="104">trans</span> (<span class="const token" data-verso-hover="105">Nat.add_le_add_left</span> (hmono _) _)</span>
+<span id="L289">    · <span class="kw">rw</span> [<span class="const token" data-verso-hover="113">Function.update_of_ne</span> hrp] <span class="kw">at</span> hd</span>
+<span id="L290">      <span class="kw">exact</span> (hI.<span class="const token" data-verso-hover="94">depProp</span> r v hr hd).<span class="const token" data-verso-hover="104">trans</span> (<span class="const token" data-verso-hover="105">Nat.add_le_add_left</span> (hmono _) _)</span>
+<span id="L291">  · <span class="kw">intro</span> r v hr hd</span>
+<span id="L292">    <span class="kw">by_cases</span> hrp : r = p</span>
+<span id="L293">    · <span class="kw">subst</span> hrp</span>
+<span id="L294">      <span class="kw">rw</span> [<span class="const token" data-verso-hover="123">Function.update_self</span>] <span class="kw">at</span> hd ⊢</span>
+<span id="L295">      <span class="kw">rcases</span> <span class="const token" data-verso-hover="116">LState.decs_apply</span> _ a v hd <span class="kw">with</span> hd | <span class="kw">rfl</span> | <span class="kw">rfl</span></span>
+<span id="L296">      · <span class="kw">exact</span> (hI.<span class="const token" data-verso-hover="96">decs</span> r v hr hd).<span class="const token" data-verso-hover="128">imp</span> (<span class="kw">fun</span> h' =&gt; h'.<span class="const token" data-verso-hover="104">trans</span> (<span class="const token" data-verso-hover="105">Nat.add_le_add_left</span> (hmono _) _))</span>
+<span id="L297">          (<span class="kw">fun</span> h' =&gt; <span class="const token" data-verso-hover="118">LState.depDecs_apply</span> _ a h')</span>
+<span id="L298">      · <span class="kw">left</span></span>
+<span id="L299">        <span class="kw">exact</span> ((hg : θ.<span class="const token" data-verso-hover="70">Q</span> ≤ _).<span class="const token" data-verso-hover="104">trans</span> (<span class="const token" data-verso-hover="103">count_le_cntIn</span> hI hr _)).<span class="const token" data-verso-hover="104">trans</span></span>
+<span id="L300">          (<span class="const token" data-verso-hover="105">Nat.add_le_add_left</span> (hmono _) _)</span>
+<span id="L301">      · <span class="kw">exact</span> <span class="const token" data-verso-hover="129">Or.inr</span> (<span class="const token" data-verso-hover="120">LState.mem_depDecs_apply</span> _ v)</span>
+<span id="L302">    · <span class="kw">rw</span> [<span class="const token" data-verso-hover="113">Function.update_of_ne</span> hrp] <span class="kw">at</span> hd ⊢</span>
+<span id="L303">      <span class="kw">exact</span> (hI.<span class="const token" data-verso-hover="96">decs</span> r v hr hd).<span class="const token" data-verso-hover="128">imp</span> (<span class="kw">fun</span> h' =&gt; h'.<span class="const token" data-verso-hover="104">trans</span> (<span class="const token" data-verso-hover="105">Nat.add_le_add_left</span> (hmono _) _)) <span class="const token" data-verso-hover="130">id</span></span>
+<span id="L304">  · <span class="kw">intro</span> r hr</span>
+<span id="L305">    <span class="kw">by_cases</span> hrp : r = p</span>
+<span id="L306">    · <span class="kw">subst</span> hrp</span>
+<span id="L307">      <span class="kw">rw</span> [<span class="const token" data-verso-hover="123">Function.update_self</span>]</span>
+<span id="L308">      <span class="kw">exact</span> <span class="const token" data-verso-hover="121">LState.decided_apply</span> _ a (hI.<span class="const token" data-verso-hover="97">decided</span> r hr)</span>
+<span id="L309">    · <span class="kw">rw</span> [<span class="const token" data-verso-hover="113">Function.update_of_ne</span> hrp]</span>
+<span id="L310">      <span class="kw">exact</span> hI.<span class="const token" data-verso-hover="97">decided</span> r hr</span>
+<span id="L311"></span>
+<span id="L312"></span>
+<span id="L313"><span class="kw">variable</span> (R : <span class="const token" data-verso-hover="79">Run</span> F θ)</span>
+<span id="L314"></span>
+<span id="L315"><span class="kw">lemma</span> <span class="const token" data-verso-hover="131">Run.inv</span> (k : <span class="const token" data-verso-hover="63">ℕ</span>) : <span class="const token" data-verso-hover="92">Inv</span> F θ (R.<span class="const token" data-verso-hover="80">st</span> k) := <span class="kw">by</span></span>
+<span id="L316">  <span class="kw">induction</span> k <span class="kw">with</span></span>
+<span id="L317">  | <span class="const token" data-verso-hover="132">zero</span> =&gt; <span class="kw">rw</span> [R.<span class="const token" data-verso-hover="81">init</span>]; <span class="kw">exact</span> <span class="const token" data-verso-hover="125">Inv.init</span></span>
+<span id="L318">  | <span class="const token" data-verso-hover="133">succ</span> k ih =&gt; <span class="kw">exact</span> ih.<span class="const token" data-verso-hover="126">step</span> (R.<span class="const token" data-verso-hover="82">step</span> k)</span>
+<span id="L319"></span>
+<span id="L320"><span class="kw">lemma</span> <span class="const token" data-verso-hover="134">Run.cntIn_mono</span> {k k' : <span class="const token" data-verso-hover="63">ℕ</span>} (h : k ≤ k') (v : <span class="const token" data-verso-hover="42">Bool</span>) :</span>
+<span id="L321">    <span class="const token" data-verso-hover="91">cntIn</span> F (R.<span class="const token" data-verso-hover="80">st</span> k) v ≤ <span class="const token" data-verso-hover="91">cntIn</span> F (R.<span class="const token" data-verso-hover="80">st</span> k') v := <span class="kw">by</span></span>
+<span id="L322">  <span class="kw">induction</span> h <span class="kw">with</span></span>
+<span id="L323">  | <span class="const token" data-verso-hover="135">refl</span> =&gt; <span class="kw">exact</span> <span class="const token" data-verso-hover="136">le_rfl</span></span>
+<span id="L324">  | <span class="const token" data-verso-hover="137">step</span> _ ih =&gt; <span class="kw">exact</span> ih.<span class="const token" data-verso-hover="104">trans</span> (<span class="const token" data-verso-hover="124">cntIn_mono_step</span> (R.<span class="const token" data-verso-hover="82">step</span> _) v)</span>
+<span id="L325"></span>
+<span id="L326"><span class="kw">lemma</span> <span class="const token" data-verso-hover="138">Run.depDecs_prefix</span> {k k' : <span class="const token" data-verso-hover="63">ℕ</span>} (h : k ≤ k') (p : P) :</span>
+<span id="L327">    (R.<span class="const token" data-verso-hover="80">st</span> k p).<span class="const token" data-verso-hover="47">depDecs</span> &lt;+: (R.<span class="const token" data-verso-hover="80">st</span> k' p).<span class="const token" data-verso-hover="47">depDecs</span> := <span class="kw">by</span></span>
+<span id="L328">  <span class="kw">induction</span> h <span class="kw">with</span></span>
+<span id="L329">  | <span class="const token" data-verso-hover="135">refl</span> =&gt; <span class="kw">exact</span> <span class="const token" data-verso-hover="139">List.prefix_refl</span> _</span>
+<span id="L330">  | <span class="const token" data-verso-hover="137">step</span> _ ih =&gt;</span>
+<span id="L331">    <span class="kw">refine</span> ih.<span class="const token" data-verso-hover="140">trans</span> ?_</span>
+<span id="L332">    <span class="kw">rcases</span> R.<span class="const token" data-verso-hover="82">step</span> _ <span class="kw">with</span> h | ⟨q, -, a, -, h⟩</span>
+<span id="L333">    · <span class="kw">rw</span> [h]</span>
+<span id="L334">    · <span class="kw">rw</span> [h]</span>
+<span id="L335">      <span class="kw">by_cases</span> hpq : p = q</span>
+<span id="L336">      · <span class="kw">subst</span> hpq; <span class="kw">rw</span> [<span class="const token" data-verso-hover="123">Function.update_self</span>]; <span class="kw">exact</span> <span class="const token" data-verso-hover="117">LState.depDecs_prefix_apply</span> _ a</span>
+<span id="L337">      · <span class="kw">rw</span> [<span class="const token" data-verso-hover="113">Function.update_of_ne</span> hpq]</span>
+<span id="L338"></span>
+<span id="L339"><span class="kw">lemma</span> <span class="const token" data-verso-hover="141">Run.depDecs_mono</span> {k k' : <span class="const token" data-verso-hover="63">ℕ</span>} (h : k ≤ k') (p : P) :</span>
+<span id="L340">    (R.<span class="const token" data-verso-hover="80">st</span> k p).<span class="const token" data-verso-hover="47">depDecs</span> ⊆ (R.<span class="const token" data-verso-hover="80">st</span> k' p).<span class="const token" data-verso-hover="47">depDecs</span> :=</span>
+<span id="L341">  (R.<span class="const token" data-verso-hover="138">depDecs_prefix</span> h p).<span class="const token" data-verso-hover="119">subset</span></span>
+<span id="L342"></span>
+<span id="L343"><span class="dc">/-! ### Runs given by a finite list of actions (followed by stuttering) -/</span></span>
+<span id="L344"></span>
+<span id="L345"><span class="dc">/-- The global state after performing the first `k` actions of `acts`. -/</span></span>
+<span id="L346"><span class="kw">def</span> <span class="const token" data-verso-hover="142">listState</span> (acts : <span class="const token" data-verso-hover="48">List</span> (P × <span class="const token" data-verso-hover="54">Act</span> P)) (k : <span class="const token" data-verso-hover="63">ℕ</span>) : P → <span class="const token" data-verso-hover="39">LState</span> P :=</span>
+<span id="L347">  (acts.<span class="const token" data-verso-hover="143">take</span> k).<span class="const token" data-verso-hover="144">foldl</span> (<span class="kw">fun</span> g pa =&gt; <span class="const token" data-verso-hover="77">Function.update</span> g pa.<span class="const token" data-verso-hover="145">1</span> ((g pa.<span class="const token" data-verso-hover="145">1</span>).<span class="const token" data-verso-hover="76">apply</span> pa.<span class="const token" data-verso-hover="146">2</span>))</span>
+<span id="L348">    (<span class="kw">fun</span> _ =&gt; <span class="const token" data-verso-hover="50">LState.init</span>)</span>
+<span id="L349"></span>
+<span id="L350"><span class="dc">/-- Every action of `acts` is performed by a correct server whose guard holds. -/</span></span>
+<span id="L351"><span class="kw">def</span> <span class="const token" data-verso-hover="32">ValidList</span> (F : <span class="const token" data-verso-hover="73">Finset</span> P) (θ : <span class="const token" data-verso-hover="67">Thresholds</span>) (acts : <span class="const token" data-verso-hover="48">List</span> (P × <span class="const token" data-verso-hover="54">Act</span> P)) : <span class="kw">Prop</span> :=</span>
+<span id="L352">  ∀ i (h : i &lt; acts.<span class="const token" data-verso-hover="86">length</span>), acts[i].<span class="const token" data-verso-hover="145">1</span> ∉ F ∧ <span class="const token" data-verso-hover="72">guard</span> F θ (<span class="const token" data-verso-hover="142">listState</span> acts i) acts[i].<span class="const token" data-verso-hover="145">1</span> acts[i].<span class="const token" data-verso-hover="146">2</span></span>
+<span id="L353"></span>
+<span id="L354"><span class="const token" data-verso-hover="147">instance</span> (F : <span class="const token" data-verso-hover="73">Finset</span> P) (θ : <span class="const token" data-verso-hover="67">Thresholds</span>) (acts : <span class="const token" data-verso-hover="48">List</span> (P × <span class="const token" data-verso-hover="54">Act</span> P)) :</span>
+<span id="L355">    <span class="const token" data-verso-hover="75">Decidable</span> (<span class="const token" data-verso-hover="32">ValidList</span> F θ acts) := <span class="kw">by</span></span>
+<span id="L356">  <span class="kw">unfold</span> <span class="const token" data-verso-hover="32">ValidList</span>; <span class="kw">infer_instance</span></span>
+<span id="L357"></span>
+<span id="L358"><span class="dc">/-- The run performing the actions of a valid list, then stuttering. -/</span></span>
+<span id="L359"><span class="kw">def</span> <span class="const token" data-verso-hover="33">Run.ofList</span> (F : <span class="const token" data-verso-hover="73">Finset</span> P) (θ : <span class="const token" data-verso-hover="67">Thresholds</span>) (acts : <span class="const token" data-verso-hover="48">List</span> (P × <span class="const token" data-verso-hover="54">Act</span> P))</span>
+<span id="L360">    (h : <span class="const token" data-verso-hover="32">ValidList</span> F θ acts) : <span class="const token" data-verso-hover="79">Run</span> F θ <span class="kw">where</span></span>
+<span id="L361">  <span class="const token" data-verso-hover="80">st</span> := <span class="const token" data-verso-hover="142">listState</span> acts</span>
+<span id="L362">  <span class="const token" data-verso-hover="81">init</span> := <span class="kw">by</span> <span class="kw">simp</span> [<span class="const token" data-verso-hover="142">listState</span>]</span>
+<span id="L363">  <span class="const token" data-verso-hover="82">step</span> k := <span class="kw">by</span></span>
+<span id="L364">    <span class="kw">by_cases</span> hk : k &lt; acts.<span class="const token" data-verso-hover="86">length</span></span>
+<span id="L365">    · <span class="kw">right</span></span>
+<span id="L366">      <span class="kw">refine</span> ⟨acts[k].<span class="const token" data-verso-hover="145">1</span>, (h k hk).<span class="const token" data-verso-hover="109">1</span>, acts[k].<span class="const token" data-verso-hover="146">2</span>, (h k hk).<span class="const token" data-verso-hover="110">2</span>, ?_⟩</span>
+<span id="L367">      <span class="kw">simp</span> only [<span class="const token" data-verso-hover="142">listState</span>]</span>
+<span id="L368">      <span class="kw">rw</span> [<span class="const token" data-verso-hover="148">List.take_add_one</span>, <span class="const token" data-verso-hover="149">List.getElem?_eq_getElem</span> hk, <span class="const token" data-verso-hover="150">Option.toList_some</span>, <span class="const token" data-verso-hover="151">List.foldl_append</span>,</span>
+<span id="L369">        <span class="const token" data-verso-hover="152">List.foldl_cons</span>, <span class="const token" data-verso-hover="153">List.foldl_nil</span>]</span>
+<span id="L370">    · <span class="kw">left</span></span>
+<span id="L371">      <span class="kw">simp</span> [<span class="const token" data-verso-hover="142">listState</span>, <span class="const token" data-verso-hover="154">List.take_of_length_le</span> (<span class="kw">by</span> <span class="kw">omega</span> : acts.<span class="const token" data-verso-hover="86">length</span> ≤ k),</span>
+<span id="L372">        <span class="const token" data-verso-hover="154">List.take_of_length_le</span> (<span class="kw">by</span> <span class="kw">omega</span> : acts.<span class="const token" data-verso-hover="86">length</span> ≤ k + <span class="nu">1</span>)]</span>
+<span id="L373"></span>
+<span id="L374"><span class="kw">lemma</span> <span class="const token" data-verso-hover="155">cntIn_add_cntIn_le</span> (F : <span class="const token" data-verso-hover="73">Finset</span> P) (g : P → <span class="const token" data-verso-hover="39">LState</span> P) :</span>
+<span id="L375">    <span class="const token" data-verso-hover="91">cntIn</span> F g <span class="const token" data-verso-hover="53">true</span> + <span class="const token" data-verso-hover="91">cntIn</span> F g <span class="const token" data-verso-hover="52">false</span> ≤ <span class="const token" data-verso-hover="156">Fintype.card</span> P - F.<span class="const token" data-verso-hover="95">card</span> := <span class="kw">by</span></span>
+<span id="L376">  <span class="kw">unfold</span> <span class="const token" data-verso-hover="91">cntIn</span></span>
+<span id="L377">  <span class="kw">rw</span> [← <span class="const token" data-verso-hover="157">card_union_of_disjoint</span>]</span>
+<span id="L378">  · <span class="kw">calc</span> _ ≤ #(<span class="const token" data-verso-hover="158">univ</span> \ F) := <span class="const token" data-verso-hover="99">card_le_card</span> (<span class="kw">by</span> <span class="kw">intro</span> q; <span class="kw">simp</span>; <span class="kw">tauto</span>)</span>
+<span id="L379">      _ = _ := <span class="kw">by</span> <span class="kw">rw</span> [<span class="const token" data-verso-hover="159">card_sdiff_of_subset</span> (<span class="const token" data-verso-hover="160">subset_univ</span> _), <span class="const token" data-verso-hover="161">card_univ</span>]</span>
+<span id="L380">  · <span class="kw">rw</span> [<span class="const token" data-verso-hover="162">disjoint_filter</span>]; <span class="kw">intro</span> q _ h1 h2; <span class="kw">simp_all</span></span>
+<span id="L381"></span>
+<span id="L382"><span class="dc">/-- Two values cannot both be supported by thresholds `A` and `B` when `n + |F| &lt; A + B`. -/</span></span>
+<span id="L383"><span class="kw">lemma</span> <span class="const token" data-verso-hover="163">eq_of_thresholds</span> {g g' : P → <span class="const token" data-verso-hover="39">LState</span> P} {A B : <span class="const token" data-verso-hover="63">ℕ</span>} {v w : <span class="const token" data-verso-hover="42">Bool</span>}</span>
+<span id="L384">    (hAB : <span class="const token" data-verso-hover="156">Fintype.card</span> P + F.<span class="const token" data-verso-hover="95">card</span> &lt; A + B) (hF : F.<span class="const token" data-verso-hover="95">card</span> ≤ <span class="const token" data-verso-hover="156">Fintype.card</span> P)</span>
+<span id="L385">    (hmono : ∀ u, <span class="const token" data-verso-hover="91">cntIn</span> F g u ≤ <span class="const token" data-verso-hover="91">cntIn</span> F g' u)</span>
+<span id="L386">    (hv : A ≤ F.<span class="const token" data-verso-hover="95">card</span> + <span class="const token" data-verso-hover="91">cntIn</span> F g v) (hw : B ≤ F.<span class="const token" data-verso-hover="95">card</span> + <span class="const token" data-verso-hover="91">cntIn</span> F g' w) : v = w := <span class="kw">by</span></span>
+<span id="L387">  <span class="kw">by_contra</span> hne</span>
+<span id="L388">  <span class="kw">have</span> h1 := hmono v</span>
+<span id="L389">  <span class="kw">have</span> h2 := <span class="const token" data-verso-hover="155">cntIn_add_cntIn_le</span> F g'</span>
+<span id="L390">  <span class="kw">cases</span> v &lt;;&gt; <span class="kw">cases</span> w &lt;;&gt; <span class="kw">simp</span> <span class="kw">at</span> hne &lt;;&gt; <span class="kw">omega</span></span>
+<span id="L391"></span>
+<span id="L392"><span class="kw">end</span> Invariants</span>
+<span id="L393"></span>
+<span id="L394"><span class="dc">/-! ### The paper's lemmas and theorems -/</span></span>
+<span id="L395"></span>
+<span id="L396"><span class="kw">section</span> Main</span>
+<span id="L397"></span>
+<span id="L398"><span class="kw">variable</span> {F : <span class="const token" data-verso-hover="73">Finset</span> P} {θ : <span class="const token" data-verso-hover="67">Thresholds</span>} (R : <span class="const token" data-verso-hover="79">Run</span> F θ)</span>
+<span id="L399"></span>
+<span id="L400"><span class="dc">/-- Observation 1: a correct server records `suggestions[σ] = v` for a correct `σ` only if `σ`</span></span>
+<span id="L401"><span class="dc">proposed `v`. -/</span></span>
+<span id="L402"><span class="kw">theorem</span> <span class="const token" data-verso-hover="13">observation1</span> (k : <span class="const token" data-verso-hover="63">ℕ</span>) (p q : P) (v : <span class="const token" data-verso-hover="42">Bool</span>) (hp : p ∉ F) (hq : q ∉ F)</span>
+<span id="L403">    (h : (R.<span class="const token" data-verso-hover="80">st</span> k p).<span class="const token" data-verso-hover="43">sugg</span> q = <span class="const token" data-verso-hover="64">some</span> v) : (R.<span class="const token" data-verso-hover="80">st</span> k q).<span class="const token" data-verso-hover="40">input</span> = <span class="const token" data-verso-hover="64">some</span> v :=</span>
+<span id="L404">  (R.<span class="const token" data-verso-hover="131">inv</span> k).<span class="const token" data-verso-hover="93">sugg</span> p q v hp hq h</span>
+<span id="L405"></span>
+<span id="L406"><span class="dc">/-- Lemma 2 of [Monti–Camaioni–Roman], for general thresholds: if a correct server ever has `Q`</span></span>
+<span id="L407"><span class="dc">suggestions for `v`, no correct server ever has `M` suggestions for `!v`, provided</span></span>
+<span id="L408"><span class="dc">`n + |F| &lt; Q + M`. (Paper: `Q = 4f+1`, `M = 2f+1`, `n = 5f+1`, `|F| ≤ f`.) -/</span></span>
+<span id="L409"><span class="kw">theorem</span> <span class="const token" data-verso-hover="14">lemma2</span> (hθ : <span class="const token" data-verso-hover="156">Fintype.card</span> P + F.<span class="const token" data-verso-hover="95">card</span> &lt; θ.<span class="const token" data-verso-hover="70">Q</span> + θ.<span class="const token" data-verso-hover="69">M</span>) (k k' : <span class="const token" data-verso-hover="63">ℕ</span>) (p q : P) (v : <span class="const token" data-verso-hover="42">Bool</span>)</span>
+<span id="L410">    (hp : p ∉ F) (hq : q ∉ F) (h1 : θ.<span class="const token" data-verso-hover="70">Q</span> ≤ <span class="const token" data-verso-hover="62">count</span> (R.<span class="const token" data-verso-hover="80">st</span> k p).<span class="const token" data-verso-hover="43">sugg</span> v) :</span>
+<span id="L411">    ¬ θ.<span class="const token" data-verso-hover="69">M</span> ≤ <span class="const token" data-verso-hover="62">count</span> (R.<span class="const token" data-verso-hover="80">st</span> k' q).<span class="const token" data-verso-hover="43">sugg</span> (!v) := <span class="kw">by</span></span>
+<span id="L412">  <span class="kw">intro</span> h2</span>
+<span id="L413">  <span class="kw">have</span> hF : F.<span class="const token" data-verso-hover="95">card</span> ≤ <span class="const token" data-verso-hover="156">Fintype.card</span> P := <span class="const token" data-verso-hover="164">card_le_univ</span> F</span>
+<span id="L414">  <span class="kw">have</span> a := h1.<span class="const token" data-verso-hover="104">trans</span> (<span class="const token" data-verso-hover="103">count_le_cntIn</span> (R.<span class="const token" data-verso-hover="131">inv</span> k) hp v)</span>
+<span id="L415">  <span class="kw">have</span> b := h2.<span class="const token" data-verso-hover="104">trans</span> (<span class="const token" data-verso-hover="103">count_le_cntIn</span> (R.<span class="const token" data-verso-hover="131">inv</span> k') hq (!v))</span>
+<span id="L416">  <span class="kw">rcases</span> <span class="const token" data-verso-hover="165">le_total</span> k k' <span class="kw">with</span> hk | hk</span>
+<span id="L417">  · <span class="kw">have</span> := <span class="const token" data-verso-hover="163">eq_of_thresholds</span> hθ hF (<span class="kw">fun</span> u =&gt; R.<span class="const token" data-verso-hover="134">cntIn_mono</span> hk u) a b</span>
+<span id="L418">    <span class="kw">cases</span> v &lt;;&gt; <span class="kw">simp</span> <span class="kw">at</span> this</span>
+<span id="L419">  · <span class="kw">have</span> := <span class="const token" data-verso-hover="163">eq_of_thresholds</span> (<span class="kw">by</span> <span class="kw">omega</span>) hF (<span class="kw">fun</span> u =&gt; R.<span class="const token" data-verso-hover="134">cntIn_mono</span> hk u) b a</span>
+<span id="L420">    <span class="kw">cases</span> v &lt;;&gt; <span class="kw">simp</span> <span class="kw">at</span> this</span>
+<span id="L421"></span>
+<span id="L422"><span class="dc">/-- Lemma 3, for general thresholds: if a correct server ever has `Q` suggestions for `v`, every</span></span>
+<span id="L423"><span class="dc">`dep` decision at a correct server is `v` (uses the Validity of `dep`). -/</span></span>
+<span id="L424"><span class="kw">theorem</span> <span class="const token" data-verso-hover="15">lemma3</span> (hθ : <span class="const token" data-verso-hover="156">Fintype.card</span> P + F.<span class="const token" data-verso-hover="95">card</span> &lt; θ.<span class="const token" data-verso-hover="70">Q</span> + θ.<span class="const token" data-verso-hover="69">M</span>) (hval : <span class="const token" data-verso-hover="83">DepValidity</span> R)</span>
+<span id="L425">    (k k' : <span class="const token" data-verso-hover="63">ℕ</span>) (p q : P) (v w : <span class="const token" data-verso-hover="42">Bool</span>) (hp : p ∉ F) (hq : q ∉ F)</span>
+<span id="L426">    (h1 : θ.<span class="const token" data-verso-hover="70">Q</span> ≤ <span class="const token" data-verso-hover="62">count</span> (R.<span class="const token" data-verso-hover="80">st</span> k p).<span class="const token" data-verso-hover="43">sugg</span> v) (h2 : w ∈ (R.<span class="const token" data-verso-hover="80">st</span> k' q).<span class="const token" data-verso-hover="47">depDecs</span>) : w = v := <span class="kw">by</span></span>
+<span id="L427">  <span class="kw">obtain</span> ⟨k'', r, hr, hd⟩ := hval k' q w hq h2</span>
+<span id="L428">  <span class="kw">have</span> hF : F.<span class="const token" data-verso-hover="95">card</span> ≤ <span class="const token" data-verso-hover="156">Fintype.card</span> P := <span class="const token" data-verso-hover="164">card_le_univ</span> F</span>
+<span id="L429">  <span class="kw">have</span> a := h1.<span class="const token" data-verso-hover="104">trans</span> (<span class="const token" data-verso-hover="103">count_le_cntIn</span> (R.<span class="const token" data-verso-hover="131">inv</span> k) hp v)</span>
+<span id="L430">  <span class="kw">have</span> b := (R.<span class="const token" data-verso-hover="131">inv</span> k'').<span class="const token" data-verso-hover="94">depProp</span> r w hr hd</span>
+<span id="L431">  <span class="kw">rcases</span> <span class="const token" data-verso-hover="165">le_total</span> k k'' <span class="kw">with</span> hk | hk</span>
+<span id="L432">  · <span class="kw">exact</span> (<span class="const token" data-verso-hover="163">eq_of_thresholds</span> hθ hF (<span class="kw">fun</span> u =&gt; R.<span class="const token" data-verso-hover="134">cntIn_mono</span> hk u) a b).<span class="const token" data-verso-hover="166">symm</span></span>
+<span id="L433">  · <span class="kw">exact</span> <span class="const token" data-verso-hover="163">eq_of_thresholds</span> (<span class="kw">by</span> <span class="kw">omega</span>) hF (<span class="kw">fun</span> u =&gt; R.<span class="const token" data-verso-hover="134">cntIn_mono</span> hk u) b a</span>
+<span id="L434"></span>
+<span id="L435"><span class="dc">/-- Lemma 4, for general thresholds: if a correct server triggers both `dep.Decide v` and</span></span>
+<span id="L436"><span class="dc">`con.Decide w`, then `v = w`. (The paper uses the Integrity of `dep`; we use its Agreement.) -/</span></span>
+<span id="L437"><span class="kw">theorem</span> <span class="const token" data-verso-hover="16">lemma4</span> (hθ : <span class="const token" data-verso-hover="156">Fintype.card</span> P + F.<span class="const token" data-verso-hover="95">card</span> &lt; θ.<span class="const token" data-verso-hover="70">Q</span> + θ.<span class="const token" data-verso-hover="69">M</span>) (hval : <span class="const token" data-verso-hover="83">DepValidity</span> R)</span>
+<span id="L438">    (hagr : <span class="const token" data-verso-hover="84">DepAgreement</span> R) (k k' : <span class="const token" data-verso-hover="63">ℕ</span>) (p : P) (v w : <span class="const token" data-verso-hover="42">Bool</span>) (hp : p ∉ F)</span>
+<span id="L439">    (h1 : v ∈ (R.<span class="const token" data-verso-hover="80">st</span> k p).<span class="const token" data-verso-hover="47">depDecs</span>) (h2 : w ∈ (R.<span class="const token" data-verso-hover="80">st</span> k' p).<span class="const token" data-verso-hover="49">decs</span>) : v = w := <span class="kw">by</span></span>
+<span id="L440">  <span class="kw">rcases</span> (R.<span class="const token" data-verso-hover="131">inv</span> k').<span class="const token" data-verso-hover="96">decs</span> p w hp h2 <span class="kw">with</span> h | h</span>
+<span id="L441">  · <span class="kw">obtain</span> ⟨k'', r, hr, hd⟩ := hval k p v hp h1</span>
+<span id="L442">    <span class="kw">have</span> b := (R.<span class="const token" data-verso-hover="131">inv</span> k'').<span class="const token" data-verso-hover="94">depProp</span> r v hr hd</span>
+<span id="L443">    <span class="kw">rcases</span> <span class="const token" data-verso-hover="165">le_total</span> k' k'' <span class="kw">with</span> hk | hk</span>
+<span id="L444">    · <span class="kw">exact</span> (<span class="const token" data-verso-hover="163">eq_of_thresholds</span> hθ (<span class="const token" data-verso-hover="164">card_le_univ</span> F) (<span class="kw">fun</span> u =&gt; R.<span class="const token" data-verso-hover="134">cntIn_mono</span> hk u) h b).<span class="const token" data-verso-hover="166">symm</span></span>
+<span id="L445">    · <span class="kw">exact</span> <span class="const token" data-verso-hover="163">eq_of_thresholds</span> (<span class="kw">by</span> <span class="kw">omega</span>) (<span class="const token" data-verso-hover="164">card_le_univ</span> F) (<span class="kw">fun</span> u =&gt; R.<span class="const token" data-verso-hover="134">cntIn_mono</span> hk u) b h</span>
+<span id="L446">  · <span class="kw">exact</span> hagr k k' p p v w hp hp h1 h</span>
+<span id="L447"></span>
+<span id="L448"><span class="dc">/-- Theorem 3 of [Monti–Camaioni–Roman]: Blink satisfies Integrity. -/</span></span>
+<span id="L449"><span class="kw">theorem</span> <span class="const token" data-verso-hover="18">theorem3</span> : <span class="const token" data-verso-hover="88">Integrity</span> R := <span class="kw">fun</span> k p hp =&gt; <span class="kw">by</span></span>
+<span id="L450">  <span class="kw">have</span> := (R.<span class="const token" data-verso-hover="131">inv</span> k).<span class="const token" data-verso-hover="97">decided</span> p hp</span>
+<span id="L451">  <span class="kw">split_ifs</span> <span class="kw">at</span> this &lt;;&gt; <span class="kw">omega</span></span>
+<span id="L452"></span>
+<span id="L453"><span class="dc">/-- Theorem 2 of [Monti–Camaioni–Roman] (Representative Validity), for general thresholds</span></span>
+<span id="L454"><span class="dc">`M, Q ≥ 2f + 1`. Unlike the paper's proof, it does not use the Termination of `dep`. -/</span></span>
+<span id="L455"><span class="kw">theorem</span> <span class="const token" data-verso-hover="17">theorem2</span> {f : <span class="const token" data-verso-hover="63">ℕ</span>} (hF : F.<span class="const token" data-verso-hover="95">card</span> ≤ f) (hM : <span class="nu">2</span> * f + <span class="nu">1</span> ≤ θ.<span class="const token" data-verso-hover="69">M</span>) (hQ : <span class="nu">2</span> * f + <span class="nu">1</span> ≤ θ.<span class="const token" data-verso-hover="70">Q</span>)</span>
+<span id="L456">    (hval : <span class="const token" data-verso-hover="83">DepValidity</span> R) : <span class="const token" data-verso-hover="90">RepValidity</span> R f := <span class="kw">by</span></span>
+<span id="L457">  <span class="kw">intro</span> k p v hp hd</span>
+<span id="L458">  <span class="kw">rcases</span> (R.<span class="const token" data-verso-hover="131">inv</span> k).<span class="const token" data-verso-hover="96">decs</span> p v hp hd <span class="kw">with</span> h | h</span>
+<span id="L459">  · <span class="kw">exact</span> ⟨k, <span class="kw">by</span> <span class="kw">unfold</span> <span class="const token" data-verso-hover="87">nProp</span>; <span class="kw">unfold</span> <span class="const token" data-verso-hover="91">cntIn</span> <span class="kw">at</span> h; <span class="kw">omega</span>⟩</span>
+<span id="L460">  · <span class="kw">obtain</span> ⟨k', r, hr, hd'⟩ := hval k p v hp h</span>
+<span id="L461">    <span class="kw">have</span> := (R.<span class="const token" data-verso-hover="131">inv</span> k').<span class="const token" data-verso-hover="94">depProp</span> r v hr hd'</span>
+<span id="L462">    <span class="kw">exact</span> ⟨k', <span class="kw">by</span> <span class="kw">unfold</span> <span class="const token" data-verso-hover="87">nProp</span>; <span class="kw">unfold</span> <span class="const token" data-verso-hover="91">cntIn</span> <span class="kw">at</span> this; <span class="kw">omega</span>⟩</span>
+<span id="L463"></span>
+<span id="L464"><span class="dc">/-- Theorem 4 of [Monti–Camaioni–Roman] (Agreement), for general thresholds with</span></span>
+<span id="L465"><span class="dc">`n + |F| &lt; Q + M` and `M ≤ Q`. Unlike the paper's proof, it does not use the Termination of `dep`. -/</span></span>
+<span id="L466"><span class="kw">theorem</span> <span class="const token" data-verso-hover="19">theorem4</span> (hθ : <span class="const token" data-verso-hover="156">Fintype.card</span> P + F.<span class="const token" data-verso-hover="95">card</span> &lt; θ.<span class="const token" data-verso-hover="70">Q</span> + θ.<span class="const token" data-verso-hover="69">M</span>) (hMQ : θ.<span class="const token" data-verso-hover="69">M</span> ≤ θ.<span class="const token" data-verso-hover="70">Q</span>)</span>
+<span id="L467">    (hval : <span class="const token" data-verso-hover="83">DepValidity</span> R) (hagr : <span class="const token" data-verso-hover="84">DepAgreement</span> R) : <span class="const token" data-verso-hover="89">Agreement</span> R := <span class="kw">by</span></span>
+<span id="L468">  <span class="kw">intro</span> k k' p q v w hp hq hv hw</span>
+<span id="L469">  <span class="kw">have</span> hF : F.<span class="const token" data-verso-hover="95">card</span> ≤ <span class="const token" data-verso-hover="156">Fintype.card</span> P := <span class="const token" data-verso-hover="164">card_le_univ</span> F</span>
+<span id="L470">  <span class="cm">--</span><span class="cm"> a dep decision `u` at time `k` is supported by `M` at some time</span></span>
+<span id="L471">  <span class="kw">have</span> dep : ∀ k p u, p ∉ F → u ∈ (R.<span class="const token" data-verso-hover="80">st</span> k p).<span class="const token" data-verso-hover="47">depDecs</span> →</span>
+<span id="L472">      ∃ k'', θ.<span class="const token" data-verso-hover="69">M</span> ≤ F.<span class="const token" data-verso-hover="95">card</span> + <span class="const token" data-verso-hover="91">cntIn</span> F (R.<span class="const token" data-verso-hover="80">st</span> k'') u := <span class="kw">fun</span> k p u hp h =&gt; <span class="kw">by</span></span>
+<span id="L473">    <span class="kw">obtain</span> ⟨k'', r, hr, hd⟩ := hval k p u hp h</span>
+<span id="L474">    <span class="kw">exact</span> ⟨k'', (R.<span class="const token" data-verso-hover="131">inv</span> k'').<span class="const token" data-verso-hover="94">depProp</span> r u hr hd⟩</span>
+<span id="L475">  <span class="kw">have</span> key : ∀ {k k' : <span class="const token" data-verso-hover="63">ℕ</span>} {A B : <span class="const token" data-verso-hover="63">ℕ</span>} {v w : <span class="const token" data-verso-hover="42">Bool</span>}, <span class="const token" data-verso-hover="156">Fintype.card</span> P + F.<span class="const token" data-verso-hover="95">card</span> &lt; A + B →</span>
+<span id="L476">      A ≤ F.<span class="const token" data-verso-hover="95">card</span> + <span class="const token" data-verso-hover="91">cntIn</span> F (R.<span class="const token" data-verso-hover="80">st</span> k) v → B ≤ F.<span class="const token" data-verso-hover="95">card</span> + <span class="const token" data-verso-hover="91">cntIn</span> F (R.<span class="const token" data-verso-hover="80">st</span> k') w → v = w :=</span>
+<span id="L477">    <span class="kw">fun</span> {k k'} {A B} {v w} hAB ha hb =&gt; <span class="kw">by</span></span>
+<span id="L478">      <span class="kw">rcases</span> <span class="const token" data-verso-hover="165">le_total</span> k k' <span class="kw">with</span> hk | hk</span>
+<span id="L479">      · <span class="kw">exact</span> <span class="const token" data-verso-hover="163">eq_of_thresholds</span> hAB hF (<span class="kw">fun</span> u =&gt; R.<span class="const token" data-verso-hover="134">cntIn_mono</span> hk u) ha hb</span>
+<span id="L480">      · <span class="kw">exact</span> (<span class="const token" data-verso-hover="163">eq_of_thresholds</span> (<span class="kw">by</span> <span class="kw">omega</span>) hF (<span class="kw">fun</span> u =&gt; R.<span class="const token" data-verso-hover="134">cntIn_mono</span> hk u) hb ha).<span class="const token" data-verso-hover="166">symm</span></span>
+<span id="L481">  <span class="kw">rcases</span> (R.<span class="const token" data-verso-hover="131">inv</span> k).<span class="const token" data-verso-hover="96">decs</span> p v hp hv <span class="kw">with</span> h1 | h1 &lt;;&gt;</span>
+<span id="L482">    <span class="kw">rcases</span> (R.<span class="const token" data-verso-hover="131">inv</span> k').<span class="const token" data-verso-hover="96">decs</span> q w hq hw <span class="kw">with</span> h2 | h2</span>
+<span id="L483">  · <span class="kw">exact</span> key (<span class="kw">by</span> <span class="kw">omega</span>) h1 h2</span>
+<span id="L484">  · <span class="kw">obtain</span> ⟨k'', h⟩ := dep _ _ _ hq h2</span>
+<span id="L485">    <span class="kw">exact</span> key hθ h1 h</span>
+<span id="L486">  · <span class="kw">obtain</span> ⟨k'', h⟩ := dep _ _ _ hp h1</span>
+<span id="L487">    <span class="kw">exact</span> key (<span class="kw">by</span> <span class="kw">omega</span>) h h2</span>
+<span id="L488">  · <span class="kw">exact</span> hagr k k' p q v w hp hq h1 h2</span>
+<span id="L489"></span>
+<span id="L490"><span class="dc">/-- Blink with the paper's thresholds (`W = Q = 4f+1`, `M = 2f+1`) satisfies Integrity,</span></span>
+<span id="L491"><span class="dc">Agreement and Representative Validity whenever `n ≤ 5f + 1` and at most `f` servers are Byzantine,</span></span>
+<span id="L492"><span class="dc">given a `dep` satisfying Validity and Agreement (Theorems 2–4 of [Monti–Camaioni–Roman]; the paper</span></span>
+<span id="L493"><span class="dc">assumes `n = 5f + 1`). -/</span></span>
+<span id="L494"><span class="kw">theorem</span> <span class="const token" data-verso-hover="20">blink_safe</span> {f : <span class="const token" data-verso-hover="63">ℕ</span>} {F : <span class="const token" data-verso-hover="73">Finset</span> P} (hF : F.<span class="const token" data-verso-hover="95">card</span> ≤ f) (hn : <span class="const token" data-verso-hover="156">Fintype.card</span> P ≤ <span class="nu">5</span> * f + <span class="nu">1</span>)</span>
+<span id="L495">    (R : <span class="const token" data-verso-hover="79">Run</span> F (<span class="const token" data-verso-hover="71">paperThresholds</span> f)) (hval : <span class="const token" data-verso-hover="83">DepValidity</span> R) (hagr : <span class="const token" data-verso-hover="84">DepAgreement</span> R) :</span>
+<span id="L496">    <span class="const token" data-verso-hover="88">Integrity</span> R ∧ <span class="const token" data-verso-hover="89">Agreement</span> R ∧ <span class="const token" data-verso-hover="90">RepValidity</span> R f :=</span>
+<span id="L497">  ⟨<span class="const token" data-verso-hover="18">theorem3</span> R,</span>
+<span id="L498">    <span class="const token" data-verso-hover="19">theorem4</span> R (<span class="kw">by</span> <span class="kw">simp</span> only [<span class="const token" data-verso-hover="71">paperThresholds</span>]; <span class="kw">omega</span>) (<span class="kw">by</span> <span class="kw">simp</span> [<span class="const token" data-verso-hover="71">paperThresholds</span>]; <span class="kw">omega</span>) hval hagr,</span>
+<span id="L499">    <span class="const token" data-verso-hover="17">theorem2</span> R hF (<span class="kw">by</span> <span class="kw">simp</span> [<span class="const token" data-verso-hover="71">paperThresholds</span>]) (<span class="kw">by</span> <span class="kw">simp</span> [<span class="const token" data-verso-hover="71">paperThresholds</span>]; <span class="kw">omega</span>) hval⟩</span>
+<span id="L500"></span>
+<span id="L501"><span class="dc">/-- Thresholds that work for every `n ≥ 5f + 1`: wait for and fast-decide on `n - f` suggestions,</span></span>
+<span id="L502"><span class="dc">majority threshold `2f + 1`. -/</span></span>
+<span id="L503"><span class="kw">def</span> <span class="const token" data-verso-hover="167">generalThresholds</span> (n f : <span class="const token" data-verso-hover="63">ℕ</span>) : <span class="const token" data-verso-hover="67">Thresholds</span> := ⟨n - f, <span class="nu">2</span> * f + <span class="nu">1</span>, n - f⟩</span>
+<span id="L504"></span>
+<span id="L505"><span class="dc">/-- Blink with thresholds `n - f`, `2f + 1`, `n - f` is safe for every `n ≥ 5f + 1`. -/</span></span>
+<span id="L506"><span class="kw">theorem</span> <span class="const token" data-verso-hover="5">blink_safe_general</span> {f : <span class="const token" data-verso-hover="63">ℕ</span>} {F : <span class="const token" data-verso-hover="73">Finset</span> P} (hF : F.<span class="const token" data-verso-hover="95">card</span> ≤ f)</span>
+<span id="L507">    (hn : <span class="nu">5</span> * f + <span class="nu">1</span> ≤ <span class="const token" data-verso-hover="156">Fintype.card</span> P) (R : <span class="const token" data-verso-hover="79">Run</span> F (<span class="const token" data-verso-hover="167">generalThresholds</span> (<span class="const token" data-verso-hover="156">Fintype.card</span> P) f))</span>
+<span id="L508">    (hval : <span class="const token" data-verso-hover="83">DepValidity</span> R) (hagr : <span class="const token" data-verso-hover="84">DepAgreement</span> R) :</span>
+<span id="L509">    <span class="const token" data-verso-hover="88">Integrity</span> R ∧ <span class="const token" data-verso-hover="89">Agreement</span> R ∧ <span class="const token" data-verso-hover="90">RepValidity</span> R f :=</span>
+<span id="L510">  ⟨<span class="const token" data-verso-hover="18">theorem3</span> R,</span>
+<span id="L511">    <span class="const token" data-verso-hover="19">theorem4</span> R (<span class="kw">by</span> <span class="kw">simp</span> only [<span class="const token" data-verso-hover="167">generalThresholds</span>]; <span class="kw">omega</span>) (<span class="kw">by</span> <span class="kw">simp</span> [<span class="const token" data-verso-hover="167">generalThresholds</span>]; <span class="kw">omega</span>)</span>
+<span id="L512">      hval hagr,</span>
+<span id="L513">    <span class="const token" data-verso-hover="17">theorem2</span> R hF (<span class="kw">by</span> <span class="kw">simp</span> [<span class="const token" data-verso-hover="167">generalThresholds</span>]) (<span class="kw">by</span> <span class="kw">simp</span> [<span class="const token" data-verso-hover="167">generalThresholds</span>]; <span class="kw">omega</span>) hval⟩</span>
+<span id="L514"></span>
+<span id="L515"><span class="kw">end</span> Main</span>
+<span id="L516"></span>
+<span id="L517"><span class="kw">end</span> Podc.FastByzantineTOB.Blink</span>
+<span id="L518"></span>
+</code></div>
+        <script>
+          window.versoHoversUrl = "PODC2026/FastByzantineTOB/-hovers.json";</script>
+        <script src="static/lean/popper.js"></script>
+        <script src="static/lean/tippy.js"></script>
+        <script src="static/lean/marked.js"></script>
+        <script src="static/lean/highlighting.js"></script>
+        <script src="static/lean/lean.js"></script>
+        </article></main><footer class="site-footer"><div class="wrap">
+        Machine-checked formalizations of PODC papers in Lean 4. Generated with <a href="https://github.com/leanprover/verso">Verso</a> from the README files of <a href="https://github.com/vasnesterov/formal_podc">vasnesterov/formal_podc</a>.</div>
+      </footer></body>
+  </html>
+

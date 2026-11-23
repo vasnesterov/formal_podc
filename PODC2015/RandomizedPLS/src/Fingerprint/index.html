@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="light dark">
+    <link rel="icon" href="data:,">
+    <title>RandomizedPLS: Fingerprint.lean · Formal PODC</title><base href="../../../.././"><link rel="stylesheet" href="static/lean/verso-vars.css">
+    <link rel="stylesheet" href="static/lean/highlighting.css">
+    <link rel="stylesheet" href="static/lean/tippy-border.css">
+    <link rel="stylesheet" href="static/style.css">
+    <script defer="defer" src="static/site.js"></script>
+    </head>
+  <body>
+    <header class="site-header">
+      <div class="wrap">
+        <a class="brand" href=".">Formal PODC</a><nav class="top">
+          <a href=".">Search</a><a href="about/">About</a><a href="https://github.com/vasnesterov/formal_podc">GitHub</a></nav>
+        </div>
+      </header>
+    <main class="wrap"><article><nav class="breadcrumbs" aria-label="Breadcrumb">
+          <a href=".">Search</a><span class="sep">›</span><a href="PODC2015/">PODC 2015</a><span class="sep">›</span><a href="PODC2015/RandomizedPLS/">RandomizedPLS</a><span class="sep">›</span><a href="PODC2015/RandomizedPLS/src/">Lean source</a><span class="sep">›</span><span aria-current="page">Fingerprint</span></nav>
+        <h1>
+          <code>Fingerprint.lean</code></h1>
+        <div class="paper-links">
+          <p>
+            Source of <a href="PODC2015/RandomizedPLS/">Randomized Proof-Labeling Schemes — PODC 2015</a> · <a href="https://github.com/vasnesterov/formal_podc/blob/main/Papers/PODC2015/RandomizedPLS/Fingerprint.lean">GitHub</a> · hover over a name for its type and documentation</p>
+          </div>
+        <div class="lean-code lean-src">
+          <code class="hl lean block" data-lean-context="Fingerprint"><span id="L1"><span class="kw">import</span> Mathlib</span>
+<span id="L2"><span class="kw">import</span> Cslib.Probability.Finite.Uniform</span>
+<span id="L3"></span>
+<span id="L4"><span class="dc">/-!</span></span>
+<span id="L5"><span class="dc"># Fingerprinting: a one-way randomized protocol for equality (Lemma 3.3 of [BFP15])</span></span>
+<span id="L6"></span>
+<span id="L7"><span class="dc">M. Baruch, P. Fraigniaud, B. Patt-Shamir. *Randomized Proof-Labeling Schemes.* PODC 2015.</span></span>
+<span id="L8"></span>
+<span id="L9"><span class="dc">Lemma 3.3 asks for a one-way protocol for `EQ`: a *sender* holding a bit string `a` sends a short</span></span>
+<span id="L10"><span class="dc">random message, and a *decider* holding a bit string `b` decides `a = b` from it; equal strings are</span></span>
+<span id="L11"><span class="dc">always accepted and distinct strings are rejected with probability `&gt; 2/3`; the message has</span></span>
+<span id="L12"><span class="dc">`O(log λ)` bits for `λ`-bit strings.</span></span>
+<span id="L13"></span>
+<span id="L14"><span class="dc">We use polynomial fingerprints over the Galois field `𝔽 = GF(2^m)`, `m = fpBits |a|` with</span></span>
+<span id="L15"><span class="dc">`2^m ≥ 3 (|a| + 1)`:</span></span>
+<span id="L16"></span>
+<span id="L17"><span class="dc">* `bitPoly a = X^|a| + ∑ aᵢ Xⁱ` encodes the bit string `a` injectively (the leading monomial</span></span>
+<span id="L18"><span class="dc">  encodes the length);</span></span>
+<span id="L19"><span class="dc">* `fpSend a x`, for a uniformly random `x ∈ 𝔽`, is the `2m`-bit string `enc x ++ enc (P_a(x))`;</span></span>
+<span id="L20"><span class="dc">* `fpDecide b r` accepts iff `r = fpSend b x` for some `x`, i.e. iff `r` has `2 · fpBits |b|`</span></span>
+<span id="L21"><span class="dc">  bits and decodes to a pair `(x, y)` with `P_b(x) = y`.</span></span>
+<span id="L22"></span>
+<span id="L23"><span class="dc">Our version is slightly more general than the paper's: `a` and `b` may have different lengths</span></span>
+<span id="L24"><span class="dc">(the message then has `2 · fpBits |a|` bits).</span></span>
+<span id="L25"></span>
+<span id="L26"><span class="dc">## Main statements</span></span>
+<span id="L27"></span>
+<span id="L28"><span class="dc">* `uprob_apply_eq` (marginal of a uniform product space; `CSLib candidate`).</span></span>
+<span id="L29"><span class="dc">* `card_filter_eval_eq_le` (two distinct polynomials agree on few points; `CSLib candidate`).</span></span>
+<span id="L30"><span class="dc">* `lemma_3_3`: Lemma 3.3 of [BFP15].</span></span>
+<span id="L31"><span class="dc">-/</span></span>
+<span id="L32"></span>
+<span id="L33"><span class="kw">namespace</span> Podc.RandomizedPLS</span>
+<span id="L34"></span>
+<span id="L35"><span class="kw">open</span> Polynomial Cslib.Probability Classical</span>
+<span id="L36"></span>
+<span id="L37"><span class="dc">/-! ### Marginals of uniform product spaces -/</span></span>
+<span id="L38"></span>
+<span id="L39"><span class="cm">--</span><span class="cm"> CSLib candidate</span></span>
+<span id="L40"><span class="dc">/-- **Marginals of a uniform product space.** An event that depends on one coordinate of the</span></span>
+<span id="L41"><span class="dc">uniform product space `∀ j, α j` has the same probability as on that coordinate. -/</span></span>
+<span id="L42"><span class="kw">theorem</span> <span class="const token" data-verso-hover="43">uprob_apply_eq</span> {ι : <span class="kw">Type</span>*} [<span class="const token" data-verso-hover="206">Fintype</span> ι] [<span class="const token" data-verso-hover="176">DecidableEq</span> ι] {α : ι → <span class="kw">Type</span>*}</span>
+<span id="L43">    [∀ i, <span class="const token" data-verso-hover="206">Fintype</span> (α i)] [∀ i, <span class="const token" data-verso-hover="109">Nonempty</span> (α i)] (i : ι) (p : α i → <span class="kw">Prop</span>) :</span>
+<span id="L44">    <span class="const token" data-verso-hover="38">uprob</span> (<span class="kw">fun</span> ω : ∀ j, α j =&gt; p (ω i)) = <span class="const token" data-verso-hover="38">uprob</span> p := <span class="kw">by</span></span>
+<span id="L45">  <span class="kw">have</span> e : (<span class="kw">fun</span> ω : ∀ j, α j =&gt; p (ω i)) = (<span class="kw">fun</span> ω =&gt; ∀ j, ∀ h : j = i, p (h ▸ ω j)) := <span class="kw">by</span></span>
+<span id="L46">    <span class="kw">funext</span> ω; <span class="kw">apply</span> <span class="const token" data-verso-hover="36">propext</span>; <span class="kw">constructor</span></span>
+<span id="L47">    · <span class="kw">rintro</span> hp j <span class="kw">rfl</span>; <span class="kw">exact</span> hp</span>
+<span id="L48">    · <span class="kw">intro</span> h; <span class="kw">exact</span> h i <span class="const token" data-verso-hover="107">rfl</span></span>
+<span id="L49">  <span class="kw">rw</span> [e, <span class="const token" data-verso-hover="579">uprob_pi</span> (<span class="kw">fun</span> j x =&gt; ∀ h : j = i, p (h ▸ x)), <span class="const token" data-verso-hover="580">Finset.prod_eq_single</span> i]</span>
+<span id="L50">  · <span class="kw">congr</span> <span class="nu">1</span>; <span class="kw">funext</span> x; <span class="kw">apply</span> <span class="const token" data-verso-hover="36">propext</span>; <span class="kw">exact</span> ⟨<span class="kw">fun</span> h =&gt; h <span class="const token" data-verso-hover="107">rfl</span>, <span class="kw">fun</span> h _ =&gt; h⟩</span>
+<span id="L51">  · <span class="kw">intro</span> j _ hj</span>
+<span id="L52">    <span class="kw">have</span> : (<span class="kw">fun</span> x : α j =&gt; ∀ h : j = i, p (h ▸ x)) = <span class="kw">fun</span> _ =&gt; <span class="const token" data-verso-hover="581">True</span> := <span class="kw">by</span></span>
+<span id="L53">      <span class="kw">funext</span> x; <span class="kw">apply</span> <span class="const token" data-verso-hover="36">propext</span>; <span class="kw">exact</span> ⟨<span class="kw">fun</span> _ =&gt; <span class="const token" data-verso-hover="582">trivial</span>, <span class="kw">fun</span> _ h =&gt; <span class="const token" data-verso-hover="99">absurd</span> h hj⟩</span>
+<span id="L54">    <span class="kw">rw</span> [this, <span class="const token" data-verso-hover="583">uprob_true</span>]; <span class="kw">simp</span></span>
+<span id="L55">  · <span class="kw">simp</span></span>
+<span id="L56"></span>
+<span id="L57"><span class="dc">/-! ### Polynomial encodings of bit strings -/</span></span>
+<span id="L58"></span>
+<span id="L59"><span class="kw">section</span> Poly</span>
+<span id="L60"></span>
+<span id="L61"><span class="kw">variable</span> {K : <span class="kw">Type</span>*} [<span class="const token" data-verso-hover="584">Field</span> K]</span>
+<span id="L62"></span>
+<span id="L63"><span class="dc">/-- The polynomial `X^|a| + ∑_{i &lt; |a|} aᵢ Xⁱ` of a bit string `a`. -/</span></span>
+<span id="L64"><span class="kw">noncomputable</span> <span class="kw">def</span> <span class="const token" data-verso-hover="585">bitPoly</span> : <span class="const token" data-verso-hover="67">List</span> <span class="const token" data-verso-hover="89">Bool</span> → K[X]</span>
+<span id="L65">  | [] =&gt; <span class="nu">1</span></span>
+<span id="L66">  | b :: t =&gt; (<span class="kw">if</span> b <span class="kw">then</span> <span class="nu">1</span> <span class="kw">else</span> <span class="nu">0</span>) + <span class="const token" data-verso-hover="586">X</span> * <span class="const token" data-verso-hover="585">bitPoly</span> t</span>
+<span id="L67"></span>
+<span id="L68"><span class="kw">lemma</span> <span class="const token" data-verso-hover="587">bitPoly_monic_natDegree</span> (a : <span class="const token" data-verso-hover="67">List</span> <span class="const token" data-verso-hover="89">Bool</span>) :</span>
+<span id="L69">    (<span class="const token" data-verso-hover="585">bitPoly</span> a : K[X]).<span class="const token" data-verso-hover="588">Monic</span> ∧ (<span class="const token" data-verso-hover="585">bitPoly</span> a : K[X]).<span class="const token" data-verso-hover="589">natDegree</span> = a.<span class="const token" data-verso-hover="54">length</span> := <span class="kw">by</span></span>
+<span id="L70">  <span class="kw">induction</span> a <span class="kw">with</span></span>
+<span id="L71">  | <span class="const token" data-verso-hover="393">nil</span> =&gt; <span class="kw">simp</span> [<span class="const token" data-verso-hover="585">bitPoly</span>]</span>
+<span id="L72">  | <span class="const token" data-verso-hover="394">cons</span> b t ih =&gt;</span>
+<span id="L73">    <span class="kw">obtain</span> ⟨hm, hd⟩ := ih</span>
+<span id="L74">    <span class="kw">have</span> hXm : (<span class="const token" data-verso-hover="586">X</span> * <span class="const token" data-verso-hover="585">bitPoly</span> t : K[X]).<span class="const token" data-verso-hover="588">Monic</span> := <span class="const token" data-verso-hover="590">monic_X</span>.<span class="const token" data-verso-hover="591">mul</span> hm</span>
+<span id="L75">    <span class="kw">have</span> hXd : (<span class="const token" data-verso-hover="586">X</span> * <span class="const token" data-verso-hover="585">bitPoly</span> t : K[X]).<span class="const token" data-verso-hover="589">natDegree</span> = t.<span class="const token" data-verso-hover="54">length</span> + <span class="nu">1</span> := <span class="kw">by</span></span>
+<span id="L76">      <span class="kw">rw</span> [<span class="const token" data-verso-hover="592">natDegree_X_mul</span> hm.<span class="const token" data-verso-hover="593">ne_zero</span>, hd]</span>
+<span id="L77">    <span class="kw">have</span> hc : ((<span class="kw">if</span> b <span class="kw">then</span> <span class="nu">1</span> <span class="kw">else</span> <span class="nu">0</span> : K[X])).<span class="const token" data-verso-hover="589">natDegree</span> &lt; (<span class="const token" data-verso-hover="586">X</span> * <span class="const token" data-verso-hover="585">bitPoly</span> t : K[X]).<span class="const token" data-verso-hover="589">natDegree</span> := <span class="kw">by</span></span>
+<span id="L78">      <span class="kw">rw</span> [hXd]; <span class="kw">split_ifs</span> &lt;;&gt; <span class="kw">simp</span></span>
+<span id="L79">    <span class="kw">refine</span> ⟨hXm.<span class="const token" data-verso-hover="594">add_of_right</span> (<span class="const token" data-verso-hover="595">degree_lt_degree</span> hc), ?_⟩</span>
+<span id="L80">    <span class="kw">simp</span> only [<span class="const token" data-verso-hover="585">bitPoly</span>, <span class="const token" data-verso-hover="478">List.length_cons</span>]</span>
+<span id="L81">    <span class="kw">rw</span> [<span class="const token" data-verso-hover="596">natDegree_add_eq_right_of_natDegree_lt</span> hc, hXd]</span>
+<span id="L82"></span>
+<span id="L83"><span class="kw">lemma</span> <span class="const token" data-verso-hover="597">bitPoly_natDegree</span> (a : <span class="const token" data-verso-hover="67">List</span> <span class="const token" data-verso-hover="89">Bool</span>) : (<span class="const token" data-verso-hover="585">bitPoly</span> a : K[X]).<span class="const token" data-verso-hover="589">natDegree</span> = a.<span class="const token" data-verso-hover="54">length</span> :=</span>
+<span id="L84">  (<span class="const token" data-verso-hover="587">bitPoly_monic_natDegree</span> a).<span class="const token" data-verso-hover="140">2</span></span>
+<span id="L85"></span>
+<span id="L86"><span class="dc">/-- Bit strings are encoded injectively. -/</span></span>
+<span id="L87"><span class="kw">lemma</span> <span class="const token" data-verso-hover="598">bitPoly_injective</span> : <span class="const token" data-verso-hover="146">Function.Injective</span> (<span class="const token" data-verso-hover="585">bitPoly</span> : <span class="const token" data-verso-hover="67">List</span> <span class="const token" data-verso-hover="89">Bool</span> → K[X]) := <span class="kw">by</span></span>
+<span id="L88">  <span class="kw">intro</span> a b h</span>
+<span id="L89">  <span class="kw">induction</span> a generalizing b <span class="kw">with</span></span>
+<span id="L90">  | <span class="const token" data-verso-hover="393">nil</span> =&gt;</span>
+<span id="L91">    <span class="kw">have</span> := <span class="const token" data-verso-hover="487">congrArg</span> <span class="const token" data-verso-hover="589">natDegree</span> h</span>
+<span id="L92">    <span class="kw">rw</span> [<span class="const token" data-verso-hover="597">bitPoly_natDegree</span>, <span class="const token" data-verso-hover="597">bitPoly_natDegree</span>] <span class="kw">at</span> this</span>
+<span id="L93">    <span class="kw">exact</span> (<span class="const token" data-verso-hover="599">List.length_eq_zero_iff</span>.<span class="const token" data-verso-hover="134">mp</span> this.<span class="const token" data-verso-hover="398">symm</span>).<span class="const token" data-verso-hover="398">symm</span></span>
+<span id="L94">  | <span class="const token" data-verso-hover="394">cons</span> x s ih =&gt;</span>
+<span id="L95">    <span class="kw">cases</span> b <span class="kw">with</span></span>
+<span id="L96">    | <span class="const token" data-verso-hover="393">nil</span> =&gt;</span>
+<span id="L97">      <span class="kw">have</span> := <span class="const token" data-verso-hover="487">congrArg</span> <span class="const token" data-verso-hover="589">natDegree</span> h</span>
+<span id="L98">      <span class="kw">rw</span> [<span class="const token" data-verso-hover="597">bitPoly_natDegree</span>, <span class="const token" data-verso-hover="597">bitPoly_natDegree</span>] <span class="kw">at</span> this</span>
+<span id="L99">      <span class="kw">simp</span> <span class="kw">at</span> this</span>
+<span id="L100">    | <span class="const token" data-verso-hover="394">cons</span> y t =&gt;</span>
+<span id="L101">      <span class="kw">have</span> h0 := <span class="const token" data-verso-hover="487">congrArg</span> (<span class="const token" data-verso-hover="600">coeff</span> · <span class="nu">0</span>) h</span>
+<span id="L102">      <span class="kw">have</span> hxy : x = y := <span class="kw">by</span></span>
+<span id="L103">        <span class="kw">cases</span> x &lt;;&gt; <span class="kw">cases</span> y &lt;;&gt; <span class="kw">simp</span> [<span class="const token" data-verso-hover="585">bitPoly</span>] <span class="kw">at</span> h0 ⊢</span>
+<span id="L104">      <span class="kw">subst</span> hxy</span>
+<span id="L105">      <span class="kw">have</span> h' : <span class="const token" data-verso-hover="586">X</span> * <span class="const token" data-verso-hover="585">bitPoly</span> s = <span class="const token" data-verso-hover="586">X</span> * (<span class="const token" data-verso-hover="585">bitPoly</span> t : K[X]) := <span class="const token" data-verso-hover="601">add_left_cancel</span> h</span>
+<span id="L106">      <span class="kw">rw</span> [ih (<span class="const token" data-verso-hover="602">mul_left_cancel₀</span> <span class="const token" data-verso-hover="603">X_ne_zero</span> h')]</span>
+<span id="L107"></span>
+<span id="L108"><span class="kw">end</span> Poly</span>
+<span id="L109"></span>
+<span id="L110"><span class="cm">--</span><span class="cm"> CSLib candidate</span></span>
+<span id="L111"><span class="dc">/-- Two distinct polynomials over a finite field agree on at most `max (deg p) (deg q)` points. -/</span></span>
+<span id="L112"><span class="kw">lemma</span> <span class="const token" data-verso-hover="44">card_filter_eval_eq_le</span> {K : <span class="kw">Type</span>*} [<span class="const token" data-verso-hover="584">Field</span> K] [<span class="const token" data-verso-hover="206">Fintype</span> K] {p q : K[X]} (hpq : p ≠ q) :</span>
+<span id="L113">    (<span class="const token" data-verso-hover="272">Finset.univ</span>.<span class="const token" data-verso-hover="604">filter</span> <span class="kw">fun</span> x =&gt; p.<span class="const token" data-verso-hover="605">eval</span> x = q.<span class="const token" data-verso-hover="605">eval</span> x).<span class="const token" data-verso-hover="284">card</span> ≤ <span class="const token" data-verso-hover="132">max</span> p.<span class="const token" data-verso-hover="589">natDegree</span> q.<span class="const token" data-verso-hover="589">natDegree</span> := <span class="kw">by</span></span>
+<span id="L114">  <span class="kw">have</span> hne : p - q ≠ <span class="nu">0</span> := <span class="const token" data-verso-hover="606">sub_ne_zero</span>.<span class="const token" data-verso-hover="127">mpr</span> hpq</span>
+<span id="L115">  <span class="kw">calc</span> _ ≤ (p - q).<span class="const token" data-verso-hover="607">roots</span>.<span class="const token" data-verso-hover="608">toFinset</span>.<span class="const token" data-verso-hover="284">card</span> := <span class="kw">by</span></span>
+<span id="L116">        <span class="kw">apply</span> <span class="const token" data-verso-hover="183">Finset.card_le_card</span></span>
+<span id="L117">        <span class="kw">intro</span> x hx</span>
+<span id="L118">        <span class="kw">simp</span> only [<span class="const token" data-verso-hover="609">Finset.mem_filter</span>, <span class="const token" data-verso-hover="279">Finset.mem_univ</span>, <span class="const token" data-verso-hover="280">true_and</span>] <span class="kw">at</span> hx</span>
+<span id="L119">        <span class="kw">simp</span> [<span class="const token" data-verso-hover="610">Multiset.mem_toFinset</span>, <span class="const token" data-verso-hover="611">mem_roots</span> hne, hx]</span>
+<span id="L120">    _ ≤ <span class="const token" data-verso-hover="612">Multiset.card</span> (p - q).<span class="const token" data-verso-hover="607">roots</span> := <span class="const token" data-verso-hover="613">Multiset.toFinset_card_le</span> _</span>
+<span id="L121">    _ ≤ (p - q).<span class="const token" data-verso-hover="589">natDegree</span> := <span class="const token" data-verso-hover="614">card_roots'</span> _</span>
+<span id="L122">    _ ≤ _ := <span class="const token" data-verso-hover="615">natDegree_sub_le</span> _ _</span>
+<span id="L123"></span>
+<span id="L124"><span class="dc">/-! ### The fingerprinting protocol -/</span></span>
+<span id="L125"></span>
+<span id="L126"><span class="dc">/-- The field `GF(2^m)` is finite. -/</span></span>
+<span id="L127"><span class="kw">noncomputable</span> <span class="kw">scoped</span> <span class="kw">instance</span> <span class="const token" data-verso-hover="616">instFintypeGaloisField</span> (m : <span class="const token" data-verso-hover="64">ℕ</span>) : <span class="const token" data-verso-hover="206">Fintype</span> (<span class="const token" data-verso-hover="371">GaloisField</span> <span class="nu">2</span> m) :=</span>
+<span id="L128">  <span class="const token" data-verso-hover="617">Fintype.ofFinite</span> _</span>
+<span id="L129"></span>
+<span id="L130"><span class="kw">lemma</span> <span class="const token" data-verso-hover="618">card_galoisField</span> {m : <span class="const token" data-verso-hover="64">ℕ</span>} (hm : m ≠ <span class="nu">0</span>) : <span class="const token" data-verso-hover="207">Fintype.card</span> (<span class="const token" data-verso-hover="371">GaloisField</span> <span class="nu">2</span> m) = <span class="nu">2</span> ^ m := <span class="kw">by</span></span>
+<span id="L131">  <span class="kw">rw</span> [<span class="const token" data-verso-hover="619">Fintype.card_eq_nat_card</span>, <span class="const token" data-verso-hover="620">GaloisField.card</span> <span class="nu">2</span> m hm]</span>
+<span id="L132"></span>
+<span id="L133"><span class="dc">/-- The exponent `m` of the field `GF(2^m)` used for strings of length `n`:</span></span>
+<span id="L134"><span class="dc">the least `m` with `3 (n + 1) ≤ 2^m`. -/</span></span>
+<span id="L135"><span class="kw">def</span> <span class="const token" data-verso-hover="372">fpBits</span> (n : <span class="const token" data-verso-hover="64">ℕ</span>) : <span class="const token" data-verso-hover="64">ℕ</span> := <span class="const token" data-verso-hover="621">Nat.clog</span> <span class="nu">2</span> (<span class="nu">3</span> * (n + <span class="nu">1</span>))</span>
+<span id="L136"></span>
+<span id="L137"><span class="kw">lemma</span> <span class="const token" data-verso-hover="622">le_two_pow_fpBits</span> (n : <span class="const token" data-verso-hover="64">ℕ</span>) : <span class="nu">3</span> * (n + <span class="nu">1</span>) ≤ <span class="nu">2</span> ^ <span class="const token" data-verso-hover="372">fpBits</span> n := <span class="const token" data-verso-hover="623">Nat.le_pow_clog</span> <span class="const token" data-verso-hover="624">one_lt_two</span> _</span>
+<span id="L138"></span>
+<span id="L139"><span class="kw">lemma</span> <span class="const token" data-verso-hover="625">fpBits_ne_zero</span> (n : <span class="const token" data-verso-hover="64">ℕ</span>) : <span class="const token" data-verso-hover="372">fpBits</span> n ≠ <span class="nu">0</span> := <span class="kw">by</span></span>
+<span id="L140">  <span class="kw">intro</span> h</span>
+<span id="L141">  <span class="kw">have</span> := <span class="const token" data-verso-hover="622">le_two_pow_fpBits</span> n</span>
+<span id="L142">  <span class="kw">rw</span> [h] <span class="kw">at</span> this</span>
+<span id="L143">  <span class="kw">omega</span></span>
+<span id="L144"></span>
+<span id="L145"><span class="dc">/-- `fpBits n = O(log n)`. -/</span></span>
+<span id="L146"><span class="kw">lemma</span> <span class="const token" data-verso-hover="410">fpBits_le</span> (n : <span class="const token" data-verso-hover="64">ℕ</span>) : <span class="const token" data-verso-hover="372">fpBits</span> n ≤ <span class="const token" data-verso-hover="220">Nat.log</span> <span class="nu">2</span> n + <span class="nu">3</span> := <span class="kw">by</span></span>
+<span id="L147">  <span class="kw">apply</span> <span class="const token" data-verso-hover="626">Nat.clog_le_of_le_pow</span></span>
+<span id="L148">  <span class="kw">have</span> := <span class="const token" data-verso-hover="627">Nat.lt_pow_succ_log_self</span> <span class="const token" data-verso-hover="624">one_lt_two</span> n</span>
+<span id="L149">  <span class="kw">rw</span> [<span class="const token" data-verso-hover="628">pow_add</span>, <span class="const token" data-verso-hover="287">pow_succ</span>] <span class="kw">at</span> *</span>
+<span id="L150">  <span class="kw">omega</span></span>
+<span id="L151"></span>
+<span id="L152"><span class="dc">/-- A binary encoding of the elements of `GF(2^m)` by `m`-bit strings. -/</span></span>
+<span id="L153"><span class="kw">noncomputable</span> <span class="kw">def</span> <span class="const token" data-verso-hover="629">fpEnc</span> (m : <span class="const token" data-verso-hover="64">ℕ</span>) (x : <span class="const token" data-verso-hover="371">GaloisField</span> <span class="nu">2</span> m) : <span class="const token" data-verso-hover="67">List</span> <span class="const token" data-verso-hover="89">Bool</span> :=</span>
+<span id="L154">  <span class="kw">if</span> hm : m = <span class="nu">0</span> <span class="kw">then</span> [] <span class="kw">else</span></span>
+<span id="L155">    <span class="const token" data-verso-hover="274">List.ofFn</span> (<span class="const token" data-verso-hover="630">Fintype.equivOfCardEq</span> (α := <span class="const token" data-verso-hover="371">GaloisField</span> <span class="nu">2</span> m) (β := <span class="const token" data-verso-hover="66">Fin</span> m → <span class="const token" data-verso-hover="89">Bool</span>)</span>
+<span id="L156">      (<span class="kw">by</span> <span class="kw">rw</span> [<span class="const token" data-verso-hover="618">card_galoisField</span> hm]; <span class="kw">simp</span>) x)</span>
+<span id="L157"></span>
+<span id="L158"><span class="kw">lemma</span> <span class="const token" data-verso-hover="631">fpEnc_length</span> {m : <span class="const token" data-verso-hover="64">ℕ</span>} (hm : m ≠ <span class="nu">0</span>) (x : <span class="const token" data-verso-hover="371">GaloisField</span> <span class="nu">2</span> m) : (<span class="const token" data-verso-hover="629">fpEnc</span> m x).<span class="const token" data-verso-hover="54">length</span> = m := <span class="kw">by</span></span>
+<span id="L159">  <span class="kw">simp</span> [<span class="const token" data-verso-hover="629">fpEnc</span>, hm]</span>
+<span id="L160"></span>
+<span id="L161"><span class="kw">lemma</span> <span class="const token" data-verso-hover="632">fpEnc_injective</span> {m : <span class="const token" data-verso-hover="64">ℕ</span>} (hm : m ≠ <span class="nu">0</span>) : <span class="const token" data-verso-hover="146">Function.Injective</span> (<span class="const token" data-verso-hover="629">fpEnc</span> m) := <span class="kw">by</span></span>
+<span id="L162">  <span class="kw">intro</span> x y h</span>
+<span id="L163">  <span class="kw">simp</span> only [<span class="const token" data-verso-hover="629">fpEnc</span>, hm, <span class="const token" data-verso-hover="633">dite_false</span>] <span class="kw">at</span> h</span>
+<span id="L164">  <span class="kw">exact</span> (<span class="const token" data-verso-hover="634">Equiv.injective</span> _) (<span class="const token" data-verso-hover="635">List.ofFn_injective</span> h)</span>
+<span id="L165"></span>
+<span id="L166"><span class="dc">/-- The message `enc x ++ enc (P_a(x))` for the evaluation point `x ∈ GF(2^m)`. -/</span></span>
+<span id="L167"><span class="kw">noncomputable</span> <span class="kw">def</span> <span class="const token" data-verso-hover="636">fpMsg</span> (m : <span class="const token" data-verso-hover="64">ℕ</span>) (a : <span class="const token" data-verso-hover="67">List</span> <span class="const token" data-verso-hover="89">Bool</span>) (x : <span class="const token" data-verso-hover="371">GaloisField</span> <span class="nu">2</span> m) : <span class="const token" data-verso-hover="67">List</span> <span class="const token" data-verso-hover="89">Bool</span> :=</span>
+<span id="L168">  <span class="const token" data-verso-hover="629">fpEnc</span> m x ++ <span class="const token" data-verso-hover="629">fpEnc</span> m ((<span class="const token" data-verso-hover="585">bitPoly</span> a).<span class="const token" data-verso-hover="605">eval</span> x)</span>
+<span id="L169"></span>
+<span id="L170"><span class="kw">lemma</span> <span class="const token" data-verso-hover="637">fpMsg_length</span> {m : <span class="const token" data-verso-hover="64">ℕ</span>} (hm : m ≠ <span class="nu">0</span>) (a : <span class="const token" data-verso-hover="67">List</span> <span class="const token" data-verso-hover="89">Bool</span>) (x : <span class="const token" data-verso-hover="371">GaloisField</span> <span class="nu">2</span> m) :</span>
+<span id="L171">    (<span class="const token" data-verso-hover="636">fpMsg</span> m a x).<span class="const token" data-verso-hover="54">length</span> = <span class="nu">2</span> * m := <span class="kw">by</span></span>
+<span id="L172">  <span class="kw">simp</span> [<span class="const token" data-verso-hover="636">fpMsg</span>, <span class="const token" data-verso-hover="631">fpEnc_length</span> hm]; <span class="kw">ring</span></span>
+<span id="L173"></span>
+<span id="L174"><span class="kw">lemma</span> <span class="const token" data-verso-hover="638">fpMsg_eq_iff</span> {m : <span class="const token" data-verso-hover="64">ℕ</span>} (hm : m ≠ <span class="nu">0</span>) (a b : <span class="const token" data-verso-hover="67">List</span> <span class="const token" data-verso-hover="89">Bool</span>) (x y : <span class="const token" data-verso-hover="371">GaloisField</span> <span class="nu">2</span> m) :</span>
+<span id="L175">    <span class="const token" data-verso-hover="636">fpMsg</span> m b y = <span class="const token" data-verso-hover="636">fpMsg</span> m a x ↔ y = x ∧ (<span class="const token" data-verso-hover="585">bitPoly</span> b).<span class="const token" data-verso-hover="605">eval</span> y = (<span class="const token" data-verso-hover="585">bitPoly</span> a).<span class="const token" data-verso-hover="605">eval</span> x := <span class="kw">by</span></span>
+<span id="L176">  <span class="kw">constructor</span></span>
+<span id="L177">  · <span class="kw">intro</span> h</span>
+<span id="L178">    <span class="kw">obtain</span> ⟨h1, h2⟩ := <span class="const token" data-verso-hover="639">List.append_inj</span> h (<span class="kw">by</span> <span class="kw">rw</span> [<span class="const token" data-verso-hover="631">fpEnc_length</span> hm, <span class="const token" data-verso-hover="631">fpEnc_length</span> hm])</span>
+<span id="L179">    <span class="kw">exact</span> ⟨<span class="const token" data-verso-hover="632">fpEnc_injective</span> hm h1, <span class="const token" data-verso-hover="632">fpEnc_injective</span> hm h2⟩</span>
+<span id="L180">  · <span class="kw">rintro</span> ⟨<span class="kw">rfl</span>, h⟩</span>
+<span id="L181">    <span class="kw">simp</span> [<span class="const token" data-verso-hover="636">fpMsg</span>, h]</span>
+<span id="L182"></span>
+<span id="L183"><span class="dc">/-- The sender of the protocol of Lemma 3.3: input `a`, random evaluation point `x`. -/</span></span>
+<span id="L184"><span class="kw">noncomputable</span> <span class="kw">def</span> <span class="const token" data-verso-hover="374">fpSend</span> (a : <span class="const token" data-verso-hover="67">List</span> <span class="const token" data-verso-hover="89">Bool</span>) (x : <span class="const token" data-verso-hover="371">GaloisField</span> <span class="nu">2</span> (<span class="const token" data-verso-hover="372">fpBits</span> a.<span class="const token" data-verso-hover="54">length</span>)) : <span class="const token" data-verso-hover="67">List</span> <span class="const token" data-verso-hover="89">Bool</span> :=</span>
+<span id="L185">  <span class="const token" data-verso-hover="636">fpMsg</span> _ a x</span>
+<span id="L186"></span>
+<span id="L187"><span class="dc">/-- The decider of the protocol of Lemma 3.3: input `b`, received message `r`. It accepts iff</span></span>
+<span id="L188"><span class="dc">`r` is of the form `enc x ++ enc (P_b(x))`. -/</span></span>
+<span id="L189"><span class="kw">noncomputable</span> <span class="kw">def</span> <span class="const token" data-verso-hover="369">fpDecide</span> (b r : <span class="const token" data-verso-hover="67">List</span> <span class="const token" data-verso-hover="89">Bool</span>) : <span class="const token" data-verso-hover="89">Bool</span> :=</span>
+<span id="L190">  <span class="const token" data-verso-hover="167">decide</span> (∃ x : <span class="const token" data-verso-hover="371">GaloisField</span> <span class="nu">2</span> (<span class="const token" data-verso-hover="372">fpBits</span> b.<span class="const token" data-verso-hover="54">length</span>), <span class="const token" data-verso-hover="636">fpMsg</span> _ b x = r)</span>
+<span id="L191"></span>
+<span id="L192"><span class="kw">lemma</span> <span class="const token" data-verso-hover="406">fpSend_length</span> (a : <span class="const token" data-verso-hover="67">List</span> <span class="const token" data-verso-hover="89">Bool</span>) (x : <span class="const token" data-verso-hover="371">GaloisField</span> <span class="nu">2</span> (<span class="const token" data-verso-hover="372">fpBits</span> a.<span class="const token" data-verso-hover="54">length</span>)) :</span>
+<span id="L193">    (<span class="const token" data-verso-hover="374">fpSend</span> a x).<span class="const token" data-verso-hover="54">length</span> = <span class="nu">2</span> * <span class="const token" data-verso-hover="372">fpBits</span> a.<span class="const token" data-verso-hover="54">length</span> :=</span>
+<span id="L194">  <span class="const token" data-verso-hover="637">fpMsg_length</span> (<span class="const token" data-verso-hover="625">fpBits_ne_zero</span> _) a x</span>
+<span id="L195"></span>
+<span id="L196"><span class="kw">lemma</span> <span class="const token" data-verso-hover="390">fpDecide_fpSend</span> (a : <span class="const token" data-verso-hover="67">List</span> <span class="const token" data-verso-hover="89">Bool</span>) (x : <span class="const token" data-verso-hover="371">GaloisField</span> <span class="nu">2</span> (<span class="const token" data-verso-hover="372">fpBits</span> a.<span class="const token" data-verso-hover="54">length</span>)) :</span>
+<span id="L197">    <span class="const token" data-verso-hover="369">fpDecide</span> a (<span class="const token" data-verso-hover="374">fpSend</span> a x) = <span class="const token" data-verso-hover="104">true</span> := <span class="kw">by</span></span>
+<span id="L198">  <span class="kw">simp</span> only [<span class="const token" data-verso-hover="369">fpDecide</span>, <span class="const token" data-verso-hover="189">decide_eq_true_eq</span>]</span>
+<span id="L199">  <span class="kw">exact</span> ⟨x, <span class="const token" data-verso-hover="107">rfl</span>⟩</span>
+<span id="L200"></span>
+<span id="L201"><span class="dc">/-- Counting form of soundness: the number of evaluation points fooling the decider is less than</span></span>
+<span id="L202"><span class="dc">a third of the field. -/</span></span>
+<span id="L203"><span class="kw">lemma</span> <span class="const token" data-verso-hover="640">card_fool_lt</span> {ma mb : <span class="const token" data-verso-hover="64">ℕ</span>} (a b : <span class="const token" data-verso-hover="67">List</span> <span class="const token" data-verso-hover="89">Bool</span>) (hab : a ≠ b)</span>
+<span id="L204">    (ha : <span class="nu">3</span> * (a.<span class="const token" data-verso-hover="54">length</span> + <span class="nu">1</span>) ≤ <span class="nu">2</span> ^ ma) (hb : <span class="nu">3</span> * (b.<span class="const token" data-verso-hover="54">length</span> + <span class="nu">1</span>) ≤ <span class="nu">2</span> ^ mb) :</span>
+<span id="L205">    <span class="nu">3</span> * (<span class="const token" data-verso-hover="272">Finset.univ</span>.<span class="const token" data-verso-hover="604">filter</span> <span class="kw">fun</span> x : <span class="const token" data-verso-hover="371">GaloisField</span> <span class="nu">2</span> ma =&gt;</span>
+<span id="L206">      ∃ y : <span class="const token" data-verso-hover="371">GaloisField</span> <span class="nu">2</span> mb, <span class="const token" data-verso-hover="636">fpMsg</span> mb b y = <span class="const token" data-verso-hover="636">fpMsg</span> ma a x).<span class="const token" data-verso-hover="284">card</span> &lt; <span class="nu">2</span> ^ ma := <span class="kw">by</span></span>
+<span id="L207">  <span class="kw">have</span> hma : ma ≠ <span class="nu">0</span> := <span class="kw">by</span> <span class="kw">rintro</span> <span class="kw">rfl</span>; <span class="kw">simp</span> <span class="kw">at</span> ha; <span class="kw">omega</span></span>
+<span id="L208">  <span class="kw">have</span> hmb : mb ≠ <span class="nu">0</span> := <span class="kw">by</span> <span class="kw">rintro</span> <span class="kw">rfl</span>; <span class="kw">simp</span> <span class="kw">at</span> hb; <span class="kw">omega</span></span>
+<span id="L209">  <span class="kw">by_cases</span> hm : ma = mb</span>
+<span id="L210">  · <span class="kw">subst</span> hm</span>
+<span id="L211">    <span class="kw">have</span> hsub : (<span class="const token" data-verso-hover="272">Finset.univ</span>.<span class="const token" data-verso-hover="604">filter</span> <span class="kw">fun</span> x : <span class="const token" data-verso-hover="371">GaloisField</span> <span class="nu">2</span> ma =&gt;</span>
+<span id="L212">        ∃ y : <span class="const token" data-verso-hover="371">GaloisField</span> <span class="nu">2</span> ma, <span class="const token" data-verso-hover="636">fpMsg</span> ma b y = <span class="const token" data-verso-hover="636">fpMsg</span> ma a x) ⊆</span>
+<span id="L213">        <span class="const token" data-verso-hover="272">Finset.univ</span>.<span class="const token" data-verso-hover="604">filter</span> <span class="kw">fun</span> x =&gt; (<span class="const token" data-verso-hover="585">bitPoly</span> a).<span class="const token" data-verso-hover="605">eval</span> x = (<span class="const token" data-verso-hover="585">bitPoly</span> b).<span class="const token" data-verso-hover="605">eval</span> x := <span class="kw">by</span></span>
+<span id="L214">      <span class="kw">intro</span> x hx</span>
+<span id="L215">      <span class="kw">simp</span> only [<span class="const token" data-verso-hover="609">Finset.mem_filter</span>, <span class="const token" data-verso-hover="279">Finset.mem_univ</span>, <span class="const token" data-verso-hover="280">true_and</span>] <span class="kw">at</span> hx ⊢</span>
+<span id="L216">      <span class="kw">obtain</span> ⟨y, hy⟩ := hx</span>
+<span id="L217">      <span class="kw">obtain</span> ⟨<span class="kw">rfl</span>, h⟩ := (<span class="const token" data-verso-hover="638">fpMsg_eq_iff</span> hma a b x y).<span class="const token" data-verso-hover="134">1</span> hy</span>
+<span id="L218">      <span class="kw">exact</span> h.<span class="const token" data-verso-hover="398">symm</span></span>
+<span id="L219">    <span class="kw">have</span> h1 := (<span class="const token" data-verso-hover="183">Finset.card_le_card</span> hsub).<span class="const token" data-verso-hover="223">trans</span></span>
+<span id="L220">      (<span class="const token" data-verso-hover="44">card_filter_eval_eq_le</span> (<span class="kw">fun</span> h =&gt; hab (<span class="const token" data-verso-hover="598">bitPoly_injective</span> h)))</span>
+<span id="L221">    <span class="kw">rw</span> [<span class="const token" data-verso-hover="597">bitPoly_natDegree</span>, <span class="const token" data-verso-hover="597">bitPoly_natDegree</span>] <span class="kw">at</span> h1</span>
+<span id="L222">    <span class="kw">rcases</span> <span class="const token" data-verso-hover="641">le_total</span> a.<span class="const token" data-verso-hover="54">length</span> b.<span class="const token" data-verso-hover="54">length</span> <span class="kw">with</span> h | h</span>
+<span id="L223">    · <span class="kw">rw</span> [<span class="const token" data-verso-hover="642">max_eq_right</span> h] <span class="kw">at</span> h1; <span class="kw">omega</span></span>
+<span id="L224">    · <span class="kw">rw</span> [<span class="const token" data-verso-hover="643">max_eq_left</span> h] <span class="kw">at</span> h1; <span class="kw">omega</span></span>
+<span id="L225">  · <span class="kw">have</span> : (<span class="const token" data-verso-hover="272">Finset.univ</span>.<span class="const token" data-verso-hover="604">filter</span> <span class="kw">fun</span> x : <span class="const token" data-verso-hover="371">GaloisField</span> <span class="nu">2</span> ma =&gt;</span>
+<span id="L226">        ∃ y : <span class="const token" data-verso-hover="371">GaloisField</span> <span class="nu">2</span> mb, <span class="const token" data-verso-hover="636">fpMsg</span> mb b y = <span class="const token" data-verso-hover="636">fpMsg</span> ma a x) = ∅ := <span class="kw">by</span></span>
+<span id="L227">      <span class="kw">apply</span> <span class="const token" data-verso-hover="644">Finset.filter_false_of_mem</span></span>
+<span id="L228">      <span class="kw">rintro</span> x - ⟨y, hy⟩</span>
+<span id="L229">      <span class="kw">have</span> := <span class="const token" data-verso-hover="487">congrArg</span> <span class="const token" data-verso-hover="54">List.length</span> hy</span>
+<span id="L230">      <span class="kw">rw</span> [<span class="const token" data-verso-hover="637">fpMsg_length</span> hma, <span class="const token" data-verso-hover="637">fpMsg_length</span> hmb] <span class="kw">at</span> this</span>
+<span id="L231">      <span class="kw">omega</span></span>
+<span id="L232">    <span class="kw">rw</span> [this]</span>
+<span id="L233">    <span class="kw">simp</span></span>
+<span id="L234"></span>
+<span id="L235"><span class="dc">/-- **Lemma 3.3 of [BFP15].** A one-way randomized protocol for equality with one-sided error:</span></span>
+<span id="L236"><span class="dc">the sender, holding `a`, draws a uniform `x ∈ GF(2^(fpBits |a|))` and sends `fpSend a x`; the</span></span>
+<span id="L237"><span class="dc">decider, holding `b`, outputs `fpDecide b (fpSend a x)`.</span></span>
+<span id="L238"><span class="dc">1. if `a = b` the decider always accepts;</span></span>
+<span id="L239"><span class="dc">2. if `a ≠ b` it rejects with probability `&gt; 2/3`;</span></span>
+<span id="L240"><span class="dc">3. the message has `2 · fpBits |a|` bits, and `2 · fpBits λ ≤ 2 log₂ λ + 6 = O(log λ)`. -/</span></span>
+<span id="L241"><span class="kw">theorem</span> <span class="const token" data-verso-hover="14">lemma_3_3</span> :</span>
+<span id="L242">    (∀ (a : <span class="const token" data-verso-hover="67">List</span> <span class="const token" data-verso-hover="89">Bool</span>) (x : <span class="const token" data-verso-hover="371">GaloisField</span> <span class="nu">2</span> (<span class="const token" data-verso-hover="372">fpBits</span> a.<span class="const token" data-verso-hover="54">length</span>)), <span class="const token" data-verso-hover="369">fpDecide</span> a (<span class="const token" data-verso-hover="374">fpSend</span> a x) = <span class="const token" data-verso-hover="104">true</span>) ∧</span>
+<span id="L243">    (∀ a b : <span class="const token" data-verso-hover="67">List</span> <span class="const token" data-verso-hover="89">Bool</span>, a ≠ b →</span>
+<span id="L244">      <span class="nu">2</span> / <span class="nu">3</span> &lt; <span class="const token" data-verso-hover="38">uprob</span> (<span class="kw">fun</span> x : <span class="const token" data-verso-hover="371">GaloisField</span> <span class="nu">2</span> (<span class="const token" data-verso-hover="372">fpBits</span> a.<span class="const token" data-verso-hover="54">length</span>) =&gt; <span class="const token" data-verso-hover="369">fpDecide</span> b (<span class="const token" data-verso-hover="374">fpSend</span> a x) = <span class="const token" data-verso-hover="103">false</span>)) ∧</span>
+<span id="L245">    (∀ (a : <span class="const token" data-verso-hover="67">List</span> <span class="const token" data-verso-hover="89">Bool</span>) (x : <span class="const token" data-verso-hover="371">GaloisField</span> <span class="nu">2</span> (<span class="const token" data-verso-hover="372">fpBits</span> a.<span class="const token" data-verso-hover="54">length</span>)), (<span class="const token" data-verso-hover="374">fpSend</span> a x).<span class="const token" data-verso-hover="54">length</span> = <span class="nu">2</span> * <span class="const token" data-verso-hover="372">fpBits</span> a.<span class="const token" data-verso-hover="54">length</span>) ∧</span>
+<span id="L246">    (∀ n, <span class="nu">2</span> * <span class="const token" data-verso-hover="372">fpBits</span> n ≤ <span class="nu">2</span> * <span class="const token" data-verso-hover="220">Nat.log</span> <span class="nu">2</span> n + <span class="nu">6</span>) := <span class="kw">by</span></span>
+<span id="L247">  <span class="kw">refine</span> ⟨<span class="const token" data-verso-hover="390">fpDecide_fpSend</span>, ?_, <span class="const token" data-verso-hover="406">fpSend_length</span>, <span class="kw">fun</span> n =&gt; <span class="kw">by</span> <span class="kw">have</span> := <span class="const token" data-verso-hover="410">fpBits_le</span> n; <span class="kw">omega</span>⟩</span>
+<span id="L248">  <span class="kw">intro</span> a b hab</span>
+<span id="L249">  <span class="kw">have</span> hfalse : (<span class="kw">fun</span> x : <span class="const token" data-verso-hover="371">GaloisField</span> <span class="nu">2</span> (<span class="const token" data-verso-hover="372">fpBits</span> a.<span class="const token" data-verso-hover="54">length</span>) =&gt; <span class="const token" data-verso-hover="369">fpDecide</span> b (<span class="const token" data-verso-hover="374">fpSend</span> a x) = <span class="const token" data-verso-hover="103">false</span>) =</span>
+<span id="L250">      <span class="kw">fun</span> x =&gt; ¬ (∃ y : <span class="const token" data-verso-hover="371">GaloisField</span> <span class="nu">2</span> (<span class="const token" data-verso-hover="372">fpBits</span> b.<span class="const token" data-verso-hover="54">length</span>), <span class="const token" data-verso-hover="636">fpMsg</span> _ b y = <span class="const token" data-verso-hover="636">fpMsg</span> _ a x) := <span class="kw">by</span></span>
+<span id="L251">    <span class="kw">funext</span> x</span>
+<span id="L252">    <span class="kw">simp</span> only [<span class="const token" data-verso-hover="369">fpDecide</span>, <span class="const token" data-verso-hover="374">fpSend</span>]; <span class="kw">exact</span> <span class="const token" data-verso-hover="36">propext</span> <span class="const token" data-verso-hover="645">decide_eq_false_iff_not</span></span>
+<span id="L253">  <span class="kw">rw</span> [hfalse, <span class="const token" data-verso-hover="401">uprob_not</span>, <span class="const token" data-verso-hover="646">uprob_eq_card_filter</span>, <span class="const token" data-verso-hover="618">card_galoisField</span> (<span class="const token" data-verso-hover="625">fpBits_ne_zero</span> _)]</span>
+<span id="L254">  <span class="kw">have</span> h := <span class="const token" data-verso-hover="640">card_fool_lt</span> (ma := <span class="const token" data-verso-hover="372">fpBits</span> a.<span class="const token" data-verso-hover="54">length</span>) (mb := <span class="const token" data-verso-hover="372">fpBits</span> b.<span class="const token" data-verso-hover="54">length</span>) a b hab</span>
+<span id="L255">    (<span class="const token" data-verso-hover="622">le_two_pow_fpBits</span> _) (<span class="const token" data-verso-hover="622">le_two_pow_fpBits</span> _)</span>
+<span id="L256">  <span class="kw">have</span> hpos : (<span class="nu">0</span> : <span class="const token" data-verso-hover="251">ℝ</span>) &lt; <span class="nu">2</span> ^ <span class="const token" data-verso-hover="372">fpBits</span> a.<span class="const token" data-verso-hover="54">length</span> := <span class="kw">by</span> <span class="kw">positivity</span></span>
+<span id="L257">  <span class="kw">have</span> h' : (<span class="nu">3</span> : <span class="const token" data-verso-hover="251">ℝ</span>) * (<span class="const token" data-verso-hover="272">Finset.univ</span>.<span class="const token" data-verso-hover="604">filter</span> <span class="kw">fun</span> x : <span class="const token" data-verso-hover="371">GaloisField</span> <span class="nu">2</span> (<span class="const token" data-verso-hover="372">fpBits</span> a.<span class="const token" data-verso-hover="54">length</span>) =&gt;</span>
+<span id="L258">      ∃ y : <span class="const token" data-verso-hover="371">GaloisField</span> <span class="nu">2</span> (<span class="const token" data-verso-hover="372">fpBits</span> b.<span class="const token" data-verso-hover="54">length</span>), <span class="const token" data-verso-hover="636">fpMsg</span> _ b y = <span class="const token" data-verso-hover="636">fpMsg</span> _ a x).<span class="const token" data-verso-hover="284">card</span> &lt;</span>
+<span id="L259">      <span class="nu">2</span> ^ <span class="const token" data-verso-hover="372">fpBits</span> a.<span class="const token" data-verso-hover="54">length</span> := <span class="kw">by</span> <span class="kw">exact_mod_cast</span> h</span>
+<span id="L260">  <span class="kw">push_cast</span></span>
+<span id="L261">  <span class="kw">rw</span> [<span class="const token" data-verso-hover="647">lt_sub_comm</span>, <span class="const token" data-verso-hover="648">div_lt_iff₀</span> hpos]</span>
+<span id="L262">  <span class="kw">linarith</span></span>
+<span id="L263"></span>
+<span id="L264"><span class="kw">end</span> Podc.RandomizedPLS</span>
+<span id="L265"></span>
+</code></div>
+        <script>
+          window.versoHoversUrl = "PODC2015/RandomizedPLS/-hovers.json";</script>
+        <script src="static/lean/popper.js"></script>
+        <script src="static/lean/tippy.js"></script>
+        <script src="static/lean/marked.js"></script>
+        <script src="static/lean/highlighting.js"></script>
+        <script src="static/lean/lean.js"></script>
+        </article></main><footer class="site-footer"><div class="wrap">
+        Machine-checked formalizations of PODC papers in Lean 4. Generated with <a href="https://github.com/leanprover/verso">Verso</a> from the README files of <a href="https://github.com/vasnesterov/formal_podc">vasnesterov/formal_podc</a>.</div>
+      </footer></body>
+  </html>
+

@@ -1,0 +1,543 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="light dark">
+    <link rel="icon" href="data:,">
+    <title>TruncatedGaleShapley: Distributed.lean · Formal PODC</title><base href="../../../.././"><link rel="stylesheet" href="static/lean/verso-vars.css">
+    <link rel="stylesheet" href="static/lean/highlighting.css">
+    <link rel="stylesheet" href="static/lean/tippy-border.css">
+    <link rel="stylesheet" href="static/style.css">
+    <script defer="defer" src="static/site.js"></script>
+    </head>
+  <body>
+    <header class="site-header">
+      <div class="wrap">
+        <a class="brand" href=".">Formal PODC</a><nav class="top">
+          <a href=".">Search</a><a href="about/">About</a><a href="https://github.com/vasnesterov/formal_podc">GitHub</a></nav>
+        </div>
+      </header>
+    <main class="wrap"><article><nav class="breadcrumbs" aria-label="Breadcrumb">
+          <a href=".">Search</a><span class="sep">›</span><a href="PODC2010/">PODC 2010</a><span class="sep">›</span><a href="PODC2010/TruncatedGaleShapley/">TruncatedGaleShapley</a><span class="sep">›</span><a href="PODC2010/TruncatedGaleShapley/src/">Lean source</a><span class="sep">›</span><span aria-current="page">Distributed</span></nav>
+        <h1>
+          <code>Distributed.lean</code></h1>
+        <div class="paper-links">
+          <p>
+            Source of <a href="PODC2010/TruncatedGaleShapley/">Almost Stable Matchings in Constant Time — PODC 2010</a> · <a href="https://github.com/vasnesterov/formal_podc/blob/main/Papers/PODC2010/TruncatedGaleShapley/Distributed.lean">GitHub</a> · hover over a name for its type and documentation</p>
+          </div>
+        <div class="lean-code lean-src">
+          <code class="hl lean block" data-lean-context="Distributed"><span id="L1"><span class="kw">import</span> Papers.PODC2010.TruncatedGaleShapley.Theorems</span>
+<span id="L2"><span class="kw">import</span> Cslib.Computability.Distributed.PortNumbering.Basic</span>
+<span id="L3"></span>
+<span id="L4"><span class="dc">/-!</span></span>
+<span id="L5"><span class="dc"># The truncated Gale–Shapley algorithm in the port-numbering model (§1.2, §4)</span></span>
+<span id="L6"></span>
+<span id="L7"><span class="dc">The model of §1.2 is CSLib's anonymous port-numbering model (`Cslib.PortNumbering`): synchronous</span></span>
+<span id="L8"><span class="dc">deterministic message passing; a node knows its degree, its colour and the constant `T`; its ports</span></span>
+<span id="L9"><span class="dc">are numbered by its preferences (port `0` = most preferred; the paper numbers from `1`).</span></span>
+<span id="L10"></span>
+<span id="L11"><span class="dc">* `NodeData`: the local data of a node (colour, a local ranking `rk` of its ports, and the</span></span>
+<span id="L12"><span class="dc">  variables `C`, `c`, `p` of §4, holding port numbers).</span></span>
+<span id="L13"><span class="dc">* `rule`: the local rule; even rounds are blue turns, odd rounds red turns. A node reads the data</span></span>
+<span id="L14"><span class="dc">  of its neighbours (full-information messages) but uses exactly the information carried by the</span></span>
+<span id="L15"><span class="dc">  messages of §4 ('propose', 'accept', 'reject', 'break').</span></span>
+<span id="L16"><span class="dc">* `gsAlg T`: the port-numbering algorithm (inputs: colour and port ranking; output: the port of the</span></span>
+<span id="L17"><span class="dc">  partner, if any).</span></span>
+<span id="L18"><span class="dc">* `toBicoloured`: the bicoloured graph with preferences defined by a simple port-numbered graph,</span></span>
+<span id="L19"><span class="dc">  a proper 2-colouring and port rankings.</span></span>
+<span id="L20"><span class="dc">* `dec_localRun`: after `2i` communication rounds the decoded configuration is the state</span></span>
+<span id="L21"><span class="dc">  `run i` of the centralised algorithm (`Theorems.lean`).</span></span>
+<span id="L22"><span class="dc">-/</span></span>
+<span id="L23"></span>
+<span id="L24"><span class="kw">namespace</span> Podc.TruncatedGaleShapley</span>
+<span id="L25"></span>
+<span id="L26"><span class="kw">open</span> Finset Cslib.PortNumbering</span>
+<span id="L27"></span>
+<span id="L28"><span class="kw">set_option</span> <span class="const token" data-verso-hover="48">linter.unusedSectionVars</span> false</span>
+<span id="L29"></span>
+<span id="L30"><span class="dc">/-- Local data of a node: colour (`true` = red), ranking of its ports (smaller = preferred), the</span></span>
+<span id="L31"><span class="dc">candidate ports `C`, the port of the outstanding proposal `c`, and the port of the partner `p`. -/</span></span>
+<span id="L32"><span class="kw">structure</span> <span class="const token" data-verso-hover="214">NodeData</span> : <span class="kw">Type</span> <span class="kw">where</span></span>
+<span id="L33">  <span class="dc">/-- Colour. -/</span></span>
+<span id="L34">  <span class="const token" data-verso-hover="215">red</span> : <span class="const token" data-verso-hover="195">Bool</span></span>
+<span id="L35">  <span class="dc">/-- Local preference ranking of the ports. -/</span></span>
+<span id="L36">  <span class="const token" data-verso-hover="216">rk</span> : <span class="const token" data-verso-hover="102">ℕ</span> → <span class="const token" data-verso-hover="102">ℕ</span></span>
+<span id="L37">  <span class="dc">/-- Candidate ports (red nodes). -/</span></span>
+<span id="L38">  <span class="const token" data-verso-hover="217">C</span> : <span class="const token" data-verso-hover="63">Finset</span> <span class="const token" data-verso-hover="102">ℕ</span></span>
+<span id="L39">  <span class="dc">/-- Port of the outstanding proposal (red nodes). -/</span></span>
+<span id="L40">  <span class="const token" data-verso-hover="218">c</span> : <span class="const token" data-verso-hover="180">Option</span> <span class="const token" data-verso-hover="102">ℕ</span></span>
+<span id="L41">  <span class="dc">/-- Port of the partner. -/</span></span>
+<span id="L42">  <span class="const token" data-verso-hover="219">p</span> : <span class="const token" data-verso-hover="180">Option</span> <span class="const token" data-verso-hover="102">ℕ</span></span>
+<span id="L43"></span>
+<span id="L44"><span class="dc">/-- The most preferred port of `S` for the ranking `rk`. -/</span></span>
+<span id="L45"><span class="kw">noncomputable</span> <span class="kw">def</span> <span class="const token" data-verso-hover="220">pbest</span> (rk : <span class="const token" data-verso-hover="102">ℕ</span> → <span class="const token" data-verso-hover="102">ℕ</span>) (S : <span class="const token" data-verso-hover="63">Finset</span> <span class="const token" data-verso-hover="102">ℕ</span>) : <span class="const token" data-verso-hover="180">Option</span> <span class="const token" data-verso-hover="102">ℕ</span> :=</span>
+<span id="L46">  <span class="kw">if</span> h : S.<span class="const token" data-verso-hover="197">Nonempty</span> <span class="kw">then</span> <span class="const token" data-verso-hover="74">some</span> (S.<span class="const token" data-verso-hover="198">exists_min_image</span> rk h).<span class="const token" data-verso-hover="199">choose</span> <span class="kw">else</span> <span class="const token" data-verso-hover="73">none</span></span>
+<span id="L47"></span>
+<span id="L48"><span class="dc">/-- Initial data from the degree and the input (colour, port ranking). -/</span></span>
+<span id="L49"><span class="kw">def</span> <span class="const token" data-verso-hover="221">initData</span> (d : <span class="const token" data-verso-hover="102">ℕ</span>) (x : <span class="const token" data-verso-hover="195">Bool</span> × (<span class="const token" data-verso-hover="102">ℕ</span> → <span class="const token" data-verso-hover="102">ℕ</span>)) : <span class="const token" data-verso-hover="214">NodeData</span> <span class="kw">where</span></span>
+<span id="L50">  <span class="const token" data-verso-hover="215">red</span> := x.<span class="const token" data-verso-hover="190">1</span></span>
+<span id="L51">  <span class="const token" data-verso-hover="216">rk</span> := x.<span class="const token" data-verso-hover="191">2</span></span>
+<span id="L52">  <span class="const token" data-verso-hover="217">C</span> := <span class="kw">if</span> x.<span class="const token" data-verso-hover="190">1</span> <span class="kw">then</span> <span class="const token" data-verso-hover="222">range</span> d <span class="kw">else</span> ∅</span>
+<span id="L53">  <span class="const token" data-verso-hover="218">c</span> := <span class="const token" data-verso-hover="73">none</span></span>
+<span id="L54">  <span class="const token" data-verso-hover="219">p</span> := <span class="const token" data-verso-hover="73">none</span></span>
+<span id="L55"></span>
+<span id="L56"><span class="dc">/-- Step 1 of the red turn at port level (`acc i`: the neighbour behind port `i` points back). -/</span></span>
+<span id="L57"><span class="kw">def</span> <span class="const token" data-verso-hover="223">pStep1</span> (x : <span class="const token" data-verso-hover="214">NodeData</span>) (acc : <span class="const token" data-verso-hover="102">ℕ</span> → <span class="kw">Prop</span>) [<span class="const token" data-verso-hover="224">DecidablePred</span> acc] : <span class="const token" data-verso-hover="63">Finset</span> <span class="const token" data-verso-hover="102">ℕ</span> × <span class="const token" data-verso-hover="180">Option</span> <span class="const token" data-verso-hover="102">ℕ</span> :=</span>
+<span id="L58">  <span class="kw">match</span> x.<span class="const token" data-verso-hover="218">c</span> <span class="kw">with</span></span>
+<span id="L59">  | <span class="const token" data-verso-hover="73">none</span> =&gt; (x.<span class="const token" data-verso-hover="217">C</span>, x.<span class="const token" data-verso-hover="219">p</span>)</span>
+<span id="L60">  | <span class="const token" data-verso-hover="74">some</span> i =&gt; <span class="kw">if</span> acc i <span class="kw">then</span> (x.<span class="const token" data-verso-hover="217">C</span>, <span class="const token" data-verso-hover="74">some</span> i) <span class="kw">else</span> (x.<span class="const token" data-verso-hover="217">C</span>.<span class="const token" data-verso-hover="92">erase</span> i, x.<span class="const token" data-verso-hover="219">p</span>)</span>
+<span id="L61"></span>
+<span id="L62"><span class="dc">/-- Step 2 of the red turn at port level. -/</span></span>
+<span id="L63"><span class="kw">def</span> <span class="const token" data-verso-hover="225">pStep2</span> (acc : <span class="const token" data-verso-hover="102">ℕ</span> → <span class="kw">Prop</span>) [<span class="const token" data-verso-hover="224">DecidablePred</span> acc] : <span class="const token" data-verso-hover="63">Finset</span> <span class="const token" data-verso-hover="102">ℕ</span> × <span class="const token" data-verso-hover="180">Option</span> <span class="const token" data-verso-hover="102">ℕ</span> → <span class="const token" data-verso-hover="63">Finset</span> <span class="const token" data-verso-hover="102">ℕ</span> × <span class="const token" data-verso-hover="180">Option</span> <span class="const token" data-verso-hover="102">ℕ</span></span>
+<span id="L64">  | (C, <span class="const token" data-verso-hover="73">none</span>) =&gt; (C, <span class="const token" data-verso-hover="73">none</span>)</span>
+<span id="L65">  | (C, <span class="const token" data-verso-hover="74">some</span> i) =&gt; <span class="kw">if</span> acc i <span class="kw">then</span> (C, <span class="const token" data-verso-hover="74">some</span> i) <span class="kw">else</span> (C.<span class="const token" data-verso-hover="92">erase</span> i, <span class="const token" data-verso-hover="73">none</span>)</span>
+<span id="L66"></span>
+<span id="L67"><span class="dc">/-- The red node's update from the result `r = (C, p)` of steps 1–2: step 3 proposes to the best</span></span>
+<span id="L68"><span class="dc">remaining port if unmatched. -/</span></span>
+<span id="L69"><span class="kw">noncomputable</span> <span class="kw">def</span> <span class="const token" data-verso-hover="226">redUpdate</span> (x : <span class="const token" data-verso-hover="214">NodeData</span>) (r : <span class="const token" data-verso-hover="63">Finset</span> <span class="const token" data-verso-hover="102">ℕ</span> × <span class="const token" data-verso-hover="180">Option</span> <span class="const token" data-verso-hover="102">ℕ</span>) : <span class="const token" data-verso-hover="214">NodeData</span> :=</span>
+<span id="L70">  { x <span class="kw">with</span> <span class="const token" data-verso-hover="217">C</span> := r.<span class="const token" data-verso-hover="190">1</span>, <span class="const token" data-verso-hover="219">p</span> := r.<span class="const token" data-verso-hover="191">2</span>, <span class="const token" data-verso-hover="218">c</span> := <span class="kw">if</span> r.<span class="const token" data-verso-hover="191">2</span> = <span class="const token" data-verso-hover="73">none</span> <span class="kw">then</span> <span class="const token" data-verso-hover="220">pbest</span> x.<span class="const token" data-verso-hover="216">rk</span> r.<span class="const token" data-verso-hover="190">1</span> <span class="kw">else</span> <span class="const token" data-verso-hover="73">none</span> }</span>
+<span id="L71"></span>
+<span id="L72"><span class="kw">open</span> Classical <span class="kw">in</span></span>
+<span id="L73"><span class="dc">/-- The local rule. In round `t` (from `0`), node data `x`, degree `d`, information `m i =</span></span>
+<span id="L74"><span class="dc">(neighbour's data, neighbour's port)` from each port `i &lt; d`:</span></span>
+<span id="L75"><span class="dc">* `t` even (blue turn): a blue node with proposers `P` (ports whose neighbour has an outstanding</span></span>
+<span id="L76"><span class="dc">  proposal on the connecting edge) takes the best port of `P ∪ {p}` as its partner;</span></span>
+<span id="L77"><span class="dc">* `t` odd (red turn): a red node with an outstanding proposal on port `i` is accepted iff the</span></span>
+<span id="L78"><span class="dc">  neighbour now points back ('accept'), otherwise rejected (port `i` removed); a matched red node</span></span>
+<span id="L79"><span class="dc">  whose partner no longer points back has received 'break' (port removed, unmatched); an</span></span>
+<span id="L80"><span class="dc">  unmatched red node then proposes to its best remaining port. -/</span></span>
+<span id="L81"><span class="kw">noncomputable</span> <span class="kw">def</span> <span class="const token" data-verso-hover="14">rule</span> (t d : <span class="const token" data-verso-hover="102">ℕ</span>) (x : <span class="const token" data-verso-hover="214">NodeData</span>) (m : <span class="const token" data-verso-hover="102">ℕ</span> → <span class="const token" data-verso-hover="180">Option</span> (<span class="const token" data-verso-hover="214">NodeData</span> × <span class="const token" data-verso-hover="102">ℕ</span>)) : <span class="const token" data-verso-hover="214">NodeData</span> :=</span>
+<span id="L82">  <span class="kw">if</span> t % <span class="nu">2</span> = <span class="nu">0</span> <span class="kw">then</span></span>
+<span id="L83">    <span class="kw">if</span> x.<span class="const token" data-verso-hover="215">red</span> <span class="kw">then</span> x <span class="kw">else</span></span>
+<span id="L84">      <span class="kw">let</span> P := (<span class="const token" data-verso-hover="222">range</span> d).<span class="const token" data-verso-hover="65">filter</span> <span class="kw">fun</span> i =&gt; ∃ y j, m i = <span class="const token" data-verso-hover="74">some</span> (y, j) ∧ y.<span class="const token" data-verso-hover="218">c</span> = <span class="const token" data-verso-hover="74">some</span> j</span>
+<span id="L85">      <span class="kw">if</span> P.<span class="const token" data-verso-hover="197">Nonempty</span> <span class="kw">then</span> { x <span class="kw">with</span> <span class="const token" data-verso-hover="219">p</span> := <span class="const token" data-verso-hover="220">pbest</span> x.<span class="const token" data-verso-hover="216">rk</span> (P ∪ x.<span class="const token" data-verso-hover="219">p</span>.<span class="const token" data-verso-hover="202">toFinset</span>) } <span class="kw">else</span> x</span>
+<span id="L86">  <span class="kw">else</span></span>
+<span id="L87">    <span class="kw">if</span> x.<span class="const token" data-verso-hover="215">red</span> <span class="kw">then</span></span>
+<span id="L88">      <span class="kw">let</span> acc : <span class="const token" data-verso-hover="102">ℕ</span> → <span class="kw">Prop</span> := <span class="kw">fun</span> i =&gt; ∃ y j, m i = <span class="const token" data-verso-hover="74">some</span> (y, j) ∧ y.<span class="const token" data-verso-hover="219">p</span> = <span class="const token" data-verso-hover="74">some</span> j</span>
+<span id="L89">      <span class="const token" data-verso-hover="226">redUpdate</span> x (<span class="const token" data-verso-hover="225">pStep2</span> acc (<span class="const token" data-verso-hover="223">pStep1</span> x acc))</span>
+<span id="L90">    <span class="kw">else</span> x</span>
+<span id="L91"></span>
+<span id="L92"><span class="dc">/-- The truncated Gale–Shapley algorithm, run for `T` communication rounds, in the port-numbering</span></span>
+<span id="L93"><span class="dc">model: input colour and port ranking, output the port of the partner (`none` = unmatched). -/</span></span>
+<span id="L94"><span class="kw">noncomputable</span> <span class="kw">def</span> <span class="const token" data-verso-hover="15">gsAlg</span> (T : <span class="const token" data-verso-hover="102">ℕ</span>) : <span class="const token" data-verso-hover="227">Algorithm</span> (<span class="const token" data-verso-hover="195">Bool</span> × (<span class="const token" data-verso-hover="102">ℕ</span> → <span class="const token" data-verso-hover="102">ℕ</span>)) (<span class="const token" data-verso-hover="180">Option</span> <span class="const token" data-verso-hover="102">ℕ</span>) :=</span>
+<span id="L95">  ((<span class="const token" data-verso-hover="228">Algorithm.ofFun</span> <span class="const token" data-verso-hover="221">initData</span>).<span class="const token" data-verso-hover="229">seq</span> <span class="nu">0</span> (<span class="const token" data-verso-hover="5">Algorithm.ofLocal</span> <span class="const token" data-verso-hover="14">rule</span>)).<span class="const token" data-verso-hover="229">seq</span> T</span>
+<span id="L96">    (<span class="const token" data-verso-hover="228">Algorithm.ofFun</span> <span class="kw">fun</span> _ x =&gt; x.<span class="const token" data-verso-hover="219">p</span>)</span>
+<span id="L97"></span>
+<span id="L98"><span class="kw">variable</span> {V : <span class="kw">Type</span>} [<span class="const token" data-verso-hover="49">Fintype</span> V] [<span class="const token" data-verso-hover="50">DecidableEq</span> V]</span>
+<span id="L99"></span>
+<span id="L100"><span class="kw">theorem</span> <span class="const token" data-verso-hover="230">gsAlg_eval</span> (T : <span class="const token" data-verso-hover="102">ℕ</span>) (G : <span class="const token" data-verso-hover="231">PNGraph</span> V) (x : V → <span class="const token" data-verso-hover="195">Bool</span> × (<span class="const token" data-verso-hover="102">ℕ</span> → <span class="const token" data-verso-hover="102">ℕ</span>)) (v : V) :</span>
+<span id="L101">    (<span class="const token" data-verso-hover="15">gsAlg</span> T).<span class="const token" data-verso-hover="232">eval</span> G T x v =</span>
+<span id="L102">      (<span class="const token" data-verso-hover="233">Algorithm.localRun</span> G <span class="const token" data-verso-hover="14">rule</span> (<span class="kw">fun</span> u =&gt; <span class="const token" data-verso-hover="221">initData</span> (G.<span class="const token" data-verso-hover="234">deg</span> u) (x u)) T v).<span class="const token" data-verso-hover="219">p</span> := <span class="kw">by</span></span>
+<span id="L103">  <span class="kw">change</span> (<span class="const token" data-verso-hover="15">gsAlg</span> T).<span class="const token" data-verso-hover="232">eval</span> G (T + <span class="nu">0</span>) x v = _</span>
+<span id="L104">  <span class="kw">rw</span> [<span class="const token" data-verso-hover="15">gsAlg</span>, <span class="const token" data-verso-hover="235">Algorithm.eval_seq</span>, <span class="const token" data-verso-hover="236">Algorithm.eval_ofFun</span>]</span>
+<span id="L105">  conv_lhs =&gt; <span class="kw">rw</span> [← <span class="const token" data-verso-hover="237">zero_add</span> T]</span>
+<span id="L106">  <span class="kw">rw</span> [<span class="const token" data-verso-hover="235">Algorithm.eval_seq</span>, <span class="const token" data-verso-hover="238">Algorithm.eval_ofLocal</span>]</span>
+<span id="L107">  <span class="kw">rfl</span></span>
+<span id="L108"></span>
+<span id="L109"><span class="dc">/-! ### The bicoloured graph defined by a port-numbered graph -/</span></span>
+<span id="L110"></span>
+<span id="L111"><span class="dc">/-- The port of `v` leading to `u` (`0` if none). -/</span></span>
+<span id="L112"><span class="kw">noncomputable</span> <span class="kw">def</span> <span class="const token" data-verso-hover="239">portOf</span> (G : <span class="const token" data-verso-hover="231">PNGraph</span> V) (v u : V) : <span class="const token" data-verso-hover="102">ℕ</span> :=</span>
+<span id="L113">  <span class="kw">open</span> Classical <span class="kw">in</span> <span class="kw">if</span> h : ∃ i, i &lt; G.<span class="const token" data-verso-hover="234">deg</span> v ∧ G.<span class="const token" data-verso-hover="240">nbr</span> v i = u <span class="kw">then</span> <span class="const token" data-verso-hover="241">Nat.find</span> h <span class="kw">else</span> <span class="nu">0</span></span>
+<span id="L114"></span>
+<span id="L115"><span class="kw">lemma</span> <span class="const token" data-verso-hover="242">portOf_nbr</span> {G : <span class="const token" data-verso-hover="231">PNGraph</span> V} (hG : G.<span class="const token" data-verso-hover="243">IsSimple</span>) {v : V} {i : <span class="const token" data-verso-hover="102">ℕ</span>} (hi : i &lt; G.<span class="const token" data-verso-hover="234">deg</span> v) :</span>
+<span id="L116">    <span class="const token" data-verso-hover="239">portOf</span> G v (G.<span class="const token" data-verso-hover="240">nbr</span> v i) = i := <span class="kw">by</span></span>
+<span id="L117">  <span class="kw">classical</span></span>
+<span id="L118">  <span class="kw">have</span> h : ∃ j, j &lt; G.<span class="const token" data-verso-hover="234">deg</span> v ∧ G.<span class="const token" data-verso-hover="240">nbr</span> v j = G.<span class="const token" data-verso-hover="240">nbr</span> v i := ⟨i, hi, <span class="const token" data-verso-hover="116">rfl</span>⟩</span>
+<span id="L119">  <span class="kw">unfold</span> <span class="const token" data-verso-hover="239">portOf</span></span>
+<span id="L120">  <span class="kw">split</span></span>
+<span id="L121">  · <span class="kw">rename_i</span> h'</span>
+<span id="L122">    <span class="kw">have</span> := <span class="const token" data-verso-hover="244">Nat.find_spec</span> h'</span>
+<span id="L123">    <span class="kw">exact</span> G.<span class="const token" data-verso-hover="245">port_unique</span> hG this.<span class="const token" data-verso-hover="106">1</span> hi this.<span class="const token" data-verso-hover="95">2</span></span>
+<span id="L124">  · <span class="kw">contradiction</span></span>
+<span id="L125"></span>
+<span id="L126"><span class="dc">/-- Hypotheses on the input of the port-numbering algorithm: `G` is simple, `red` is a proper</span></span>
+<span id="L127"><span class="dc">2-colouring, and every node ranks its ports injectively. -/</span></span>
+<span id="L128"><span class="kw">structure</span> <span class="const token" data-verso-hover="246">GoodInput</span> (G : <span class="const token" data-verso-hover="231">PNGraph</span> V) (red : V → <span class="const token" data-verso-hover="195">Bool</span>) (rk : V → <span class="const token" data-verso-hover="102">ℕ</span> → <span class="const token" data-verso-hover="102">ℕ</span>) : <span class="kw">Prop</span> <span class="kw">where</span></span>
+<span id="L129">  <span class="const token" data-verso-hover="247">simple</span> : G.<span class="const token" data-verso-hover="243">IsSimple</span></span>
+<span id="L130">  <span class="const token" data-verso-hover="248">red_ne</span> : ∀ v i, i &lt; G.<span class="const token" data-verso-hover="234">deg</span> v → red (G.<span class="const token" data-verso-hover="240">nbr</span> v i) ≠ red v</span>
+<span id="L131">  <span class="const token" data-verso-hover="249">rk_inj</span> : ∀ v i j, i &lt; G.<span class="const token" data-verso-hover="234">deg</span> v → j &lt; G.<span class="const token" data-verso-hover="234">deg</span> v → rk v i = rk v j → i = j</span>
+<span id="L132"></span>
+<span id="L133"><span class="dc">/-- The bicoloured graph with preferences: neighbours of `v` are the nodes behind its ports, and</span></span>
+<span id="L134"><span class="dc">`v` ranks the neighbour behind port `i` by `rk v i`. -/</span></span>
+<span id="L135"><span class="kw">noncomputable</span> <span class="kw">def</span> <span class="const token" data-verso-hover="250">toBicoloured</span> (G : <span class="const token" data-verso-hover="231">PNGraph</span> V) (red : V → <span class="const token" data-verso-hover="195">Bool</span>) (rk : V → <span class="const token" data-verso-hover="102">ℕ</span> → <span class="const token" data-verso-hover="102">ℕ</span>)</span>
+<span id="L136">    (h : <span class="const token" data-verso-hover="246">GoodInput</span> G red rk) : <span class="const token" data-verso-hover="51">Bicoloured</span> V <span class="kw">where</span></span>
+<span id="L137">  <span class="const token" data-verso-hover="57">N</span> v := (<span class="const token" data-verso-hover="222">range</span> (G.<span class="const token" data-verso-hover="234">deg</span> v)).<span class="const token" data-verso-hover="152">image</span> (G.<span class="const token" data-verso-hover="240">nbr</span> v)</span>
+<span id="L138">  <span class="const token" data-verso-hover="147">symm</span> := <span class="kw">by</span></span>
+<span id="L139">    <span class="kw">intro</span> u v hv</span>
+<span id="L140">    <span class="kw">simp</span> only [<span class="const token" data-verso-hover="251">mem_image</span>, <span class="const token" data-verso-hover="252">mem_range</span>] <span class="kw">at</span> hv ⊢</span>
+<span id="L141">    <span class="kw">obtain</span> ⟨i, hi, <span class="kw">rfl</span>⟩ := hv</span>
+<span id="L142">    <span class="kw">exact</span> ⟨G.<span class="const token" data-verso-hover="253">rport</span> u i, G.<span class="const token" data-verso-hover="254">rport_lt</span> hi, G.<span class="const token" data-verso-hover="255">nbr_nbr</span> hi⟩</span>
+<span id="L143">  <span class="const token" data-verso-hover="58">rank</span> v u := rk v (<span class="const token" data-verso-hover="239">portOf</span> G v u)</span>
+<span id="L144">  <span class="const token" data-verso-hover="99">rank_inj</span> := <span class="kw">by</span></span>
+<span id="L145">    <span class="kw">intro</span> v u u' hu hu' he</span>
+<span id="L146">    <span class="kw">simp</span> only [<span class="const token" data-verso-hover="251">mem_image</span>, <span class="const token" data-verso-hover="252">mem_range</span>] <span class="kw">at</span> hu hu'</span>
+<span id="L147">    <span class="kw">obtain</span> ⟨i, hi, <span class="kw">rfl</span>⟩ := hu</span>
+<span id="L148">    <span class="kw">obtain</span> ⟨j, hj, <span class="kw">rfl</span>⟩ := hu'</span>
+<span id="L149">    <span class="kw">rw</span> [<span class="const token" data-verso-hover="242">portOf_nbr</span> h.<span class="const token" data-verso-hover="247">simple</span> hi, <span class="const token" data-verso-hover="242">portOf_nbr</span> h.<span class="const token" data-verso-hover="247">simple</span> hj] <span class="kw">at</span> he</span>
+<span id="L150">    <span class="kw">rw</span> [h.<span class="const token" data-verso-hover="249">rk_inj</span> v i j hi hj he]</span>
+<span id="L151">  <span class="const token" data-verso-hover="66">red</span> := red</span>
+<span id="L152">  <span class="const token" data-verso-hover="196">red_ne</span> := <span class="kw">by</span></span>
+<span id="L153">    <span class="kw">intro</span> u v hv</span>
+<span id="L154">    <span class="kw">simp</span> only [<span class="const token" data-verso-hover="251">mem_image</span>, <span class="const token" data-verso-hover="252">mem_range</span>] <span class="kw">at</span> hv</span>
+<span id="L155">    <span class="kw">obtain</span> ⟨i, hi, <span class="kw">rfl</span>⟩ := hv</span>
+<span id="L156">    <span class="kw">exact</span> h.<span class="const token" data-verso-hover="248">red_ne</span> u i hi</span>
+<span id="L157"></span>
+<span id="L158"><span class="dc">/-! ### Decoding port-level configurations -/</span></span>
+<span id="L159"></span>
+<span id="L160"><span class="kw">section</span> Decode</span>
+<span id="L161"></span>
+<span id="L162"><span class="kw">variable</span> {G : <span class="const token" data-verso-hover="231">PNGraph</span> V} {red : V → <span class="const token" data-verso-hover="195">Bool</span>} {rk : V → <span class="const token" data-verso-hover="102">ℕ</span> → <span class="const token" data-verso-hover="102">ℕ</span>} (h : <span class="const token" data-verso-hover="246">GoodInput</span> G red rk)</span>
+<span id="L163"></span>
+<span id="L164"><span class="dc">/-- Decode a port-level configuration into a node-level state. -/</span></span>
+<span id="L165"><span class="kw">def</span> <span class="const token" data-verso-hover="256">dec</span> (G : <span class="const token" data-verso-hover="231">PNGraph</span> V) (s : V → <span class="const token" data-verso-hover="214">NodeData</span>) : <span class="const token" data-verso-hover="71">State</span> V <span class="kw">where</span></span>
+<span id="L166">  <span class="const token" data-verso-hover="78">C</span> v := (s v).<span class="const token" data-verso-hover="217">C</span>.<span class="const token" data-verso-hover="152">image</span> (G.<span class="const token" data-verso-hover="240">nbr</span> v)</span>
+<span id="L167">  <span class="const token" data-verso-hover="129">c</span> v := (s v).<span class="const token" data-verso-hover="218">c</span>.<span class="const token" data-verso-hover="257">map</span> (G.<span class="const token" data-verso-hover="240">nbr</span> v)</span>
+<span id="L168">  <span class="const token" data-verso-hover="72">p</span> v := (s v).<span class="const token" data-verso-hover="219">p</span>.<span class="const token" data-verso-hover="257">map</span> (G.<span class="const token" data-verso-hover="240">nbr</span> v)</span>
+<span id="L169"></span>
+<span id="L170"><span class="dc">/-- Well-formed port-level configurations: the colour and ranking are the inputs, and all stored</span></span>
+<span id="L171"><span class="dc">ports exist. -/</span></span>
+<span id="L172"><span class="kw">structure</span> <span class="const token" data-verso-hover="258">PInv</span> (G : <span class="const token" data-verso-hover="231">PNGraph</span> V) (red : V → <span class="const token" data-verso-hover="195">Bool</span>) (rk : V → <span class="const token" data-verso-hover="102">ℕ</span> → <span class="const token" data-verso-hover="102">ℕ</span>) (s : V → <span class="const token" data-verso-hover="214">NodeData</span>) : <span class="kw">Prop</span> <span class="kw">where</span></span>
+<span id="L173">  <span class="const token" data-verso-hover="259">red</span> : ∀ v, (s v).<span class="const token" data-verso-hover="215">red</span> = red v</span>
+<span id="L174">  <span class="const token" data-verso-hover="260">rk</span> : ∀ v, (s v).<span class="const token" data-verso-hover="216">rk</span> = rk v</span>
+<span id="L175">  <span class="const token" data-verso-hover="261">C</span> : ∀ v, (s v).<span class="const token" data-verso-hover="217">C</span> ⊆ <span class="const token" data-verso-hover="222">range</span> (G.<span class="const token" data-verso-hover="234">deg</span> v)</span>
+<span id="L176">  <span class="const token" data-verso-hover="262">c</span> : ∀ v i, (s v).<span class="const token" data-verso-hover="218">c</span> = <span class="const token" data-verso-hover="74">some</span> i → i &lt; G.<span class="const token" data-verso-hover="234">deg</span> v</span>
+<span id="L177">  <span class="const token" data-verso-hover="263">p</span> : ∀ v i, (s v).<span class="const token" data-verso-hover="219">p</span> = <span class="const token" data-verso-hover="74">some</span> i → i &lt; G.<span class="const token" data-verso-hover="234">deg</span> v</span>
+<span id="L178"></span>
+<span id="L179"><span class="kw">include</span> h <span class="kw">in</span></span>
+<span id="L180"><span class="kw">lemma</span> <span class="const token" data-verso-hover="264">nbr_eq_iff</span> {v : V} {i j : <span class="const token" data-verso-hover="102">ℕ</span>} (hi : i &lt; G.<span class="const token" data-verso-hover="234">deg</span> v) (hj : j &lt; G.<span class="const token" data-verso-hover="234">deg</span> (G.<span class="const token" data-verso-hover="240">nbr</span> v i)) :</span>
+<span id="L181">    G.<span class="const token" data-verso-hover="240">nbr</span> (G.<span class="const token" data-verso-hover="240">nbr</span> v i) j = v ↔ j = G.<span class="const token" data-verso-hover="253">rport</span> v i := <span class="kw">by</span></span>
+<span id="L182">  <span class="kw">constructor</span></span>
+<span id="L183">  · <span class="kw">intro</span> hv</span>
+<span id="L184">    <span class="kw">exact</span> G.<span class="const token" data-verso-hover="245">port_unique</span> h.<span class="const token" data-verso-hover="247">simple</span> hj (G.<span class="const token" data-verso-hover="254">rport_lt</span> hi) (hv.<span class="const token" data-verso-hover="114">trans</span> (G.<span class="const token" data-verso-hover="255">nbr_nbr</span> hi).<span class="const token" data-verso-hover="101">symm</span>)</span>
+<span id="L185">  · <span class="kw">rintro</span> <span class="kw">rfl</span>; <span class="kw">exact</span> G.<span class="const token" data-verso-hover="255">nbr_nbr</span> hi</span>
+<span id="L186"></span>
+<span id="L187"><span class="kw">include</span> h <span class="kw">in</span></span>
+<span id="L188"><span class="dc">/-- The neighbour behind port `i` of `v` stores port `j` pointing back to `v` iff its decoded</span></span>
+<span id="L189"><span class="dc">pointer is `v`. -/</span></span>
+<span id="L190"><span class="kw">lemma</span> <span class="const token" data-verso-hover="265">map_eq_some_iff</span> {v : V} {i : <span class="const token" data-verso-hover="102">ℕ</span>} (hi : i &lt; G.<span class="const token" data-verso-hover="234">deg</span> v) {o : <span class="const token" data-verso-hover="180">Option</span> <span class="const token" data-verso-hover="102">ℕ</span>}</span>
+<span id="L191">    (ho : ∀ j, o = <span class="const token" data-verso-hover="74">some</span> j → j &lt; G.<span class="const token" data-verso-hover="234">deg</span> (G.<span class="const token" data-verso-hover="240">nbr</span> v i)) :</span>
+<span id="L192">    o.<span class="const token" data-verso-hover="257">map</span> (G.<span class="const token" data-verso-hover="240">nbr</span> (G.<span class="const token" data-verso-hover="240">nbr</span> v i)) = <span class="const token" data-verso-hover="74">some</span> v ↔ o = <span class="const token" data-verso-hover="74">some</span> (G.<span class="const token" data-verso-hover="253">rport</span> v i) := <span class="kw">by</span></span>
+<span id="L193">  <span class="kw">constructor</span></span>
+<span id="L194">  · <span class="kw">intro</span> he</span>
+<span id="L195">    <span class="kw">obtain</span> ⟨j, hj, hjv⟩ := <span class="const token" data-verso-hover="266">Option.map_eq_some_iff</span>.<span class="const token" data-verso-hover="123">1</span> he</span>
+<span id="L196">    <span class="kw">rw</span> [hj, (<span class="const token" data-verso-hover="264">nbr_eq_iff</span> h hi (ho j hj)).<span class="const token" data-verso-hover="123">1</span> hjv]</span>
+<span id="L197">  · <span class="kw">intro</span> he; <span class="kw">rw</span> [he]; <span class="kw">simp</span> [G.<span class="const token" data-verso-hover="255">nbr_nbr</span> hi]</span>
+<span id="L198"></span>
+<span id="L199"><span class="kw">lemma</span> <span class="const token" data-verso-hover="267">pbest_spec</span> {rk' : <span class="const token" data-verso-hover="102">ℕ</span> → <span class="const token" data-verso-hover="102">ℕ</span>} {S : <span class="const token" data-verso-hover="63">Finset</span> <span class="const token" data-verso-hover="102">ℕ</span>} {i : <span class="const token" data-verso-hover="102">ℕ</span>} (hb : <span class="const token" data-verso-hover="220">pbest</span> rk' S = <span class="const token" data-verso-hover="74">some</span> i) :</span>
+<span id="L200">    i ∈ S ∧ ∀ j ∈ S, rk' i ≤ rk' j := <span class="kw">by</span></span>
+<span id="L201">  <span class="kw">unfold</span> <span class="const token" data-verso-hover="220">pbest</span> <span class="kw">at</span> hb</span>
+<span id="L202">  <span class="kw">split_ifs</span> <span class="kw">at</span> hb <span class="kw">with</span> hS</span>
+<span id="L203">  <span class="kw">cases</span> hb; <span class="kw">exact</span> (S.<span class="const token" data-verso-hover="198">exists_min_image</span> rk' hS).<span class="const token" data-verso-hover="207">choose_spec</span></span>
+<span id="L204"></span>
+<span id="L205"><span class="kw">lemma</span> <span class="const token" data-verso-hover="268">pbest_eq_none</span> {rk' : <span class="const token" data-verso-hover="102">ℕ</span> → <span class="const token" data-verso-hover="102">ℕ</span>} {S : <span class="const token" data-verso-hover="63">Finset</span> <span class="const token" data-verso-hover="102">ℕ</span>} : <span class="const token" data-verso-hover="220">pbest</span> rk' S = <span class="const token" data-verso-hover="73">none</span> ↔ S = ∅ := <span class="kw">by</span></span>
+<span id="L206">  <span class="kw">unfold</span> <span class="const token" data-verso-hover="220">pbest</span>; <span class="kw">split_ifs</span> <span class="kw">with</span> hS &lt;;&gt; <span class="kw">simp_all</span> [<span class="const token" data-verso-hover="206">Finset.nonempty_iff_ne_empty</span>]</span>
+<span id="L207"></span>
+<span id="L208"><span class="kw">include</span> h <span class="kw">in</span></span>
+<span id="L209"><span class="kw">lemma</span> <span class="const token" data-verso-hover="269">image_nbr_subset</span> {v : V} {S : <span class="const token" data-verso-hover="63">Finset</span> <span class="const token" data-verso-hover="102">ℕ</span>} (hS : S ⊆ <span class="const token" data-verso-hover="222">range</span> (G.<span class="const token" data-verso-hover="234">deg</span> v)) :</span>
+<span id="L210">    S.<span class="const token" data-verso-hover="152">image</span> (G.<span class="const token" data-verso-hover="240">nbr</span> v) ⊆ (<span class="const token" data-verso-hover="250">toBicoloured</span> G red rk h).<span class="const token" data-verso-hover="57">N</span> v :=</span>
+<span id="L211">  <span class="const token" data-verso-hover="270">image_subset_image</span> hS</span>
+<span id="L212"></span>
+<span id="L213"><span class="kw">include</span> h <span class="kw">in</span></span>
+<span id="L214"><span class="dc">/-- The best port decodes to the best neighbour. -/</span></span>
+<span id="L215"><span class="kw">lemma</span> <span class="const token" data-verso-hover="271">pbest_map</span> {v : V} {S : <span class="const token" data-verso-hover="63">Finset</span> <span class="const token" data-verso-hover="102">ℕ</span>} (hS : S ⊆ <span class="const token" data-verso-hover="222">range</span> (G.<span class="const token" data-verso-hover="234">deg</span> v)) :</span>
+<span id="L216">    (<span class="const token" data-verso-hover="220">pbest</span> (rk v) S).<span class="const token" data-verso-hover="257">map</span> (G.<span class="const token" data-verso-hover="240">nbr</span> v) = (<span class="const token" data-verso-hover="250">toBicoloured</span> G red rk h).<span class="const token" data-verso-hover="77">best</span> v (S.<span class="const token" data-verso-hover="152">image</span> (G.<span class="const token" data-verso-hover="240">nbr</span> v)) := <span class="kw">by</span></span>
+<span id="L217">  <span class="kw">rcases</span> hb : <span class="const token" data-verso-hover="220">pbest</span> (rk v) S <span class="kw">with</span> _ | i</span>
+<span id="L218">  · <span class="kw">rw</span> [<span class="const token" data-verso-hover="268">pbest_eq_none</span>.<span class="const token" data-verso-hover="123">1</span> hb]; <span class="kw">simp</span> only [<span class="const token" data-verso-hover="272">Option.map_none</span>, <span class="const token" data-verso-hover="273">image_empty</span>]</span>
+<span id="L219">    <span class="kw">exact</span> ((<span class="const token" data-verso-hover="115">Bicoloured.best_eq_none</span> _).<span class="const token" data-verso-hover="109">2</span> <span class="const token" data-verso-hover="116">rfl</span>).<span class="const token" data-verso-hover="101">symm</span></span>
+<span id="L220">  · <span class="kw">obtain</span> ⟨hiS, hmin⟩ := <span class="const token" data-verso-hover="267">pbest_spec</span> hb</span>
+<span id="L221">    <span class="kw">symm</span></span>
+<span id="L222">    <span class="kw">rw</span> [<span class="const token" data-verso-hover="274">Option.map_some</span>, <span class="const token" data-verso-hover="209">Bicoloured.best_eq_some_iff</span> _ (<span class="const token" data-verso-hover="269">image_nbr_subset</span> h hS)]</span>
+<span id="L223">    <span class="kw">refine</span> ⟨<span class="const token" data-verso-hover="275">mem_image_of_mem</span> _ hiS, ?_⟩</span>
+<span id="L224">    <span class="kw">rintro</span> y hy</span>
+<span id="L225">    <span class="kw">obtain</span> ⟨j, hj, <span class="kw">rfl</span>⟩ := <span class="const token" data-verso-hover="251">mem_image</span>.<span class="const token" data-verso-hover="123">1</span> hy</span>
+<span id="L226">    <span class="kw">change</span> rk v (<span class="const token" data-verso-hover="239">portOf</span> G v (G.<span class="const token" data-verso-hover="240">nbr</span> v i)) ≤ rk v (<span class="const token" data-verso-hover="239">portOf</span> G v (G.<span class="const token" data-verso-hover="240">nbr</span> v j))</span>
+<span id="L227">    <span class="kw">rw</span> [<span class="const token" data-verso-hover="242">portOf_nbr</span> h.<span class="const token" data-verso-hover="247">simple</span> (<span class="const token" data-verso-hover="252">mem_range</span>.<span class="const token" data-verso-hover="123">1</span> (hS hiS)), <span class="const token" data-verso-hover="242">portOf_nbr</span> h.<span class="const token" data-verso-hover="247">simple</span> (<span class="const token" data-verso-hover="252">mem_range</span>.<span class="const token" data-verso-hover="123">1</span> (hS hj))]</span>
+<span id="L228">    <span class="kw">exact</span> hmin j hj</span>
+<span id="L229"></span>
+<span id="L230"><span class="kw">include</span> h <span class="kw">in</span></span>
+<span id="L231"><span class="kw">lemma</span> <span class="const token" data-verso-hover="276">image_erase_nbr</span> {v : V} {S : <span class="const token" data-verso-hover="63">Finset</span> <span class="const token" data-verso-hover="102">ℕ</span>} (hS : S ⊆ <span class="const token" data-verso-hover="222">range</span> (G.<span class="const token" data-verso-hover="234">deg</span> v)) {i : <span class="const token" data-verso-hover="102">ℕ</span>}</span>
+<span id="L232">    (hi : i &lt; G.<span class="const token" data-verso-hover="234">deg</span> v) : (S.<span class="const token" data-verso-hover="92">erase</span> i).<span class="const token" data-verso-hover="152">image</span> (G.<span class="const token" data-verso-hover="240">nbr</span> v) = (S.<span class="const token" data-verso-hover="152">image</span> (G.<span class="const token" data-verso-hover="240">nbr</span> v)).<span class="const token" data-verso-hover="92">erase</span> (G.<span class="const token" data-verso-hover="240">nbr</span> v i) := <span class="kw">by</span></span>
+<span id="L233">  <span class="kw">ext</span> y</span>
+<span id="L234">  <span class="kw">simp</span> only [<span class="const token" data-verso-hover="251">mem_image</span>, <span class="const token" data-verso-hover="171">mem_erase</span>]</span>
+<span id="L235">  <span class="kw">constructor</span></span>
+<span id="L236">  · <span class="kw">rintro</span> ⟨j, ⟨hji, hj⟩, <span class="kw">rfl</span>⟩</span>
+<span id="L237">    <span class="kw">exact</span> ⟨<span class="kw">fun</span> he =&gt; hji (G.<span class="const token" data-verso-hover="245">port_unique</span> h.<span class="const token" data-verso-hover="247">simple</span> (<span class="const token" data-verso-hover="252">mem_range</span>.<span class="const token" data-verso-hover="123">1</span> (hS hj)) hi he), j, hj, <span class="const token" data-verso-hover="116">rfl</span>⟩</span>
+<span id="L238">  · <span class="kw">rintro</span> ⟨hne, j, hj, <span class="kw">rfl</span>⟩</span>
+<span id="L239">    <span class="kw">exact</span> ⟨j, ⟨<span class="kw">fun</span> hji =&gt; hne (hji ▸ <span class="const token" data-verso-hover="116">rfl</span>), hj⟩, <span class="const token" data-verso-hover="116">rfl</span>⟩</span>
+<span id="L240"></span>
+<span id="L241"><span class="kw">lemma</span> <span class="const token" data-verso-hover="277">nbrInfo_of_lt</span> {s : V → <span class="const token" data-verso-hover="214">NodeData</span>} {v : V} {i : <span class="const token" data-verso-hover="102">ℕ</span>} (hi : i &lt; G.<span class="const token" data-verso-hover="234">deg</span> v) :</span>
+<span id="L242">    <span class="const token" data-verso-hover="278">Algorithm.nbrInfo</span> G s v i = <span class="const token" data-verso-hover="74">some</span> (s (G.<span class="const token" data-verso-hover="240">nbr</span> v i), G.<span class="const token" data-verso-hover="253">rport</span> v i) := <span class="kw">by</span></span>
+<span id="L243">  <span class="kw">simp</span> [<span class="const token" data-verso-hover="278">Algorithm.nbrInfo</span>, hi]</span>
+<span id="L244"></span>
+<span id="L245"><span class="dc">/-- One communication round of the port-level algorithm. -/</span></span>
+<span id="L246"><span class="kw">noncomputable</span> <span class="kw">def</span> <span class="const token" data-verso-hover="279">pstep</span> (G : <span class="const token" data-verso-hover="231">PNGraph</span> V) (t : <span class="const token" data-verso-hover="102">ℕ</span>) (s : V → <span class="const token" data-verso-hover="214">NodeData</span>) : V → <span class="const token" data-verso-hover="214">NodeData</span> :=</span>
+<span id="L247">  <span class="kw">fun</span> v =&gt; <span class="const token" data-verso-hover="14">rule</span> t (G.<span class="const token" data-verso-hover="234">deg</span> v) (s v) (<span class="const token" data-verso-hover="278">Algorithm.nbrInfo</span> G s v)</span>
+<span id="L248"></span>
+<span id="L249"><span class="kw">lemma</span> <span class="const token" data-verso-hover="280">localRun_succ_eq</span> (x : V → <span class="const token" data-verso-hover="214">NodeData</span>) (t : <span class="const token" data-verso-hover="102">ℕ</span>) :</span>
+<span id="L250">    <span class="const token" data-verso-hover="233">Algorithm.localRun</span> G <span class="const token" data-verso-hover="14">rule</span> x (t + <span class="nu">1</span>) = <span class="const token" data-verso-hover="279">pstep</span> G t (<span class="const token" data-verso-hover="233">Algorithm.localRun</span> G <span class="const token" data-verso-hover="14">rule</span> x t) := <span class="kw">by</span></span>
+<span id="L251">  <span class="kw">funext</span> v; <span class="kw">exact</span> <span class="const token" data-verso-hover="281">Algorithm.localRun_succ</span> G <span class="const token" data-verso-hover="14">rule</span> x t v</span>
+<span id="L252"></span>
+<span id="L253"><span class="kw">open</span> Classical <span class="kw">in</span></span>
+<span id="L254"><span class="kw">include</span> h <span class="kw">in</span></span>
+<span id="L255"><span class="dc">/-- The port-level proposers decode to the node-level proposers. -/</span></span>
+<span id="L256"><span class="kw">lemma</span> <span class="const token" data-verso-hover="282">proposers_dec</span> {s : V → <span class="const token" data-verso-hover="214">NodeData</span>} (hs : <span class="const token" data-verso-hover="258">PInv</span> G red rk s) (v : V) :</span>
+<span id="L257">    ((<span class="const token" data-verso-hover="222">range</span> (G.<span class="const token" data-verso-hover="234">deg</span> v)).<span class="const token" data-verso-hover="65">filter</span> <span class="kw">fun</span> i =&gt; ∃ y j, <span class="const token" data-verso-hover="278">Algorithm.nbrInfo</span> G s v i = <span class="const token" data-verso-hover="74">some</span> (y, j) ∧</span>
+<span id="L258">        y.<span class="const token" data-verso-hover="218">c</span> = <span class="const token" data-verso-hover="74">some</span> j).<span class="const token" data-verso-hover="152">image</span> (G.<span class="const token" data-verso-hover="240">nbr</span> v) = (<span class="const token" data-verso-hover="250">toBicoloured</span> G red rk h).<span class="const token" data-verso-hover="201">proposers</span> (<span class="const token" data-verso-hover="256">dec</span> G s) v := <span class="kw">by</span></span>
+<span id="L259">  <span class="kw">ext</span> y</span>
+<span id="L260">  <span class="kw">simp</span> only [<span class="const token" data-verso-hover="201">Bicoloured.proposers</span>, <span class="const token" data-verso-hover="251">mem_image</span>, <span class="const token" data-verso-hover="136">mem_filter</span>, <span class="const token" data-verso-hover="252">mem_range</span>]</span>
+<span id="L261">  <span class="kw">have</span> hN : y ∈ (<span class="const token" data-verso-hover="250">toBicoloured</span> G red rk h).<span class="const token" data-verso-hover="57">N</span> v ↔ ∃ i, i &lt; G.<span class="const token" data-verso-hover="234">deg</span> v ∧ G.<span class="const token" data-verso-hover="240">nbr</span> v i = y := <span class="kw">by</span></span>
+<span id="L262">    <span class="kw">simp</span> [<span class="const token" data-verso-hover="250">toBicoloured</span>]</span>
+<span id="L263">  <span class="kw">rw</span> [hN]</span>
+<span id="L264">  <span class="kw">constructor</span></span>
+<span id="L265">  · <span class="kw">rintro</span> ⟨i, ⟨hi, y', j, hm, hc⟩, <span class="kw">rfl</span>⟩</span>
+<span id="L266">    <span class="kw">rw</span> [<span class="const token" data-verso-hover="277">nbrInfo_of_lt</span> hi] <span class="kw">at</span> hm</span>
+<span id="L267">    <span class="kw">cases</span> hm</span>
+<span id="L268">    <span class="kw">refine</span> ⟨⟨i, hi, <span class="const token" data-verso-hover="116">rfl</span>⟩, ?_⟩</span>
+<span id="L269">    <span class="kw">change</span> ((s (G.<span class="const token" data-verso-hover="240">nbr</span> v i)).<span class="const token" data-verso-hover="218">c</span>).<span class="const token" data-verso-hover="257">map</span> _ = _</span>
+<span id="L270">    <span class="kw">rw</span> [<span class="const token" data-verso-hover="265">map_eq_some_iff</span> h hi (hs.<span class="const token" data-verso-hover="262">c</span> _)]; <span class="kw">exact</span> hc</span>
+<span id="L271">  · <span class="kw">rintro</span> ⟨⟨i, hi, <span class="kw">rfl</span>⟩, hc⟩</span>
+<span id="L272">    <span class="kw">change</span> ((s (G.<span class="const token" data-verso-hover="240">nbr</span> v i)).<span class="const token" data-verso-hover="218">c</span>).<span class="const token" data-verso-hover="257">map</span> _ = _ <span class="kw">at</span> hc</span>
+<span id="L273">    <span class="kw">rw</span> [<span class="const token" data-verso-hover="265">map_eq_some_iff</span> h hi (hs.<span class="const token" data-verso-hover="262">c</span> _)] <span class="kw">at</span> hc</span>
+<span id="L274">    <span class="kw">exact</span> ⟨i, ⟨hi, _, _, <span class="const token" data-verso-hover="277">nbrInfo_of_lt</span> hi, hc⟩, <span class="const token" data-verso-hover="116">rfl</span>⟩</span>
+<span id="L275"></span>
+<span id="L276"><span class="kw">lemma</span> <span class="const token" data-verso-hover="283">image_union_toFinset</span> {v : V} (S : <span class="const token" data-verso-hover="63">Finset</span> <span class="const token" data-verso-hover="102">ℕ</span>) (o : <span class="const token" data-verso-hover="180">Option</span> <span class="const token" data-verso-hover="102">ℕ</span>) :</span>
+<span id="L277">    (S ∪ o.<span class="const token" data-verso-hover="202">toFinset</span>).<span class="const token" data-verso-hover="152">image</span> (G.<span class="const token" data-verso-hover="240">nbr</span> v) = S.<span class="const token" data-verso-hover="152">image</span> (G.<span class="const token" data-verso-hover="240">nbr</span> v) ∪ (o.<span class="const token" data-verso-hover="257">map</span> (G.<span class="const token" data-verso-hover="240">nbr</span> v)).<span class="const token" data-verso-hover="202">toFinset</span> := <span class="kw">by</span></span>
+<span id="L278">  <span class="kw">cases</span> o &lt;;&gt; <span class="kw">simp</span></span>
+<span id="L279"></span>
+<span id="L280"><span class="kw">open</span> Classical <span class="kw">in</span></span>
+<span id="L281"><span class="kw">include</span> h <span class="kw">in</span></span>
+<span id="L282"><span class="dc">/-- A blue turn of the port-level algorithm decodes to the blue turn of §4. -/</span></span>
+<span id="L283"><span class="kw">lemma</span> <span class="const token" data-verso-hover="284">blue_step</span> {s : V → <span class="const token" data-verso-hover="214">NodeData</span>} (hs : <span class="const token" data-verso-hover="258">PInv</span> G red rk s) {t : <span class="const token" data-verso-hover="102">ℕ</span>} (ht : t % <span class="nu">2</span> = <span class="nu">0</span>) :</span>
+<span id="L284">    <span class="const token" data-verso-hover="258">PInv</span> G red rk (<span class="const token" data-verso-hover="279">pstep</span> G t s) ∧</span>
+<span id="L285">      <span class="const token" data-verso-hover="256">dec</span> G (<span class="const token" data-verso-hover="279">pstep</span> G t s) = (<span class="const token" data-verso-hover="250">toBicoloured</span> G red rk h).<span class="const token" data-verso-hover="11">blueTurn</span> (<span class="const token" data-verso-hover="256">dec</span> G s) := <span class="kw">by</span></span>
+<span id="L286">  <span class="kw">set</span> P : V → <span class="const token" data-verso-hover="63">Finset</span> <span class="const token" data-verso-hover="102">ℕ</span> := <span class="kw">fun</span> v =&gt; (<span class="const token" data-verso-hover="222">range</span> (G.<span class="const token" data-verso-hover="234">deg</span> v)).<span class="const token" data-verso-hover="65">filter</span> <span class="kw">fun</span> i =&gt;</span>
+<span id="L287">    ∃ y j, <span class="const token" data-verso-hover="278">Algorithm.nbrInfo</span> G s v i = <span class="const token" data-verso-hover="74">some</span> (y, j) ∧ y.<span class="const token" data-verso-hover="218">c</span> = <span class="const token" data-verso-hover="74">some</span> j</span>
+<span id="L288">  <span class="kw">have</span> hv : ∀ v, <span class="const token" data-verso-hover="279">pstep</span> G t s v = <span class="kw">if</span> red v = <span class="const token" data-verso-hover="67">true</span> <span class="kw">then</span> s v <span class="kw">else</span></span>
+<span id="L289">      <span class="kw">if</span> (P v).<span class="const token" data-verso-hover="197">Nonempty</span> <span class="kw">then</span> { s v <span class="kw">with</span> <span class="const token" data-verso-hover="219">p</span> := <span class="const token" data-verso-hover="220">pbest</span> (rk v) (P v ∪ (s v).<span class="const token" data-verso-hover="219">p</span>.<span class="const token" data-verso-hover="202">toFinset</span>) } <span class="kw">else</span> s v := <span class="kw">by</span></span>
+<span id="L290">    <span class="kw">intro</span> v</span>
+<span id="L291">    <span class="kw">simp</span> only [<span class="const token" data-verso-hover="279">pstep</span>, <span class="const token" data-verso-hover="14">rule</span>, ht, <span class="const token" data-verso-hover="285">ite_true</span>, hs.<span class="const token" data-verso-hover="259">red</span> v, hs.<span class="const token" data-verso-hover="260">rk</span> v, P]</span>
+<span id="L292">  <span class="kw">have</span> hPsub : ∀ v, P v ∪ (s v).<span class="const token" data-verso-hover="219">p</span>.<span class="const token" data-verso-hover="202">toFinset</span> ⊆ <span class="const token" data-verso-hover="222">range</span> (G.<span class="const token" data-verso-hover="234">deg</span> v) := <span class="kw">by</span></span>
+<span id="L293">    <span class="kw">intro</span> v i hi</span>
+<span id="L294">    <span class="kw">rcases</span> <span class="const token" data-verso-hover="286">mem_union</span>.<span class="const token" data-verso-hover="123">1</span> hi <span class="kw">with</span> hi | hi</span>
+<span id="L295">    · <span class="kw">exact</span> (<span class="const token" data-verso-hover="136">mem_filter</span>.<span class="const token" data-verso-hover="123">1</span> hi).<span class="const token" data-verso-hover="106">1</span></span>
+<span id="L296">    · <span class="kw">exact</span> <span class="const token" data-verso-hover="252">mem_range</span>.<span class="const token" data-verso-hover="109">2</span> (hs.<span class="const token" data-verso-hover="263">p</span> v i (<span class="kw">by</span> <span class="kw">simpa</span> <span class="kw">using</span> hi))</span>
+<span id="L297">  <span class="kw">refine</span> ⟨⟨<span class="kw">fun</span> v =&gt; ?_, <span class="kw">fun</span> v =&gt; ?_, <span class="kw">fun</span> v =&gt; ?_, <span class="kw">fun</span> v =&gt; ?_, <span class="kw">fun</span> v i hi =&gt; ?_⟩, ?_⟩</span>
+<span id="L298">  · <span class="kw">rw</span> [hv]; <span class="kw">split_ifs</span> &lt;;&gt; <span class="kw">simp</span> [hs.<span class="const token" data-verso-hover="259">red</span> v]</span>
+<span id="L299">  · <span class="kw">rw</span> [hv]; <span class="kw">split_ifs</span> &lt;;&gt; <span class="kw">simp</span> [hs.<span class="const token" data-verso-hover="260">rk</span> v]</span>
+<span id="L300">  · <span class="kw">rw</span> [hv]; <span class="kw">split_ifs</span> &lt;;&gt; <span class="kw">simp</span> [hs.<span class="const token" data-verso-hover="261">C</span> v]</span>
+<span id="L301">  · <span class="kw">intro</span> i hi; <span class="kw">rw</span> [hv] <span class="kw">at</span> hi; <span class="kw">split_ifs</span> <span class="kw">at</span> hi &lt;;&gt; <span class="kw">exact</span> hs.<span class="const token" data-verso-hover="262">c</span> v i hi</span>
+<span id="L302">  · <span class="kw">rw</span> [hv] <span class="kw">at</span> hi</span>
+<span id="L303">    <span class="kw">split_ifs</span> <span class="kw">at</span> hi</span>
+<span id="L304">    · <span class="kw">exact</span> hs.<span class="const token" data-verso-hover="263">p</span> v i hi</span>
+<span id="L305">    · <span class="kw">exact</span> <span class="const token" data-verso-hover="252">mem_range</span>.<span class="const token" data-verso-hover="123">1</span> (hPsub v (<span class="const token" data-verso-hover="267">pbest_spec</span> hi).<span class="const token" data-verso-hover="106">1</span>)</span>
+<span id="L306">    · <span class="kw">exact</span> hs.<span class="const token" data-verso-hover="263">p</span> v i hi</span>
+<span id="L307">  · ext1</span>
+<span id="L308">    · <span class="kw">funext</span> v; <span class="kw">simp</span> only [<span class="const token" data-verso-hover="256">dec</span>, <span class="const token" data-verso-hover="287">Bicoloured.blueTurn_C</span>, hv]; <span class="kw">split_ifs</span> &lt;;&gt; <span class="kw">rfl</span></span>
+<span id="L309">    · <span class="kw">funext</span> v; <span class="kw">simp</span> only [<span class="const token" data-verso-hover="256">dec</span>, <span class="const token" data-verso-hover="288">Bicoloured.blueTurn_c</span>, hv]; <span class="kw">split_ifs</span> &lt;;&gt; <span class="kw">rfl</span></span>
+<span id="L310">    · <span class="kw">funext</span> v</span>
+<span id="L311">      <span class="kw">have</span> hprop : (P v).<span class="const token" data-verso-hover="152">image</span> (G.<span class="const token" data-verso-hover="240">nbr</span> v) = (<span class="const token" data-verso-hover="250">toBicoloured</span> G red rk h).<span class="const token" data-verso-hover="201">proposers</span> (<span class="const token" data-verso-hover="256">dec</span> G s) v :=</span>
+<span id="L312">        <span class="const token" data-verso-hover="282">proposers_dec</span> h hs v</span>
+<span id="L313">      <span class="kw">change</span> ((<span class="const token" data-verso-hover="279">pstep</span> G t s v).<span class="const token" data-verso-hover="219">p</span>).<span class="const token" data-verso-hover="257">map</span> (G.<span class="const token" data-verso-hover="240">nbr</span> v) = ((<span class="const token" data-verso-hover="250">toBicoloured</span> G red rk h).<span class="const token" data-verso-hover="11">blueTurn</span> (<span class="const token" data-verso-hover="256">dec</span> G s)).<span class="const token" data-verso-hover="72">p</span> v</span>
+<span id="L314">      <span class="kw">rw</span> [hv]</span>
+<span id="L315">      <span class="kw">by_cases</span> hr : red v = <span class="const token" data-verso-hover="67">true</span></span>
+<span id="L316">      · <span class="kw">rw</span> [<span class="const token" data-verso-hover="132">ite_eq_left</span> hr, <span class="const token" data-verso-hover="289">Bicoloured.blueTurn_p_red</span> _ _ (<span class="kw">by</span> <span class="kw">exact</span> hr)]; <span class="kw">rfl</span></span>
+<span id="L317">      · <span class="kw">have</span> hr' : red v = <span class="const token" data-verso-hover="69">false</span> := <span class="kw">by</span> <span class="kw">simpa</span> <span class="kw">using</span> hr</span>
+<span id="L318">        <span class="kw">rw</span> [<span class="const token" data-verso-hover="131">ite_eq_right</span> hr]</span>
+<span id="L319">        <span class="kw">by_cases</span> hP : (P v).<span class="const token" data-verso-hover="197">Nonempty</span></span>
+<span id="L320">        · <span class="kw">have</span> hP' : ((<span class="const token" data-verso-hover="250">toBicoloured</span> G red rk h).<span class="const token" data-verso-hover="201">proposers</span> (<span class="const token" data-verso-hover="256">dec</span> G s) v).<span class="const token" data-verso-hover="197">Nonempty</span> := <span class="kw">by</span></span>
+<span id="L321">            <span class="kw">rw</span> [← hprop]; <span class="kw">exact</span> hP.<span class="const token" data-verso-hover="290">image</span> _</span>
+<span id="L322">          <span class="kw">rw</span> [<span class="const token" data-verso-hover="132">ite_eq_left</span> hP, <span class="const token" data-verso-hover="291">Bicoloured.blueTurn_p_nonempty</span> _ _ (<span class="kw">by</span> <span class="kw">exact</span> hr') hP', ← hprop,</span>
+<span id="L323">            <span class="kw">show</span> (<span class="const token" data-verso-hover="256">dec</span> G s).<span class="const token" data-verso-hover="72">p</span> v = (s v).<span class="const token" data-verso-hover="219">p</span>.<span class="const token" data-verso-hover="257">map</span> (G.<span class="const token" data-verso-hover="240">nbr</span> v) <span class="kw">from</span> <span class="const token" data-verso-hover="116">rfl</span>, ← <span class="const token" data-verso-hover="283">image_union_toFinset</span>,</span>
+<span id="L324">            ← <span class="const token" data-verso-hover="271">pbest_map</span> h (hPsub v)]</span>
+<span id="L325">        · <span class="kw">have</span> hP' : ¬ ((<span class="const token" data-verso-hover="250">toBicoloured</span> G red rk h).<span class="const token" data-verso-hover="201">proposers</span> (<span class="const token" data-verso-hover="256">dec</span> G s) v).<span class="const token" data-verso-hover="197">Nonempty</span> := <span class="kw">by</span></span>
+<span id="L326">            <span class="kw">rw</span> [← hprop, <span class="const token" data-verso-hover="292">Finset.image_nonempty</span>]; <span class="kw">exact</span> hP</span>
+<span id="L327">          <span class="kw">rw</span> [<span class="const token" data-verso-hover="131">ite_eq_right</span> hP, <span class="const token" data-verso-hover="293">Bicoloured.blueTurn_p_empty</span> _ _ hP']</span>
+<span id="L328">          <span class="kw">rfl</span></span>
+<span id="L329"></span>
+<span id="L330"><span class="dc">/-- A port-level pair `(C, p)` of node `v` decodes to the node-level pair `(C', p')`. -/</span></span>
+<span id="L331"><span class="kw">def</span> <span class="const token" data-verso-hover="294">DecPair</span> (G : <span class="const token" data-verso-hover="231">PNGraph</span> V) (v : V) (a : <span class="const token" data-verso-hover="63">Finset</span> <span class="const token" data-verso-hover="102">ℕ</span> × <span class="const token" data-verso-hover="180">Option</span> <span class="const token" data-verso-hover="102">ℕ</span>) (b : <span class="const token" data-verso-hover="63">Finset</span> V × <span class="const token" data-verso-hover="180">Option</span> V) : <span class="kw">Prop</span> :=</span>
+<span id="L332">  a.<span class="const token" data-verso-hover="190">1</span> ⊆ <span class="const token" data-verso-hover="222">range</span> (G.<span class="const token" data-verso-hover="234">deg</span> v) ∧ (∀ i, a.<span class="const token" data-verso-hover="191">2</span> = <span class="const token" data-verso-hover="74">some</span> i → i &lt; G.<span class="const token" data-verso-hover="234">deg</span> v) ∧ a.<span class="const token" data-verso-hover="190">1</span>.<span class="const token" data-verso-hover="152">image</span> (G.<span class="const token" data-verso-hover="240">nbr</span> v) = b.<span class="const token" data-verso-hover="190">1</span> ∧</span>
+<span id="L333">    a.<span class="const token" data-verso-hover="191">2</span>.<span class="const token" data-verso-hover="257">map</span> (G.<span class="const token" data-verso-hover="240">nbr</span> v) = b.<span class="const token" data-verso-hover="191">2</span></span>
+<span id="L334"></span>
+<span id="L335"><span class="kw">open</span> Classical <span class="kw">in</span></span>
+<span id="L336"><span class="kw">include</span> h <span class="kw">in</span></span>
+<span id="L337"><span class="kw">lemma</span> <span class="const token" data-verso-hover="295">acc_iff</span> {s : V → <span class="const token" data-verso-hover="214">NodeData</span>} (hs : <span class="const token" data-verso-hover="258">PInv</span> G red rk s) {v : V} {i : <span class="const token" data-verso-hover="102">ℕ</span>} (hi : i &lt; G.<span class="const token" data-verso-hover="234">deg</span> v) :</span>
+<span id="L338">    (∃ y j, <span class="const token" data-verso-hover="278">Algorithm.nbrInfo</span> G s v i = <span class="const token" data-verso-hover="74">some</span> (y, j) ∧ y.<span class="const token" data-verso-hover="219">p</span> = <span class="const token" data-verso-hover="74">some</span> j) ↔</span>
+<span id="L339">      (<span class="const token" data-verso-hover="256">dec</span> G s).<span class="const token" data-verso-hover="72">p</span> (G.<span class="const token" data-verso-hover="240">nbr</span> v i) = <span class="const token" data-verso-hover="74">some</span> v := <span class="kw">by</span></span>
+<span id="L340">  <span class="kw">rw</span> [<span class="const token" data-verso-hover="277">nbrInfo_of_lt</span> hi]</span>
+<span id="L341">  <span class="kw">change</span> _ ↔ ((s (G.<span class="const token" data-verso-hover="240">nbr</span> v i)).<span class="const token" data-verso-hover="219">p</span>).<span class="const token" data-verso-hover="257">map</span> _ = _</span>
+<span id="L342">  <span class="kw">rw</span> [<span class="const token" data-verso-hover="265">map_eq_some_iff</span> h hi (hs.<span class="const token" data-verso-hover="263">p</span> _)]</span>
+<span id="L343">  <span class="kw">constructor</span></span>
+<span id="L344">  · <span class="kw">rintro</span> ⟨y, j, he, hp⟩; <span class="kw">cases</span> he; <span class="kw">exact</span> hp</span>
+<span id="L345">  · <span class="kw">intro</span> hp; <span class="kw">exact</span> ⟨_, _, <span class="const token" data-verso-hover="116">rfl</span>, hp⟩</span>
+<span id="L346"></span>
+<span id="L347"><span class="kw">open</span> Classical <span class="kw">in</span></span>
+<span id="L348"><span class="kw">include</span> h <span class="kw">in</span></span>
+<span id="L349"><span class="kw">lemma</span> <span class="const token" data-verso-hover="296">step1_dec</span> {s : V → <span class="const token" data-verso-hover="214">NodeData</span>} (hs : <span class="const token" data-verso-hover="258">PInv</span> G red rk s) (v : V) :</span>
+<span id="L350">    <span class="const token" data-verso-hover="294">DecPair</span> G v (<span class="const token" data-verso-hover="223">pStep1</span> (s v) <span class="kw">fun</span> i =&gt; ∃ y j, <span class="const token" data-verso-hover="278">Algorithm.nbrInfo</span> G s v i = <span class="const token" data-verso-hover="74">some</span> (y, j) ∧</span>
+<span id="L351">      y.<span class="const token" data-verso-hover="219">p</span> = <span class="const token" data-verso-hover="74">some</span> j) (<span class="const token" data-verso-hover="203">Bicoloured.redStep1</span> (<span class="const token" data-verso-hover="256">dec</span> G s) v) := <span class="kw">by</span></span>
+<span id="L352">  <span class="kw">unfold</span> <span class="const token" data-verso-hover="223">pStep1</span> <span class="const token" data-verso-hover="203">Bicoloured.redStep1</span></span>
+<span id="L353">  <span class="kw">rcases</span> hc : (s v).<span class="const token" data-verso-hover="218">c</span> <span class="kw">with</span> _ | i</span>
+<span id="L354">  · <span class="kw">have</span> : (<span class="const token" data-verso-hover="256">dec</span> G s).<span class="const token" data-verso-hover="129">c</span> v = <span class="const token" data-verso-hover="73">none</span> := <span class="kw">by</span> <span class="kw">simp</span> [<span class="const token" data-verso-hover="256">dec</span>, hc]</span>
+<span id="L355">    <span class="kw">rw</span> [this]</span>
+<span id="L356">    <span class="kw">exact</span> ⟨hs.<span class="const token" data-verso-hover="261">C</span> v, hs.<span class="const token" data-verso-hover="263">p</span> v, <span class="const token" data-verso-hover="116">rfl</span>, <span class="const token" data-verso-hover="116">rfl</span>⟩</span>
+<span id="L357">  · <span class="kw">have</span> hi := hs.<span class="const token" data-verso-hover="262">c</span> v i hc</span>
+<span id="L358">    <span class="kw">have</span> : (<span class="const token" data-verso-hover="256">dec</span> G s).<span class="const token" data-verso-hover="129">c</span> v = <span class="const token" data-verso-hover="74">some</span> (G.<span class="const token" data-verso-hover="240">nbr</span> v i) := <span class="kw">by</span> <span class="kw">simp</span> [<span class="const token" data-verso-hover="256">dec</span>, hc]</span>
+<span id="L359">    <span class="kw">rw</span> [this]</span>
+<span id="L360">    <span class="kw">simp</span> only</span>
+<span id="L361">    <span class="kw">by_cases</span> hacc : ∃ y j, <span class="const token" data-verso-hover="278">Algorithm.nbrInfo</span> G s v i = <span class="const token" data-verso-hover="74">some</span> (y, j) ∧ y.<span class="const token" data-verso-hover="219">p</span> = <span class="const token" data-verso-hover="74">some</span> j</span>
+<span id="L362">    · <span class="kw">rw</span> [<span class="const token" data-verso-hover="132">ite_eq_left</span> hacc, <span class="const token" data-verso-hover="132">ite_eq_left</span> ((<span class="const token" data-verso-hover="295">acc_iff</span> h hs hi).<span class="const token" data-verso-hover="123">1</span> hacc)]</span>
+<span id="L363">      <span class="kw">exact</span> ⟨hs.<span class="const token" data-verso-hover="261">C</span> v, <span class="kw">fun</span> j hj =&gt; <span class="kw">by</span> <span class="kw">cases</span> hj; <span class="kw">exact</span> hi, <span class="const token" data-verso-hover="116">rfl</span>, <span class="const token" data-verso-hover="116">rfl</span>⟩</span>
+<span id="L364">    · <span class="kw">rw</span> [<span class="const token" data-verso-hover="131">ite_eq_right</span> hacc, <span class="const token" data-verso-hover="131">ite_eq_right</span> (<span class="kw">fun</span> h' =&gt; hacc ((<span class="const token" data-verso-hover="295">acc_iff</span> h hs hi).<span class="const token" data-verso-hover="109">2</span> h'))]</span>
+<span id="L365">      <span class="kw">exact</span> ⟨(<span class="const token" data-verso-hover="297">erase_subset</span> _ _).<span class="const token" data-verso-hover="298">trans</span> (hs.<span class="const token" data-verso-hover="261">C</span> v), hs.<span class="const token" data-verso-hover="263">p</span> v, <span class="const token" data-verso-hover="276">image_erase_nbr</span> h (hs.<span class="const token" data-verso-hover="261">C</span> v) hi, <span class="const token" data-verso-hover="116">rfl</span>⟩</span>
+<span id="L366"></span>
+<span id="L367"><span class="kw">open</span> Classical <span class="kw">in</span></span>
+<span id="L368"><span class="kw">include</span> h <span class="kw">in</span></span>
+<span id="L369"><span class="kw">lemma</span> <span class="const token" data-verso-hover="299">step2_dec</span> {s : V → <span class="const token" data-verso-hover="214">NodeData</span>} (hs : <span class="const token" data-verso-hover="258">PInv</span> G red rk s) (v : V) {a : <span class="const token" data-verso-hover="63">Finset</span> <span class="const token" data-verso-hover="102">ℕ</span> × <span class="const token" data-verso-hover="180">Option</span> <span class="const token" data-verso-hover="102">ℕ</span>}</span>
+<span id="L370">    {b : <span class="const token" data-verso-hover="63">Finset</span> V × <span class="const token" data-verso-hover="180">Option</span> V} (hab : <span class="const token" data-verso-hover="294">DecPair</span> G v a b) :</span>
+<span id="L371">    <span class="const token" data-verso-hover="294">DecPair</span> G v (<span class="const token" data-verso-hover="225">pStep2</span> (<span class="kw">fun</span> i =&gt; ∃ y j, <span class="const token" data-verso-hover="278">Algorithm.nbrInfo</span> G s v i = <span class="const token" data-verso-hover="74">some</span> (y, j) ∧</span>
+<span id="L372">      y.<span class="const token" data-verso-hover="219">p</span> = <span class="const token" data-verso-hover="74">some</span> j) a) (<span class="const token" data-verso-hover="204">Bicoloured.redStep2</span> (<span class="const token" data-verso-hover="256">dec</span> G s) v b) := <span class="kw">by</span></span>
+<span id="L373">  <span class="kw">obtain</span> ⟨C, o⟩ := a</span>
+<span id="L374">  <span class="kw">obtain</span> ⟨D, o'⟩ := b</span>
+<span id="L375">  <span class="kw">obtain</span> ⟨hC, ho, hD, ho'⟩ := hab</span>
+<span id="L376">  <span class="kw">simp</span> only <span class="kw">at</span> hC ho hD ho'</span>
+<span id="L377">  <span class="kw">subst</span> hD ho'</span>
+<span id="L378">  <span class="kw">rcases</span> o <span class="kw">with</span> _ | i</span>
+<span id="L379">  · <span class="kw">exact</span> ⟨hC, <span class="kw">fun</span> _ hh =&gt; <span class="kw">by</span> <span class="kw">simp</span> [<span class="const token" data-verso-hover="225">pStep2</span>] <span class="kw">at</span> hh, <span class="const token" data-verso-hover="116">rfl</span>, <span class="const token" data-verso-hover="116">rfl</span>⟩</span>
+<span id="L380">  · <span class="kw">have</span> hi := ho i <span class="const token" data-verso-hover="116">rfl</span></span>
+<span id="L381">    <span class="kw">simp</span> only [<span class="const token" data-verso-hover="225">pStep2</span>, <span class="const token" data-verso-hover="274">Option.map_some</span>, <span class="const token" data-verso-hover="204">Bicoloured.redStep2</span>]</span>
+<span id="L382">    <span class="kw">by_cases</span> hacc : ∃ y j, <span class="const token" data-verso-hover="278">Algorithm.nbrInfo</span> G s v i = <span class="const token" data-verso-hover="74">some</span> (y, j) ∧ y.<span class="const token" data-verso-hover="219">p</span> = <span class="const token" data-verso-hover="74">some</span> j</span>
+<span id="L383">    · <span class="kw">rw</span> [<span class="const token" data-verso-hover="132">ite_eq_left</span> hacc, <span class="const token" data-verso-hover="132">ite_eq_left</span> ((<span class="const token" data-verso-hover="295">acc_iff</span> h hs hi).<span class="const token" data-verso-hover="123">1</span> hacc)]</span>
+<span id="L384">      <span class="kw">exact</span> ⟨hC, <span class="kw">fun</span> j hj =&gt; <span class="kw">by</span> <span class="kw">cases</span> hj; <span class="kw">exact</span> hi, <span class="const token" data-verso-hover="116">rfl</span>, <span class="const token" data-verso-hover="116">rfl</span>⟩</span>
+<span id="L385">    · <span class="kw">rw</span> [<span class="const token" data-verso-hover="131">ite_eq_right</span> hacc, <span class="const token" data-verso-hover="131">ite_eq_right</span> (<span class="kw">fun</span> h' =&gt; hacc ((<span class="const token" data-verso-hover="295">acc_iff</span> h hs hi).<span class="const token" data-verso-hover="109">2</span> h'))]</span>
+<span id="L386">      <span class="kw">exact</span> ⟨(<span class="const token" data-verso-hover="297">erase_subset</span> _ _).<span class="const token" data-verso-hover="298">trans</span> hC, <span class="kw">fun</span> _ hh =&gt; <span class="kw">by</span> <span class="kw">simp</span> <span class="kw">at</span> hh, <span class="const token" data-verso-hover="276">image_erase_nbr</span> h hC hi, <span class="const token" data-verso-hover="116">rfl</span>⟩</span>
+<span id="L387"></span>
+<span id="L388"><span class="kw">open</span> Classical <span class="kw">in</span></span>
+<span id="L389"><span class="kw">include</span> h <span class="kw">in</span></span>
+<span id="L390"><span class="dc">/-- A red turn of the port-level algorithm decodes to the red turn of §4. -/</span></span>
+<span id="L391"><span class="kw">lemma</span> <span class="const token" data-verso-hover="300">red_step</span> {s : V → <span class="const token" data-verso-hover="214">NodeData</span>} (hs : <span class="const token" data-verso-hover="258">PInv</span> G red rk s) {t : <span class="const token" data-verso-hover="102">ℕ</span>} (ht : t % <span class="nu">2</span> = <span class="nu">1</span>) :</span>
+<span id="L392">    <span class="const token" data-verso-hover="258">PInv</span> G red rk (<span class="const token" data-verso-hover="279">pstep</span> G t s) ∧</span>
+<span id="L393">      <span class="const token" data-verso-hover="256">dec</span> G (<span class="const token" data-verso-hover="279">pstep</span> G t s) = (<span class="const token" data-verso-hover="250">toBicoloured</span> G red rk h).<span class="const token" data-verso-hover="12">redTurn</span> (<span class="const token" data-verso-hover="256">dec</span> G s) := <span class="kw">by</span></span>
+<span id="L394">  <span class="kw">set</span> acc : V → <span class="const token" data-verso-hover="102">ℕ</span> → <span class="kw">Prop</span> := <span class="kw">fun</span> v i =&gt; ∃ y j, <span class="const token" data-verso-hover="278">Algorithm.nbrInfo</span> G s v i = <span class="const token" data-verso-hover="74">some</span> (y, j) ∧</span>
+<span id="L395">    y.<span class="const token" data-verso-hover="219">p</span> = <span class="const token" data-verso-hover="74">some</span> j</span>
+<span id="L396">  <span class="kw">set</span> r : V → <span class="const token" data-verso-hover="63">Finset</span> <span class="const token" data-verso-hover="102">ℕ</span> × <span class="const token" data-verso-hover="180">Option</span> <span class="const token" data-verso-hover="102">ℕ</span> := <span class="kw">fun</span> v =&gt; <span class="const token" data-verso-hover="225">pStep2</span> (acc v) (<span class="const token" data-verso-hover="223">pStep1</span> (s v) (acc v))</span>
+<span id="L397">  <span class="kw">have</span> hv : ∀ v, <span class="const token" data-verso-hover="279">pstep</span> G t s v = <span class="kw">if</span> red v = <span class="const token" data-verso-hover="67">true</span> <span class="kw">then</span> <span class="const token" data-verso-hover="226">redUpdate</span> (s v) (r v) <span class="kw">else</span> s v := <span class="kw">by</span></span>
+<span id="L398">    <span class="kw">intro</span> v</span>
+<span id="L399">    <span class="kw">simp</span> only [<span class="const token" data-verso-hover="279">pstep</span>, <span class="const token" data-verso-hover="14">rule</span>, ht, hs.<span class="const token" data-verso-hover="259">red</span> v, r, acc]</span>
+<span id="L400">    <span class="kw">simp</span></span>
+<span id="L401">  <span class="kw">have</span> hdec : ∀ v, <span class="const token" data-verso-hover="294">DecPair</span> G v (r v) (<span class="const token" data-verso-hover="204">Bicoloured.redStep2</span> (<span class="const token" data-verso-hover="256">dec</span> G s) v</span>
+<span id="L402">      (<span class="const token" data-verso-hover="203">Bicoloured.redStep1</span> (<span class="const token" data-verso-hover="256">dec</span> G s) v)) := <span class="kw">fun</span> v =&gt; <span class="const token" data-verso-hover="299">step2_dec</span> h hs v (<span class="const token" data-verso-hover="296">step1_dec</span> h hs v)</span>
+<span id="L403">  <span class="kw">refine</span> ⟨⟨<span class="kw">fun</span> v =&gt; ?_, <span class="kw">fun</span> v =&gt; ?_, <span class="kw">fun</span> v =&gt; ?_, <span class="kw">fun</span> v =&gt; ?_, <span class="kw">fun</span> v =&gt; ?_⟩, ?_⟩</span>
+<span id="L404">  · <span class="kw">rw</span> [hv]; <span class="kw">split_ifs</span> &lt;;&gt; <span class="kw">simp</span> [<span class="const token" data-verso-hover="226">redUpdate</span>, hs.<span class="const token" data-verso-hover="259">red</span> v]</span>
+<span id="L405">  · <span class="kw">rw</span> [hv]; <span class="kw">split_ifs</span> &lt;;&gt; <span class="kw">simp</span> [<span class="const token" data-verso-hover="226">redUpdate</span>, hs.<span class="const token" data-verso-hover="260">rk</span> v]</span>
+<span id="L406">  · <span class="kw">rw</span> [hv]; <span class="kw">split_ifs</span></span>
+<span id="L407">    · <span class="kw">exact</span> (hdec v).<span class="const token" data-verso-hover="106">1</span></span>
+<span id="L408">    · <span class="kw">exact</span> hs.<span class="const token" data-verso-hover="261">C</span> v</span>
+<span id="L409">  · <span class="kw">intro</span> i hi; <span class="kw">rw</span> [hv] <span class="kw">at</span> hi; <span class="kw">split_ifs</span> <span class="kw">at</span> hi</span>
+<span id="L410">    · <span class="kw">simp</span> only [<span class="const token" data-verso-hover="226">redUpdate</span>] <span class="kw">at</span> hi</span>
+<span id="L411">      <span class="kw">split_ifs</span> <span class="kw">at</span> hi</span>
+<span id="L412">      <span class="kw">exact</span> <span class="const token" data-verso-hover="252">mem_range</span>.<span class="const token" data-verso-hover="123">1</span> ((hdec v).<span class="const token" data-verso-hover="106">1</span> (<span class="const token" data-verso-hover="267">pbest_spec</span> hi).<span class="const token" data-verso-hover="106">1</span>)</span>
+<span id="L413">    · <span class="kw">exact</span> hs.<span class="const token" data-verso-hover="262">c</span> v i hi</span>
+<span id="L414">  · <span class="kw">intro</span> i hi; <span class="kw">rw</span> [hv] <span class="kw">at</span> hi; <span class="kw">split_ifs</span> <span class="kw">at</span> hi</span>
+<span id="L415">    · <span class="kw">exact</span> (hdec v).<span class="const token" data-verso-hover="95">2</span><span class="nu">.</span><span class="const token" data-verso-hover="106">1</span> i hi</span>
+<span id="L416">    · <span class="kw">exact</span> hs.<span class="const token" data-verso-hover="263">p</span> v i hi</span>
+<span id="L417">  · ext1 &lt;;&gt; <span class="kw">funext</span> v &lt;;&gt; <span class="kw">by_cases</span> hr : red v = <span class="const token" data-verso-hover="67">true</span></span>
+<span id="L418">    · <span class="kw">change</span> ((<span class="const token" data-verso-hover="279">pstep</span> G t s v).<span class="const token" data-verso-hover="217">C</span>).<span class="const token" data-verso-hover="152">image</span> (G.<span class="const token" data-verso-hover="240">nbr</span> v) = _</span>
+<span id="L419">      <span class="kw">rw</span> [hv, <span class="const token" data-verso-hover="132">ite_eq_left</span> hr, ((<span class="const token" data-verso-hover="250">toBicoloured</span> G red rk h).<span class="const token" data-verso-hover="301">redTurn_red</span> _ (<span class="kw">by</span> <span class="kw">exact</span> hr)).<span class="const token" data-verso-hover="106">1</span>]</span>
+<span id="L420">      <span class="kw">exact</span> (hdec v).<span class="const token" data-verso-hover="95">2</span><span class="nu">.</span><span class="const token" data-verso-hover="95">2</span><span class="nu">.</span><span class="const token" data-verso-hover="106">1</span></span>
+<span id="L421">    · <span class="kw">have</span> hr' : (<span class="const token" data-verso-hover="250">toBicoloured</span> G red rk h).<span class="const token" data-verso-hover="66">red</span> v = <span class="const token" data-verso-hover="69">false</span> := <span class="kw">by</span></span>
+<span id="L422">        <span class="kw">have</span> : red v = <span class="const token" data-verso-hover="69">false</span> := <span class="kw">by</span> <span class="kw">simpa</span> <span class="kw">using</span> hr</span>
+<span id="L423">        <span class="kw">exact</span> this</span>
+<span id="L424">      <span class="kw">change</span> ((<span class="const token" data-verso-hover="279">pstep</span> G t s v).<span class="const token" data-verso-hover="217">C</span>).<span class="const token" data-verso-hover="152">image</span> (G.<span class="const token" data-verso-hover="240">nbr</span> v) = _</span>
+<span id="L425">      <span class="kw">rw</span> [hv, <span class="const token" data-verso-hover="131">ite_eq_right</span> hr, ((<span class="const token" data-verso-hover="250">toBicoloured</span> G red rk h).<span class="const token" data-verso-hover="302">redTurn_blue</span> _ hr').<span class="const token" data-verso-hover="106">1</span>]; <span class="kw">rfl</span></span>
+<span id="L426">    · <span class="kw">change</span> ((<span class="const token" data-verso-hover="279">pstep</span> G t s v).<span class="const token" data-verso-hover="218">c</span>).<span class="const token" data-verso-hover="257">map</span> (G.<span class="const token" data-verso-hover="240">nbr</span> v) = _</span>
+<span id="L427">      <span class="kw">rw</span> [hv, <span class="const token" data-verso-hover="132">ite_eq_left</span> hr, ((<span class="const token" data-verso-hover="250">toBicoloured</span> G red rk h).<span class="const token" data-verso-hover="301">redTurn_red</span> _ (<span class="kw">by</span> <span class="kw">exact</span> hr)).<span class="const token" data-verso-hover="95">2</span><span class="nu">.</span><span class="const token" data-verso-hover="106">1</span>,</span>
+<span id="L428">        ← (hdec v).<span class="const token" data-verso-hover="95">2</span><span class="nu">.</span><span class="const token" data-verso-hover="95">2</span><span class="nu">.</span><span class="const token" data-verso-hover="95">2</span>, ← (hdec v).<span class="const token" data-verso-hover="95">2</span><span class="nu">.</span><span class="const token" data-verso-hover="95">2</span><span class="nu">.</span><span class="const token" data-verso-hover="106">1</span>]</span>
+<span id="L429">      <span class="kw">by_cases</span> h2 : (r v).<span class="const token" data-verso-hover="191">2</span> = <span class="const token" data-verso-hover="73">none</span></span>
+<span id="L430">      · <span class="kw">simp</span> only [<span class="const token" data-verso-hover="226">redUpdate</span>, h2, <span class="const token" data-verso-hover="272">Option.map_none</span>, ↓<span class="const token" data-verso-hover="303">reduceIte</span>]</span>
+<span id="L431">        <span class="kw">rw</span> [hs.<span class="const token" data-verso-hover="260">rk</span> v]; <span class="kw">exact</span> <span class="const token" data-verso-hover="271">pbest_map</span> h (hdec v).<span class="const token" data-verso-hover="106">1</span></span>
+<span id="L432">      · <span class="kw">have</span> h2' : (r v).<span class="const token" data-verso-hover="191">2</span>.<span class="const token" data-verso-hover="257">map</span> (G.<span class="const token" data-verso-hover="240">nbr</span> v) ≠ <span class="const token" data-verso-hover="73">none</span> := <span class="kw">by</span> <span class="kw">simpa</span> <span class="kw">using</span> h2</span>
+<span id="L433">        <span class="kw">simp</span> only [<span class="const token" data-verso-hover="226">redUpdate</span>, h2, h2', ↓<span class="const token" data-verso-hover="303">reduceIte</span>, <span class="const token" data-verso-hover="272">Option.map_none</span>]</span>
+<span id="L434">    · <span class="kw">have</span> hr' : (<span class="const token" data-verso-hover="250">toBicoloured</span> G red rk h).<span class="const token" data-verso-hover="66">red</span> v = <span class="const token" data-verso-hover="69">false</span> := <span class="kw">by</span></span>
+<span id="L435">        <span class="kw">have</span> : red v = <span class="const token" data-verso-hover="69">false</span> := <span class="kw">by</span> <span class="kw">simpa</span> <span class="kw">using</span> hr</span>
+<span id="L436">        <span class="kw">exact</span> this</span>
+<span id="L437">      <span class="kw">change</span> ((<span class="const token" data-verso-hover="279">pstep</span> G t s v).<span class="const token" data-verso-hover="218">c</span>).<span class="const token" data-verso-hover="257">map</span> (G.<span class="const token" data-verso-hover="240">nbr</span> v) = _</span>
+<span id="L438">      <span class="kw">rw</span> [hv, <span class="const token" data-verso-hover="131">ite_eq_right</span> hr, ((<span class="const token" data-verso-hover="250">toBicoloured</span> G red rk h).<span class="const token" data-verso-hover="302">redTurn_blue</span> _ hr').<span class="const token" data-verso-hover="95">2</span><span class="nu">.</span><span class="const token" data-verso-hover="106">1</span>]; <span class="kw">rfl</span></span>
+<span id="L439">    · <span class="kw">change</span> ((<span class="const token" data-verso-hover="279">pstep</span> G t s v).<span class="const token" data-verso-hover="219">p</span>).<span class="const token" data-verso-hover="257">map</span> (G.<span class="const token" data-verso-hover="240">nbr</span> v) = _</span>
+<span id="L440">      <span class="kw">rw</span> [hv, <span class="const token" data-verso-hover="132">ite_eq_left</span> hr, ((<span class="const token" data-verso-hover="250">toBicoloured</span> G red rk h).<span class="const token" data-verso-hover="301">redTurn_red</span> _ (<span class="kw">by</span> <span class="kw">exact</span> hr)).<span class="const token" data-verso-hover="95">2</span><span class="nu">.</span><span class="const token" data-verso-hover="95">2</span>]</span>
+<span id="L441">      <span class="kw">exact</span> (hdec v).<span class="const token" data-verso-hover="95">2</span><span class="nu">.</span><span class="const token" data-verso-hover="95">2</span><span class="nu">.</span><span class="const token" data-verso-hover="95">2</span></span>
+<span id="L442">    · <span class="kw">have</span> hr' : (<span class="const token" data-verso-hover="250">toBicoloured</span> G red rk h).<span class="const token" data-verso-hover="66">red</span> v = <span class="const token" data-verso-hover="69">false</span> := <span class="kw">by</span></span>
+<span id="L443">        <span class="kw">have</span> : red v = <span class="const token" data-verso-hover="69">false</span> := <span class="kw">by</span> <span class="kw">simpa</span> <span class="kw">using</span> hr</span>
+<span id="L444">        <span class="kw">exact</span> this</span>
+<span id="L445">      <span class="kw">change</span> ((<span class="const token" data-verso-hover="279">pstep</span> G t s v).<span class="const token" data-verso-hover="219">p</span>).<span class="const token" data-verso-hover="257">map</span> (G.<span class="const token" data-verso-hover="240">nbr</span> v) = _</span>
+<span id="L446">      <span class="kw">rw</span> [hv, <span class="const token" data-verso-hover="131">ite_eq_right</span> hr, ((<span class="const token" data-verso-hover="250">toBicoloured</span> G red rk h).<span class="const token" data-verso-hover="302">redTurn_blue</span> _ hr').<span class="const token" data-verso-hover="95">2</span><span class="nu">.</span><span class="const token" data-verso-hover="95">2</span>]; <span class="kw">rfl</span></span>
+<span id="L447"></span>
+<span id="L448"><span class="kw">end</span> Decode</span>
+<span id="L449"></span>
+<span id="L450"><span class="dc">/-! ### Correctness of the simulation -/</span></span>
+<span id="L451"></span>
+<span id="L452"><span class="kw">section</span> Run</span>
+<span id="L453"></span>
+<span id="L454"><span class="kw">variable</span> {G : <span class="const token" data-verso-hover="231">PNGraph</span> V} {red : V → <span class="const token" data-verso-hover="195">Bool</span>} {rk : V → <span class="const token" data-verso-hover="102">ℕ</span> → <span class="const token" data-verso-hover="102">ℕ</span>} (h : <span class="const token" data-verso-hover="246">GoodInput</span> G red rk)</span>
+<span id="L455"></span>
+<span id="L456"><span class="dc">/-- The initial port-level configuration. -/</span></span>
+<span id="L457"><span class="kw">def</span> <span class="const token" data-verso-hover="304">initConf</span> (G : <span class="const token" data-verso-hover="231">PNGraph</span> V) (red : V → <span class="const token" data-verso-hover="195">Bool</span>) (rk : V → <span class="const token" data-verso-hover="102">ℕ</span> → <span class="const token" data-verso-hover="102">ℕ</span>) : V → <span class="const token" data-verso-hover="214">NodeData</span> :=</span>
+<span id="L458">  <span class="kw">fun</span> v =&gt; <span class="const token" data-verso-hover="221">initData</span> (G.<span class="const token" data-verso-hover="234">deg</span> v) (red v, rk v)</span>
+<span id="L459"></span>
+<span id="L460"><span class="kw">include</span> h <span class="kw">in</span></span>
+<span id="L461"><span class="dc">/-- **Simulation.** After `2i` communication rounds (`i` blue and `i` red turns) the decoded</span></span>
+<span id="L462"><span class="dc">port-level configuration is the state `M_i`, `C_i`, `c_i` at the end of round `i` of §4. -/</span></span>
+<span id="L463"><span class="kw">theorem</span> <span class="const token" data-verso-hover="7">dec_localRun</span> (i : <span class="const token" data-verso-hover="102">ℕ</span>) :</span>
+<span id="L464">    <span class="const token" data-verso-hover="258">PInv</span> G red rk (<span class="const token" data-verso-hover="233">Algorithm.localRun</span> G <span class="const token" data-verso-hover="14">rule</span> (<span class="const token" data-verso-hover="304">initConf</span> G red rk) (<span class="nu">2</span> * i)) ∧</span>
+<span id="L465">      <span class="const token" data-verso-hover="256">dec</span> G (<span class="const token" data-verso-hover="233">Algorithm.localRun</span> G <span class="const token" data-verso-hover="14">rule</span> (<span class="const token" data-verso-hover="304">initConf</span> G red rk) (<span class="nu">2</span> * i)) =</span>
+<span id="L466">        (<span class="const token" data-verso-hover="250">toBicoloured</span> G red rk h).<span class="const token" data-verso-hover="103">run</span> i := <span class="kw">by</span></span>
+<span id="L467">  <span class="kw">induction</span> i <span class="kw">with</span></span>
+<span id="L468">  | <span class="const token" data-verso-hover="159">zero</span> =&gt;</span>
+<span id="L469">    <span class="kw">refine</span> ⟨⟨<span class="kw">fun</span> v =&gt; <span class="const token" data-verso-hover="116">rfl</span>, <span class="kw">fun</span> v =&gt; <span class="const token" data-verso-hover="116">rfl</span>, <span class="kw">fun</span> v =&gt; ?_, <span class="kw">fun</span> v i hi =&gt; <span class="kw">by</span> <span class="kw">simp</span> [<span class="const token" data-verso-hover="304">initConf</span>, <span class="const token" data-verso-hover="221">initData</span>] <span class="kw">at</span> hi,</span>
+<span id="L470">      <span class="kw">fun</span> v i hi =&gt; <span class="kw">by</span> <span class="kw">simp</span> [<span class="const token" data-verso-hover="304">initConf</span>, <span class="const token" data-verso-hover="221">initData</span>] <span class="kw">at</span> hi⟩, ?_⟩</span>
+<span id="L471">    · <span class="kw">change</span> (<span class="const token" data-verso-hover="304">initConf</span> G red rk v).<span class="const token" data-verso-hover="217">C</span> ⊆ <span class="const token" data-verso-hover="222">range</span> (G.<span class="const token" data-verso-hover="234">deg</span> v)</span>
+<span id="L472">      <span class="kw">simp</span> only [<span class="const token" data-verso-hover="304">initConf</span>, <span class="const token" data-verso-hover="221">initData</span>]; <span class="kw">split_ifs</span> &lt;;&gt; <span class="kw">simp</span></span>
+<span id="L473">    · ext1 &lt;;&gt; <span class="kw">funext</span> v</span>
+<span id="L474">      · <span class="kw">simp</span> only [<span class="const token" data-verso-hover="305">Nat.mul_zero</span>, <span class="const token" data-verso-hover="306">Algorithm.localRun_zero</span>, <span class="const token" data-verso-hover="256">dec</span>, <span class="const token" data-verso-hover="304">initConf</span>, <span class="const token" data-verso-hover="221">initData</span>,</span>
+<span id="L475">          <span class="const token" data-verso-hover="105">Bicoloured.run_zero</span>, <span class="const token" data-verso-hover="307">Bicoloured.init_C</span>]</span>
+<span id="L476">        <span class="kw">change</span> _ = <span class="kw">if</span> red v = <span class="const token" data-verso-hover="67">true</span> <span class="kw">then</span> _ <span class="kw">else</span> _</span>
+<span id="L477">        <span class="kw">split_ifs</span> &lt;;&gt; <span class="kw">simp</span> [<span class="const token" data-verso-hover="250">toBicoloured</span>]</span>
+<span id="L478">      · <span class="kw">rfl</span></span>
+<span id="L479">      · <span class="kw">rfl</span></span>
+<span id="L480">  | <span class="const token" data-verso-hover="160">succ</span> i ih =&gt;</span>
+<span id="L481">    <span class="kw">obtain</span> ⟨hP, hD⟩ := ih</span>
+<span id="L482">    <span class="kw">have</span> e : <span class="nu">2</span> * (i + <span class="nu">1</span>) = <span class="nu">2</span> * i + <span class="nu">1</span> + <span class="nu">1</span> := <span class="kw">by</span> <span class="kw">ring</span></span>
+<span id="L483">    <span class="kw">rw</span> [e, <span class="const token" data-verso-hover="280">localRun_succ_eq</span>, <span class="const token" data-verso-hover="280">localRun_succ_eq</span>]</span>
+<span id="L484">    <span class="kw">obtain</span> ⟨hP1, hD1⟩ := <span class="const token" data-verso-hover="284">blue_step</span> h hP (t := <span class="nu">2</span> * i) (<span class="kw">by</span> <span class="kw">omega</span>)</span>
+<span id="L485">    <span class="kw">obtain</span> ⟨hP2, hD2⟩ := <span class="const token" data-verso-hover="300">red_step</span> h hP1 (t := <span class="nu">2</span> * i + <span class="nu">1</span>) (<span class="kw">by</span> <span class="kw">omega</span>)</span>
+<span id="L486">    <span class="kw">refine</span> ⟨hP2, ?_⟩</span>
+<span id="L487">    <span class="kw">rw</span> [hD2, hD1, hD, <span class="const token" data-verso-hover="126">Bicoloured.run_succ</span>]</span>
+<span id="L488">    <span class="kw">rfl</span></span>
+<span id="L489"></span>
+<span id="L490"><span class="kw">include</span> h <span class="kw">in</span></span>
+<span id="L491"><span class="dc">/-- The output of `gsAlg (2i)` is the matching `M_i` (as ports). -/</span></span>
+<span id="L492"><span class="kw">theorem</span> <span class="const token" data-verso-hover="16">gsAlg_partner</span> (i : <span class="const token" data-verso-hover="102">ℕ</span>) (v : V) :</span>
+<span id="L493">    ((<span class="const token" data-verso-hover="15">gsAlg</span> (<span class="nu">2</span> * i)).<span class="const token" data-verso-hover="232">eval</span> G (<span class="nu">2</span> * i) (<span class="kw">fun</span> u =&gt; (red u, rk u)) v).<span class="const token" data-verso-hover="257">map</span> (G.<span class="const token" data-verso-hover="240">nbr</span> v) =</span>
+<span id="L494">      ((<span class="const token" data-verso-hover="250">toBicoloured</span> G red rk h).<span class="const token" data-verso-hover="103">run</span> i).<span class="const token" data-verso-hover="72">p</span> v := <span class="kw">by</span></span>
+<span id="L495">  <span class="kw">rw</span> [<span class="const token" data-verso-hover="230">gsAlg_eval</span>, ← (<span class="const token" data-verso-hover="7">dec_localRun</span> h i).<span class="const token" data-verso-hover="95">2</span>]</span>
+<span id="L496">  <span class="kw">rfl</span></span>
+<span id="L497"></span>
+<span id="L498"><span class="kw">end</span> Run</span>
+<span id="L499"></span>
+<span id="L500"><span class="kw">end</span> Podc.TruncatedGaleShapley</span>
+<span id="L501"></span>
+</code></div>
+        <script>
+          window.versoHoversUrl = "PODC2010/TruncatedGaleShapley/-hovers.json";</script>
+        <script src="static/lean/popper.js"></script>
+        <script src="static/lean/tippy.js"></script>
+        <script src="static/lean/marked.js"></script>
+        <script src="static/lean/highlighting.js"></script>
+        <script src="static/lean/lean.js"></script>
+        </article></main><footer class="site-footer"><div class="wrap">
+        Machine-checked formalizations of PODC papers in Lean 4. Generated with <a href="https://github.com/leanprover/verso">Verso</a> from the README files of <a href="https://github.com/vasnesterov/formal_podc">vasnesterov/formal_podc</a>.</div>
+      </footer></body>
+  </html>
+

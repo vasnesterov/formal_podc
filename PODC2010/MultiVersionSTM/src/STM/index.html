@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="light dark">
+    <link rel="icon" href="data:,">
+    <title>MultiVersionSTM: STM.lean · Formal PODC</title><base href="../../../.././"><link rel="stylesheet" href="static/lean/verso-vars.css">
+    <link rel="stylesheet" href="static/lean/highlighting.css">
+    <link rel="stylesheet" href="static/lean/tippy-border.css">
+    <link rel="stylesheet" href="static/style.css">
+    <script defer="defer" src="static/site.js"></script>
+    </head>
+  <body>
+    <header class="site-header">
+      <div class="wrap">
+        <a class="brand" href=".">Formal PODC</a><nav class="top">
+          <a href=".">Search</a><a href="about/">About</a><a href="https://github.com/vasnesterov/formal_podc">GitHub</a></nav>
+        </div>
+      </header>
+    <main class="wrap"><article><nav class="breadcrumbs" aria-label="Breadcrumb">
+          <a href=".">Search</a><span class="sep">›</span><a href="PODC2010/">PODC 2010</a><span class="sep">›</span><a href="PODC2010/MultiVersionSTM/">MultiVersionSTM</a><span class="sep">›</span><a href="PODC2010/MultiVersionSTM/src/">Lean source</a><span class="sep">›</span><span aria-current="page">STM</span></nav>
+        <h1>
+          <code>STM.lean</code></h1>
+        <div class="paper-links">
+          <p>
+            Source of <a href="PODC2010/MultiVersionSTM/">Maintaining Multiple Versions in STM — PODC 2010</a> · <a href="https://github.com/vasnesterov/formal_podc/blob/main/Papers/PODC2010/MultiVersionSTM/STM.lean">GitHub</a> · hover over a name for its type and documentation</p>
+          </div>
+        <div class="lean-code lean-src">
+          <code class="hl lean block" data-lean-context="STM"><span id="L1"><span class="kw">import</span> Papers.PODC2010.MultiVersionSTM.Model</span>
+<span id="L2"></span>
+<span id="L3"><span class="dc">/-!</span></span>
+<span id="L4"><span class="dc"># STM algorithms on base objects</span></span>
+<span id="L5"></span>
+<span id="L6"><span class="dc">Section 3 of Perelman–Fan–Keidar (PODC 2010). An STM is run by threads `P` that communicate</span></span>
+<span id="L7"><span class="dc">through shared base objects `B` (holding values in `M`) and have private memory `L`. To run a</span></span>
+<span id="L8"><span class="dc">transactional operation, the thread `thr T` takes the invocation as input, performs a sequence of</span></span>
+<span id="L9"><span class="dc">base steps determined by the input and the memory (a `Prog`: a finite decision tree of</span></span>
+<span id="L10"><span class="dc">read-modify-write accesses), and returns a response. The base steps of one transactional step are</span></span>
+<span id="L11"><span class="dc">atomic. The algorithm is deterministic; the environment chooses the invocations (a schedule</span></span>
+<span id="L12"><span class="dc">`σ : List (Inv Tx O)`).</span></span>
+<span id="L13"></span>
+<span id="L14"><span class="dc">* `STM.exec`, `STM.hist`, `STM.conf`, `STM.resp`: the execution, history, final configuration</span></span>
+<span id="L15"><span class="dc">  and responses of a schedule.</span></span>
+<span id="L16"><span class="dc">* `STM.Correct` (strict serializability), `STM.MVPermissive` (Definition 2),</span></span>
+<span id="L17"><span class="dc">  `STM.ReadsWritten`: properties of all well-formed histories of the STM.</span></span>
+<span id="L18"><span class="dc">* **Versions kept.** The paper does not define which versions an STM "keeps". We let an STM come</span></span>
+<span id="L19"><span class="dc">  with a declared set `kept C` of versions kept in configuration `C`, with the two properties that</span></span>
+<span id="L20"><span class="dc">  give the notion its meaning: a read returns a kept version (`KeepsReads`), and a version that is</span></span>
+<span id="L21"><span class="dc">  not kept (garbage collected) is never kept again (`GCFinal`). `keptOld` counts the kept versions</span></span>
+<span id="L22"><span class="dc">  that are overwritten (the counts 6 and 7 in the proof of Theorem 1).</span></span>
+<span id="L23"><span class="dc">* Definition 1 (`WDAP`), Definition 3 (`OnlineSpaceOptimal`), Definition 4 (`UPGC`, literal</span></span>
+<span id="L24"><span class="dc">  reading, and `UPGCPrec`, the potential-reader reading of Section 7), and "the configuration</span></span>
+<span id="L25"><span class="dc">  external to a solo read-only transaction is unchanged" (`NoTrace`, Theorem 3).</span></span>
+<span id="L26"><span class="dc">-/</span></span>
+<span id="L27"></span>
+<span id="L28"><span class="kw">namespace</span> Podc.MultiVersionSTM</span>
+<span id="L29"></span>
+<span id="L30"><span class="kw">open</span> <span class="kw">scoped</span> Classical</span>
+<span id="L31"></span>
+<span id="L32"><span class="dc">/-- A program for one transactional step: return a result, or access base object `b` with the</span></span>
+<span id="L33"><span class="dc">read-modify-write primitive `f` (which writes `f x` and returns the old value `x`) and continue. -/</span></span>
+<span id="L34"><span class="kw">inductive</span> <span class="const token" data-verso-hover="7">Prog</span> (B M α : <span class="kw">Type</span>) <span class="kw">where</span></span>
+<span id="L35">  | <span class="const token" data-verso-hover="158">ret</span> (a : α)</span>
+<span id="L36">  | <span class="const token" data-verso-hover="159">access</span> (b : B) (f : M → M) (k : M → <span class="const token" data-verso-hover="7">Prog</span> B M α)</span>
+<span id="L37"></span>
+<span id="L38"><span class="dc">/-- One base-object access: object, old value, new value. -/</span></span>
+<span id="L39"><span class="kw">structure</span> <span class="const token" data-verso-hover="130">Access</span> (B M : <span class="kw">Type</span>) <span class="kw">where</span></span>
+<span id="L40">  <span class="const token" data-verso-hover="132">b</span> : B</span>
+<span id="L41">  <span class="const token" data-verso-hover="136">old</span> : M</span>
+<span id="L42">  <span class="const token" data-verso-hover="133">new</span> : M</span>
+<span id="L43"></span>
+<span id="L44"><span class="dc">/-- Running a program on the shared memory: result, new memory, trace of accesses. -/</span></span>
+<span id="L45"><span class="kw">noncomputable</span> <span class="kw">def</span> <span class="const token" data-verso-hover="157">Prog.run</span> {B M α : <span class="kw">Type</span>} : <span class="const token" data-verso-hover="7">Prog</span> B M α → (B → M) → α × (B → M) × <span class="const token" data-verso-hover="92">List</span> (<span class="const token" data-verso-hover="130">Access</span> B M)</span>
+<span id="L46">  | <span class="const token" data-verso-hover="158">.</span>ret a, m =&gt; (a, m, [])</span>
+<span id="L47">  | <span class="const token" data-verso-hover="159">.</span>access b f k, m =&gt;</span>
+<span id="L48">    <span class="kw">let</span> r := (k (m b)).<span class="const token" data-verso-hover="157">run</span> (<span class="const token" data-verso-hover="131">Function.update</span> m b (f (m b)))</span>
+<span id="L49">    (r.<span class="const token" data-verso-hover="94">1</span>, r.<span class="const token" data-verso-hover="95">2</span><span class="nu">.</span><span class="const token" data-verso-hover="94">1</span>, ⟨b, m b, f (m b)⟩ :: r.<span class="const token" data-verso-hover="95">2</span><span class="nu">.</span><span class="const token" data-verso-hover="95">2</span>)</span>
+<span id="L50"></span>
+<span id="L51"><span class="kw">variable</span> {Tx O P : <span class="kw">Type</span>}</span>
+<span id="L52"></span>
+<span id="L53"><span class="dc">/-- An STM algorithm: base objects `B` with values `M`, private states `L`, initial</span></span>
+<span id="L54"><span class="dc">configuration, and the program each thread runs for each invocation. -/</span></span>
+<span id="L55"><span class="kw">structure</span> <span class="const token" data-verso-hover="87">STM</span> (Tx O P : <span class="kw">Type</span>) <span class="kw">where</span></span>
+<span id="L56">  <span class="const token" data-verso-hover="171">B</span> : <span class="kw">Type</span></span>
+<span id="L57">  <span class="const token" data-verso-hover="172">M</span> : <span class="kw">Type</span></span>
+<span id="L58">  <span class="const token" data-verso-hover="276">L</span> : <span class="kw">Type</span></span>
+<span id="L59">  <span class="const token" data-verso-hover="277">mem₀</span> : <span class="const token" data-verso-hover="171">B</span> → <span class="const token" data-verso-hover="172">M</span></span>
+<span id="L60">  <span class="const token" data-verso-hover="278">loc₀</span> : P → <span class="const token" data-verso-hover="276">L</span></span>
+<span id="L61">  <span class="const token" data-verso-hover="279">prog</span> : P → <span class="const token" data-verso-hover="276">L</span> → <span class="const token" data-verso-hover="93">Inv</span> Tx O → <span class="const token" data-verso-hover="7">Prog</span> <span class="const token" data-verso-hover="171">B</span> <span class="const token" data-verso-hover="172">M</span> (<span class="const token" data-verso-hover="276">L</span> × <span class="const token" data-verso-hover="228">Resp</span> Tx)</span>
+<span id="L62"></span>
+<span id="L63"><span class="dc">/-- A configuration: shared memory and private states. -/</span></span>
+<span id="L64"><span class="kw">structure</span> <span class="const token" data-verso-hover="89">Config</span> (X : <span class="const token" data-verso-hover="87">STM</span> Tx O P) <span class="kw">where</span></span>
+<span id="L65">  <span class="const token" data-verso-hover="163">mem</span> : X.<span class="const token" data-verso-hover="171">B</span> → X.<span class="const token" data-verso-hover="172">M</span></span>
+<span id="L66">  <span class="const token" data-verso-hover="164">loc</span> : P → X.<span class="const token" data-verso-hover="276">L</span></span>
+<span id="L67"></span>
+<span id="L68"><span class="kw">namespace</span> STM</span>
+<span id="L69"></span>
+<span id="L70"><span class="kw">variable</span> (X : <span class="const token" data-verso-hover="87">STM</span> Tx O P)</span>
+<span id="L71"></span>
+<span id="L72"><span class="dc">/-- The initial configuration. -/</span></span>
+<span id="L73"><span class="kw">def</span> <span class="const token" data-verso-hover="106">init</span> : <span class="const token" data-verso-hover="89">Config</span> X := ⟨X.<span class="const token" data-verso-hover="277">mem₀</span>, X.<span class="const token" data-verso-hover="278">loc₀</span>⟩</span>
+<span id="L74"></span>
+<span id="L75"><span class="dc">/-- The trace of one transactional step. -/</span></span>
+<span id="L76"><span class="kw">abbrev</span> <span class="const token" data-verso-hover="166">Trace</span> := <span class="const token" data-verso-hover="92">List</span> (<span class="const token" data-verso-hover="130">Access</span> X.<span class="const token" data-verso-hover="171">B</span> X.<span class="const token" data-verso-hover="172">M</span>)</span>
+<span id="L77"></span>
+<span id="L78"><span class="kw">variable</span> [<span class="const token" data-verso-hover="8">TxSys</span> Tx P]</span>
+<span id="L79"></span>
+<span id="L80"><span class="dc">/-- One (atomic) transactional step: thread `thr i.tx` runs its program for `i`. -/</span></span>
+<span id="L81"><span class="kw">noncomputable</span> <span class="kw">def</span> <span class="const token" data-verso-hover="102">step</span> (C : <span class="const token" data-verso-hover="89">Config</span> X) (i : <span class="const token" data-verso-hover="93">Inv</span> Tx O) : <span class="const token" data-verso-hover="89">Config</span> X × <span class="const token" data-verso-hover="228">Resp</span> Tx × X.<span class="const token" data-verso-hover="166">Trace</span> :=</span>
+<span id="L82">  <span class="kw">let</span> r := (X.<span class="const token" data-verso-hover="279">prog</span> (<span class="const token" data-verso-hover="177">thr</span> i.<span class="const token" data-verso-hover="50">tx</span>) (C.<span class="const token" data-verso-hover="164">loc</span> (<span class="const token" data-verso-hover="177">thr</span> i.<span class="const token" data-verso-hover="50">tx</span>)) i).<span class="const token" data-verso-hover="157">run</span> C.<span class="const token" data-verso-hover="163">mem</span></span>
+<span id="L83">  (⟨r.<span class="const token" data-verso-hover="95">2</span><span class="nu">.</span><span class="const token" data-verso-hover="94">1</span>, <span class="const token" data-verso-hover="131">Function.update</span> C.<span class="const token" data-verso-hover="164">loc</span> (<span class="const token" data-verso-hover="177">thr</span> i.<span class="const token" data-verso-hover="50">tx</span>) r.<span class="const token" data-verso-hover="94">1</span><span class="nu">.</span><span class="const token" data-verso-hover="94">1</span>⟩, r.<span class="const token" data-verso-hover="94">1</span><span class="nu">.</span><span class="const token" data-verso-hover="95">2</span>, r.<span class="const token" data-verso-hover="95">2</span><span class="nu">.</span><span class="const token" data-verso-hover="95">2</span>)</span>
+<span id="L84"></span>
+<span id="L85"><span class="dc">/-- Running a schedule from a configuration: final configuration and the steps (events with</span></span>
+<span id="L86"><span class="dc">their base-step traces). -/</span></span>
+<span id="L87"><span class="kw">noncomputable</span> <span class="kw">def</span> <span class="const token" data-verso-hover="90">run</span> (C : <span class="const token" data-verso-hover="89">Config</span> X) (σ : <span class="const token" data-verso-hover="92">List</span> (<span class="const token" data-verso-hover="93">Inv</span> Tx O)) :</span>
+<span id="L88">    <span class="const token" data-verso-hover="89">Config</span> X × <span class="const token" data-verso-hover="92">List</span> (<span class="const token" data-verso-hover="28">Event</span> Tx O × X.<span class="const token" data-verso-hover="166">Trace</span>) :=</span>
+<span id="L89">  σ.<span class="const token" data-verso-hover="97">foldl</span> (<span class="kw">fun</span> s i =&gt; <span class="kw">let</span> r := X.<span class="const token" data-verso-hover="102">step</span> s.<span class="const token" data-verso-hover="94">1</span> i; (r.<span class="const token" data-verso-hover="94">1</span>, s.<span class="const token" data-verso-hover="95">2</span> ++ [(⟨i, r.<span class="const token" data-verso-hover="95">2</span><span class="nu">.</span><span class="const token" data-verso-hover="94">1</span>⟩, r.<span class="const token" data-verso-hover="95">2</span><span class="nu">.</span><span class="const token" data-verso-hover="95">2</span>)])) (C, [])</span>
+<span id="L90"></span>
+<span id="L91"><span class="dc">/-- The execution of a schedule from the initial configuration. -/</span></span>
+<span id="L92"><span class="kw">noncomputable</span> <span class="kw">def</span> <span class="const token" data-verso-hover="105">exec</span> (σ : <span class="const token" data-verso-hover="92">List</span> (<span class="const token" data-verso-hover="93">Inv</span> Tx O)) : <span class="const token" data-verso-hover="89">Config</span> X × <span class="const token" data-verso-hover="92">List</span> (<span class="const token" data-verso-hover="28">Event</span> Tx O × X.<span class="const token" data-verso-hover="166">Trace</span>) :=</span>
+<span id="L93">  X.<span class="const token" data-verso-hover="90">run</span> X.<span class="const token" data-verso-hover="106">init</span> σ</span>
+<span id="L94"></span>
+<span id="L95"><span class="dc">/-- The history of a schedule. -/</span></span>
+<span id="L96"><span class="kw">noncomputable</span> <span class="kw">def</span> <span class="const token" data-verso-hover="108">hist</span> (σ : <span class="const token" data-verso-hover="92">List</span> (<span class="const token" data-verso-hover="93">Inv</span> Tx O)) : <span class="const token" data-verso-hover="27">Hist</span> Tx O := (X.<span class="const token" data-verso-hover="105">exec</span> σ).<span class="const token" data-verso-hover="95">2</span>.<span class="const token" data-verso-hover="113">map</span> <span class="const token" data-verso-hover="94">Prod.fst</span></span>
+<span id="L97"></span>
+<span id="L98"><span class="dc">/-- The configuration after a schedule. -/</span></span>
+<span id="L99"><span class="kw">noncomputable</span> <span class="kw">def</span> <span class="const token" data-verso-hover="110">conf</span> (σ : <span class="const token" data-verso-hover="92">List</span> (<span class="const token" data-verso-hover="93">Inv</span> Tx O)) : <span class="const token" data-verso-hover="89">Config</span> X := (X.<span class="const token" data-verso-hover="105">exec</span> σ).<span class="const token" data-verso-hover="94">1</span></span>
+<span id="L100"></span>
+<span id="L101"><span class="dc">/-- The response to invocation `i` after schedule `σ`. -/</span></span>
+<span id="L102"><span class="kw">noncomputable</span> <span class="kw">def</span> <span class="const token" data-verso-hover="116">resp</span> (σ : <span class="const token" data-verso-hover="92">List</span> (<span class="const token" data-verso-hover="93">Inv</span> Tx O)) (i : <span class="const token" data-verso-hover="93">Inv</span> Tx O) : <span class="const token" data-verso-hover="228">Resp</span> Tx :=</span>
+<span id="L103">  (X.<span class="const token" data-verso-hover="102">step</span> (X.<span class="const token" data-verso-hover="110">conf</span> σ) i).<span class="const token" data-verso-hover="95">2</span><span class="nu">.</span><span class="const token" data-verso-hover="94">1</span></span>
+<span id="L104"></span>
+<span id="L105"><span class="dc">/-! ### Correctness and permissiveness -/</span></span>
+<span id="L106"></span>
+<span id="L107"><span class="dc">/-- The STM is strictly serializable: all its well-formed histories are. -/</span></span>
+<span id="L108"><span class="kw">def</span> <span class="const token" data-verso-hover="280">Correct</span> : <span class="kw">Prop</span> := ∀ σ, <span class="const token" data-verso-hover="78">WF</span> (X.<span class="const token" data-verso-hover="108">hist</span> σ) → <span class="const token" data-verso-hover="10">StrictSer</span> (X.<span class="const token" data-verso-hover="108">hist</span> σ)</span>
+<span id="L109"></span>
+<span id="L110"><span class="dc">/-- The STM is MV-permissive (Definition 2). -/</span></span>
+<span id="L111"><span class="kw">def</span> <span class="const token" data-verso-hover="213">MVPermissive</span> : <span class="kw">Prop</span> := ∀ σ, <span class="const token" data-verso-hover="78">WF</span> (X.<span class="const token" data-verso-hover="108">hist</span> σ) → <span class="const token" data-verso-hover="18">MVPerm</span> (X.<span class="const token" data-verso-hover="108">hist</span> σ)</span>
+<span id="L112"></span>
+<span id="L113"><span class="dc">/-- Reads of the STM return written versions. -/</span></span>
+<span id="L114"><span class="kw">def</span> <span class="const token" data-verso-hover="9">ReadsWrittenOnly</span> : <span class="kw">Prop</span> := ∀ σ, <span class="const token" data-verso-hover="78">WF</span> (X.<span class="const token" data-verso-hover="108">hist</span> σ) → <span class="const token" data-verso-hover="268">ReadsWritten</span> (X.<span class="const token" data-verso-hover="108">hist</span> σ)</span>
+<span id="L115"></span>
+<span id="L116"><span class="dc">/-! ### Versions kept -/</span></span>
+<span id="L117"></span>
+<span id="L118"><span class="dc">/-- A read (not following an own write) returns a version kept just before it. -/</span></span>
+<span id="L119"><span class="kw">def</span> <span class="const token" data-verso-hover="11">KeepsReads</span> (kept : <span class="const token" data-verso-hover="89">Config</span> X → <span class="const token" data-verso-hover="281">Set</span> (<span class="const token" data-verso-hover="266">Version</span> Tx O)) : <span class="kw">Prop</span> :=</span>
+<span id="L120">  ∀ σ T o v, <span class="const token" data-verso-hover="78">WF</span> (X.<span class="const token" data-verso-hover="108">hist</span> (σ ++ [<span class="const token" data-verso-hover="219">.</span>read T o])) → X.<span class="const token" data-verso-hover="116">resp</span> σ (<span class="const token" data-verso-hover="219">.</span>read T o) = <span class="const token" data-verso-hover="53">some</span> v →</span>
+<span id="L121">    ¬ <span class="const token" data-verso-hover="38">Writes</span> (X.<span class="const token" data-verso-hover="108">hist</span> σ) T o → (o, v) ∈ kept (X.<span class="const token" data-verso-hover="110">conf</span> σ)</span>
+<span id="L122"></span>
+<span id="L123"><span class="dc">/-- Garbage collection is final: an existing version that is not kept is never kept again. -/</span></span>
+<span id="L124"><span class="kw">def</span> <span class="const token" data-verso-hover="12">GCFinal</span> (kept : <span class="const token" data-verso-hover="89">Config</span> X → <span class="const token" data-verso-hover="281">Set</span> (<span class="const token" data-verso-hover="266">Version</span> Tx O)) : <span class="kw">Prop</span> :=</span>
+<span id="L125">  ∀ σ τ v, <span class="const token" data-verso-hover="78">WF</span> (X.<span class="const token" data-verso-hover="108">hist</span> (σ ++ τ)) → <span class="const token" data-verso-hover="269">VExists</span> (X.<span class="const token" data-verso-hover="108">hist</span> σ) v → v ∉ kept (X.<span class="const token" data-verso-hover="110">conf</span> σ) →</span>
+<span id="L126">    v ∉ kept (X.<span class="const token" data-verso-hover="110">conf</span> (σ ++ τ))</span>
+<span id="L127"></span>
+<span id="L128"><span class="dc">/-- A correct, MV-permissive STM with a declared set of kept versions. -/</span></span>
+<span id="L129"><span class="kw">structure</span> <span class="const token" data-verso-hover="282">Valid</span> (kept : <span class="const token" data-verso-hover="89">Config</span> X → <span class="const token" data-verso-hover="281">Set</span> (<span class="const token" data-verso-hover="266">Version</span> Tx O)) : <span class="kw">Prop</span> <span class="kw">where</span></span>
+<span id="L130">  <span class="const token" data-verso-hover="283">correct</span> : X.<span class="const token" data-verso-hover="280">Correct</span></span>
+<span id="L131">  <span class="const token" data-verso-hover="284">mvPermissive</span> : X.<span class="const token" data-verso-hover="213">MVPermissive</span></span>
+<span id="L132">  <span class="const token" data-verso-hover="285">readsWritten</span> : X.<span class="const token" data-verso-hover="9">ReadsWrittenOnly</span></span>
+<span id="L133">  <span class="const token" data-verso-hover="286">keepsReads</span> : X.<span class="const token" data-verso-hover="11">KeepsReads</span> kept</span>
+<span id="L134">  <span class="const token" data-verso-hover="287">gcFinal</span> : X.<span class="const token" data-verso-hover="12">GCFinal</span> kept</span>
+<span id="L135"></span>
+<span id="L136"><span class="dc">/-- The number of kept overwritten versions after schedule `σ`. -/</span></span>
+<span id="L137"><span class="kw">noncomputable</span> <span class="kw">def</span> <span class="const token" data-verso-hover="288">keptOld</span> (kept : <span class="const token" data-verso-hover="89">Config</span> X → <span class="const token" data-verso-hover="281">Set</span> (<span class="const token" data-verso-hover="266">Version</span> Tx O)) (σ : <span class="const token" data-verso-hover="92">List</span> (<span class="const token" data-verso-hover="93">Inv</span> Tx O)) : <span class="const token" data-verso-hover="289">ℕ</span>∞ :=</span>
+<span id="L138">  (kept (X.<span class="const token" data-verso-hover="110">conf</span> σ) ∩ {v | <span class="const token" data-verso-hover="271">Old</span> (X.<span class="const token" data-verso-hover="108">hist</span> σ) v}).<span class="const token" data-verso-hover="290">encard</span></span>
+<span id="L139"></span>
+<span id="L140"><span class="dc">/-- **Definition 3.** `X` is online space optimal if at every point of every (well-formed)</span></span>
+<span id="L141"><span class="dc">history it keeps at most as many (overwritten) versions as any other MV-permissive STM. -/</span></span>
+<span id="L142"><span class="kw">def</span> <span class="const token" data-verso-hover="13">OnlineSpaceOptimal</span> (kept : <span class="const token" data-verso-hover="89">Config</span> X → <span class="const token" data-verso-hover="281">Set</span> (<span class="const token" data-verso-hover="266">Version</span> Tx O)) : <span class="kw">Prop</span> :=</span>
+<span id="L143">  ∀ (Y : <span class="const token" data-verso-hover="87">STM</span> Tx O P) (keptY : <span class="const token" data-verso-hover="89">Config</span> Y → <span class="const token" data-verso-hover="281">Set</span> (<span class="const token" data-verso-hover="266">Version</span> Tx O)), Y.<span class="const token" data-verso-hover="282">Valid</span> keptY →</span>
+<span id="L144">    ∀ σ, <span class="const token" data-verso-hover="78">WF</span> (X.<span class="const token" data-verso-hover="108">hist</span> σ) → <span class="const token" data-verso-hover="78">WF</span> (Y.<span class="const token" data-verso-hover="108">hist</span> σ) → X.<span class="const token" data-verso-hover="288">keptOld</span> kept σ ≤ Y.<span class="const token" data-verso-hover="288">keptOld</span> keptY σ</span>
+<span id="L145"></span>
+<span id="L146"><span class="dc">/-- `T` can read version `v` after `h` without violating correctness: the history in which `T`</span></span>
+<span id="L147"><span class="dc">then reads `v` and commits is strictly serializable. -/</span></span>
+<span id="L148"><span class="kw">def</span> <span class="const token" data-verso-hover="291">CanRead</span> (h : <span class="const token" data-verso-hover="27">Hist</span> Tx O) (T : Tx) (v : <span class="const token" data-verso-hover="266">Version</span> Tx O) : <span class="kw">Prop</span> :=</span>
+<span id="L149">  <span class="const token" data-verso-hover="10">StrictSer</span> (h ++ [⟨<span class="const token" data-verso-hover="219">.</span>read T v.<span class="const token" data-verso-hover="94">1</span>, <span class="const token" data-verso-hover="53">some</span> v.<span class="const token" data-verso-hover="95">2</span>⟩, ⟨<span class="const token" data-verso-hover="52">.</span>commit T, <span class="const token" data-verso-hover="53">some</span> <span class="const token" data-verso-hover="57">none</span>⟩])</span>
+<span id="L150"></span>
+<span id="L151"><span class="dc">/-- **Definition 4 (UP GC), literal reading.** A version is kept only if some extension of the</span></span>
+<span id="L152"><span class="dc">execution has a live transaction that can read it and cannot read any version written after it. -/</span></span>
+<span id="L153"><span class="kw">def</span> <span class="const token" data-verso-hover="14">UPGC</span> (kept : <span class="const token" data-verso-hover="89">Config</span> X → <span class="const token" data-verso-hover="281">Set</span> (<span class="const token" data-verso-hover="266">Version</span> Tx O)) : <span class="kw">Prop</span> :=</span>
+<span id="L154">  ∀ σ v, <span class="const token" data-verso-hover="78">WF</span> (X.<span class="const token" data-verso-hover="108">hist</span> σ) → v ∈ kept (X.<span class="const token" data-verso-hover="110">conf</span> σ) →</span>
+<span id="L155">    ∃ τ T, <span class="const token" data-verso-hover="78">WF</span> (X.<span class="const token" data-verso-hover="108">hist</span> (σ ++ τ)) ∧ <span class="const token" data-verso-hover="267">Live</span> (X.<span class="const token" data-verso-hover="108">hist</span> (σ ++ τ)) T ∧ <span class="const token" data-verso-hover="291">CanRead</span> (X.<span class="const token" data-verso-hover="108">hist</span> (σ ++ τ)) T v ∧</span>
+<span id="L156">      ∀ w, <span class="const token" data-verso-hover="270">WrittenAfter</span> (X.<span class="const token" data-verso-hover="108">hist</span> (σ ++ τ)) v w → ¬ <span class="const token" data-verso-hover="291">CanRead</span> (X.<span class="const token" data-verso-hover="108">hist</span> (σ ++ τ)) T w</span>
+<span id="L157"></span>
+<span id="L158"><span class="dc">/-- **UP GC, potential-reader reading** (Section 7, Design Principle 5): an overwritten version</span></span>
+<span id="L159"><span class="dc">is kept only if some live transaction precedes the transaction that overwrote it (only the</span></span>
+<span id="L160"><span class="dc">"precedes `oʲ⁺¹.writer`" half of "potential reader" is required, which makes this weaker). -/</span></span>
+<span id="L161"><span class="kw">def</span> <span class="const token" data-verso-hover="2">UPGCPrec</span> (kept : <span class="const token" data-verso-hover="89">Config</span> X → <span class="const token" data-verso-hover="281">Set</span> (<span class="const token" data-verso-hover="266">Version</span> Tx O)) : <span class="kw">Prop</span> :=</span>
+<span id="L162">  ∀ σ o v, <span class="const token" data-verso-hover="78">WF</span> (X.<span class="const token" data-verso-hover="108">hist</span> σ) → (o, v) ∈ kept (X.<span class="const token" data-verso-hover="110">conf</span> σ) → <span class="const token" data-verso-hover="271">Old</span> (X.<span class="const token" data-verso-hover="108">hist</span> σ) (o, v) →</span>
+<span id="L163">    ∃ T W', <span class="const token" data-verso-hover="267">Live</span> (X.<span class="const token" data-verso-hover="108">hist</span> σ) T ∧ <span class="const token" data-verso-hover="272">NextWriter</span> (X.<span class="const token" data-verso-hover="108">hist</span> σ) o v W' ∧ <span class="const token" data-verso-hover="274">Prec</span> (X.<span class="const token" data-verso-hover="108">hist</span> σ) T W'</span>
+<span id="L164"></span>
+<span id="L165"><span class="dc">/-! ### Read visibility (Theorem 3) -/</span></span>
+<span id="L166"></span>
+<span id="L167"><span class="dc">/-- Two configurations agree outside thread `p`: same shared memory, same private states of the</span></span>
+<span id="L168"><span class="dc">other threads ("the configuration external to the transaction"). -/</span></span>
+<span id="L169"><span class="kw">def</span> <span class="const token" data-verso-hover="292">ExtEq</span> (p : P) (C C' : <span class="const token" data-verso-hover="89">Config</span> X) : <span class="kw">Prop</span> := C.<span class="const token" data-verso-hover="163">mem</span> = C'.<span class="const token" data-verso-hover="163">mem</span> ∧ ∀ q, q ≠ p → C.<span class="const token" data-verso-hover="164">loc</span> q = C'.<span class="const token" data-verso-hover="164">loc</span> q</span>
+<span id="L170"></span>
+<span id="L171"><span class="dc">/-- Read-only transactions leave no trace: whenever a read-only transaction runs from its first</span></span>
+<span id="L172"><span class="dc">to its last step with no step of another transaction in between, the configurations external to</span></span>
+<span id="L173"><span class="dc">it before and after are the same. -/</span></span>
+<span id="L174"><span class="kw">def</span> <span class="const token" data-verso-hover="293">NoTrace</span> : <span class="kw">Prop</span> :=</span>
+<span id="L175">  ∀ σ τ T, <span class="const token" data-verso-hover="78">WF</span> (X.<span class="const token" data-verso-hover="108">hist</span> (σ ++ τ)) → <span class="const token" data-verso-hover="214">ro</span> T = <span class="const token" data-verso-hover="215">true</span> → (∀ i ∈ τ, <span class="const token" data-verso-hover="50">Inv.tx</span> i = T) →</span>
+<span id="L176">    ¬ <span class="const token" data-verso-hover="30">Began</span> (X.<span class="const token" data-verso-hover="108">hist</span> σ) T → <span class="const token" data-verso-hover="32">Committed</span> (X.<span class="const token" data-verso-hover="108">hist</span> (σ ++ τ)) T →</span>
+<span id="L177">    <span class="const token" data-verso-hover="292">ExtEq</span> X (<span class="const token" data-verso-hover="177">thr</span> T) (X.<span class="const token" data-verso-hover="110">conf</span> σ) (X.<span class="const token" data-verso-hover="110">conf</span> (σ ++ τ))</span>
+<span id="L178"></span>
+<span id="L179"><span class="dc">/-! ### Weak disjoint-access parallelism (Definition 1) -/</span></span>
+<span id="L180"></span>
+<span id="L181"><span class="dc">/-- Some base step of transaction `T` in the execution of `σ` accesses base object `b`. -/</span></span>
+<span id="L182"><span class="kw">def</span> <span class="const token" data-verso-hover="294">Touches</span> (σ : <span class="const token" data-verso-hover="92">List</span> (<span class="const token" data-verso-hover="93">Inv</span> Tx O)) (T : Tx) (b : X.<span class="const token" data-verso-hover="171">B</span>) : <span class="kw">Prop</span> :=</span>
+<span id="L183">  ∃ s ∈ (X.<span class="const token" data-verso-hover="105">exec</span> σ).<span class="const token" data-verso-hover="95">2</span>, s.<span class="const token" data-verso-hover="94">1</span>.<span class="const token" data-verso-hover="49">inv</span>.<span class="const token" data-verso-hover="50">tx</span> = T ∧ ∃ a ∈ s.<span class="const token" data-verso-hover="95">2</span>, a.<span class="const token" data-verso-hover="132">b</span> = b</span>
+<span id="L184"></span>
+<span id="L185"><span class="dc">/-- Some base step of transaction `T` in the execution of `σ` changes base object `b`. -/</span></span>
+<span id="L186"><span class="kw">def</span> <span class="const token" data-verso-hover="295">Changes</span> (σ : <span class="const token" data-verso-hover="92">List</span> (<span class="const token" data-verso-hover="93">Inv</span> Tx O)) (T : Tx) (b : X.<span class="const token" data-verso-hover="171">B</span>) : <span class="kw">Prop</span> :=</span>
+<span id="L187">  ∃ s ∈ (X.<span class="const token" data-verso-hover="105">exec</span> σ).<span class="const token" data-verso-hover="95">2</span>, s.<span class="const token" data-verso-hover="94">1</span>.<span class="const token" data-verso-hover="49">inv</span>.<span class="const token" data-verso-hover="50">tx</span> = T ∧ ∃ a ∈ s.<span class="const token" data-verso-hover="95">2</span>, a.<span class="const token" data-verso-hover="132">b</span> = b ∧ a.<span class="const token" data-verso-hover="136">old</span> ≠ a.<span class="const token" data-verso-hover="133">new</span></span>
+<span id="L188"></span>
+<span id="L189"><span class="dc">/-- The base steps of `T₁` and `T₂` contend: some base object is accessed by both, and changed by</span></span>
+<span id="L190"><span class="dc">one of them. -/</span></span>
+<span id="L191"><span class="kw">def</span> <span class="const token" data-verso-hover="296">Contend</span> (σ : <span class="const token" data-verso-hover="92">List</span> (<span class="const token" data-verso-hover="93">Inv</span> Tx O)) (T₁ T₂ : Tx) : <span class="kw">Prop</span> :=</span>
+<span id="L192">  ∃ b, X.<span class="const token" data-verso-hover="294">Touches</span> σ T₁ b ∧ X.<span class="const token" data-verso-hover="294">Touches</span> σ T₂ b ∧ (X.<span class="const token" data-verso-hover="295">Changes</span> σ T₁ b ∨ X.<span class="const token" data-verso-hover="295">Changes</span> σ T₂ b)</span>
+<span id="L193"></span>
+<span id="L194"><span class="kw">end</span> STM</span>
+<span id="L195"></span>
+<span id="L196"><span class="dc">/-- The `i`-th event of `h` belongs to a transaction satisfying `S`. -/</span></span>
+<span id="L197"><span class="kw">def</span> <span class="const token" data-verso-hover="297">EvAt</span> (h : <span class="const token" data-verso-hover="27">Hist</span> Tx O) (i : <span class="const token" data-verso-hover="231">ℕ</span>) (S : Tx → <span class="kw">Prop</span>) : <span class="kw">Prop</span> := ∃ e, h[i]? = <span class="const token" data-verso-hover="53">some</span> e ∧ S e.<span class="const token" data-verso-hover="49">inv</span>.<span class="const token" data-verso-hover="50">tx</span></span>
+<span id="L198"></span>
+<span id="L199"><span class="dc">/-- The execution interval of `T` overlaps that of `{T₁, T₂}`. -/</span></span>
+<span id="L200"><span class="kw">def</span> <span class="const token" data-verso-hover="298">Overlaps</span> (h : <span class="const token" data-verso-hover="27">Hist</span> Tx O) (T₁ T₂ T : Tx) : <span class="kw">Prop</span> :=</span>
+<span id="L201">  (∃ i j, i ≤ j ∧ <span class="const token" data-verso-hover="297">EvAt</span> h i (· = T) ∧ <span class="const token" data-verso-hover="297">EvAt</span> h j (<span class="kw">fun</span> x =&gt; x = T₁ ∨ x = T₂)) ∧</span>
+<span id="L202">  (∃ i j, i ≤ j ∧ <span class="const token" data-verso-hover="297">EvAt</span> h i (<span class="kw">fun</span> x =&gt; x = T₁ ∨ x = T₂) ∧ <span class="const token" data-verso-hover="297">EvAt</span> h j (· = T))</span>
+<span id="L203"></span>
+<span id="L204"><span class="dc">/-- `T₁` and `T₂` are disjoint-access in `h`: in the graph on transactional objects joining two</span></span>
+<span id="L205"><span class="dc">objects accessed by a common transaction whose interval overlaps that of `{T₁, T₂}`, no object</span></span>
+<span id="L206"><span class="dc">accessed by `T₁` is connected to an object accessed by `T₂`. -/</span></span>
+<span id="L207"><span class="kw">def</span> <span class="const token" data-verso-hover="299">DisjointAccess</span> (h : <span class="const token" data-verso-hover="27">Hist</span> Tx O) (T₁ T₂ : Tx) : <span class="kw">Prop</span> :=</span>
+<span id="L208">  ¬ ∃ x y, <span class="const token" data-verso-hover="40">Accesses</span> h T₁ x ∧ <span class="const token" data-verso-hover="40">Accesses</span> h T₂ y ∧</span>
+<span id="L209">    <span class="const token" data-verso-hover="300">Relation.ReflTransGen</span> (<span class="kw">fun</span> x y =&gt; ∃ T, <span class="const token" data-verso-hover="298">Overlaps</span> h T₁ T₂ T ∧ <span class="const token" data-verso-hover="40">Accesses</span> h T x ∧ <span class="const token" data-verso-hover="40">Accesses</span> h T y)</span>
+<span id="L210">      x y</span>
+<span id="L211"></span>
+<span id="L212"><span class="kw">namespace</span> STM</span>
+<span id="L213"></span>
+<span id="L214"><span class="kw">variable</span> (X : <span class="const token" data-verso-hover="87">STM</span> Tx O P) [<span class="const token" data-verso-hover="8">TxSys</span> Tx P]</span>
+<span id="L215"></span>
+<span id="L216"><span class="dc">/-- **Definition 1.** Weak disjoint-access parallelism: in every execution, the base steps of two</span></span>
+<span id="L217"><span class="dc">disjoint-access transactions do not contend. -/</span></span>
+<span id="L218"><span class="kw">def</span> <span class="const token" data-verso-hover="17">WDAP</span> : <span class="kw">Prop</span> :=</span>
+<span id="L219">  ∀ σ, <span class="const token" data-verso-hover="78">WF</span> (X.<span class="const token" data-verso-hover="108">hist</span> σ) → ∀ T₁ T₂, T₁ ≠ T₂ → <span class="const token" data-verso-hover="299">DisjointAccess</span> (X.<span class="const token" data-verso-hover="108">hist</span> σ) T₁ T₂ → ¬ X.<span class="const token" data-verso-hover="296">Contend</span> σ T₁ T₂</span>
+<span id="L220"></span>
+<span id="L221"><span class="kw">end</span> STM</span>
+<span id="L222"></span>
+<span id="L223"><span class="kw">end</span> Podc.MultiVersionSTM</span>
+<span id="L224"></span>
+</code></div>
+        <script>
+          window.versoHoversUrl = "PODC2010/MultiVersionSTM/-hovers.json";</script>
+        <script src="static/lean/popper.js"></script>
+        <script src="static/lean/tippy.js"></script>
+        <script src="static/lean/marked.js"></script>
+        <script src="static/lean/highlighting.js"></script>
+        <script src="static/lean/lean.js"></script>
+        </article></main><footer class="site-footer"><div class="wrap">
+        Machine-checked formalizations of PODC papers in Lean 4. Generated with <a href="https://github.com/leanprover/verso">Verso</a> from the README files of <a href="https://github.com/vasnesterov/formal_podc">vasnesterov/formal_podc</a>.</div>
+      </footer></body>
+  </html>
+

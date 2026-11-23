@@ -1,0 +1,437 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="light dark">
+    <link rel="icon" href="data:,">
+    <title>BindingCrusaderAgreement: BCAByz.lean · Formal PODC</title><base href="../../../.././"><link rel="stylesheet" href="static/lean/verso-vars.css">
+    <link rel="stylesheet" href="static/lean/highlighting.css">
+    <link rel="stylesheet" href="static/lean/tippy-border.css">
+    <link rel="stylesheet" href="static/style.css">
+    <script defer="defer" src="static/site.js"></script>
+    </head>
+  <body>
+    <header class="site-header">
+      <div class="wrap">
+        <a class="brand" href=".">Formal PODC</a><nav class="top">
+          <a href=".">Search</a><a href="about/">About</a><a href="https://github.com/vasnesterov/formal_podc">GitHub</a></nav>
+        </div>
+      </header>
+    <main class="wrap"><article><nav class="breadcrumbs" aria-label="Breadcrumb">
+          <a href=".">Search</a><span class="sep">›</span><a href="PODC2022/">PODC 2022</a><span class="sep">›</span><a href="PODC2022/BindingCrusaderAgreement/">BindingCrusaderAgreement</a><span class="sep">›</span><a href="PODC2022/BindingCrusaderAgreement/src/">Lean source</a><span class="sep">›</span><span aria-current="page">BCAByz</span></nav>
+        <h1>
+          <code>BCAByz.lean</code></h1>
+        <div class="paper-links">
+          <p>
+            Source of <a href="PODC2022/BindingCrusaderAgreement/">Binding Crusader Agreement — PODC 2022</a> · <a href="https://github.com/vasnesterov/formal_podc/blob/main/Papers/PODC2022/BindingCrusaderAgreement/BCAByz.lean">GitHub</a> · hover over a name for its type and documentation</p>
+          </div>
+        <div class="lean-code lean-src">
+          <code class="hl lean block" data-lean-context="BCAByz"><span id="L1"><span class="kw">import</span> Papers.PODC2022.BindingCrusaderAgreement.EchoLayer</span>
+<span id="L2"></span>
+<span id="L3"><span class="dc">/-!</span></span>
+<span id="L4"><span class="dc"># Algorithm 4: Binding Crusader Agreement with Byzantine faults (`BCA_Byz`)</span></span>
+<span id="L5"></span>
+<span id="L6"><span class="dc">Abraham, Ben-David, Yandamuri, PODC 2022, Section 4.2, Algorithm 4, Theorem 4.3 and</span></span>
+<span id="L7"><span class="dc">Lemmas 4.4–4.9.</span></span>
+<span id="L8"></span>
+<span id="L9"><span class="dc">The protocol (`n ≥ 3t + 1`, asynchronous, adaptive Byzantine adversary), after the echo layer</span></span>
+<span id="L10"><span class="dc">(`EchoLayer.lean`):</span></span>
+<span id="L11"><span class="dc">* lines 8–12: once `|approvedVals| &gt; 1`, or `⟨echo2, v⟩` was received from `n − t` parties,</span></span>
+<span id="L12"><span class="dc">  send `⟨echo3, ⊥⟩` resp. `⟨echo3, v⟩` (only one `echo3`);</span></span>
+<span id="L13"><span class="dc">* lines 13–17: once `|approvedVals| &gt; 1` and `n − t` `echo3` messages were received, decide</span></span>
+<span id="L14"><span class="dc">  `⊥`; once `⟨echo3, v⟩` was received from `n − t` parties, decide `v` (after the own `echo3`).</span></span>
+<span id="L15"></span>
+<span id="L16"><span class="dc">Guards are liberal (see `Cslib.Byzantine.AsyncBroadcast`): when both conditions of a "wait until"</span></span>
+<span id="L17"><span class="dc">hold, either branch may be taken. This only adds behaviours, so the safety results apply to the</span></span>
+<span id="L18"><span class="dc">paper's deterministic precedence as well.</span></span>
+<span id="L19"></span>
+<span id="L20"><span class="dc">## Main results</span></span>
+<span id="L21"><span class="dc">* `agreement` (Lemma 4.4) — for *all* recorded decisions, including those of parties corrupted</span></span>
+<span id="L22"><span class="dc">  after deciding;</span></span>
+<span id="L23"><span class="dc">* `validity` (Lemma 4.5);</span></span>
+<span id="L24"><span class="dc">* `echo3_consistent` (Lemma 4.8);</span></span>
+<span id="L25"><span class="dc">* `binding` (Lemma 4.9, Definition 3.1 (Binding)) — against the adaptive adversary;</span></span>
+<span id="L26"><span class="dc">* `termination` (Lemma 4.7) — in every fair execution all correct parties decide;</span></span>
+<span id="L27"><span class="dc">* `out_ncard_le_four` (Lemma 4.7, "within 4 communication rounds"): every party broadcasts at</span></span>
+<span id="L28"><span class="dc">  most 4 messages.</span></span>
+<span id="L29"><span class="dc">-/</span></span>
+<span id="L30"></span>
+<span id="L31"><span class="kw">namespace</span> Podc.BindingCrusaderAgreement.Alg4</span>
+<span id="L32"></span>
+<span id="L33"><span class="kw">open</span> Cslib.Byzantine.AsyncBroadcast Podc.BindingCrusaderAgreement</span>
+<span id="L34"></span>
+<span id="L35"><span class="kw">variable</span> {P : <span class="kw">Type</span>*} [<span class="const token" data-verso-hover="25">Fintype</span> P] [<span class="const token" data-verso-hover="26">DecidableEq</span> P]</span>
+<span id="L36"></span>
+<span id="L37"><span class="dc">/-- Broadcast guards of Algorithm 4 (input `x`, inbox `ib`, own broadcasts `out`). -/</span></span>
+<span id="L38"><span class="kw">def</span> <span class="const token" data-verso-hover="27">sendG</span> (t : <span class="const token" data-verso-hover="28">ℕ</span>) (x : <span class="const token" data-verso-hover="29">Bool</span>) (ib : P → <span class="const token" data-verso-hover="30">Set</span> <span class="const token" data-verso-hover="31">Msg</span>) (out : <span class="const token" data-verso-hover="30">Set</span> <span class="const token" data-verso-hover="31">Msg</span>) : <span class="const token" data-verso-hover="31">Msg</span> → <span class="kw">Prop</span></span>
+<span id="L39">  | <span class="const token" data-verso-hover="32">.</span>echo v =&gt; v = x ∨ t + <span class="nu">1</span> ≤ <span class="const token" data-verso-hover="33">cnt</span> ib (<span class="const token" data-verso-hover="32">.</span>echo v)</span>
+<span id="L40">  | <span class="const token" data-verso-hover="34">.</span>echo2 v =&gt; <span class="const token" data-verso-hover="35">Approved</span> t ib v ∧ ∀ w, <span class="const token" data-verso-hover="34">.</span>echo2 w ∉ out</span>
+<span id="L41">  | <span class="const token" data-verso-hover="36">.</span>echo3 <span class="const token" data-verso-hover="37">none</span> =&gt; <span class="const token" data-verso-hover="38">BothApproved</span> t ib ∧ ∀ o, <span class="const token" data-verso-hover="36">.</span>echo3 o ∉ out</span>
+<span id="L42">  | <span class="const token" data-verso-hover="36">.</span>echo3 (<span class="const token" data-verso-hover="39">some</span> v) =&gt; <span class="const token" data-verso-hover="40">Fintype.card</span> P - t ≤ <span class="const token" data-verso-hover="33">cnt</span> ib (<span class="const token" data-verso-hover="34">.</span>echo2 v) ∧ ∀ o, <span class="const token" data-verso-hover="36">.</span>echo3 o ∉ out</span>
+<span id="L43">  | _ =&gt; <span class="const token" data-verso-hover="41">False</span></span>
+<span id="L44"></span>
+<span id="L45"><span class="dc">/-- Decision guards of Algorithm 4 (`none` = `⊥`). -/</span></span>
+<span id="L46"><span class="kw">def</span> <span class="const token" data-verso-hover="42">decideG</span> (t : <span class="const token" data-verso-hover="28">ℕ</span>) (ib : P → <span class="const token" data-verso-hover="30">Set</span> <span class="const token" data-verso-hover="31">Msg</span>) (out : <span class="const token" data-verso-hover="30">Set</span> <span class="const token" data-verso-hover="31">Msg</span>) : <span class="const token" data-verso-hover="43">Option</span> <span class="const token" data-verso-hover="29">Bool</span> → <span class="kw">Prop</span></span>
+<span id="L47">  | <span class="const token" data-verso-hover="37">none</span> =&gt; <span class="const token" data-verso-hover="38">BothApproved</span> t ib ∧ <span class="const token" data-verso-hover="40">Fintype.card</span> P - t ≤ <span class="const token" data-verso-hover="44">cntP</span> ib <span class="const token" data-verso-hover="45">Msg.IsEcho3</span> ∧ ∃ o, <span class="const token" data-verso-hover="36">.</span>echo3 o ∈ out</span>
+<span id="L48">  | <span class="const token" data-verso-hover="39">some</span> v =&gt; <span class="const token" data-verso-hover="40">Fintype.card</span> P - t ≤ <span class="const token" data-verso-hover="33">cnt</span> ib (<span class="const token" data-verso-hover="36">.</span>echo3 (<span class="const token" data-verso-hover="39">some</span> v)) ∧ ∃ o, <span class="const token" data-verso-hover="36">.</span>echo3 o ∈ out</span>
+<span id="L49"></span>
+<span id="L50"><span class="dc">/-- Algorithm 4 as a broadcast protocol with binary inputs and outputs in `{0, 1, ⊥}`. -/</span></span>
+<span id="L51"><span class="kw">def</span> <span class="const token" data-verso-hover="46">alg</span> (t : <span class="const token" data-verso-hover="28">ℕ</span>) : <span class="const token" data-verso-hover="47">Protocol</span> P <span class="const token" data-verso-hover="31">Msg</span> <span class="const token" data-verso-hover="29">Bool</span> (<span class="const token" data-verso-hover="43">Option</span> <span class="const token" data-verso-hover="29">Bool</span>) <span class="kw">where</span></span>
+<span id="L52">  <span class="const token" data-verso-hover="48">send</span> _ x ib out m := <span class="const token" data-verso-hover="27">sendG</span> t x ib out m</span>
+<span id="L53">  <span class="const token" data-verso-hover="49">decide</span> _ _ ib out o := <span class="const token" data-verso-hover="42">decideG</span> t ib out o</span>
+<span id="L54"></span>
+<span id="L55"><span class="kw">omit</span> [<span class="const token" data-verso-hover="26">DecidableEq</span> P] <span class="kw">in</span></span>
+<span id="L56"><span class="kw">theorem</span> <span class="const token" data-verso-hover="50">isEchoLayer</span> (t : <span class="const token" data-verso-hover="28">ℕ</span>) : <span class="const token" data-verso-hover="51">IsEchoLayer</span> t (<span class="const token" data-verso-hover="46">alg</span> (P := P) t) :=</span>
+<span id="L57">  ⟨<span class="kw">fun</span> _ _ _ _ _ =&gt; <span class="const token" data-verso-hover="52">Iff.rfl</span>, <span class="kw">fun</span> _ _ _ _ _ =&gt; <span class="const token" data-verso-hover="52">Iff.rfl</span>⟩</span>
+<span id="L58"></span>
+<span id="L59"><span class="kw">variable</span> {t : <span class="const token" data-verso-hover="28">ℕ</span>} {x : P → <span class="const token" data-verso-hover="29">Bool</span>} {k : <span class="const token" data-verso-hover="53">FaultKind</span>} {σ : <span class="const token" data-verso-hover="54">State</span> P <span class="const token" data-verso-hover="31">Msg</span> (<span class="const token" data-verso-hover="43">Option</span> <span class="const token" data-verso-hover="29">Bool</span>)}</span>
+<span id="L60"></span>
+<span id="L61"><span class="dc">/-! ### Justifications -/</span></span>
+<span id="L62"></span>
+<span id="L63"><span class="kw">theorem</span> <span class="const token" data-verso-hover="55">echo3_some_just</span> (h : <span class="const token" data-verso-hover="56">Reachable</span> (<span class="const token" data-verso-hover="46">alg</span> t) x k t σ) {p : P} {v : <span class="const token" data-verso-hover="29">Bool</span>}</span>
+<span id="L64">    (hm : (p, <span class="const token" data-verso-hover="36">.</span>echo3 (<span class="const token" data-verso-hover="39">some</span> v)) ∈ σ.<span class="const token" data-verso-hover="57">sent</span>) :</span>
+<span id="L65">    <span class="const token" data-verso-hover="40">Fintype.card</span> P - t ≤ <span class="const token" data-verso-hover="33">cnt</span> (σ.<span class="const token" data-verso-hover="58">inbox</span> p) (<span class="const token" data-verso-hover="34">.</span>echo2 v) := <span class="kw">by</span></span>
+<span id="L66">  <span class="kw">refine</span> h.<span class="const token" data-verso-hover="59">sent_just</span> (J := <span class="kw">fun</span> _ m ib _ =&gt; ∀ v, m = <span class="const token" data-verso-hover="36">.</span>echo3 (<span class="const token" data-verso-hover="39">some</span> v) →</span>
+<span id="L67">    <span class="const token" data-verso-hover="40">Fintype.card</span> P - t ≤ <span class="const token" data-verso-hover="33">cnt</span> ib (<span class="const token" data-verso-hover="34">.</span>echo2 v)) ?_ ?_ hm v <span class="const token" data-verso-hover="60">rfl</span></span>
+<span id="L68">  · <span class="kw">intro</span> p m ib ib' out out' hib _ hj v hv</span>
+<span id="L69">    <span class="kw">exact</span> (hj v hv).<span class="const token" data-verso-hover="61">trans</span> (<span class="const token" data-verso-hover="62">cnt_mono</span> hib _)</span>
+<span id="L70">  · <span class="kw">intro</span> p ib out m hs v hv</span>
+<span id="L71">    <span class="kw">subst</span> hv</span>
+<span id="L72">    <span class="kw">exact</span> hs.<span class="const token" data-verso-hover="63">1</span></span>
+<span id="L73"></span>
+<span id="L74"><span class="kw">theorem</span> <span class="const token" data-verso-hover="64">echo3_none_just</span> (h : <span class="const token" data-verso-hover="56">Reachable</span> (<span class="const token" data-verso-hover="46">alg</span> t) x k t σ) {p : P}</span>
+<span id="L75">    (hm : (p, <span class="const token" data-verso-hover="36">.</span>echo3 <span class="const token" data-verso-hover="37">none</span>) ∈ σ.<span class="const token" data-verso-hover="57">sent</span>) : <span class="const token" data-verso-hover="38">BothApproved</span> t (σ.<span class="const token" data-verso-hover="58">inbox</span> p) := <span class="kw">by</span></span>
+<span id="L76">  <span class="kw">refine</span> h.<span class="const token" data-verso-hover="59">sent_just</span> (J := <span class="kw">fun</span> _ m ib _ =&gt; m = <span class="const token" data-verso-hover="36">.</span>echo3 <span class="const token" data-verso-hover="37">none</span> → <span class="const token" data-verso-hover="38">BothApproved</span> t ib) ?_ ?_ hm <span class="const token" data-verso-hover="60">rfl</span></span>
+<span id="L77">  · <span class="kw">intro</span> p m ib ib' out out' hib _ hj hv</span>
+<span id="L78">    <span class="kw">exact</span> (hj hv).<span class="const token" data-verso-hover="65">mono</span> hib</span>
+<span id="L79">  · <span class="kw">intro</span> p ib out m hs hv</span>
+<span id="L80">    <span class="kw">subst</span> hv</span>
+<span id="L81">    <span class="kw">exact</span> hs.<span class="const token" data-verso-hover="63">1</span></span>
+<span id="L82"></span>
+<span id="L83"><span class="kw">theorem</span> <span class="const token" data-verso-hover="66">echo3_unique</span> (h : <span class="const token" data-verso-hover="56">Reachable</span> (<span class="const token" data-verso-hover="46">alg</span> t) x k t σ) {p : P} {o o' : <span class="const token" data-verso-hover="43">Option</span> <span class="const token" data-verso-hover="29">Bool</span>}</span>
+<span id="L84">    (hv : (p, <span class="const token" data-verso-hover="36">.</span>echo3 o) ∈ σ.<span class="const token" data-verso-hover="57">sent</span>) (hw : (p, <span class="const token" data-verso-hover="36">.</span>echo3 o') ∈ σ.<span class="const token" data-verso-hover="57">sent</span>) : o = o' := <span class="kw">by</span></span>
+<span id="L85">  <span class="kw">have</span> := h.<span class="const token" data-verso-hover="67">sent_excl</span> <span class="const token" data-verso-hover="45">Msg.IsEcho3</span> ?_ hv hw <span class="const token" data-verso-hover="68">trivial</span> <span class="const token" data-verso-hover="68">trivial</span></span>
+<span id="L86">  · <span class="kw">simpa</span> <span class="kw">using</span> this</span>
+<span id="L87">  · <span class="kw">intro</span> p ib out m hs hm m' hm' h2</span>
+<span id="L88">    <span class="kw">cases</span> m <span class="kw">with</span></span>
+<span id="L89">    | <span class="const token" data-verso-hover="36">echo3</span> o =&gt;</span>
+<span id="L90">      <span class="kw">cases</span> m' <span class="kw">with</span></span>
+<span id="L91">      | <span class="const token" data-verso-hover="36">echo3</span> o' =&gt; <span class="kw">cases</span> o &lt;;&gt; <span class="kw">exact</span> hs.<span class="const token" data-verso-hover="69">2</span> o' hm'</span>
+<span id="L92">      | <span class="const token" data-verso-hover="70">_</span> =&gt; <span class="kw">exact</span> h2</span>
+<span id="L93">    | <span class="const token" data-verso-hover="32">_</span> =&gt; <span class="kw">exact</span> hm</span>
+<span id="L94"></span>
+<span id="L95"><span class="dc">/-- Only `echo`, `echo2`, `echo3` messages are broadcast. -/</span></span>
+<span id="L96"><span class="kw">theorem</span> <span class="const token" data-verso-hover="71">sent_kind</span> (h : <span class="const token" data-verso-hover="56">Reachable</span> (<span class="const token" data-verso-hover="46">alg</span> t) x k t σ) {p : P} {m : <span class="const token" data-verso-hover="31">Msg</span>} (hm : (p, m) ∈ σ.<span class="const token" data-verso-hover="57">sent</span>) :</span>
+<span id="L97">    (∃ v, m = <span class="const token" data-verso-hover="32">.</span>echo v) ∨ (∃ v, m = <span class="const token" data-verso-hover="34">.</span>echo2 v) ∨ (∃ o, m = <span class="const token" data-verso-hover="36">.</span>echo3 o) := <span class="kw">by</span></span>
+<span id="L98">  <span class="kw">refine</span> h.<span class="const token" data-verso-hover="59">sent_just</span> (J := <span class="kw">fun</span> _ m _ _ =&gt;</span>
+<span id="L99">    (∃ v, m = <span class="const token" data-verso-hover="32">.</span>echo v) ∨ (∃ v, m = <span class="const token" data-verso-hover="34">.</span>echo2 v) ∨ (∃ o, m = <span class="const token" data-verso-hover="36">.</span>echo3 o)) ?_ ?_ hm</span>
+<span id="L100">  · <span class="kw">intro</span> _ _ _ _ _ _ _ _ hj; <span class="kw">exact</span> hj</span>
+<span id="L101">  · <span class="kw">intro</span> p ib out m hs</span>
+<span id="L102">    <span class="kw">cases</span> m <span class="kw">with</span></span>
+<span id="L103">    | <span class="const token" data-verso-hover="32">echo</span> v =&gt; <span class="kw">exact</span> <span class="const token" data-verso-hover="72">Or.inl</span> ⟨v, <span class="const token" data-verso-hover="60">rfl</span>⟩</span>
+<span id="L104">    | <span class="const token" data-verso-hover="34">echo2</span> v =&gt; <span class="kw">exact</span> <span class="const token" data-verso-hover="73">Or.inr</span> (<span class="const token" data-verso-hover="72">Or.inl</span> ⟨v, <span class="const token" data-verso-hover="60">rfl</span>⟩)</span>
+<span id="L105">    | <span class="const token" data-verso-hover="36">echo3</span> o =&gt; <span class="kw">exact</span> <span class="const token" data-verso-hover="73">Or.inr</span> (<span class="const token" data-verso-hover="73">Or.inr</span> ⟨o, <span class="const token" data-verso-hover="60">rfl</span>⟩)</span>
+<span id="L106">    | <span class="const token" data-verso-hover="6">echo4</span> o =&gt; <span class="kw">exact</span> hs.<span class="const token" data-verso-hover="74">elim</span></span>
+<span id="L107">    | <span class="const token" data-verso-hover="70">echo5</span> o =&gt; <span class="kw">exact</span> hs.<span class="const token" data-verso-hover="74">elim</span></span>
+<span id="L108"></span>
+<span id="L109"><span class="kw">theorem</span> <span class="const token" data-verso-hover="75">dec_some_just</span> (h : <span class="const token" data-verso-hover="56">Reachable</span> (<span class="const token" data-verso-hover="46">alg</span> t) x k t σ) {p : P} {v : <span class="const token" data-verso-hover="29">Bool</span>}</span>
+<span id="L110">    (hd : σ.<span class="const token" data-verso-hover="76">dec</span> p = <span class="const token" data-verso-hover="39">some</span> (<span class="const token" data-verso-hover="39">some</span> v)) : <span class="const token" data-verso-hover="40">Fintype.card</span> P - t ≤ <span class="const token" data-verso-hover="33">cnt</span> (σ.<span class="const token" data-verso-hover="58">inbox</span> p) (<span class="const token" data-verso-hover="36">.</span>echo3 (<span class="const token" data-verso-hover="39">some</span> v)) := <span class="kw">by</span></span>
+<span id="L111">  <span class="kw">refine</span> h.<span class="const token" data-verso-hover="77">dec_just</span> (J := <span class="kw">fun</span> _ o ib _ =&gt; ∀ v, o = <span class="const token" data-verso-hover="39">some</span> v →</span>
+<span id="L112">    <span class="const token" data-verso-hover="40">Fintype.card</span> P - t ≤ <span class="const token" data-verso-hover="33">cnt</span> ib (<span class="const token" data-verso-hover="36">.</span>echo3 (<span class="const token" data-verso-hover="39">some</span> v))) ?_ ?_ hd v <span class="const token" data-verso-hover="60">rfl</span></span>
+<span id="L113">  · <span class="kw">intro</span> p o ib ib' out out' hib _ hj v hv</span>
+<span id="L114">    <span class="kw">exact</span> (hj v hv).<span class="const token" data-verso-hover="61">trans</span> (<span class="const token" data-verso-hover="62">cnt_mono</span> hib _)</span>
+<span id="L115">  · <span class="kw">intro</span> p ib out o hs v hv</span>
+<span id="L116">    <span class="kw">subst</span> hv</span>
+<span id="L117">    <span class="kw">exact</span> hs.<span class="const token" data-verso-hover="63">1</span></span>
+<span id="L118"></span>
+<span id="L119"><span class="kw">theorem</span> <span class="const token" data-verso-hover="78">dec_none_just</span> (h : <span class="const token" data-verso-hover="56">Reachable</span> (<span class="const token" data-verso-hover="46">alg</span> t) x k t σ) {p : P} (hd : σ.<span class="const token" data-verso-hover="76">dec</span> p = <span class="const token" data-verso-hover="39">some</span> <span class="const token" data-verso-hover="37">none</span>) :</span>
+<span id="L120">    <span class="const token" data-verso-hover="38">BothApproved</span> t (σ.<span class="const token" data-verso-hover="58">inbox</span> p) ∧ <span class="const token" data-verso-hover="40">Fintype.card</span> P - t ≤ <span class="const token" data-verso-hover="44">cntP</span> (σ.<span class="const token" data-verso-hover="58">inbox</span> p) <span class="const token" data-verso-hover="45">Msg.IsEcho3</span> := <span class="kw">by</span></span>
+<span id="L121">  <span class="kw">refine</span> h.<span class="const token" data-verso-hover="77">dec_just</span> (J := <span class="kw">fun</span> _ o ib _ =&gt; o = <span class="const token" data-verso-hover="37">none</span> →</span>
+<span id="L122">    <span class="const token" data-verso-hover="38">BothApproved</span> t ib ∧ <span class="const token" data-verso-hover="40">Fintype.card</span> P - t ≤ <span class="const token" data-verso-hover="44">cntP</span> ib <span class="const token" data-verso-hover="45">Msg.IsEcho3</span>) ?_ ?_ hd <span class="const token" data-verso-hover="60">rfl</span></span>
+<span id="L123">  · <span class="kw">intro</span> p o ib ib' out out' hib _ hj hv</span>
+<span id="L124">    <span class="kw">exact</span> ⟨(hj hv).<span class="const token" data-verso-hover="63">1</span>.<span class="const token" data-verso-hover="65">mono</span> hib, (hj hv).<span class="const token" data-verso-hover="69">2</span>.<span class="const token" data-verso-hover="61">trans</span> (<span class="const token" data-verso-hover="79">cntP_mono</span> hib _)⟩</span>
+<span id="L125">  · <span class="kw">intro</span> p ib out o hs hv</span>
+<span id="L126">    <span class="kw">subst</span> hv</span>
+<span id="L127">    <span class="kw">exact</span> ⟨hs.<span class="const token" data-verso-hover="63">1</span>, hs.<span class="const token" data-verso-hover="69">2</span><span class="nu">.</span><span class="const token" data-verso-hover="63">1</span>⟩</span>
+<span id="L128"></span>
+<span id="L129"><span class="dc">/-! ### Safety -/</span></span>
+<span id="L130"></span>
+<span id="L131"><span class="dc">/-- Lemma 4.8: two `echo3` messages with non-`⊥` values broadcast by (then uncorrupted) parties</span></span>
+<span id="L132"><span class="dc">carry the same value. -/</span></span>
+<span id="L133"><span class="kw">theorem</span> <span class="const token" data-verso-hover="14">echo3_consistent</span> (ht : <span class="nu">3</span> * t &lt; <span class="const token" data-verso-hover="40">Fintype.card</span> P) (h : <span class="const token" data-verso-hover="56">Reachable</span> (<span class="const token" data-verso-hover="46">alg</span> t) x k t σ)</span>
+<span id="L134">    {s s' : P} {v w : <span class="const token" data-verso-hover="29">Bool</span>} (hv : (s, <span class="const token" data-verso-hover="36">.</span>echo3 (<span class="const token" data-verso-hover="39">some</span> v)) ∈ σ.<span class="const token" data-verso-hover="57">sent</span>)</span>
+<span id="L135">    (hw : (s', <span class="const token" data-verso-hover="36">.</span>echo3 (<span class="const token" data-verso-hover="39">some</span> w)) ∈ σ.<span class="const token" data-verso-hover="57">sent</span>) : v = w := <span class="kw">by</span></span>
+<span id="L136">  <span class="kw">have</span> h1 := <span class="const token" data-verso-hover="55">echo3_some_just</span> h hv</span>
+<span id="L137">  <span class="kw">have</span> h2 := <span class="const token" data-verso-hover="55">echo3_some_just</span> h hw</span>
+<span id="L138">  <span class="kw">have</span> hb := h.<span class="const token" data-verso-hover="80">bad_ncard_le</span></span>
+<span id="L139">  <span class="kw">obtain</span> ⟨r, hr1, hr2, hrb⟩ := <span class="const token" data-verso-hover="81">exists_mem_inter_not_mem</span> (S₁ := {r | <span class="const token" data-verso-hover="34">Msg.echo2</span> v ∈ σ.<span class="const token" data-verso-hover="58">inbox</span> s r})</span>
+<span id="L140">    (S₂ := {r | <span class="const token" data-verso-hover="34">Msg.echo2</span> w ∈ σ.<span class="const token" data-verso-hover="58">inbox</span> s' r}) (B := σ.<span class="const token" data-verso-hover="82">bad</span>) (<span class="kw">by</span> <span class="kw">unfold</span> <span class="const token" data-verso-hover="33">cnt</span> <span class="kw">at</span> h1 h2; <span class="kw">omega</span>)</span>
+<span id="L141">  <span class="kw">exact</span> <span class="const token" data-verso-hover="83">echo2_unique</span> (<span class="const token" data-verso-hover="50">isEchoLayer</span> t) h (h.<span class="const token" data-verso-hover="84">genuine</span> hr1 hrb) (h.<span class="const token" data-verso-hover="84">genuine</span> hr2 hrb)</span>
+<span id="L142"></span>
+<span id="L143"><span class="dc">/-- Lemma 4.4 (Agreement): no two parties decide different non-`⊥` values. This holds for all</span></span>
+<span id="L144"><span class="dc">recorded decisions, also those of parties corrupted after deciding. -/</span></span>
+<span id="L145"><span class="kw">theorem</span> <span class="const token" data-verso-hover="10">agreement</span> (ht : <span class="nu">3</span> * t &lt; <span class="const token" data-verso-hover="40">Fintype.card</span> P) (h : <span class="const token" data-verso-hover="56">Reachable</span> (<span class="const token" data-verso-hover="46">alg</span> t) x k t σ) {p q : P}</span>
+<span id="L146">    {a b : <span class="const token" data-verso-hover="29">Bool</span>} (hp : σ.<span class="const token" data-verso-hover="76">dec</span> p = <span class="const token" data-verso-hover="39">some</span> (<span class="const token" data-verso-hover="39">some</span> a)) (hq : σ.<span class="const token" data-verso-hover="76">dec</span> q = <span class="const token" data-verso-hover="39">some</span> (<span class="const token" data-verso-hover="39">some</span> b)) : a = b := <span class="kw">by</span></span>
+<span id="L147">  <span class="kw">have</span> h1 := <span class="const token" data-verso-hover="75">dec_some_just</span> h hp</span>
+<span id="L148">  <span class="kw">have</span> h2 := <span class="const token" data-verso-hover="75">dec_some_just</span> h hq</span>
+<span id="L149">  <span class="kw">have</span> hb := h.<span class="const token" data-verso-hover="80">bad_ncard_le</span></span>
+<span id="L150">  <span class="kw">obtain</span> ⟨r, hr1, hr2, hrb⟩ := <span class="const token" data-verso-hover="81">exists_mem_inter_not_mem</span></span>
+<span id="L151">    (S₁ := {r | <span class="const token" data-verso-hover="36">Msg.echo3</span> (<span class="const token" data-verso-hover="39">some</span> a) ∈ σ.<span class="const token" data-verso-hover="58">inbox</span> p r})</span>
+<span id="L152">    (S₂ := {r | <span class="const token" data-verso-hover="36">Msg.echo3</span> (<span class="const token" data-verso-hover="39">some</span> b) ∈ σ.<span class="const token" data-verso-hover="58">inbox</span> q r}) (B := σ.<span class="const token" data-verso-hover="82">bad</span>) (<span class="kw">by</span> <span class="kw">unfold</span> <span class="const token" data-verso-hover="33">cnt</span> <span class="kw">at</span> h1 h2; <span class="kw">omega</span>)</span>
+<span id="L153">  <span class="kw">simpa</span> <span class="kw">using</span> <span class="const token" data-verso-hover="66">echo3_unique</span> h (h.<span class="const token" data-verso-hover="84">genuine</span> hr1 hrb) (h.<span class="const token" data-verso-hover="84">genuine</span> hr2 hrb)</span>
+<span id="L154"></span>
+<span id="L155"><span class="dc">/-- Lemma 4.5 (Validity): if all non-faulty parties have input `v`, every decision is `v`.</span></span>
+<span id="L156"><span class="dc">Non-faulty parties are those of a set `H` with `|Hᶜ| ≤ t` that contains no corrupted party</span></span>
+<span id="L157"><span class="dc">(with adaptive corruption, `H` is the set of parties that are never corrupted). The conclusion</span></span>
+<span id="L158"><span class="dc">holds for every recorded decision. -/</span></span>
+<span id="L159"><span class="kw">theorem</span> <span class="const token" data-verso-hover="2">validity</span> (ht : <span class="nu">3</span> * t &lt; <span class="const token" data-verso-hover="40">Fintype.card</span> P) (h : <span class="const token" data-verso-hover="56">Reachable</span> (<span class="const token" data-verso-hover="46">alg</span> t) x k t σ) {H : <span class="const token" data-verso-hover="30">Set</span> P}</span>
+<span id="L160">    (hbad : σ.<span class="const token" data-verso-hover="82">bad</span> ⊆ Hᶜ) (hH : Hᶜ.<span class="const token" data-verso-hover="85">ncard</span> ≤ t) {v : <span class="const token" data-verso-hover="29">Bool</span>} (hx : ∀ p ∈ H, x p = v) (p : P) :</span>
+<span id="L161">    σ.<span class="const token" data-verso-hover="76">dec</span> p = <span class="const token" data-verso-hover="37">none</span> ∨ σ.<span class="const token" data-verso-hover="76">dec</span> p = <span class="const token" data-verso-hover="39">some</span> (<span class="const token" data-verso-hover="39">some</span> v) := <span class="kw">by</span></span>
+<span id="L162">  <span class="kw">have</span> hA := <span class="const token" data-verso-hover="50">isEchoLayer</span> (P := P) t</span>
+<span id="L163">  <span class="kw">have</span> ht2 : <span class="nu">2</span> * t &lt; <span class="const token" data-verso-hover="40">Fintype.card</span> P := <span class="kw">by</span> <span class="kw">omega</span></span>
+<span id="L164">  <span class="kw">have</span> hb := h.<span class="const token" data-verso-hover="80">bad_ncard_le</span></span>
+<span id="L165">  <span class="kw">rcases</span> hd : σ.<span class="const token" data-verso-hover="76">dec</span> p <span class="kw">with</span> _ | o</span>
+<span id="L166">  · <span class="kw">exact</span> <span class="const token" data-verso-hover="72">Or.inl</span> <span class="const token" data-verso-hover="60">rfl</span></span>
+<span id="L167">  · <span class="kw">right</span></span>
+<span id="L168">    <span class="kw">rcases</span> o <span class="kw">with</span> _ | w</span>
+<span id="L169">    · <span class="kw">obtain</span> ⟨⟨h1, h2⟩, _⟩ := <span class="const token" data-verso-hover="78">dec_none_just</span> h hd</span>
+<span id="L170">      <span class="kw">exfalso</span></span>
+<span id="L171">      <span class="kw">cases</span> v</span>
+<span id="L172">      · <span class="kw">exact</span> <span class="const token" data-verso-hover="86">not_approved_of_inputs</span> hA ht2 h hbad hH hx p h1</span>
+<span id="L173">      · <span class="kw">exact</span> <span class="const token" data-verso-hover="86">not_approved_of_inputs</span> hA ht2 h hbad hH hx p h2</span>
+<span id="L174">    · <span class="kw">by_cases</span> hw : w = v</span>
+<span id="L175">      · <span class="kw">rw</span> [hw]</span>
+<span id="L176">      <span class="kw">exfalso</span></span>
+<span id="L177">      <span class="kw">have</span> hw' : w = !v := <span class="kw">by</span> <span class="kw">cases</span> w &lt;;&gt; <span class="kw">cases</span> v &lt;;&gt; <span class="kw">simp_all</span></span>
+<span id="L178">      <span class="kw">subst</span> hw'</span>
+<span id="L179">      <span class="kw">have</span> h1 := <span class="const token" data-verso-hover="75">dec_some_just</span> h hd</span>
+<span id="L180">      <span class="kw">obtain</span> ⟨r, hr, hrb⟩ := h.<span class="const token" data-verso-hover="87">exists_good</span> (S := {r | <span class="const token" data-verso-hover="36">Msg.echo3</span> (<span class="const token" data-verso-hover="39">some</span> (!v)) ∈ σ.<span class="const token" data-verso-hover="58">inbox</span> p r})</span>
+<span id="L181">        (<span class="kw">by</span> <span class="kw">unfold</span> <span class="const token" data-verso-hover="33">cnt</span> <span class="kw">at</span> h1; <span class="kw">omega</span>)</span>
+<span id="L182">      <span class="kw">have</span> h2 := <span class="const token" data-verso-hover="55">echo3_some_just</span> h (h.<span class="const token" data-verso-hover="84">genuine</span> hr hrb)</span>
+<span id="L183">      <span class="kw">obtain</span> ⟨r', hr', hrb'⟩ := h.<span class="const token" data-verso-hover="87">exists_good</span> (S := {r' | <span class="const token" data-verso-hover="34">Msg.echo2</span> (!v) ∈ σ.<span class="const token" data-verso-hover="58">inbox</span> r r'})</span>
+<span id="L184">        (<span class="kw">by</span> <span class="kw">unfold</span> <span class="const token" data-verso-hover="33">cnt</span> <span class="kw">at</span> h2; <span class="kw">omega</span>)</span>
+<span id="L185">      <span class="kw">exact</span> <span class="const token" data-verso-hover="88">not_echo2_of_inputs</span> hA ht2 h hbad hH hx r' (h.<span class="const token" data-verso-hover="84">genuine</span> hr' hrb')</span>
+<span id="L186"></span>
+<span id="L187"><span class="dc">/-- Lemma 4.9 (Binding, Definition 3.1): once some party has decided, there is a value `b`</span></span>
+<span id="L188"><span class="dc">such that in every extension of the execution no party ever decides `1 − b`.</span></span>
+<span id="L189"></span>
+<span id="L190"><span class="dc">The paper fixes `b` at the first decision of a non-faulty party; we prove the statement for</span></span>
+<span id="L191"><span class="dc">every reachable state with a decision (in particular the first one), against the adaptive</span></span>
+<span id="L192"><span class="dc">adversary (extensions may corrupt further parties) and for all recorded decisions. -/</span></span>
+<span id="L193"><span class="kw">theorem</span> <span class="const token" data-verso-hover="3">binding</span> (ht : <span class="nu">3</span> * t &lt; <span class="const token" data-verso-hover="40">Fintype.card</span> P) (h : <span class="const token" data-verso-hover="56">Reachable</span> (<span class="const token" data-verso-hover="46">alg</span> t) x k t σ) {p : P}</span>
+<span id="L194">    (hp : σ.<span class="const token" data-verso-hover="76">dec</span> p ≠ <span class="const token" data-verso-hover="37">none</span>) : ∃ b : <span class="const token" data-verso-hover="29">Bool</span>, ∀ σ', <span class="const token" data-verso-hover="89">Reach</span> (<span class="const token" data-verso-hover="46">alg</span> t) x k t σ σ' →</span>
+<span id="L195">      ∀ q, σ'.<span class="const token" data-verso-hover="76">dec</span> q ≠ <span class="const token" data-verso-hover="39">some</span> (<span class="const token" data-verso-hover="39">some</span> (!b)) := <span class="kw">by</span></span>
+<span id="L196">  <span class="kw">have</span> hb := h.<span class="const token" data-verso-hover="80">bad_ncard_le</span></span>
+<span id="L197">  <span class="kw">by_cases</span> hex : ∃ s u, (s, <span class="const token" data-verso-hover="36">Msg.echo3</span> (<span class="const token" data-verso-hover="39">some</span> u)) ∈ σ.<span class="const token" data-verso-hover="57">sent</span></span>
+<span id="L198">  · <span class="kw">obtain</span> ⟨s, u, hs⟩ := hex</span>
+<span id="L199">    <span class="kw">refine</span> ⟨u, <span class="kw">fun</span> σ' hσ' q hq =&gt; ?_⟩</span>
+<span id="L200">    <span class="kw">have</span> h' := h.<span class="const token" data-verso-hover="90">reach</span> hσ'</span>
+<span id="L201">    <span class="kw">have</span> hb' := h'.<span class="const token" data-verso-hover="80">bad_ncard_le</span></span>
+<span id="L202">    <span class="kw">have</span> h1 := <span class="const token" data-verso-hover="75">dec_some_just</span> h' hq</span>
+<span id="L203">    <span class="kw">obtain</span> ⟨r, hr, hrb⟩ := h'.<span class="const token" data-verso-hover="87">exists_good</span> (S := {r | <span class="const token" data-verso-hover="36">Msg.echo3</span> (<span class="const token" data-verso-hover="39">some</span> (!u)) ∈ σ'.<span class="const token" data-verso-hover="58">inbox</span> q r})</span>
+<span id="L204">      (<span class="kw">by</span> <span class="kw">unfold</span> <span class="const token" data-verso-hover="33">cnt</span> <span class="kw">at</span> h1; <span class="kw">omega</span>)</span>
+<span id="L205">    <span class="kw">have</span> := <span class="const token" data-verso-hover="14">echo3_consistent</span> ht h' (hσ'.<span class="const token" data-verso-hover="91">sent_subset</span> hs) (h'.<span class="const token" data-verso-hover="84">genuine</span> hr hrb)</span>
+<span id="L206">    <span class="kw">cases</span> u &lt;;&gt; <span class="kw">simp</span> <span class="kw">at</span> this</span>
+<span id="L207">  · push <span class="const token" data-verso-hover="92">Not</span> <span class="kw">at</span> hex</span>
+<span id="L208">    <span class="kw">refine</span> ⟨<span class="const token" data-verso-hover="93">true</span>, <span class="kw">fun</span> σ' hσ' q hq =&gt; ?_⟩</span>
+<span id="L209">    <span class="kw">have</span> h' := h.<span class="const token" data-verso-hover="90">reach</span> hσ'</span>
+<span id="L210">    <span class="kw">have</span> hb' := h'.<span class="const token" data-verso-hover="80">bad_ncard_le</span></span>
+<span id="L211">    <span class="kw">rcases</span> hd : σ.<span class="const token" data-verso-hover="76">dec</span> p <span class="kw">with</span> _ | o</span>
+<span id="L212">    · <span class="kw">exact</span> hp hd</span>
+<span id="L213">    <span class="kw">rcases</span> o <span class="kw">with</span> _ | v</span>
+<span id="L214">    · <span class="cm">--</span><span class="cm"> `p` decided `⊥`: the uncorrupted senders of its `n − t` `echo3` messages sent `⊥`.</span></span>
+<span id="L215">      <span class="kw">obtain</span> ⟨_, h1⟩ := <span class="const token" data-verso-hover="78">dec_none_just</span> h hd</span>
+<span id="L216">      <span class="kw">let</span> S := {s | ∃ m ∈ σ.<span class="const token" data-verso-hover="58">inbox</span> p s, <span class="const token" data-verso-hover="45">Msg.IsEcho3</span> m}</span>
+<span id="L217">      <span class="kw">let</span> G := S \ σ.<span class="const token" data-verso-hover="82">bad</span></span>
+<span id="L218">      <span class="kw">have</span> hG : ∀ s ∈ G, (s, <span class="const token" data-verso-hover="36">Msg.echo3</span> <span class="const token" data-verso-hover="37">none</span>) ∈ σ.<span class="const token" data-verso-hover="57">sent</span> := <span class="kw">by</span></span>
+<span id="L219">        <span class="kw">intro</span> s ⟨⟨m, hm, hm3⟩, hsb⟩</span>
+<span id="L220">        <span class="kw">have</span> hsent := h.<span class="const token" data-verso-hover="84">genuine</span> hm hsb</span>
+<span id="L221">        <span class="kw">cases</span> m <span class="kw">with</span></span>
+<span id="L222">        | <span class="const token" data-verso-hover="36">echo3</span> o =&gt;</span>
+<span id="L223">          <span class="kw">cases</span> o <span class="kw">with</span></span>
+<span id="L224">          | <span class="const token" data-verso-hover="37">none</span> =&gt; <span class="kw">exact</span> hsent</span>
+<span id="L225">          | <span class="const token" data-verso-hover="39">some</span> u =&gt; <span class="kw">exact</span> <span class="const token" data-verso-hover="94">absurd</span> hsent (hex s u)</span>
+<span id="L226">        | <span class="const token" data-verso-hover="6">_</span> =&gt; <span class="kw">exact</span> hm3.<span class="const token" data-verso-hover="74">elim</span></span>
+<span id="L227">      <span class="kw">have</span> h2 := <span class="const token" data-verso-hover="75">dec_some_just</span> h' hq</span>
+<span id="L228">      <span class="kw">let</span> T := {r | <span class="const token" data-verso-hover="36">Msg.echo3</span> (<span class="const token" data-verso-hover="39">some</span> <span class="const token" data-verso-hover="95">false</span>) ∈ σ'.<span class="const token" data-verso-hover="58">inbox</span> q r}</span>
+<span id="L229">      <span class="kw">have</span> hTG : T ∩ G ⊆ σ'.<span class="const token" data-verso-hover="82">bad</span> \ σ.<span class="const token" data-verso-hover="82">bad</span> := <span class="kw">by</span></span>
+<span id="L230">        <span class="kw">intro</span> r ⟨hrT, hrG⟩</span>
+<span id="L231">        <span class="kw">refine</span> ⟨<span class="const token" data-verso-hover="96">by_contra</span> <span class="kw">fun</span> hrb =&gt; ?_, hrG.<span class="const token" data-verso-hover="69">2</span>⟩</span>
+<span id="L232">        <span class="kw">have</span> := <span class="const token" data-verso-hover="66">echo3_unique</span> h' (h'.<span class="const token" data-verso-hover="84">genuine</span> hrT hrb) (hσ'.<span class="const token" data-verso-hover="91">sent_subset</span> (hG r hrG))</span>
+<span id="L233">        <span class="kw">simp</span> <span class="kw">at</span> this</span>
+<span id="L234">      <span class="kw">have</span> hS : S ⊆ G ∪ σ.<span class="const token" data-verso-hover="82">bad</span> := <span class="kw">fun</span> s hs =&gt; <span class="kw">by</span></span>
+<span id="L235">        <span class="kw">by_cases</span> hsb : s ∈ σ.<span class="const token" data-verso-hover="82">bad</span></span>
+<span id="L236">        · <span class="kw">exact</span> <span class="const token" data-verso-hover="73">Or.inr</span> hsb</span>
+<span id="L237">        · <span class="kw">exact</span> <span class="const token" data-verso-hover="72">Or.inl</span> ⟨hs, hsb⟩</span>
+<span id="L238">      <span class="kw">have</span> e1 := (<span class="const token" data-verso-hover="97">Set.ncard_le_ncard</span> hS).<span class="const token" data-verso-hover="61">trans</span> (<span class="const token" data-verso-hover="98">Set.ncard_union_le</span> _ _)</span>
+<span id="L239">      <span class="kw">have</span> hT : T ⊆ Gᶜ ∪ (σ'.<span class="const token" data-verso-hover="82">bad</span> \ σ.<span class="const token" data-verso-hover="82">bad</span>) := <span class="kw">fun</span> r hr =&gt; <span class="kw">by</span></span>
+<span id="L240">        <span class="kw">by_cases</span> hrG : r ∈ G</span>
+<span id="L241">        · <span class="kw">exact</span> <span class="const token" data-verso-hover="73">Or.inr</span> (hTG ⟨hr, hrG⟩)</span>
+<span id="L242">        · <span class="kw">exact</span> <span class="const token" data-verso-hover="72">Or.inl</span> hrG</span>
+<span id="L243">      <span class="kw">have</span> e2 := (<span class="const token" data-verso-hover="97">Set.ncard_le_ncard</span> hT).<span class="const token" data-verso-hover="61">trans</span> (<span class="const token" data-verso-hover="98">Set.ncard_union_le</span> _ _)</span>
+<span id="L244">      <span class="kw">have</span> e3 := <span class="const token" data-verso-hover="99">Set.ncard_add_ncard_compl</span> G</span>
+<span id="L245">      <span class="kw">have</span> e4 := <span class="const token" data-verso-hover="100">Set.ncard_sdiff_add_ncard_of_subset</span> hσ'.<span class="const token" data-verso-hover="101">bad_subset</span></span>
+<span id="L246">      <span class="kw">rw</span> [<span class="const token" data-verso-hover="102">Nat.card_eq_fintype_card</span>] <span class="kw">at</span> e3</span>
+<span id="L247">      <span class="kw">have</span> e5 : <span class="const token" data-verso-hover="40">Fintype.card</span> P - t ≤ T.<span class="const token" data-verso-hover="85">ncard</span> := h2</span>
+<span id="L248">      <span class="kw">have</span> e6 : <span class="const token" data-verso-hover="40">Fintype.card</span> P - t ≤ S.<span class="const token" data-verso-hover="85">ncard</span> := h1</span>
+<span id="L249">      <span class="kw">omega</span></span>
+<span id="L250">    · <span class="cm">--</span><span class="cm"> `p` decided a value: some uncorrupted party sent a non-`⊥` `echo3`.</span></span>
+<span id="L251">      <span class="kw">have</span> h1 := <span class="const token" data-verso-hover="75">dec_some_just</span> h hd</span>
+<span id="L252">      <span class="kw">obtain</span> ⟨r, hr, hrb⟩ := h.<span class="const token" data-verso-hover="87">exists_good</span> (S := {r | <span class="const token" data-verso-hover="36">Msg.echo3</span> (<span class="const token" data-verso-hover="39">some</span> v) ∈ σ.<span class="const token" data-verso-hover="58">inbox</span> p r})</span>
+<span id="L253">        (<span class="kw">by</span> <span class="kw">unfold</span> <span class="const token" data-verso-hover="33">cnt</span> <span class="kw">at</span> h1; <span class="kw">omega</span>)</span>
+<span id="L254">      <span class="kw">exact</span> <span class="const token" data-verso-hover="94">absurd</span> (h.<span class="const token" data-verso-hover="84">genuine</span> hr hrb) (hex r v)</span>
+<span id="L255"></span>
+<span id="L256"><span class="dc">/-- The number of broadcasts of every party is at most 4: one or two `echo`, one `echo2`, one</span></span>
+<span id="L257"><span class="dc">`echo3` (the content of "terminates within 4 communication rounds" in Lemma 4.7). -/</span></span>
+<span id="L258"><span class="kw">theorem</span> <span class="const token" data-verso-hover="13">out_ncard_le_four</span> (h : <span class="const token" data-verso-hover="56">Reachable</span> (<span class="const token" data-verso-hover="46">alg</span> t) x k t σ) (p : P) : (σ.<span class="const token" data-verso-hover="103">out</span> p).<span class="const token" data-verso-hover="85">ncard</span> ≤ <span class="nu">4</span> := <span class="kw">by</span></span>
+<span id="L259">  <span class="kw">classical</span></span>
+<span id="L260">  <span class="kw">let</span> w0 : <span class="const token" data-verso-hover="29">Bool</span> := <span class="kw">if</span> hw : ∃ w, (p, <span class="const token" data-verso-hover="34">Msg.echo2</span> w) ∈ σ.<span class="const token" data-verso-hover="57">sent</span> <span class="kw">then</span> hw.<span class="const token" data-verso-hover="104">choose</span> <span class="kw">else</span> <span class="const token" data-verso-hover="93">true</span></span>
+<span id="L261">  <span class="kw">let</span> o0 : <span class="const token" data-verso-hover="43">Option</span> <span class="const token" data-verso-hover="29">Bool</span> := <span class="kw">if</span> ho : ∃ o, (p, <span class="const token" data-verso-hover="36">Msg.echo3</span> o) ∈ σ.<span class="const token" data-verso-hover="57">sent</span> <span class="kw">then</span> ho.<span class="const token" data-verso-hover="104">choose</span> <span class="kw">else</span> <span class="const token" data-verso-hover="37">none</span></span>
+<span id="L262">  <span class="kw">have</span> hsub : σ.<span class="const token" data-verso-hover="103">out</span> p ⊆ {<span class="const token" data-verso-hover="32">.</span>echo <span class="const token" data-verso-hover="93">true</span>, <span class="const token" data-verso-hover="32">.</span>echo <span class="const token" data-verso-hover="95">false</span>, <span class="const token" data-verso-hover="34">.</span>echo2 w0, <span class="const token" data-verso-hover="36">.</span>echo3 o0} := <span class="kw">by</span></span>
+<span id="L263">    <span class="kw">intro</span> m hm</span>
+<span id="L264">    <span class="kw">rcases</span> <span class="const token" data-verso-hover="71">sent_kind</span> h hm <span class="kw">with</span> ⟨v, <span class="kw">rfl</span>⟩ | ⟨v, <span class="kw">rfl</span>⟩ | ⟨o, <span class="kw">rfl</span>⟩</span>
+<span id="L265">    · <span class="kw">cases</span> v &lt;;&gt; <span class="kw">simp</span></span>
+<span id="L266">    · <span class="kw">have</span> hw : ∃ w, (p, <span class="const token" data-verso-hover="34">Msg.echo2</span> w) ∈ σ.<span class="const token" data-verso-hover="57">sent</span> := ⟨v, hm⟩</span>
+<span id="L267">      <span class="kw">have</span> : v = w0 := <span class="kw">by</span></span>
+<span id="L268">        <span class="kw">simp</span> only [w0, <span class="const token" data-verso-hover="105">dite_eq_left_of_eq_true</span> (<span class="const token" data-verso-hover="106">eq_true</span> hw)]</span>
+<span id="L269">        <span class="kw">exact</span> <span class="const token" data-verso-hover="83">echo2_unique</span> (<span class="const token" data-verso-hover="50">isEchoLayer</span> t) h hm hw.<span class="const token" data-verso-hover="107">choose_spec</span></span>
+<span id="L270">      <span class="kw">simp</span> [this]</span>
+<span id="L271">    · <span class="kw">have</span> ho : ∃ o, (p, <span class="const token" data-verso-hover="36">Msg.echo3</span> o) ∈ σ.<span class="const token" data-verso-hover="57">sent</span> := ⟨o, hm⟩</span>
+<span id="L272">      <span class="kw">have</span> : o = o0 := <span class="kw">by</span></span>
+<span id="L273">        <span class="kw">simp</span> only [o0, <span class="const token" data-verso-hover="105">dite_eq_left_of_eq_true</span> (<span class="const token" data-verso-hover="106">eq_true</span> ho)]</span>
+<span id="L274">        <span class="kw">exact</span> <span class="const token" data-verso-hover="66">echo3_unique</span> h hm ho.<span class="const token" data-verso-hover="107">choose_spec</span></span>
+<span id="L275">      <span class="kw">simp</span> [this]</span>
+<span id="L276">  <span class="kw">refine</span> (<span class="const token" data-verso-hover="97">Set.ncard_le_ncard</span> hsub).<span class="const token" data-verso-hover="61">trans</span> ?_</span>
+<span id="L277">  <span class="kw">refine</span> (<span class="const token" data-verso-hover="108">Set.ncard_insert_le</span> _ _).<span class="const token" data-verso-hover="61">trans</span> ?_</span>
+<span id="L278">  <span class="kw">refine</span> <span class="const token" data-verso-hover="109">Nat.add_le_add_right</span> ((<span class="const token" data-verso-hover="108">Set.ncard_insert_le</span> _ _).<span class="const token" data-verso-hover="61">trans</span> ?_) <span class="nu">1</span></span>
+<span id="L279">  <span class="kw">refine</span> <span class="const token" data-verso-hover="109">Nat.add_le_add_right</span> ((<span class="const token" data-verso-hover="108">Set.ncard_insert_le</span> _ _).<span class="const token" data-verso-hover="61">trans</span> ?_) <span class="nu">1</span></span>
+<span id="L280">  <span class="kw">simp</span></span>
+<span id="L281"></span>
+<span id="L282"><span class="dc">/-! ### Termination (Lemma 4.7) -/</span></span>
+<span id="L283"></span>
+<span id="L284"><span class="kw">section</span> Termination</span>
+<span id="L285"></span>
+<span id="L286"><span class="kw">variable</span> (E : <span class="const token" data-verso-hover="110">Exec</span> (<span class="const token" data-verso-hover="46">alg</span> t) x k t) (hF : E.<span class="const token" data-verso-hover="111">Fair</span>)</span>
+<span id="L287"><span class="kw">include</span> hF</span>
+<span id="L288"></span>
+<span id="L289"><span class="dc">/-- Every correct party eventually broadcasts an `echo3` message. -/</span></span>
+<span id="L290"><span class="kw">theorem</span> <span class="const token" data-verso-hover="112">eventually_echo3</span> (ht : <span class="nu">3</span> * t &lt; <span class="const token" data-verso-hover="40">Fintype.card</span> P) {q : P} (hq : E.<span class="const token" data-verso-hover="113">Correct</span> q) :</span>
+<span id="L291">    ∃ i o, (q, <span class="const token" data-verso-hover="36">Msg.echo3</span> o) ∈ (E.<span class="const token" data-verso-hover="114">σ</span> i).<span class="const token" data-verso-hover="57">sent</span> := <span class="kw">by</span></span>
+<span id="L292">  <span class="kw">have</span> hA := <span class="const token" data-verso-hover="50">isEchoLayer</span> (P := P) t</span>
+<span id="L293">  <span class="kw">have</span> ht2 : <span class="nu">2</span> * t &lt; <span class="const token" data-verso-hover="40">Fintype.card</span> P := <span class="kw">by</span> <span class="kw">omega</span></span>
+<span id="L294">  <span class="kw">by_cases</span> hmix : ∃ s₁ s₂ i₁ i₂ w, E.<span class="const token" data-verso-hover="113">Correct</span> s₁ ∧ E.<span class="const token" data-verso-hover="113">Correct</span> s₂ ∧</span>
+<span id="L295">      (s₁, <span class="const token" data-verso-hover="34">Msg.echo2</span> w) ∈ (E.<span class="const token" data-verso-hover="114">σ</span> i₁).<span class="const token" data-verso-hover="57">sent</span> ∧ (s₂, <span class="const token" data-verso-hover="34">Msg.echo2</span> (!w)) ∈ (E.<span class="const token" data-verso-hover="114">σ</span> i₂).<span class="const token" data-verso-hover="57">sent</span></span>
+<span id="L296">  · <span class="cm">--</span><span class="cm"> some correct parties sent different `echo2` values: everybody approves both.</span></span>
+<span id="L297">    <span class="kw">obtain</span> ⟨s₁, s₂, i₁, i₂, w, -, -, h₁, h₂⟩ := hmix</span>
+<span id="L298">    <span class="kw">obtain</span> ⟨j₁, hj₁⟩ := <span class="const token" data-verso-hover="11">Exec.approved_spread</span> hA E hF ht</span>
+<span id="L299">      (<span class="const token" data-verso-hover="115">echo2_approved</span> hA (E.<span class="const token" data-verso-hover="116">reachable</span> i₁) h₁) hq</span>
+<span id="L300">    <span class="kw">obtain</span> ⟨j₂, hj₂⟩ := <span class="const token" data-verso-hover="11">Exec.approved_spread</span> hA E hF ht</span>
+<span id="L301">      (<span class="const token" data-verso-hover="115">echo2_approved</span> hA (E.<span class="const token" data-verso-hover="116">reachable</span> i₂) h₂) hq</span>
+<span id="L302">    <span class="kw">obtain</span> ⟨j, m', hm', hj⟩ := E.<span class="const token" data-verso-hover="117">eventually_sent</span> hF hq (φ := <span class="const token" data-verso-hover="45">Msg.IsEcho3</span>) (m := <span class="const token" data-verso-hover="36">.</span>echo3 <span class="const token" data-verso-hover="37">none</span>)</span>
+<span id="L303">      <span class="const token" data-verso-hover="68">trivial</span> (i := <span class="const token" data-verso-hover="118">max</span> j₁ j₂) <span class="kw">fun</span> j hij hno =&gt; ⟨<span class="const token" data-verso-hover="119">bothApproved_of_ne</span> (<span class="kw">by</span> <span class="kw">cases</span> w &lt;;&gt; <span class="kw">simp</span>)</span>
+<span id="L304">        (hj₁ j (<span class="const token" data-verso-hover="120">le_of_max_le_left</span> hij)) (hj₂ j (<span class="const token" data-verso-hover="121">le_of_max_le_right</span> hij)),</span>
+<span id="L305">        <span class="kw">fun</span> o ho =&gt; hno (<span class="const token" data-verso-hover="36">.</span>echo3 o) <span class="const token" data-verso-hover="68">trivial</span> ho⟩</span>
+<span id="L306">    <span class="kw">cases</span> m' <span class="kw">with</span></span>
+<span id="L307">    | <span class="const token" data-verso-hover="36">echo3</span> o =&gt; <span class="kw">exact</span> ⟨j, o, hj⟩</span>
+<span id="L308">    | <span class="const token" data-verso-hover="6">_</span> =&gt; <span class="kw">exact</span> <span class="const token" data-verso-hover="94">absurd</span> hm' <span class="const token" data-verso-hover="122">id</span></span>
+<span id="L309">  · <span class="cm">--</span><span class="cm"> all correct parties sent the same `echo2` value `w`.</span></span>
+<span id="L310">    push <span class="const token" data-verso-hover="92">Not</span> <span class="kw">at</span> hmix</span>
+<span id="L311">    <span class="kw">obtain</span> ⟨i, w, hi⟩ := <span class="const token" data-verso-hover="123">Exec.eventually_echo2</span> hA E hF ht hq</span>
+<span id="L312">    <span class="kw">have</span> hall : ∀ s ∈ {s | E.<span class="const token" data-verso-hover="113">Correct</span> s}, ∃ i, (s, <span class="const token" data-verso-hover="34">Msg.echo2</span> w) ∈ (E.<span class="const token" data-verso-hover="114">σ</span> i).<span class="const token" data-verso-hover="57">sent</span> := <span class="kw">by</span></span>
+<span id="L313">      <span class="kw">intro</span> s hs</span>
+<span id="L314">      <span class="kw">obtain</span> ⟨i', w', hi'⟩ := <span class="const token" data-verso-hover="123">Exec.eventually_echo2</span> hA E hF ht hs</span>
+<span id="L315">      <span class="kw">by_cases</span> hww : w' = w</span>
+<span id="L316">      · <span class="kw">exact</span> ⟨i', hww ▸ hi'⟩</span>
+<span id="L317">      · <span class="kw">have</span> : w' = !w := <span class="kw">by</span> <span class="kw">cases</span> w &lt;;&gt; <span class="kw">cases</span> w' &lt;;&gt; <span class="kw">simp_all</span></span>
+<span id="L318">        <span class="kw">subst</span> this</span>
+<span id="L319">        <span class="kw">exact</span> <span class="const token" data-verso-hover="94">absurd</span> hi' (hmix q s i i' w hq hs hi)</span>
+<span id="L320">    <span class="kw">obtain</span> ⟨j, hj⟩ := E.<span class="const token" data-verso-hover="124">eventually_rcv_all</span> hF (<span class="kw">fun</span> s hs =&gt; hs) (m := <span class="kw">fun</span> _ =&gt; <span class="const token" data-verso-hover="34">.</span>echo2 w) hall hq</span>
+<span id="L321">    <span class="kw">obtain</span> ⟨j', m', hm', hj'⟩ := E.<span class="const token" data-verso-hover="117">eventually_sent</span> hF hq (φ := <span class="const token" data-verso-hover="45">Msg.IsEcho3</span>)</span>
+<span id="L322">      (m := <span class="const token" data-verso-hover="36">.</span>echo3 (<span class="const token" data-verso-hover="39">some</span> w)) <span class="const token" data-verso-hover="68">trivial</span> (i := j) <span class="kw">fun</span> j₂ hij hno =&gt;</span>
+<span id="L323">        ⟨(E.<span class="const token" data-verso-hover="125">card_sub_le_ncard_correct</span>).<span class="const token" data-verso-hover="61">trans</span> (<span class="const token" data-verso-hover="126">le_cnt</span> <span class="kw">fun</span> s hs =&gt; E.<span class="const token" data-verso-hover="127">rcv_mono</span> hij (hj s hs)),</span>
+<span id="L324">          <span class="kw">fun</span> o ho =&gt; hno (<span class="const token" data-verso-hover="36">.</span>echo3 o) <span class="const token" data-verso-hover="68">trivial</span> ho⟩</span>
+<span id="L325">    <span class="kw">cases</span> m' <span class="kw">with</span></span>
+<span id="L326">    | <span class="const token" data-verso-hover="36">echo3</span> o =&gt; <span class="kw">exact</span> ⟨j', o, hj'⟩</span>
+<span id="L327">    | <span class="const token" data-verso-hover="32">_</span> =&gt; <span class="kw">exact</span> <span class="const token" data-verso-hover="94">absurd</span> hm' <span class="const token" data-verso-hover="122">id</span></span>
+<span id="L328"></span>
+<span id="L329"><span class="dc">/-- Lemma 4.7 (Termination): in every fair execution, every correct (never corrupted) party</span></span>
+<span id="L330"><span class="dc">decides. -/</span></span>
+<span id="L331"><span class="kw">theorem</span> <span class="const token" data-verso-hover="12">termination</span> (ht : <span class="nu">3</span> * t &lt; <span class="const token" data-verso-hover="40">Fintype.card</span> P) {q : P} (hq : E.<span class="const token" data-verso-hover="113">Correct</span> q) :</span>
+<span id="L332">    ∃ i, (E.<span class="const token" data-verso-hover="114">σ</span> i).<span class="const token" data-verso-hover="76">dec</span> q ≠ <span class="const token" data-verso-hover="37">none</span> := <span class="kw">by</span></span>
+<span id="L333">  <span class="kw">have</span> hA := <span class="const token" data-verso-hover="50">isEchoLayer</span> (P := P) t</span>
+<span id="L334">  <span class="kw">obtain</span> ⟨iq, oq, hiq⟩ := <span class="const token" data-verso-hover="112">eventually_echo3</span> E hF ht hq</span>
+<span id="L335">  <span class="kw">by_cases</span> hbot : ∃ s i, E.<span class="const token" data-verso-hover="113">Correct</span> s ∧ (s, <span class="const token" data-verso-hover="36">Msg.echo3</span> <span class="const token" data-verso-hover="37">none</span>) ∈ (E.<span class="const token" data-verso-hover="114">σ</span> i).<span class="const token" data-verso-hover="57">sent</span></span>
+<span id="L336">  · <span class="cm">--</span><span class="cm"> some correct party sent `⟨echo3, ⊥⟩`: everybody approves both values and gets `n − t`</span></span>
+<span id="L337">    <span class="cm">--</span><span class="cm"> `echo3` messages, so decides `⊥` (unless it decided before).</span></span>
+<span id="L338">    <span class="kw">obtain</span> ⟨s, i, -, hs⟩ := hbot</span>
+<span id="L339">    <span class="kw">have</span> hboth := <span class="const token" data-verso-hover="64">echo3_none_just</span> (E.<span class="const token" data-verso-hover="116">reachable</span> i) hs</span>
+<span id="L340">    <span class="kw">obtain</span> ⟨j₁, hj₁⟩ := <span class="const token" data-verso-hover="11">Exec.approved_spread</span> hA E hF ht hboth.<span class="const token" data-verso-hover="63">1</span> hq</span>
+<span id="L341">    <span class="kw">obtain</span> ⟨j₂, hj₂⟩ := <span class="const token" data-verso-hover="11">Exec.approved_spread</span> hA E hF ht hboth.<span class="const token" data-verso-hover="69">2</span> hq</span>
+<span id="L342">    <span class="kw">obtain</span> ⟨j₃, hj₃⟩ := E.<span class="const token" data-verso-hover="128">eventually_rcv_all'</span> hF (S := {s | E.<span class="const token" data-verso-hover="113">Correct</span> s}) (<span class="kw">fun</span> s hs =&gt; hs)</span>
+<span id="L343">      (φ := <span class="const token" data-verso-hover="45">Msg.IsEcho3</span>) (<span class="kw">fun</span> s hs =&gt; <span class="kw">by</span></span>
+<span id="L344">        <span class="kw">obtain</span> ⟨i, o, hi⟩ := <span class="const token" data-verso-hover="112">eventually_echo3</span> E hF ht hs</span>
+<span id="L345">        <span class="kw">exact</span> ⟨i, <span class="const token" data-verso-hover="36">.</span>echo3 o, <span class="const token" data-verso-hover="68">trivial</span>, hi⟩) hq</span>
+<span id="L346">    <span class="kw">refine</span> E.<span class="const token" data-verso-hover="129">eventually_dec</span> hF hq (o := <span class="const token" data-verso-hover="37">none</span>) (i := <span class="const token" data-verso-hover="118">max</span> (<span class="const token" data-verso-hover="118">max</span> j₁ j₂) (<span class="const token" data-verso-hover="118">max</span> j₃ iq))</span>
+<span id="L347">      <span class="kw">fun</span> j hij _ =&gt; ⟨⟨hj₁ j (<span class="kw">by</span> <span class="kw">omega</span>), hj₂ j (<span class="kw">by</span> <span class="kw">omega</span>)⟩,</span>
+<span id="L348">        (E.<span class="const token" data-verso-hover="125">card_sub_le_ncard_correct</span>).<span class="const token" data-verso-hover="61">trans</span> (<span class="const token" data-verso-hover="130">le_cntP</span> <span class="kw">fun</span> s hs =&gt; ?_),</span>
+<span id="L349">        ⟨oq, E.<span class="const token" data-verso-hover="131">sent_mono</span> (<span class="kw">by</span> <span class="kw">omega</span>) hiq⟩⟩</span>
+<span id="L350">    <span class="kw">obtain</span> ⟨m, hm, hm'⟩ := hj₃ s hs</span>
+<span id="L351">    <span class="kw">exact</span> ⟨m, E.<span class="const token" data-verso-hover="127">rcv_mono</span> (<span class="kw">by</span> <span class="kw">omega</span>) hm', hm⟩</span>
+<span id="L352">  · <span class="cm">--</span><span class="cm"> all correct parties sent `⟨echo3, w⟩` for the same `w` (Lemma 4.8).</span></span>
+<span id="L353">    push <span class="const token" data-verso-hover="92">Not</span> <span class="kw">at</span> hbot</span>
+<span id="L354">    <span class="kw">obtain</span> ⟨w, <span class="kw">rfl</span>⟩ : ∃ w, oq = <span class="const token" data-verso-hover="39">some</span> w := <span class="kw">by</span></span>
+<span id="L355">      <span class="kw">cases</span> oq <span class="kw">with</span></span>
+<span id="L356">      | <span class="const token" data-verso-hover="37">none</span> =&gt; <span class="kw">exact</span> <span class="const token" data-verso-hover="94">absurd</span> hiq (hbot q iq hq)</span>
+<span id="L357">      | <span class="const token" data-verso-hover="39">some</span> w =&gt; <span class="kw">exact</span> ⟨w, <span class="const token" data-verso-hover="60">rfl</span>⟩</span>
+<span id="L358">    <span class="kw">have</span> hall : ∀ s ∈ {s | E.<span class="const token" data-verso-hover="113">Correct</span> s}, ∃ i, (s, <span class="const token" data-verso-hover="36">Msg.echo3</span> (<span class="const token" data-verso-hover="39">some</span> w)) ∈ (E.<span class="const token" data-verso-hover="114">σ</span> i).<span class="const token" data-verso-hover="57">sent</span> := <span class="kw">by</span></span>
+<span id="L359">      <span class="kw">intro</span> s hs</span>
+<span id="L360">      <span class="kw">obtain</span> ⟨i, o, hi⟩ := <span class="const token" data-verso-hover="112">eventually_echo3</span> E hF ht hs</span>
+<span id="L361">      <span class="kw">cases</span> o <span class="kw">with</span></span>
+<span id="L362">      | <span class="const token" data-verso-hover="37">none</span> =&gt; <span class="kw">exact</span> <span class="const token" data-verso-hover="94">absurd</span> hi (hbot s i hs)</span>
+<span id="L363">      | <span class="const token" data-verso-hover="39">some</span> w' =&gt;</span>
+<span id="L364">        <span class="kw">refine</span> ⟨i, ?_⟩</span>
+<span id="L365">        <span class="kw">have</span> := <span class="const token" data-verso-hover="14">echo3_consistent</span> ht (E.<span class="const token" data-verso-hover="116">reachable</span> (<span class="const token" data-verso-hover="118">max</span> i iq)) (E.<span class="const token" data-verso-hover="131">sent_mono</span> (<span class="const token" data-verso-hover="132">le_max_left</span> _ _) hi)</span>
+<span id="L366">          (E.<span class="const token" data-verso-hover="131">sent_mono</span> (<span class="const token" data-verso-hover="133">le_max_right</span> _ _) hiq)</span>
+<span id="L367">        <span class="kw">rwa</span> [this] <span class="kw">at</span> hi</span>
+<span id="L368">    <span class="kw">obtain</span> ⟨j, hj⟩ := E.<span class="const token" data-verso-hover="124">eventually_rcv_all</span> hF (<span class="kw">fun</span> s hs =&gt; hs) (m := <span class="kw">fun</span> _ =&gt; <span class="const token" data-verso-hover="36">.</span>echo3 (<span class="const token" data-verso-hover="39">some</span> w))</span>
+<span id="L369">      hall hq</span>
+<span id="L370">    <span class="kw">exact</span> E.<span class="const token" data-verso-hover="129">eventually_dec</span> hF hq (o := <span class="const token" data-verso-hover="39">some</span> w) (i := <span class="const token" data-verso-hover="118">max</span> j iq) <span class="kw">fun</span> j' hij _ =&gt;</span>
+<span id="L371">      ⟨(E.<span class="const token" data-verso-hover="125">card_sub_le_ncard_correct</span>).<span class="const token" data-verso-hover="61">trans</span></span>
+<span id="L372">        (<span class="const token" data-verso-hover="126">le_cnt</span> <span class="kw">fun</span> s hs =&gt; E.<span class="const token" data-verso-hover="127">rcv_mono</span> (<span class="const token" data-verso-hover="120">le_of_max_le_left</span> hij) (hj s hs)),</span>
+<span id="L373">        ⟨<span class="const token" data-verso-hover="39">some</span> w, E.<span class="const token" data-verso-hover="131">sent_mono</span> (<span class="const token" data-verso-hover="121">le_of_max_le_right</span> hij) hiq⟩⟩</span>
+<span id="L374"></span>
+<span id="L375"><span class="kw">end</span> Termination</span>
+<span id="L376"></span>
+<span id="L377"><span class="dc">/-- Theorem 4.3 (Algorithm 4 implements BCA): agreement, validity, binding, termination and</span></span>
+<span id="L378"><span class="dc">at most 4 broadcasts per party, for `n ≥ 3t + 1` and an adaptive Byzantine adversary. -/</span></span>
+<span id="L379"><span class="kw">theorem</span> <span class="const token" data-verso-hover="9">theorem_4_3</span> (ht : <span class="nu">3</span> * t &lt; <span class="const token" data-verso-hover="40">Fintype.card</span> P) :</span>
+<span id="L380">    (∀ σ, <span class="const token" data-verso-hover="56">Reachable</span> (<span class="const token" data-verso-hover="46">alg</span> t) x <span class="const token" data-verso-hover="134">.</span>byzantine t σ → ∀ p q a b,</span>
+<span id="L381">      σ.<span class="const token" data-verso-hover="76">dec</span> p = <span class="const token" data-verso-hover="39">some</span> (<span class="const token" data-verso-hover="39">some</span> a) → σ.<span class="const token" data-verso-hover="76">dec</span> q = <span class="const token" data-verso-hover="39">some</span> (<span class="const token" data-verso-hover="39">some</span> b) → a = b) ∧</span>
+<span id="L382">    (∀ σ, <span class="const token" data-verso-hover="56">Reachable</span> (<span class="const token" data-verso-hover="46">alg</span> t) x <span class="const token" data-verso-hover="134">.</span>byzantine t σ → ∀ (H : <span class="const token" data-verso-hover="30">Set</span> P) v, σ.<span class="const token" data-verso-hover="82">bad</span> ⊆ Hᶜ → Hᶜ.<span class="const token" data-verso-hover="85">ncard</span> ≤ t →</span>
+<span id="L383">      (∀ p ∈ H, x p = v) → ∀ p, σ.<span class="const token" data-verso-hover="76">dec</span> p = <span class="const token" data-verso-hover="37">none</span> ∨ σ.<span class="const token" data-verso-hover="76">dec</span> p = <span class="const token" data-verso-hover="39">some</span> (<span class="const token" data-verso-hover="39">some</span> v)) ∧</span>
+<span id="L384">    (∀ σ, <span class="const token" data-verso-hover="56">Reachable</span> (<span class="const token" data-verso-hover="46">alg</span> t) x <span class="const token" data-verso-hover="134">.</span>byzantine t σ → ∀ p, σ.<span class="const token" data-verso-hover="76">dec</span> p ≠ <span class="const token" data-verso-hover="37">none</span> →</span>
+<span id="L385">      ∃ b : <span class="const token" data-verso-hover="29">Bool</span>, ∀ σ', <span class="const token" data-verso-hover="89">Reach</span> (<span class="const token" data-verso-hover="46">alg</span> t) x <span class="const token" data-verso-hover="134">.</span>byzantine t σ σ' → ∀ q, σ'.<span class="const token" data-verso-hover="76">dec</span> q ≠ <span class="const token" data-verso-hover="39">some</span> (<span class="const token" data-verso-hover="39">some</span> (!b))) ∧</span>
+<span id="L386">    (∀ E : <span class="const token" data-verso-hover="110">Exec</span> (<span class="const token" data-verso-hover="46">alg</span> t) x <span class="const token" data-verso-hover="134">.</span>byzantine t, E.<span class="const token" data-verso-hover="111">Fair</span> → ∀ q, E.<span class="const token" data-verso-hover="113">Correct</span> q → ∃ i, (E.<span class="const token" data-verso-hover="114">σ</span> i).<span class="const token" data-verso-hover="76">dec</span> q ≠ <span class="const token" data-verso-hover="37">none</span>) ∧</span>
+<span id="L387">    (∀ σ, <span class="const token" data-verso-hover="56">Reachable</span> (<span class="const token" data-verso-hover="46">alg</span> t) x <span class="const token" data-verso-hover="134">.</span>byzantine t σ → ∀ p, (σ.<span class="const token" data-verso-hover="103">out</span> p).<span class="const token" data-verso-hover="85">ncard</span> ≤ <span class="nu">4</span>) :=</span>
+<span id="L388">  ⟨<span class="kw">fun</span> _ h _ _ _ _ hp hq =&gt; <span class="const token" data-verso-hover="10">agreement</span> ht h hp hq,</span>
+<span id="L389">   <span class="kw">fun</span> _ h _ _ hbad hH hx p =&gt; <span class="const token" data-verso-hover="2">validity</span> ht h hbad hH hx p,</span>
+<span id="L390">   <span class="kw">fun</span> _ h _ hp =&gt; <span class="const token" data-verso-hover="3">binding</span> ht h hp,</span>
+<span id="L391">   <span class="kw">fun</span> E hF _ hq =&gt; <span class="const token" data-verso-hover="12">termination</span> E hF ht hq,</span>
+<span id="L392">   <span class="kw">fun</span> _ h p =&gt; <span class="const token" data-verso-hover="13">out_ncard_le_four</span> h p⟩</span>
+<span id="L393"></span>
+<span id="L394"><span class="kw">end</span> Podc.BindingCrusaderAgreement.Alg4</span>
+<span id="L395"></span>
+</code></div>
+        <script>
+          window.versoHoversUrl = "PODC2022/BindingCrusaderAgreement/-hovers.json";</script>
+        <script src="static/lean/popper.js"></script>
+        <script src="static/lean/tippy.js"></script>
+        <script src="static/lean/marked.js"></script>
+        <script src="static/lean/highlighting.js"></script>
+        <script src="static/lean/lean.js"></script>
+        </article></main><footer class="site-footer"><div class="wrap">
+        Machine-checked formalizations of PODC papers in Lean 4. Generated with <a href="https://github.com/leanprover/verso">Verso</a> from the README files of <a href="https://github.com/vasnesterov/formal_podc">vasnesterov/formal_podc</a>.</div>
+      </footer></body>
+  </html>
+

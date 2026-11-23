@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="light dark">
+    <link rel="icon" href="data:,">
+    <title>ForgetIT: Defs.lean · Formal PODC</title><base href="../../../.././"><link rel="stylesheet" href="static/lean/verso-vars.css">
+    <link rel="stylesheet" href="static/lean/highlighting.css">
+    <link rel="stylesheet" href="static/lean/tippy-border.css">
+    <link rel="stylesheet" href="static/style.css">
+    <script defer="defer" src="static/site.js"></script>
+    </head>
+  <body>
+    <header class="site-header">
+      <div class="wrap">
+        <a class="brand" href=".">Formal PODC</a><nav class="top">
+          <a href=".">Search</a><a href="about/">About</a><a href="https://github.com/vasnesterov/formal_podc">GitHub</a></nav>
+        </div>
+      </header>
+    <main class="wrap"><article><nav class="breadcrumbs" aria-label="Breadcrumb">
+          <a href=".">Search</a><span class="sep">›</span><a href="PODC2026/">PODC 2026</a><span class="sep">›</span><a href="PODC2026/ForgetIT/">ForgetIT</a><span class="sep">›</span><a href="PODC2026/ForgetIT/src/">Lean source</a><span class="sep">›</span><span aria-current="page">Defs</span></nav>
+        <h1>
+          <code>Defs.lean</code></h1>
+        <div class="paper-links">
+          <p>
+            Source of <a href="PODC2026/ForgetIT/">Forget-IT — PODC 2026</a> · <a href="https://github.com/vasnesterov/formal_podc/blob/main/Papers/PODC2026/ForgetIT/Defs.lean">GitHub</a> · hover over a name for its type and documentation</p>
+          </div>
+        <div class="lean-code lean-src">
+          <code class="hl lean block" data-lean-context="Defs"><span id="L1"><span class="kw">import</span> Mathlib</span>
+<span id="L2"><span class="kw">import</span> Cslib.Foundations.Data.Finset.Quorum</span>
+<span id="L3"></span>
+<span id="L4"><span class="dc">/-!</span></span>
+<span id="L5"><span class="dc"># Forget-IT: messages, local state and the rules of Algorithms 1–3</span></span>
+<span id="L6"></span>
+<span id="L7"><span class="dc">Abraham, Das, Efron, Komatovic, *Forget-IT: Optimal Good-Case Latency For Information-Theoretic</span></span>
+<span id="L8"><span class="dc">BFT*, PODC 2026 (DOI 10.1145/3796701.3815965), Section 4.1, Algorithms 1–3.</span></span>
+<span id="L9"></span>
+<span id="L10"><span class="dc">This file transcribes the pseudocode as *guarded actions* on the local state of one process:</span></span>
+<span id="L11"><span class="dc">`En prm p a s` is the guard ("upon …") of rule `a` at process `p` in state `s`, and</span></span>
+<span id="L12"><span class="dc">`exec prm p a s` is the new local state together with the list of messages broadcast by the rule.</span></span>
+<span id="L13"></span>
+<span id="L14"><span class="dc">Conventions.</span></span>
+<span id="L15"><span class="dc">* Views are natural numbers; the protocol uses views `1, 2, …`. The pseudocode also touches</span></span>
+<span id="L16"><span class="dc">  views `V - 2` and `V - 1` when entering view `V`, i.e. the nonexistent views `-1` and `0` when</span></span>
+<span id="L17"><span class="dc">  entering view `1`; with truncated subtraction both are view `0` here (a dummy view).</span></span>
+<span id="L18"><span class="dc">* `GV Val` is `Value ∪ {SAFE}`; `⊥` is `none`.</span></span>
+<span id="L19"><span class="dc">* The guard field of a `vote-2` message has type `Option (GV Val)` (the pseudocode copies</span></span>
+<span id="L20"><span class="dc">  `guard_i[view_i]`, which is never `⊥` for a correct process, see `Safety.lean`).</span></span>
+<span id="L21"><span class="dc">* "Receipt of `k` messages" counts distinct senders (line 21). `cert` is line 117.</span></span>
+<span id="L22"><span class="dc">* The rules quantifying over a set `S` of accepted `vote-2` messages (lines 58, 61, 63) are</span></span>
+<span id="L23"><span class="dc">  stated with the largest admissible set, which is equivalent.</span></span>
+<span id="L24"><span class="dc">* The fields `clk`, `entered`, `active`, `out` are only used by the timed implementation</span></span>
+<span id="L25"><span class="dc">  (`Protocol.lean`): a local clock, the clock value at the last view entry, whether the current</span></span>
+<span id="L26"><span class="dc">  view was entered actively, and the outbox of the current tick.</span></span>
+<span id="L27"><span class="dc">-/</span></span>
+<span id="L28"></span>
+<span id="L29"><span class="kw">namespace</span> Podc.ForgetIT</span>
+<span id="L30"></span>
+<span id="L31"><span class="kw">open</span> Finset</span>
+<span id="L32"></span>
+<span id="L33"><span class="dc">/-- `Value ∪ {SAFE}`. -/</span></span>
+<span id="L34"><span class="kw">inductive</span> <span class="const token" data-verso-hover="83">GV</span> (Val : <span class="kw">Type</span>) <span class="kw">where</span></span>
+<span id="L35">  | <span class="const token" data-verso-hover="33">safe</span></span>
+<span id="L36">  | <span class="const token" data-verso-hover="84">val</span> (v : Val)</span>
+<span id="L37">  <span class="kw">deriving</span> <span class="const token" data-verso-hover="85">DecidableEq</span></span>
+<span id="L38"></span>
+<span id="L39"><span class="dc">/-- Messages of Forget-IT. `echo k V x` is `⟨echo-(k+1), V, x⟩`. -/</span></span>
+<span id="L40"><span class="kw">inductive</span> <span class="const token" data-verso-hover="31">Msg</span> (Val : <span class="kw">Type</span>) <span class="kw">where</span></span>
+<span id="L41">  | <span class="const token" data-verso-hover="86">prepare</span> (V : <span class="const token" data-verso-hover="28">ℕ</span>) (v : Val)</span>
+<span id="L42">  | <span class="const token" data-verso-hover="87">vote1</span> (V : <span class="const token" data-verso-hover="28">ℕ</span>) (v : Val)</span>
+<span id="L43">  | <span class="const token" data-verso-hover="88">vote2</span> (V : <span class="const token" data-verso-hover="28">ℕ</span>) (l : <span class="const token" data-verso-hover="89">Option</span> Val) (g : <span class="const token" data-verso-hover="89">Option</span> (<span class="const token" data-verso-hover="83">GV</span> Val))</span>
+<span id="L44">  | <span class="const token" data-verso-hover="32">echo</span> (k : <span class="const token" data-verso-hover="20">Fin</span> <span class="nu">3</span>) (V : <span class="const token" data-verso-hover="28">ℕ</span>) (x : <span class="const token" data-verso-hover="83">GV</span> Val)</span>
+<span id="L45">  <span class="kw">deriving</span> <span class="const token" data-verso-hover="85">DecidableEq</span></span>
+<span id="L46"></span>
+<span id="L47"><span class="dc">/-- Protocol parameters: resilience `f` (`n = 3f + 1`), the leader schedule, and the time unit</span></span>
+<span id="L48"><span class="dc">`Δ` (in ticks; only used by the timed implementation). -/</span></span>
+<span id="L49"><span class="kw">structure</span> <span class="const token" data-verso-hover="19">Params</span> (P : <span class="kw">Type</span>) <span class="kw">where</span></span>
+<span id="L50">  <span class="const token" data-verso-hover="21">f</span> : <span class="const token" data-verso-hover="28">ℕ</span></span>
+<span id="L51">  <span class="const token" data-verso-hover="22">leader</span> : <span class="const token" data-verso-hover="28">ℕ</span> → P</span>
+<span id="L52">  <span class="const token" data-verso-hover="23">Δ</span> : <span class="const token" data-verso-hover="28">ℕ</span></span>
+<span id="L53"></span>
+<span id="L54"><span class="dc">/-- Local state of process `p_i` (lines 3–16), plus the volatile state: received messages</span></span>
+<span id="L55"><span class="dc">`rcv` and accepted `vote-2` messages `acc` (at most one per view and sender, line 25). -/</span></span>
+<span id="L56"><span class="kw">structure</span> <span class="const token" data-verso-hover="52">LS</span> (P Val : <span class="kw">Type</span>) <span class="kw">where</span></span>
+<span id="L57">  <span class="const token" data-verso-hover="90">prop</span> : Val</span>
+<span id="L58">  <span class="const token" data-verso-hover="62">view</span> : <span class="const token" data-verso-hover="28">ℕ</span></span>
+<span id="L59">  <span class="const token" data-verso-hover="91">guard</span> : <span class="const token" data-verso-hover="28">ℕ</span> → <span class="const token" data-verso-hover="89">Option</span> (<span class="const token" data-verso-hover="83">GV</span> Val)</span>
+<span id="L60">  <span class="const token" data-verso-hover="92">vtp</span> : <span class="const token" data-verso-hover="28">ℕ</span> → <span class="const token" data-verso-hover="89">Option</span> Val</span>
+<span id="L61">  <span class="const token" data-verso-hover="93">lock</span> : <span class="const token" data-verso-hover="28">ℕ</span> → <span class="const token" data-verso-hover="89">Option</span> Val</span>
+<span id="L62">  <span class="const token" data-verso-hover="94">vote1</span> : <span class="const token" data-verso-hover="28">ℕ</span> → <span class="const token" data-verso-hover="89">Option</span> Val</span>
+<span id="L63">  <span class="const token" data-verso-hover="95">vote2</span> : <span class="const token" data-verso-hover="28">ℕ</span> → <span class="const token" data-verso-hover="89">Option</span> (<span class="const token" data-verso-hover="89">Option</span> Val × <span class="const token" data-verso-hover="89">Option</span> (<span class="const token" data-verso-hover="83">GV</span> Val))</span>
+<span id="L64">  <span class="const token" data-verso-hover="96">pot</span> : <span class="const token" data-verso-hover="28">ℕ</span> → <span class="const token" data-verso-hover="89">Option</span> Val</span>
+<span id="L65">  <span class="const token" data-verso-hover="97">alert</span> : <span class="const token" data-verso-hover="28">ℕ</span> → <span class="const token" data-verso-hover="89">Option</span> <span class="const token" data-verso-hover="26">Bool</span></span>
+<span id="L66">  <span class="const token" data-verso-hover="64">vc</span> : <span class="const token" data-verso-hover="28">ℕ</span> → <span class="const token" data-verso-hover="26">Bool</span></span>
+<span id="L67">  <span class="dc">/-- `val_echo(k+1)_i[V][1]`. -/</span></span>
+<span id="L68">  <span class="const token" data-verso-hover="98">echo</span> : <span class="const token" data-verso-hover="20">Fin</span> <span class="nu">3</span> → <span class="const token" data-verso-hover="28">ℕ</span> → <span class="const token" data-verso-hover="89">Option</span> (<span class="const token" data-verso-hover="83">GV</span> Val)</span>
+<span id="L69">  <span class="dc">/-- whether `val_echo(k+1)_i[V][2]` (always `SAFE`) is set. -/</span></span>
+<span id="L70">  <span class="const token" data-verso-hover="99">echoS</span> : <span class="const token" data-verso-hover="20">Fin</span> <span class="nu">3</span> → <span class="const token" data-verso-hover="28">ℕ</span> → <span class="const token" data-verso-hover="26">Bool</span></span>
+<span id="L71">  <span class="const token" data-verso-hover="100">rcv</span> : <span class="const token" data-verso-hover="30">List</span> (P × <span class="const token" data-verso-hover="31">Msg</span> Val)</span>
+<span id="L72">  <span class="const token" data-verso-hover="101">acc</span> : <span class="const token" data-verso-hover="28">ℕ</span> → P → <span class="const token" data-verso-hover="89">Option</span> (<span class="const token" data-verso-hover="89">Option</span> Val × <span class="const token" data-verso-hover="89">Option</span> (<span class="const token" data-verso-hover="83">GV</span> Val))</span>
+<span id="L73">  <span class="dc">/-- the decision (view, value), if any. -/</span></span>
+<span id="L74">  <span class="const token" data-verso-hover="67">decided</span> : <span class="const token" data-verso-hover="89">Option</span> (<span class="const token" data-verso-hover="28">ℕ</span> × Val)</span>
+<span id="L75">  <span class="const token" data-verso-hover="102">clk</span> : <span class="const token" data-verso-hover="28">ℕ</span></span>
+<span id="L76">  <span class="const token" data-verso-hover="103">entered</span> : <span class="const token" data-verso-hover="28">ℕ</span></span>
+<span id="L77">  <span class="const token" data-verso-hover="63">active</span> : <span class="const token" data-verso-hover="26">Bool</span></span>
+<span id="L78">  <span class="const token" data-verso-hover="104">out</span> : <span class="const token" data-verso-hover="30">List</span> (<span class="const token" data-verso-hover="31">Msg</span> Val)</span>
+<span id="L79"></span>
+<span id="L80"><span class="kw">variable</span> {P Val : <span class="kw">Type</span>} [<span class="const token" data-verso-hover="105">Fintype</span> P] [<span class="const token" data-verso-hover="85">DecidableEq</span> P] [<span class="const token" data-verso-hover="85">DecidableEq</span> Val]</span>
+<span id="L81"></span>
+<span id="L82"><span class="dc">/-- Distinct senders of received messages satisfying `b`. -/</span></span>
+<span id="L83"><span class="kw">def</span> <span class="const token" data-verso-hover="106">snd</span> (rcv : <span class="const token" data-verso-hover="30">List</span> (P × <span class="const token" data-verso-hover="31">Msg</span> Val)) (b : <span class="const token" data-verso-hover="31">Msg</span> Val → <span class="const token" data-verso-hover="26">Bool</span>) : <span class="const token" data-verso-hover="107">Finset</span> P :=</span>
+<span id="L84">  <span class="const token" data-verso-hover="108">univ</span>.<span class="const token" data-verso-hover="109">filter</span> <span class="kw">fun</span> q =&gt; ∃ e ∈ rcv, e.<span class="const token" data-verso-hover="110">1</span> = q ∧ b e.<span class="const token" data-verso-hover="82">2</span> = <span class="const token" data-verso-hover="39">true</span></span>
+<span id="L85"></span>
+<span id="L86"><span class="dc">/-- `⟨vote-1, V, v⟩`. -/</span></span>
+<span id="L87"><span class="kw">def</span> <span class="const token" data-verso-hover="111">isVote1</span> (V : <span class="const token" data-verso-hover="28">ℕ</span>) (v : Val) : <span class="const token" data-verso-hover="31">Msg</span> Val → <span class="const token" data-verso-hover="26">Bool</span></span>
+<span id="L88">  | <span class="const token" data-verso-hover="87">.</span>vote1 V' v' =&gt; V' == V &amp;&amp; v' == v</span>
+<span id="L89">  | _ =&gt; <span class="const token" data-verso-hover="112">false</span></span>
+<span id="L90"></span>
+<span id="L91"><span class="dc">/-- `⟨vote-2, V, v, ·⟩` with lock `v ≠ ⊥`. -/</span></span>
+<span id="L92"><span class="kw">def</span> <span class="const token" data-verso-hover="113">isVote2L</span> (V : <span class="const token" data-verso-hover="28">ℕ</span>) (v : Val) : <span class="const token" data-verso-hover="31">Msg</span> Val → <span class="const token" data-verso-hover="26">Bool</span></span>
+<span id="L93">  | <span class="const token" data-verso-hover="88">.</span>vote2 V' (<span class="const token" data-verso-hover="69">some</span> v') _ =&gt; V' == V &amp;&amp; v' == v</span>
+<span id="L94">  | _ =&gt; <span class="const token" data-verso-hover="112">false</span></span>
+<span id="L95"></span>
+<span id="L96"><span class="dc">/-- `⟨echo-(k+1), V, y⟩` with `y = x` or `y = SAFE` (`SAFE` counts for every value). -/</span></span>
+<span id="L97"><span class="kw">def</span> <span class="const token" data-verso-hover="114">isEcho</span> (k : <span class="const token" data-verso-hover="20">Fin</span> <span class="nu">3</span>) (V : <span class="const token" data-verso-hover="28">ℕ</span>) (x : <span class="const token" data-verso-hover="83">GV</span> Val) : <span class="const token" data-verso-hover="31">Msg</span> Val → <span class="const token" data-verso-hover="26">Bool</span></span>
+<span id="L98">  | <span class="const token" data-verso-hover="32">.</span>echo k' V' y =&gt; k' == k &amp;&amp; V' == V &amp;&amp; (y == x || y == <span class="const token" data-verso-hover="33">.</span>safe)</span>
+<span id="L99">  | _ =&gt; <span class="const token" data-verso-hover="112">false</span></span>
+<span id="L100"></span>
+<span id="L101"><span class="dc">/-- `cert(echo-(k+1), th, V, x)` (line 117). -/</span></span>
+<span id="L102"><span class="kw">def</span> <span class="const token" data-verso-hover="115">cert</span> (s : <span class="const token" data-verso-hover="52">LS</span> P Val) (k : <span class="const token" data-verso-hover="20">Fin</span> <span class="nu">3</span>) (th V : <span class="const token" data-verso-hover="28">ℕ</span>) (x : <span class="const token" data-verso-hover="83">GV</span> Val) : <span class="kw">Prop</span> :=</span>
+<span id="L103">  th ≤ (<span class="const token" data-verso-hover="106">snd</span> s.<span class="const token" data-verso-hover="100">rcv</span> (<span class="const token" data-verso-hover="114">isEcho</span> k V x)).<span class="const token" data-verso-hover="116">card</span></span>
+<span id="L104"></span>
+<span id="L105"><span class="dc">/-- `V ∈ {view_i − 2, view_i − 1, view_i}`. -/</span></span>
+<span id="L106"><span class="kw">def</span> <span class="const token" data-verso-hover="117">inW</span> (s : <span class="const token" data-verso-hover="52">LS</span> P Val) (V : <span class="const token" data-verso-hover="28">ℕ</span>) : <span class="kw">Prop</span> := V ≤ s.<span class="const token" data-verso-hover="62">view</span> ∧ s.<span class="const token" data-verso-hover="62">view</span> ≤ V + <span class="nu">2</span></span>
+<span id="L107"></span>
+<span id="L108"><span class="dc">/-- Lock carried by an accepted `vote-2` entry. -/</span></span>
+<span id="L109"><span class="kw">def</span> <span class="const token" data-verso-hover="118">lockOf</span> (o : <span class="const token" data-verso-hover="89">Option</span> (<span class="const token" data-verso-hover="89">Option</span> Val × <span class="const token" data-verso-hover="89">Option</span> (<span class="const token" data-verso-hover="83">GV</span> Val))) : <span class="const token" data-verso-hover="89">Option</span> Val := o.<span class="const token" data-verso-hover="119">bind</span> <span class="const token" data-verso-hover="110">Prod.fst</span></span>
+<span id="L110"></span>
+<span id="L111"><span class="dc">/-- Guard carried by an accepted `vote-2` entry. -/</span></span>
+<span id="L112"><span class="kw">def</span> <span class="const token" data-verso-hover="120">guardOf</span> (o : <span class="const token" data-verso-hover="89">Option</span> (<span class="const token" data-verso-hover="89">Option</span> Val × <span class="const token" data-verso-hover="89">Option</span> (<span class="const token" data-verso-hover="83">GV</span> Val))) : <span class="const token" data-verso-hover="89">Option</span> (<span class="const token" data-verso-hover="83">GV</span> Val) := o.<span class="const token" data-verso-hover="119">bind</span> <span class="const token" data-verso-hover="82">Prod.snd</span></span>
+<span id="L113"></span>
+<span id="L114"><span class="dc">/-- Senders of accepted `vote-2` messages for view `V`. -/</span></span>
+<span id="L115"><span class="kw">def</span> <span class="const token" data-verso-hover="121">accAll</span> (s : <span class="const token" data-verso-hover="52">LS</span> P Val) (V : <span class="const token" data-verso-hover="28">ℕ</span>) : <span class="const token" data-verso-hover="107">Finset</span> P := <span class="const token" data-verso-hover="108">univ</span>.<span class="const token" data-verso-hover="109">filter</span> <span class="kw">fun</span> q =&gt; s.<span class="const token" data-verso-hover="101">acc</span> V q ≠ <span class="const token" data-verso-hover="77">none</span></span>
+<span id="L116"></span>
+<span id="L117"><span class="dc">/-- Senders of accepted `vote-2` messages for `V` carrying guard `G`. -/</span></span>
+<span id="L118"><span class="kw">def</span> <span class="const token" data-verso-hover="122">accG</span> (s : <span class="const token" data-verso-hover="52">LS</span> P Val) (V : <span class="const token" data-verso-hover="28">ℕ</span>) (G : <span class="const token" data-verso-hover="83">GV</span> Val) : <span class="const token" data-verso-hover="107">Finset</span> P :=</span>
+<span id="L119">  <span class="const token" data-verso-hover="108">univ</span>.<span class="const token" data-verso-hover="109">filter</span> <span class="kw">fun</span> q =&gt; <span class="const token" data-verso-hover="120">guardOf</span> (s.<span class="const token" data-verso-hover="101">acc</span> V q) = <span class="const token" data-verso-hover="69">some</span> G</span>
+<span id="L120"></span>
+<span id="L121"><span class="dc">/-- Senders of accepted `vote-2` messages for `V` whose lock is `⊥` or `ol`. -/</span></span>
+<span id="L122"><span class="kw">def</span> <span class="const token" data-verso-hover="123">lockSet</span> (s : <span class="const token" data-verso-hover="52">LS</span> P Val) (V : <span class="const token" data-verso-hover="28">ℕ</span>) (ol : <span class="const token" data-verso-hover="89">Option</span> Val) : <span class="const token" data-verso-hover="107">Finset</span> P :=</span>
+<span id="L123">  <span class="const token" data-verso-hover="108">univ</span>.<span class="const token" data-verso-hover="109">filter</span> <span class="kw">fun</span> q =&gt; s.<span class="const token" data-verso-hover="101">acc</span> V q ≠ <span class="const token" data-verso-hover="77">none</span> ∧ (<span class="const token" data-verso-hover="118">lockOf</span> (s.<span class="const token" data-verso-hover="101">acc</span> V q) = <span class="const token" data-verso-hover="77">none</span> ∨ <span class="const token" data-verso-hover="118">lockOf</span> (s.<span class="const token" data-verso-hover="101">acc</span> V q) = ol)</span>
+<span id="L124"></span>
+<span id="L125"><span class="dc">/-- Senders of accepted `vote-2` messages for `V` whose lock is `⊥` or differs from</span></span>
+<span id="L126"><span class="dc">`potential_decision_i[V]` (line 63). -/</span></span>
+<span id="L127"><span class="kw">def</span> <span class="const token" data-verso-hover="124">notPotSet</span> (s : <span class="const token" data-verso-hover="52">LS</span> P Val) (V : <span class="const token" data-verso-hover="28">ℕ</span>) : <span class="const token" data-verso-hover="107">Finset</span> P :=</span>
+<span id="L128">  <span class="const token" data-verso-hover="108">univ</span>.<span class="const token" data-verso-hover="109">filter</span> <span class="kw">fun</span> q =&gt; s.<span class="const token" data-verso-hover="101">acc</span> V q ≠ <span class="const token" data-verso-hover="77">none</span> ∧ (<span class="const token" data-verso-hover="118">lockOf</span> (s.<span class="const token" data-verso-hover="101">acc</span> V q) = <span class="const token" data-verso-hover="77">none</span> ∨ <span class="const token" data-verso-hover="118">lockOf</span> (s.<span class="const token" data-verso-hover="101">acc</span> V q) ≠ s.<span class="const token" data-verso-hover="96">pot</span> V)</span>
+<span id="L129"></span>
+<span id="L130"><span class="dc">/-- `divergent_guards(V)` (line 123): the number of accepted `vote-2` messages minus the number</span></span>
+<span id="L131"><span class="dc">of those carrying the most frequent guard is at least `f + 1`; equivalently, this holds for</span></span>
+<span id="L132"><span class="dc">every guard `G`. -/</span></span>
+<span id="L133"><span class="kw">def</span> <span class="const token" data-verso-hover="125">divergent</span> (f : <span class="const token" data-verso-hover="28">ℕ</span>) (s : <span class="const token" data-verso-hover="52">LS</span> P Val) (V : <span class="const token" data-verso-hover="28">ℕ</span>) : <span class="kw">Prop</span> :=</span>
+<span id="L134">  ∀ G : <span class="const token" data-verso-hover="83">GV</span> Val, f + <span class="nu">1</span> + (<span class="const token" data-verso-hover="122">accG</span> s V G).<span class="const token" data-verso-hover="116">card</span> ≤ (<span class="const token" data-verso-hover="121">accAll</span> s V).<span class="const token" data-verso-hover="116">card</span></span>
+<span id="L135"></span>
+<span id="L136"><span class="dc">/-- The rules of Algorithms 1–3 (the guarded actions of a process). -/</span></span>
+<span id="L137"><span class="kw">inductive</span> <span class="const token" data-verso-hover="126">Act</span> (P Val : <span class="kw">Type</span>) <span class="kw">where</span></span>
+<span id="L138">  <span class="dc">/-- line 35: vote for the leader's proposal. -/</span></span>
+<span id="L139">  | <span class="const token" data-verso-hover="127">vote1</span> (w : Val)</span>
+<span id="L140">  <span class="dc">/-- line 39: lock and send `vote-2`. -/</span></span>
+<span id="L141">  | <span class="const token" data-verso-hover="128">lock</span> (v : Val)</span>
+<span id="L142">  <span class="dc">/-- line 43: decide. -/</span></span>
+<span id="L143">  | <span class="const token" data-verso-hover="129">decide</span> (v : Val)</span>
+<span id="L144">  <span class="dc">/-- line 45: timeout `vote-2`. -/</span></span>
+<span id="L145">  | <span class="const token" data-verso-hover="130">timeout2</span></span>
+<span id="L146">  <span class="dc">/-- line 50: clear the guard. -/</span></span>
+<span id="L147">  | <span class="const token" data-verso-hover="131">clearGuard</span> (x : <span class="const token" data-verso-hover="83">GV</span> Val)</span>
+<span id="L148">  <span class="dc">/-- lines 23–25: accept a `vote-2` message. -/</span></span>
+<span id="L149">  | <span class="const token" data-verso-hover="132">accept</span> (V : <span class="const token" data-verso-hover="28">ℕ</span>) (q : P) (l : <span class="const token" data-verso-hover="89">Option</span> Val) (g : <span class="const token" data-verso-hover="89">Option</span> (<span class="const token" data-verso-hover="83">GV</span> Val))</span>
+<span id="L150">  <span class="dc">/-- line 58 (`ol = some ℓ`: line 59, `ol = none`: line 60). -/</span></span>
+<span id="L151">  | <span class="const token" data-verso-hover="133">alertSet</span> (V : <span class="const token" data-verso-hover="28">ℕ</span>) (ol : <span class="const token" data-verso-hover="89">Option</span> Val)</span>
+<span id="L152">  <span class="dc">/-- line 61. -/</span></span>
+<span id="L153">  | <span class="const token" data-verso-hover="134">alertClear1</span> (V : <span class="const token" data-verso-hover="28">ℕ</span>)</span>
+<span id="L154">  <span class="dc">/-- line 63. -/</span></span>
+<span id="L155">  | <span class="const token" data-verso-hover="135">alertClear2</span> (V : <span class="const token" data-verso-hover="28">ℕ</span>)</span>
+<span id="L156">  <span class="dc">/-- line 65: the view-change timer. -/</span></span>
+<span id="L157">  | <span class="const token" data-verso-hover="136">vcTimer</span></span>
+<span id="L158">  <span class="dc">/-- line 67. -/</span></span>
+<span id="L159">  | <span class="const token" data-verso-hover="137">echoLock</span> (V : <span class="const token" data-verso-hover="28">ℕ</span>) (q : P) (x : Val)</span>
+<span id="L160">  <span class="dc">/-- line 69. -/</span></span>
+<span id="L161">  | <span class="const token" data-verso-hover="138">echoGuard</span> (V : <span class="const token" data-verso-hover="28">ℕ</span>) (G : <span class="const token" data-verso-hover="83">GV</span> Val)</span>
+<span id="L162">  <span class="dc">/-- line 71. -/</span></span>
+<span id="L163">  | <span class="const token" data-verso-hover="139">echoDiv</span> (V : <span class="const token" data-verso-hover="28">ℕ</span>)</span>
+<span id="L164">  <span class="dc">/-- line 73. -/</span></span>
+<span id="L165">  | <span class="const token" data-verso-hover="140">echo2</span> (V : <span class="const token" data-verso-hover="28">ℕ</span>) (x : <span class="const token" data-verso-hover="83">GV</span> Val)</span>
+<span id="L166">  <span class="dc">/-- line 75. -/</span></span>
+<span id="L167">  | <span class="const token" data-verso-hover="141">echo3</span> (V : <span class="const token" data-verso-hover="28">ℕ</span>) (x : <span class="const token" data-verso-hover="83">GV</span> Val)</span>
+<span id="L168">  <span class="dc">/-- line 77. -/</span></span>
+<span id="L169">  | <span class="const token" data-verso-hover="142">enter3</span> (V : <span class="const token" data-verso-hover="28">ℕ</span>) (x : <span class="const token" data-verso-hover="83">GV</span> Val)</span>
+<span id="L170">  <span class="dc">/-- line 80. -/</span></span>
+<span id="L171">  | <span class="const token" data-verso-hover="143">enter3L</span> (V : <span class="const token" data-verso-hover="28">ℕ</span>) (x : <span class="const token" data-verso-hover="83">GV</span> Val)</span>
+<span id="L172">  <span class="dc">/-- line 85. -/</span></span>
+<span id="L173">  | <span class="const token" data-verso-hover="144">enterPrep</span> (V : <span class="const token" data-verso-hover="28">ℕ</span>) (w : Val) (x : <span class="const token" data-verso-hover="83">GV</span> Val)</span>
+<span id="L174">  <span class="dc">/-- line 88. -/</span></span>
+<span id="L175">  | <span class="const token" data-verso-hover="145">passive</span> (V : <span class="const token" data-verso-hover="28">ℕ</span>) (x : <span class="const token" data-verso-hover="83">GV</span> Val)</span>
+<span id="L176">  <span class="dc">/-- line 52: the recovery procedure. -/</span></span>
+<span id="L177">  | <span class="const token" data-verso-hover="146">recover</span></span>
+<span id="L178"></span>
+<span id="L179"><span class="dc">/-- Guards of the rules ("upon …"). Timing conditions (lines 45, 65) are dropped: the timers may</span></span>
+<span id="L180"><span class="dc">fire at any time. -/</span></span>
+<span id="L181"><span class="kw">def</span> <span class="const token" data-verso-hover="147">En</span> (prm : <span class="const token" data-verso-hover="19">Params</span> P) (p : P) : <span class="const token" data-verso-hover="126">Act</span> P Val → <span class="const token" data-verso-hover="52">LS</span> P Val → <span class="kw">Prop</span></span>
+<span id="L182">  | <span class="const token" data-verso-hover="127">.</span>vote1 w, s =&gt; (prm.<span class="const token" data-verso-hover="22">leader</span> s.<span class="const token" data-verso-hover="62">view</span>, <span class="const token" data-verso-hover="86">.</span>prepare s.<span class="const token" data-verso-hover="62">view</span> w) ∈ s.<span class="const token" data-verso-hover="100">rcv</span> ∧</span>
+<span id="L183">      (s.<span class="const token" data-verso-hover="91">guard</span> s.<span class="const token" data-verso-hover="62">view</span> = <span class="const token" data-verso-hover="69">some</span> <span class="const token" data-verso-hover="33">.</span>safe ∨ s.<span class="const token" data-verso-hover="91">guard</span> s.<span class="const token" data-verso-hover="62">view</span> = <span class="const token" data-verso-hover="69">some</span> (<span class="const token" data-verso-hover="84">.</span>val w)) ∧</span>
+<span id="L184">      s.<span class="const token" data-verso-hover="94">vote1</span> s.<span class="const token" data-verso-hover="62">view</span> = <span class="const token" data-verso-hover="77">none</span> ∧ s.<span class="const token" data-verso-hover="64">vc</span> s.<span class="const token" data-verso-hover="62">view</span> = <span class="const token" data-verso-hover="112">false</span></span>
+<span id="L185">  | <span class="const token" data-verso-hover="128">.</span>lock v, s =&gt; <span class="nu">2</span> * prm.<span class="const token" data-verso-hover="21">f</span> + <span class="nu">1</span> ≤ (<span class="const token" data-verso-hover="106">snd</span> s.<span class="const token" data-verso-hover="100">rcv</span> (<span class="const token" data-verso-hover="111">isVote1</span> s.<span class="const token" data-verso-hover="62">view</span> v)).<span class="const token" data-verso-hover="116">card</span> ∧ s.<span class="const token" data-verso-hover="64">vc</span> s.<span class="const token" data-verso-hover="62">view</span> = <span class="const token" data-verso-hover="112">false</span> ∧</span>
+<span id="L186">      s.<span class="const token" data-verso-hover="95">vote2</span> s.<span class="const token" data-verso-hover="62">view</span> = <span class="const token" data-verso-hover="77">none</span></span>
+<span id="L187">  | <span class="const token" data-verso-hover="129">.</span><span class="kw">decide</span> v, s =&gt; <span class="nu">2</span> * prm.<span class="const token" data-verso-hover="21">f</span> + <span class="nu">1</span> ≤ (<span class="const token" data-verso-hover="106">snd</span> s.<span class="const token" data-verso-hover="100">rcv</span> (<span class="const token" data-verso-hover="113">isVote2L</span> s.<span class="const token" data-verso-hover="62">view</span> v)).<span class="const token" data-verso-hover="116">card</span></span>
+<span id="L188">  | <span class="const token" data-verso-hover="130">.</span>timeout2, s =&gt; s.<span class="const token" data-verso-hover="95">vote2</span> s.<span class="const token" data-verso-hover="62">view</span> = <span class="const token" data-verso-hover="77">none</span></span>
+<span id="L189">  | <span class="const token" data-verso-hover="131">.</span>clearGuard x, s =&gt; <span class="const token" data-verso-hover="115">cert</span> s <span class="nu">1</span> (prm.<span class="const token" data-verso-hover="21">f</span> + <span class="nu">1</span>) (s.<span class="const token" data-verso-hover="62">view</span> - <span class="nu">1</span>) x ∧ s.<span class="const token" data-verso-hover="91">guard</span> s.<span class="const token" data-verso-hover="62">view</span> ≠ <span class="const token" data-verso-hover="69">some</span> <span class="const token" data-verso-hover="33">.</span>safe ∧</span>
+<span id="L190">      s.<span class="const token" data-verso-hover="91">guard</span> s.<span class="const token" data-verso-hover="62">view</span> ≠ <span class="const token" data-verso-hover="69">some</span> x</span>
+<span id="L191">  | <span class="const token" data-verso-hover="132">.</span>accept V q l g, s =&gt; (q, <span class="const token" data-verso-hover="88">.</span>vote2 V l g) ∈ s.<span class="const token" data-verso-hover="100">rcv</span> ∧ s.<span class="const token" data-verso-hover="101">acc</span> V q = <span class="const token" data-verso-hover="77">none</span> ∧</span>
+<span id="L192">      ∀ v ∈ l, prm.<span class="const token" data-verso-hover="21">f</span> + <span class="nu">1</span> ≤ (<span class="const token" data-verso-hover="106">snd</span> s.<span class="const token" data-verso-hover="100">rcv</span> (<span class="const token" data-verso-hover="111">isVote1</span> V v)).<span class="const token" data-verso-hover="116">card</span></span>
+<span id="L193">  | <span class="const token" data-verso-hover="133">.</span>alertSet V ol, s =&gt; <span class="const token" data-verso-hover="117">inW</span> s V ∧ s.<span class="const token" data-verso-hover="97">alert</span> V = <span class="const token" data-verso-hover="77">none</span> ∧ <span class="nu">2</span> * prm.<span class="const token" data-verso-hover="21">f</span> + <span class="nu">1</span> ≤ (<span class="const token" data-verso-hover="123">lockSet</span> s V ol).<span class="const token" data-verso-hover="116">card</span> ∧</span>
+<span id="L194">      ∀ ℓ ∈ ol, ∃ q, <span class="const token" data-verso-hover="118">lockOf</span> (s.<span class="const token" data-verso-hover="101">acc</span> V q) = <span class="const token" data-verso-hover="69">some</span> ℓ</span>
+<span id="L195">  | <span class="const token" data-verso-hover="134">.</span>alertClear1 V, s =&gt; <span class="const token" data-verso-hover="117">inW</span> s V ∧ s.<span class="const token" data-verso-hover="97">alert</span> V = <span class="const token" data-verso-hover="69">some</span> <span class="const token" data-verso-hover="39">true</span> ∧</span>
+<span id="L196">      <span class="nu">2</span> * prm.<span class="const token" data-verso-hover="21">f</span> + <span class="nu">1</span> ≤ (<span class="const token" data-verso-hover="123">lockSet</span> s V <span class="const token" data-verso-hover="77">none</span>).<span class="const token" data-verso-hover="116">card</span></span>
+<span id="L197">  | <span class="const token" data-verso-hover="135">.</span>alertClear2 V, s =&gt; <span class="const token" data-verso-hover="117">inW</span> s V ∧ s.<span class="const token" data-verso-hover="97">alert</span> V = <span class="const token" data-verso-hover="69">some</span> <span class="const token" data-verso-hover="39">true</span> ∧ <span class="nu">2</span> * prm.<span class="const token" data-verso-hover="21">f</span> + <span class="nu">1</span> ≤ (<span class="const token" data-verso-hover="124">notPotSet</span> s V).<span class="const token" data-verso-hover="116">card</span></span>
+<span id="L198">  | <span class="const token" data-verso-hover="136">.</span>vcTimer, _ =&gt; <span class="const token" data-verso-hover="148">True</span></span>
+<span id="L199">  | <span class="const token" data-verso-hover="137">.</span>echoLock V q x, s =&gt; <span class="const token" data-verso-hover="117">inW</span> s V ∧ <span class="const token" data-verso-hover="118">lockOf</span> (s.<span class="const token" data-verso-hover="101">acc</span> V q) = <span class="const token" data-verso-hover="69">some</span> x ∧</span>
+<span id="L200">      (s.<span class="const token" data-verso-hover="96">pot</span> V = <span class="const token" data-verso-hover="69">some</span> x ∨ s.<span class="const token" data-verso-hover="97">alert</span> V = <span class="const token" data-verso-hover="69">some</span> <span class="const token" data-verso-hover="112">false</span>) ∧ s.<span class="const token" data-verso-hover="64">vc</span> V = <span class="const token" data-verso-hover="39">true</span></span>
+<span id="L201">  | <span class="const token" data-verso-hover="138">.</span>echoGuard V G, s =&gt; <span class="const token" data-verso-hover="117">inW</span> s V ∧ prm.<span class="const token" data-verso-hover="21">f</span> + <span class="nu">1</span> ≤ (<span class="const token" data-verso-hover="122">accG</span> s V G).<span class="const token" data-verso-hover="116">card</span> ∧ s.<span class="const token" data-verso-hover="97">alert</span> V = <span class="const token" data-verso-hover="69">some</span> <span class="const token" data-verso-hover="112">false</span> ∧</span>
+<span id="L202">      s.<span class="const token" data-verso-hover="64">vc</span> V = <span class="const token" data-verso-hover="39">true</span></span>
+<span id="L203">  | <span class="const token" data-verso-hover="139">.</span>echoDiv V, s =&gt; <span class="const token" data-verso-hover="117">inW</span> s V ∧ s.<span class="const token" data-verso-hover="97">alert</span> V = <span class="const token" data-verso-hover="69">some</span> <span class="const token" data-verso-hover="112">false</span> ∧ <span class="const token" data-verso-hover="125">divergent</span> prm.<span class="const token" data-verso-hover="21">f</span> s V ∧ s.<span class="const token" data-verso-hover="64">vc</span> V = <span class="const token" data-verso-hover="39">true</span></span>
+<span id="L204">  | <span class="const token" data-verso-hover="140">.</span>echo2 V x, s =&gt; <span class="const token" data-verso-hover="117">inW</span> s V ∧ <span class="const token" data-verso-hover="115">cert</span> s <span class="nu">0</span> (<span class="nu">2</span> * prm.<span class="const token" data-verso-hover="21">f</span> + <span class="nu">1</span>) V x</span>
+<span id="L205">  | <span class="const token" data-verso-hover="141">.</span>echo3 V x, s =&gt; <span class="const token" data-verso-hover="117">inW</span> s V ∧ <span class="const token" data-verso-hover="115">cert</span> s <span class="nu">1</span> (<span class="nu">2</span> * prm.<span class="const token" data-verso-hover="21">f</span> + <span class="nu">1</span>) V x</span>
+<span id="L206">  | <span class="const token" data-verso-hover="142">.</span>enter3 V x, s =&gt; <span class="const token" data-verso-hover="115">cert</span> s <span class="nu">2</span> (<span class="nu">2</span> * prm.<span class="const token" data-verso-hover="21">f</span> + <span class="nu">1</span>) V x ∧ s.<span class="const token" data-verso-hover="62">view</span> ≤ V ∧ p ≠ prm.<span class="const token" data-verso-hover="22">leader</span> (V + <span class="nu">1</span>)</span>
+<span id="L207">  | <span class="const token" data-verso-hover="143">.</span>enter3L V x, s =&gt; <span class="const token" data-verso-hover="115">cert</span> s <span class="nu">2</span> (prm.<span class="const token" data-verso-hover="21">f</span> + <span class="nu">1</span>) V x ∧ s.<span class="const token" data-verso-hover="62">view</span> ≤ V ∧ p = prm.<span class="const token" data-verso-hover="22">leader</span> (V + <span class="nu">1</span>)</span>
+<span id="L208">  | <span class="const token" data-verso-hover="144">.</span>enterPrep V w x, s =&gt; (prm.<span class="const token" data-verso-hover="22">leader</span> V, <span class="const token" data-verso-hover="86">.</span>prepare V w) ∈ s.<span class="const token" data-verso-hover="100">rcv</span> ∧ s.<span class="const token" data-verso-hover="62">view</span> &lt; V ∧</span>
+<span id="L209">      <span class="const token" data-verso-hover="115">cert</span> s <span class="nu">1</span> (prm.<span class="const token" data-verso-hover="21">f</span> + <span class="nu">1</span>) (V - <span class="nu">1</span>) x</span>
+<span id="L210">  | <span class="const token" data-verso-hover="145">.</span>passive V x, s =&gt; <span class="const token" data-verso-hover="115">cert</span> s <span class="nu">0</span> (prm.<span class="const token" data-verso-hover="21">f</span> + <span class="nu">1</span>) V x ∧ s.<span class="const token" data-verso-hover="62">view</span> ≤ V</span>
+<span id="L211">  | <span class="const token" data-verso-hover="146">.</span>recover, _ =&gt; <span class="const token" data-verso-hover="148">True</span></span>
+<span id="L212"></span>
+<span id="L213"><span class="dc">/-- `ensure_view_change(V, g)` (line 99). -/</span></span>
+<span id="L214"><span class="kw">def</span> <span class="const token" data-verso-hover="149">ensureVC</span> (V : <span class="const token" data-verso-hover="28">ℕ</span>) (g : <span class="const token" data-verso-hover="89">Option</span> (<span class="const token" data-verso-hover="83">GV</span> Val)) (s : <span class="const token" data-verso-hover="52">LS</span> P Val) : <span class="const token" data-verso-hover="52">LS</span> P Val × <span class="const token" data-verso-hover="30">List</span> (<span class="const token" data-verso-hover="31">Msg</span> Val) :=</span>
+<span id="L215">  <span class="kw">match</span> s.<span class="const token" data-verso-hover="95">vote2</span> V <span class="kw">with</span></span>
+<span id="L216">  | <span class="const token" data-verso-hover="77">none</span> =&gt; ({ s <span class="kw">with</span> <span class="const token" data-verso-hover="64">vc</span> := <span class="const token" data-verso-hover="150">Function.update</span> s.<span class="const token" data-verso-hover="64">vc</span> V <span class="const token" data-verso-hover="39">true</span>,</span>
+<span id="L217">                      <span class="const token" data-verso-hover="95">vote2</span> := <span class="const token" data-verso-hover="150">Function.update</span> s.<span class="const token" data-verso-hover="95">vote2</span> V (<span class="const token" data-verso-hover="69">some</span> (<span class="const token" data-verso-hover="77">none</span>, g)) }, [<span class="const token" data-verso-hover="88">.</span>vote2 V <span class="const token" data-verso-hover="77">none</span> g])</span>
+<span id="L218">  | <span class="const token" data-verso-hover="69">some</span> _ =&gt; ({ s <span class="kw">with</span> <span class="const token" data-verso-hover="64">vc</span> := <span class="const token" data-verso-hover="150">Function.update</span> s.<span class="const token" data-verso-hover="64">vc</span> V <span class="const token" data-verso-hover="39">true</span> }, [])</span>
+<span id="L219"></span>
+<span id="L220"><span class="dc">/-- `send_echo_one/two/three(V, x)` (lines 102–116). -/</span></span>
+<span id="L221"><span class="kw">def</span> <span class="const token" data-verso-hover="151">sendEcho</span> (k : <span class="const token" data-verso-hover="20">Fin</span> <span class="nu">3</span>) (V : <span class="const token" data-verso-hover="28">ℕ</span>) (x : <span class="const token" data-verso-hover="83">GV</span> Val) (s : <span class="const token" data-verso-hover="52">LS</span> P Val) : <span class="const token" data-verso-hover="52">LS</span> P Val × <span class="const token" data-verso-hover="30">List</span> (<span class="const token" data-verso-hover="31">Msg</span> Val) :=</span>
+<span id="L222">  <span class="kw">match</span> s.<span class="const token" data-verso-hover="98">echo</span> k V <span class="kw">with</span></span>
+<span id="L223">  | <span class="const token" data-verso-hover="77">none</span> =&gt; ({ s <span class="kw">with</span> <span class="const token" data-verso-hover="98">echo</span> := <span class="const token" data-verso-hover="150">Function.update</span> s.<span class="const token" data-verso-hover="98">echo</span> k (<span class="const token" data-verso-hover="150">Function.update</span> (s.<span class="const token" data-verso-hover="98">echo</span> k) V (<span class="const token" data-verso-hover="69">some</span> x)) },</span>
+<span id="L224">      [<span class="const token" data-verso-hover="32">.</span>echo k V x])</span>
+<span id="L225">  | <span class="const token" data-verso-hover="69">some</span> y =&gt;</span>
+<span id="L226">    <span class="kw">if</span> s.<span class="const token" data-verso-hover="99">echoS</span> k V = <span class="const token" data-verso-hover="112">false</span> ∧ y ≠ <span class="const token" data-verso-hover="33">.</span>safe ∧ (x = <span class="const token" data-verso-hover="33">.</span>safe ∨ x ≠ y) <span class="kw">then</span></span>
+<span id="L227">      ({ s <span class="kw">with</span> <span class="const token" data-verso-hover="99">echoS</span> := <span class="const token" data-verso-hover="150">Function.update</span> s.<span class="const token" data-verso-hover="99">echoS</span> k (<span class="const token" data-verso-hover="150">Function.update</span> (s.<span class="const token" data-verso-hover="99">echoS</span> k) V <span class="const token" data-verso-hover="39">true</span>) },</span>
+<span id="L228">        [<span class="const token" data-verso-hover="32">.</span>echo k V <span class="const token" data-verso-hover="33">.</span>safe])</span>
+<span id="L229">    <span class="kw">else</span> (s, [])</span>
+<span id="L230"></span>
+<span id="L231"><span class="dc">/-- `upon entering view V` (lines 30–34), after `guard_i[V]` has been set (active entry). -/</span></span>
+<span id="L232"><span class="kw">def</span> <span class="const token" data-verso-hover="152">enterV</span> (prm : <span class="const token" data-verso-hover="19">Params</span> P) (p : P) (V : <span class="const token" data-verso-hover="28">ℕ</span>) (s : <span class="const token" data-verso-hover="52">LS</span> P Val) : <span class="const token" data-verso-hover="52">LS</span> P Val × <span class="const token" data-verso-hover="30">List</span> (<span class="const token" data-verso-hover="31">Msg</span> Val) :=</span>
+<span id="L233">  <span class="kw">let</span> s0 := { s <span class="kw">with</span> <span class="const token" data-verso-hover="62">view</span> := V, <span class="const token" data-verso-hover="103">entered</span> := s.<span class="const token" data-verso-hover="102">clk</span>, <span class="const token" data-verso-hover="63">active</span> := <span class="const token" data-verso-hover="39">true</span> }</span>
+<span id="L234">  <span class="kw">let</span> r1 := <span class="const token" data-verso-hover="149">ensureVC</span> (V - <span class="nu">2</span>) (s.<span class="const token" data-verso-hover="91">guard</span> V) s0</span>
+<span id="L235">  <span class="kw">let</span> r2 := <span class="const token" data-verso-hover="149">ensureVC</span> (V - <span class="nu">1</span>) (s.<span class="const token" data-verso-hover="91">guard</span> V) r1.<span class="const token" data-verso-hover="110">1</span></span>
+<span id="L236">  (r2.<span class="const token" data-verso-hover="110">1</span>, r1.<span class="const token" data-verso-hover="82">2</span> ++ r2.<span class="const token" data-verso-hover="82">2</span> ++</span>
+<span id="L237">    (<span class="kw">if</span> p = prm.<span class="const token" data-verso-hover="22">leader</span> V <span class="kw">then</span> (<span class="kw">match</span> r2.<span class="const token" data-verso-hover="110">1</span>.<span class="const token" data-verso-hover="92">vtp</span> V <span class="kw">with</span> | <span class="const token" data-verso-hover="69">some</span> w =&gt; [<span class="const token" data-verso-hover="86">.</span>prepare V w] | <span class="const token" data-verso-hover="77">none</span> =&gt; [])</span>
+<span id="L238">     <span class="kw">else</span> []))</span>
+<span id="L239"></span>
+<span id="L240"><span class="dc">/-- `upon passively entering view V` (lines 94–98), after `guard_i[V]` has been set. -/</span></span>
+<span id="L241"><span class="kw">def</span> <span class="const token" data-verso-hover="153">passiveV</span> (V : <span class="const token" data-verso-hover="28">ℕ</span>) (s : <span class="const token" data-verso-hover="52">LS</span> P Val) : <span class="const token" data-verso-hover="52">LS</span> P Val × <span class="const token" data-verso-hover="30">List</span> (<span class="const token" data-verso-hover="31">Msg</span> Val) :=</span>
+<span id="L242">  <span class="kw">let</span> s0 := { s <span class="kw">with</span> <span class="const token" data-verso-hover="62">view</span> := V, <span class="const token" data-verso-hover="103">entered</span> := s.<span class="const token" data-verso-hover="102">clk</span>, <span class="const token" data-verso-hover="63">active</span> := <span class="const token" data-verso-hover="112">false</span> }</span>
+<span id="L243">  <span class="kw">let</span> r1 := <span class="const token" data-verso-hover="149">ensureVC</span> (V - <span class="nu">2</span>) (s.<span class="const token" data-verso-hover="91">guard</span> V) s0</span>
+<span id="L244">  <span class="kw">let</span> r2 := <span class="const token" data-verso-hover="149">ensureVC</span> (V - <span class="nu">1</span>) (s.<span class="const token" data-verso-hover="91">guard</span> V) r1.<span class="const token" data-verso-hover="110">1</span></span>
+<span id="L245">  <span class="kw">let</span> r3 := <span class="const token" data-verso-hover="149">ensureVC</span> V (s.<span class="const token" data-verso-hover="91">guard</span> V) r2.<span class="const token" data-verso-hover="110">1</span></span>
+<span id="L246">  (r3.<span class="const token" data-verso-hover="110">1</span>, r1.<span class="const token" data-verso-hover="82">2</span> ++ r2.<span class="const token" data-verso-hover="82">2</span> ++ r3.<span class="const token" data-verso-hover="82">2</span>)</span>
+<span id="L247"></span>
+<span id="L248"><span class="dc">/-- Set `guard_i[V] ← x`. -/</span></span>
+<span id="L249"><span class="kw">def</span> <span class="const token" data-verso-hover="154">setGuard</span> (V : <span class="const token" data-verso-hover="28">ℕ</span>) (x : <span class="const token" data-verso-hover="83">GV</span> Val) (s : <span class="const token" data-verso-hover="52">LS</span> P Val) : <span class="const token" data-verso-hover="52">LS</span> P Val :=</span>
+<span id="L250">  { s <span class="kw">with</span> <span class="const token" data-verso-hover="91">guard</span> := <span class="const token" data-verso-hover="150">Function.update</span> s.<span class="const token" data-verso-hover="91">guard</span> V (<span class="const token" data-verso-hover="69">some</span> x) }</span>
+<span id="L251"></span>
+<span id="L252"><span class="dc">/-- `x` if it is a value, else `d` (line 82–83). -/</span></span>
+<span id="L253"><span class="kw">def</span> <span class="const token" data-verso-hover="155">gvOr</span> (x : <span class="const token" data-verso-hover="83">GV</span> Val) (d : Val) : Val :=</span>
+<span id="L254">  <span class="kw">match</span> x <span class="kw">with</span></span>
+<span id="L255">  | <span class="const token" data-verso-hover="33">.</span>safe =&gt; d</span>
+<span id="L256">  | <span class="const token" data-verso-hover="84">.</span>val v =&gt; v</span>
+<span id="L257"></span>
+<span id="L258"><span class="dc">/-- Set `value_to_propose_i[V] ← w`. -/</span></span>
+<span id="L259"><span class="kw">def</span> <span class="const token" data-verso-hover="156">setVtp</span> (V : <span class="const token" data-verso-hover="28">ℕ</span>) (w : Val) (s : <span class="const token" data-verso-hover="52">LS</span> P Val) : <span class="const token" data-verso-hover="52">LS</span> P Val :=</span>
+<span id="L260">  { s <span class="kw">with</span> <span class="const token" data-verso-hover="92">vtp</span> := <span class="const token" data-verso-hover="150">Function.update</span> s.<span class="const token" data-verso-hover="92">vtp</span> V (<span class="const token" data-verso-hover="69">some</span> w) }</span>
+<span id="L261"></span>
+<span id="L262"><span class="dc">/-- Effect of a rule: new local state and broadcast messages. -/</span></span>
+<span id="L263"><span class="kw">def</span> <span class="const token" data-verso-hover="157">exec</span> (prm : <span class="const token" data-verso-hover="19">Params</span> P) (p : P) : <span class="const token" data-verso-hover="126">Act</span> P Val → <span class="const token" data-verso-hover="52">LS</span> P Val → <span class="const token" data-verso-hover="52">LS</span> P Val × <span class="const token" data-verso-hover="30">List</span> (<span class="const token" data-verso-hover="31">Msg</span> Val)</span>
+<span id="L264">  | <span class="const token" data-verso-hover="127">.</span>vote1 w, s =&gt; ({ s <span class="kw">with</span> <span class="const token" data-verso-hover="94">vote1</span> := <span class="const token" data-verso-hover="150">Function.update</span> s.<span class="const token" data-verso-hover="94">vote1</span> s.<span class="const token" data-verso-hover="62">view</span> (<span class="const token" data-verso-hover="69">some</span> w) },</span>
+<span id="L265">      [<span class="const token" data-verso-hover="87">.</span>vote1 s.<span class="const token" data-verso-hover="62">view</span> w])</span>
+<span id="L266">  | <span class="const token" data-verso-hover="128">.</span>lock v, s =&gt; ({ s <span class="kw">with</span> <span class="const token" data-verso-hover="93">lock</span> := <span class="const token" data-verso-hover="150">Function.update</span> s.<span class="const token" data-verso-hover="93">lock</span> s.<span class="const token" data-verso-hover="62">view</span> (<span class="const token" data-verso-hover="69">some</span> v),</span>
+<span id="L267">                            <span class="const token" data-verso-hover="95">vote2</span> := <span class="const token" data-verso-hover="150">Function.update</span> s.<span class="const token" data-verso-hover="95">vote2</span> s.<span class="const token" data-verso-hover="62">view</span> (<span class="const token" data-verso-hover="69">some</span> (<span class="const token" data-verso-hover="69">some</span> v, s.<span class="const token" data-verso-hover="91">guard</span> s.<span class="const token" data-verso-hover="62">view</span>)) },</span>
+<span id="L268">      [<span class="const token" data-verso-hover="88">.</span>vote2 s.<span class="const token" data-verso-hover="62">view</span> (<span class="const token" data-verso-hover="69">some</span> v) (s.<span class="const token" data-verso-hover="91">guard</span> s.<span class="const token" data-verso-hover="62">view</span>)])</span>
+<span id="L269">  | <span class="const token" data-verso-hover="129">.</span><span class="kw">decide</span> v, s =&gt; ({ s <span class="kw">with</span> <span class="const token" data-verso-hover="67">decided</span> := s.<span class="const token" data-verso-hover="67">decided</span>.<span class="const token" data-verso-hover="158">or</span> (<span class="const token" data-verso-hover="69">some</span> (s.<span class="const token" data-verso-hover="62">view</span>, v)) }, [])</span>
+<span id="L270">  | <span class="const token" data-verso-hover="130">.</span>timeout2, s =&gt; ({ s <span class="kw">with</span> <span class="const token" data-verso-hover="95">vote2</span> := <span class="const token" data-verso-hover="150">Function.update</span> s.<span class="const token" data-verso-hover="95">vote2</span> s.<span class="const token" data-verso-hover="62">view</span></span>
+<span id="L271">                                (<span class="const token" data-verso-hover="69">some</span> (s.<span class="const token" data-verso-hover="93">lock</span> s.<span class="const token" data-verso-hover="62">view</span>, s.<span class="const token" data-verso-hover="91">guard</span> s.<span class="const token" data-verso-hover="62">view</span>)) },</span>
+<span id="L272">      [<span class="const token" data-verso-hover="88">.</span>vote2 s.<span class="const token" data-verso-hover="62">view</span> (s.<span class="const token" data-verso-hover="93">lock</span> s.<span class="const token" data-verso-hover="62">view</span>) (s.<span class="const token" data-verso-hover="91">guard</span> s.<span class="const token" data-verso-hover="62">view</span>)])</span>
+<span id="L273">  | <span class="const token" data-verso-hover="131">.</span>clearGuard _, s =&gt; (<span class="const token" data-verso-hover="154">setGuard</span> s.<span class="const token" data-verso-hover="62">view</span> <span class="const token" data-verso-hover="33">.</span>safe s, [])</span>
+<span id="L274">  | <span class="const token" data-verso-hover="132">.</span>accept V q l g, s =&gt;</span>
+<span id="L275">      ({ s <span class="kw">with</span> <span class="const token" data-verso-hover="101">acc</span> := <span class="const token" data-verso-hover="150">Function.update</span> s.<span class="const token" data-verso-hover="101">acc</span> V (<span class="const token" data-verso-hover="150">Function.update</span> (s.<span class="const token" data-verso-hover="101">acc</span> V) q (<span class="const token" data-verso-hover="69">some</span> (l, g))) }, [])</span>
+<span id="L276">  | <span class="const token" data-verso-hover="133">.</span>alertSet V ol, s =&gt; <span class="kw">match</span> ol <span class="kw">with</span></span>
+<span id="L277">      | <span class="const token" data-verso-hover="77">none</span> =&gt; ({ s <span class="kw">with</span> <span class="const token" data-verso-hover="97">alert</span> := <span class="const token" data-verso-hover="150">Function.update</span> s.<span class="const token" data-verso-hover="97">alert</span> V (<span class="const token" data-verso-hover="69">some</span> <span class="const token" data-verso-hover="112">false</span>) }, [])</span>
+<span id="L278">      | <span class="const token" data-verso-hover="69">some</span> ℓ =&gt; ({ s <span class="kw">with</span> <span class="const token" data-verso-hover="97">alert</span> := <span class="const token" data-verso-hover="150">Function.update</span> s.<span class="const token" data-verso-hover="97">alert</span> V (<span class="const token" data-verso-hover="69">some</span> <span class="const token" data-verso-hover="39">true</span>),</span>
+<span id="L279">                            <span class="const token" data-verso-hover="96">pot</span> := <span class="const token" data-verso-hover="150">Function.update</span> s.<span class="const token" data-verso-hover="96">pot</span> V (<span class="const token" data-verso-hover="69">some</span> ℓ) }, [])</span>
+<span id="L280">  | <span class="const token" data-verso-hover="134">.</span>alertClear1 V, s =&gt; ({ s <span class="kw">with</span> <span class="const token" data-verso-hover="97">alert</span> := <span class="const token" data-verso-hover="150">Function.update</span> s.<span class="const token" data-verso-hover="97">alert</span> V (<span class="const token" data-verso-hover="69">some</span> <span class="const token" data-verso-hover="112">false</span>) }, [])</span>
+<span id="L281">  | <span class="const token" data-verso-hover="135">.</span>alertClear2 V, s =&gt; ({ s <span class="kw">with</span> <span class="const token" data-verso-hover="97">alert</span> := <span class="const token" data-verso-hover="150">Function.update</span> s.<span class="const token" data-verso-hover="97">alert</span> V (<span class="const token" data-verso-hover="69">some</span> <span class="const token" data-verso-hover="112">false</span>) }, [])</span>
+<span id="L282">  | <span class="const token" data-verso-hover="136">.</span>vcTimer, s =&gt; ({ s <span class="kw">with</span> <span class="const token" data-verso-hover="64">vc</span> := <span class="const token" data-verso-hover="150">Function.update</span> s.<span class="const token" data-verso-hover="64">vc</span> s.<span class="const token" data-verso-hover="62">view</span> <span class="const token" data-verso-hover="39">true</span> }, [])</span>
+<span id="L283">  | <span class="const token" data-verso-hover="137">.</span>echoLock V _ x, s =&gt; <span class="const token" data-verso-hover="151">sendEcho</span> <span class="nu">0</span> V (<span class="const token" data-verso-hover="84">.</span>val x) s</span>
+<span id="L284">  | <span class="const token" data-verso-hover="138">.</span>echoGuard V G, s =&gt; <span class="const token" data-verso-hover="151">sendEcho</span> <span class="nu">0</span> V G s</span>
+<span id="L285">  | <span class="const token" data-verso-hover="139">.</span>echoDiv V, s =&gt; <span class="const token" data-verso-hover="151">sendEcho</span> <span class="nu">0</span> V <span class="const token" data-verso-hover="33">.</span>safe s</span>
+<span id="L286">  | <span class="const token" data-verso-hover="140">.</span>echo2 V x, s =&gt; <span class="const token" data-verso-hover="151">sendEcho</span> <span class="nu">1</span> V x s</span>
+<span id="L287">  | <span class="const token" data-verso-hover="141">.</span>echo3 V x, s =&gt; <span class="const token" data-verso-hover="151">sendEcho</span> <span class="nu">2</span> V x s</span>
+<span id="L288">  | <span class="const token" data-verso-hover="142">.</span>enter3 V x, s =&gt; <span class="const token" data-verso-hover="152">enterV</span> prm p (V + <span class="nu">1</span>) (<span class="const token" data-verso-hover="154">setGuard</span> (V + <span class="nu">1</span>) x s)</span>
+<span id="L289">  | <span class="const token" data-verso-hover="143">.</span>enter3L V x, s =&gt;</span>
+<span id="L290">      <span class="const token" data-verso-hover="152">enterV</span> prm p (V + <span class="nu">1</span>) (<span class="const token" data-verso-hover="156">setVtp</span> (V + <span class="nu">1</span>) (<span class="const token" data-verso-hover="155">gvOr</span> x s.<span class="const token" data-verso-hover="90">prop</span>) (<span class="const token" data-verso-hover="154">setGuard</span> (V + <span class="nu">1</span>) x s))</span>
+<span id="L291">  | <span class="const token" data-verso-hover="144">.</span>enterPrep V _ x, s =&gt; <span class="const token" data-verso-hover="152">enterV</span> prm p V (<span class="const token" data-verso-hover="154">setGuard</span> V x s)</span>
+<span id="L292">  | <span class="const token" data-verso-hover="145">.</span>passive V x, s =&gt; <span class="kw">if</span> s.<span class="const token" data-verso-hover="62">view</span> &lt; V <span class="kw">then</span> <span class="const token" data-verso-hover="153">passiveV</span> V (<span class="const token" data-verso-hover="154">setGuard</span> V x s) <span class="kw">else</span> <span class="const token" data-verso-hover="149">ensureVC</span> s.<span class="const token" data-verso-hover="62">view</span> (<span class="const token" data-verso-hover="69">some</span> x) s</span>
+<span id="L293">  | <span class="const token" data-verso-hover="146">.</span>recover, s =&gt;</span>
+<span id="L294">      <span class="kw">let</span> s1 := { s <span class="kw">with</span> <span class="const token" data-verso-hover="64">vc</span> := <span class="kw">fun</span> W =&gt; <span class="kw">if</span> W = s.<span class="const token" data-verso-hover="62">view</span> ∨ W = s.<span class="const token" data-verso-hover="62">view</span> - <span class="nu">1</span> ∨ W = s.<span class="const token" data-verso-hover="62">view</span> - <span class="nu">2</span> <span class="kw">then</span> <span class="const token" data-verso-hover="39">true</span></span>
+<span id="L295">                                         <span class="kw">else</span> s.<span class="const token" data-verso-hover="64">vc</span> W }</span>
+<span id="L296">      <span class="kw">match</span> s1.<span class="const token" data-verso-hover="95">vote2</span> s.<span class="const token" data-verso-hover="62">view</span> <span class="kw">with</span></span>
+<span id="L297">      | <span class="const token" data-verso-hover="77">none</span> =&gt; ({ s1 <span class="kw">with</span> <span class="const token" data-verso-hover="95">vote2</span> := <span class="const token" data-verso-hover="150">Function.update</span> s1.<span class="const token" data-verso-hover="95">vote2</span> s.<span class="const token" data-verso-hover="62">view</span></span>
+<span id="L298">                                  (<span class="const token" data-verso-hover="69">some</span> (s.<span class="const token" data-verso-hover="93">lock</span> s.<span class="const token" data-verso-hover="62">view</span>, s.<span class="const token" data-verso-hover="91">guard</span> s.<span class="const token" data-verso-hover="62">view</span>)) },</span>
+<span id="L299">                 [<span class="const token" data-verso-hover="88">.</span>vote2 s.<span class="const token" data-verso-hover="62">view</span> (s.<span class="const token" data-verso-hover="93">lock</span> s.<span class="const token" data-verso-hover="62">view</span>) (s.<span class="const token" data-verso-hover="91">guard</span> s.<span class="const token" data-verso-hover="62">view</span>)])</span>
+<span id="L300">      | <span class="const token" data-verso-hover="69">some</span> _ =&gt; (s1, [])</span>
+<span id="L301"></span>
+<span id="L302"><span class="dc">/-- Local state right after `upon starting` (lines 26–28), before entering view 1. -/</span></span>
+<span id="L303"><span class="kw">def</span> <span class="const token" data-verso-hover="53">startLS</span> (v : Val) : <span class="const token" data-verso-hover="52">LS</span> P Val <span class="kw">where</span></span>
+<span id="L304">  <span class="const token" data-verso-hover="90">prop</span> := v</span>
+<span id="L305">  <span class="const token" data-verso-hover="62">view</span> := <span class="nu">0</span></span>
+<span id="L306">  <span class="const token" data-verso-hover="91">guard</span> := <span class="const token" data-verso-hover="150">Function.update</span> (<span class="kw">fun</span> _ =&gt; <span class="const token" data-verso-hover="77">none</span>) <span class="nu">1</span> (<span class="const token" data-verso-hover="69">some</span> <span class="const token" data-verso-hover="33">.</span>safe)</span>
+<span id="L307">  <span class="const token" data-verso-hover="92">vtp</span> := <span class="const token" data-verso-hover="150">Function.update</span> (<span class="kw">fun</span> _ =&gt; <span class="const token" data-verso-hover="77">none</span>) <span class="nu">1</span> (<span class="const token" data-verso-hover="69">some</span> v)</span>
+<span id="L308">  <span class="const token" data-verso-hover="93">lock</span> := <span class="kw">fun</span> _ =&gt; <span class="const token" data-verso-hover="77">none</span></span>
+<span id="L309">  <span class="const token" data-verso-hover="94">vote1</span> := <span class="kw">fun</span> _ =&gt; <span class="const token" data-verso-hover="77">none</span></span>
+<span id="L310">  <span class="const token" data-verso-hover="95">vote2</span> := <span class="kw">fun</span> _ =&gt; <span class="const token" data-verso-hover="77">none</span></span>
+<span id="L311">  <span class="const token" data-verso-hover="96">pot</span> := <span class="kw">fun</span> _ =&gt; <span class="const token" data-verso-hover="77">none</span></span>
+<span id="L312">  <span class="const token" data-verso-hover="97">alert</span> := <span class="kw">fun</span> _ =&gt; <span class="const token" data-verso-hover="77">none</span></span>
+<span id="L313">  <span class="const token" data-verso-hover="64">vc</span> := <span class="kw">fun</span> _ =&gt; <span class="const token" data-verso-hover="112">false</span></span>
+<span id="L314">  <span class="const token" data-verso-hover="98">echo</span> := <span class="kw">fun</span> _ _ =&gt; <span class="const token" data-verso-hover="77">none</span></span>
+<span id="L315">  <span class="const token" data-verso-hover="99">echoS</span> := <span class="kw">fun</span> _ _ =&gt; <span class="const token" data-verso-hover="112">false</span></span>
+<span id="L316">  <span class="const token" data-verso-hover="100">rcv</span> := []</span>
+<span id="L317">  <span class="const token" data-verso-hover="101">acc</span> := <span class="kw">fun</span> _ _ =&gt; <span class="const token" data-verso-hover="77">none</span></span>
+<span id="L318">  <span class="const token" data-verso-hover="67">decided</span> := <span class="const token" data-verso-hover="77">none</span></span>
+<span id="L319">  <span class="const token" data-verso-hover="102">clk</span> := <span class="nu">0</span></span>
+<span id="L320">  <span class="const token" data-verso-hover="103">entered</span> := <span class="nu">0</span></span>
+<span id="L321">  <span class="const token" data-verso-hover="63">active</span> := <span class="const token" data-verso-hover="112">false</span></span>
+<span id="L322">  <span class="const token" data-verso-hover="104">out</span> := []</span>
+<span id="L323"></span>
+<span id="L324"><span class="dc">/-- Initial local state (after `enter view 1`, line 29) and the messages it broadcasts. -/</span></span>
+<span id="L325"><span class="kw">def</span> <span class="const token" data-verso-hover="159">initR</span> (prm : <span class="const token" data-verso-hover="19">Params</span> P) (p : P) (v : Val) : <span class="const token" data-verso-hover="52">LS</span> P Val × <span class="const token" data-verso-hover="30">List</span> (<span class="const token" data-verso-hover="31">Msg</span> Val) :=</span>
+<span id="L326">  <span class="const token" data-verso-hover="152">enterV</span> prm p <span class="nu">1</span> (<span class="const token" data-verso-hover="53">startLS</span> v)</span>
+<span id="L327"></span>
+<span id="L328"><span class="dc">/-- Initial local state, with the initial broadcasts in the outbox. -/</span></span>
+<span id="L329"><span class="kw">def</span> <span class="const token" data-verso-hover="160">initLS</span> (prm : <span class="const token" data-verso-hover="19">Params</span> P) (p : P) (v : Val) : <span class="const token" data-verso-hover="52">LS</span> P Val :=</span>
+<span id="L330">  { (<span class="const token" data-verso-hover="159">initR</span> prm p v).<span class="const token" data-verso-hover="110">1</span> <span class="kw">with</span> <span class="const token" data-verso-hover="104">out</span> := (<span class="const token" data-verso-hover="159">initR</span> prm p v).<span class="const token" data-verso-hover="82">2</span> }</span>
+<span id="L331"></span>
+<span id="L332"><span class="kw">end</span> Podc.ForgetIT</span>
+<span id="L333"></span>
+</code></div>
+        <script>
+          window.versoHoversUrl = "PODC2026/ForgetIT/-hovers.json";</script>
+        <script src="static/lean/popper.js"></script>
+        <script src="static/lean/tippy.js"></script>
+        <script src="static/lean/marked.js"></script>
+        <script src="static/lean/highlighting.js"></script>
+        <script src="static/lean/lean.js"></script>
+        </article></main><footer class="site-footer"><div class="wrap">
+        Machine-checked formalizations of PODC papers in Lean 4. Generated with <a href="https://github.com/leanprover/verso">Verso</a> from the README files of <a href="https://github.com/vasnesterov/formal_podc">vasnesterov/formal_podc</a>.</div>
+      </footer></body>
+  </html>
+

@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="light dark">
+    <link rel="icon" href="data:,">
+    <title>TreeAA: Gradecast.lean · Formal PODC</title><base href="../../../.././"><link rel="stylesheet" href="static/lean/verso-vars.css">
+    <link rel="stylesheet" href="static/lean/highlighting.css">
+    <link rel="stylesheet" href="static/lean/tippy-border.css">
+    <link rel="stylesheet" href="static/style.css">
+    <script defer="defer" src="static/site.js"></script>
+    </head>
+  <body>
+    <header class="site-header">
+      <div class="wrap">
+        <a class="brand" href=".">Formal PODC</a><nav class="top">
+          <a href=".">Search</a><a href="about/">About</a><a href="https://github.com/vasnesterov/formal_podc">GitHub</a></nav>
+        </div>
+      </header>
+    <main class="wrap"><article><nav class="breadcrumbs" aria-label="Breadcrumb">
+          <a href=".">Search</a><span class="sep">›</span><a href="PODC2026/">PODC 2026</a><span class="sep">›</span><a href="PODC2026/TreeAA/">TreeAA</a><span class="sep">›</span><a href="PODC2026/TreeAA/src/">Lean source</a><span class="sep">›</span><span aria-current="page">Gradecast</span></nav>
+        <h1>
+          <code>Gradecast.lean</code></h1>
+        <div class="paper-links">
+          <p>
+            Source of <a href="PODC2026/TreeAA/">Approximate Agreement on Trees and Block Graphs — PODC 2026</a> · <a href="https://github.com/vasnesterov/formal_podc/blob/main/Papers/PODC2026/TreeAA/Gradecast.lean">GitHub</a> · hover over a name for its type and documentation</p>
+          </div>
+        <div class="lean-code lean-src">
+          <code class="hl lean block" data-lean-context="Gradecast"><span id="L1"><span class="kw">import</span> Papers.PODC2026.TreeAA.Spec</span>
+<span id="L2"><span class="kw">import</span> Cslib.Foundations.Data.Finset.Quorum</span>
+<span id="L3"></span>
+<span id="L4"><span class="dc">/-!</span></span>
+<span id="L5"><span class="dc"># The 3-round gradecast of Ben-Or, Dolev and Hoch  -- CSLib candidate</span></span>
+<span id="L6"></span>
+<span id="L7"><span class="dc">Theorem 4 of the paper cites [Ben-Or, Dolev, Hoch, *Simple gradecast based algorithms*, 2010,</span></span>
+<span id="L8"><span class="dc">Theorem 1]: gradecast (Definition 4, `Gradecast`) is achievable for `t &lt; n/3` Byzantine parties in</span></span>
+<span id="L9"><span class="dc">3 synchronous rounds without signatures. We implement the protocol in CSLib's lock-step model on</span></span>
+<span id="L10"><span class="dc">the complete network and verify it (`bdhGradecast_solves`).</span></span>
+<span id="L11"></span>
+<span id="L12"><span class="dc">Protocol `bdhGradecast t snd` (the history length is the current round number):</span></span>
+<span id="L13"><span class="dc">* round 0: the sender sends its input `v` to everybody;</span></span>
+<span id="L14"><span class="dc">* round 1: everybody echoes the value it received from the sender (the sender echoes `v`);</span></span>
+<span id="L15"><span class="dc">* round 2: a party that saw some `w` echoed by at least `n - t` parties (counting its own echo)</span></span>
+<span id="L16"><span class="dc">  sends `w` ("ready"), otherwise nothing;</span></span>
+<span id="L17"><span class="dc">* after round 2 (history of length 3): if some `w` has `≥ n - t` readies (counting its own), output</span></span>
+<span id="L18"><span class="dc">  `(w, 2)`; else if some `w` has `≥ t + 1` readies, output `(w, 1)`; else output `(x, 0)` (`x` is</span></span>
+<span id="L19"><span class="dc">  the own input, a dummy value).</span></span>
+<span id="L20"></span>
+<span id="L21"><span class="dc">A party does not receive its own messages on `⊤`; the counts use `gcView`, which inserts the own</span></span>
+<span id="L22"><span class="dc">message into the inbox.</span></span>
+<span id="L23"><span class="dc">-/</span></span>
+<span id="L24"></span>
+<span id="L25"><span class="kw">namespace</span> TreeAA</span>
+<span id="L26"></span>
+<span id="L27"><span class="kw">open</span> Cslib.Byzantine.LockStep</span>
+<span id="L28"></span>
+<span id="L29"><span class="kw">section</span> BDH</span>
+<span id="L30"></span>
+<span id="L31"><span class="kw">variable</span> {P : <span class="kw">Type</span>} [<span class="const token" data-verso-hover="246">Fintype</span> P] [<span class="const token" data-verso-hover="48">DecidableEq</span> P] {W : <span class="kw">Type</span>} [<span class="const token" data-verso-hover="48">DecidableEq</span> W]</span>
+<span id="L32"></span>
+<span id="L33"><span class="dc">/-! ### Local computations -/</span></span>
+<span id="L34"></span>
+<span id="L35"><span class="dc">/-- The number of parties `q` with `c q = some w`. -/</span></span>
+<span id="L36"><span class="kw">def</span> <span class="const token" data-verso-hover="314">gcCount</span> (c : P → <span class="const token" data-verso-hover="315">Option</span> W) (w : W) : <span class="const token" data-verso-hover="229">ℕ</span> := <span class="const token" data-verso-hover="187">Finset.univ</span>.<span class="const token" data-verso-hover="42">countEq</span> c (<span class="const token" data-verso-hover="316">some</span> w)</span>
+<span id="L37"></span>
+<span id="L38"><span class="dc">/-- The inbox `ib` of `p`, completed with `p`'s own message `own`. -/</span></span>
+<span id="L39"><span class="kw">def</span> <span class="const token" data-verso-hover="317">gcView</span> (p : P) (own : <span class="const token" data-verso-hover="315">Option</span> W) (ib : <span class="const token" data-verso-hover="318">Inbox</span> P W) : P → <span class="const token" data-verso-hover="315">Option</span> W :=</span>
+<span id="L40">  <span class="kw">fun</span> q =&gt; <span class="kw">if</span> q = p <span class="kw">then</span> own <span class="kw">else</span> ib q</span>
+<span id="L41"></span>
+<span id="L42"><span class="kw">open</span> Classical <span class="kw">in</span></span>
+<span id="L43"><span class="dc">/-- The ready message: a value with at least `n - t` echoes. -/</span></span>
+<span id="L44"><span class="kw">noncomputable</span> <span class="kw">def</span> <span class="const token" data-verso-hover="319">gcReady</span> (t : <span class="const token" data-verso-hover="229">ℕ</span>) (c : P → <span class="const token" data-verso-hover="315">Option</span> W) : <span class="const token" data-verso-hover="315">Option</span> W :=</span>
+<span id="L45">  <span class="kw">if</span> h : ∃ w, <span class="const token" data-verso-hover="248">Fintype.card</span> P - t ≤ <span class="const token" data-verso-hover="314">gcCount</span> c w <span class="kw">then</span> <span class="const token" data-verso-hover="316">some</span> h.<span class="const token" data-verso-hover="70">choose</span> <span class="kw">else</span> <span class="const token" data-verso-hover="320">none</span></span>
+<span id="L46"></span>
+<span id="L47"><span class="kw">open</span> Classical <span class="kw">in</span></span>
+<span id="L48"><span class="dc">/-- The output: grade 2 for a value with `≥ n - t` readies, grade 1 for one with `≥ t + 1`</span></span>
+<span id="L49"><span class="dc">readies, otherwise the dummy value `x` with grade 0. -/</span></span>
+<span id="L50"><span class="kw">noncomputable</span> <span class="kw">def</span> <span class="const token" data-verso-hover="321">gcGrade</span> (t : <span class="const token" data-verso-hover="229">ℕ</span>) (x : W) (c : P → <span class="const token" data-verso-hover="315">Option</span> W) : W × <span class="const token" data-verso-hover="250">Fin</span> <span class="nu">3</span> :=</span>
+<span id="L51">  <span class="kw">if</span> h : ∃ w, <span class="const token" data-verso-hover="248">Fintype.card</span> P - t ≤ <span class="const token" data-verso-hover="314">gcCount</span> c w <span class="kw">then</span> (h.<span class="const token" data-verso-hover="70">choose</span>, <span class="nu">2</span>)</span>
+<span id="L52">  <span class="kw">else</span> <span class="kw">if</span> h : ∃ w, t + <span class="nu">1</span> ≤ <span class="const token" data-verso-hover="314">gcCount</span> c w <span class="kw">then</span> (h.<span class="const token" data-verso-hover="70">choose</span>, <span class="nu">1</span>) <span class="kw">else</span> (x, <span class="nu">0</span>)</span>
+<span id="L53"></span>
+<span id="L54"><span class="dc">/-- The message of `p` (to everybody) after history `h`. -/</span></span>
+<span id="L55"><span class="kw">noncomputable</span> <span class="kw">def</span> <span class="const token" data-verso-hover="322">gcMsg</span> (t : <span class="const token" data-verso-hover="229">ℕ</span>) (snd p : P) (x : W) : <span class="const token" data-verso-hover="323">History</span> P W → <span class="const token" data-verso-hover="315">Option</span> W</span>
+<span id="L56">  | [] =&gt; <span class="kw">if</span> p = snd <span class="kw">then</span> <span class="const token" data-verso-hover="316">some</span> x <span class="kw">else</span> <span class="const token" data-verso-hover="320">none</span></span>
+<span id="L57">  | [ib₀] =&gt; <span class="kw">if</span> p = snd <span class="kw">then</span> <span class="const token" data-verso-hover="316">some</span> x <span class="kw">else</span> ib₀ snd</span>
+<span id="L58">  | [ib₀, ib₁] =&gt; <span class="const token" data-verso-hover="319">gcReady</span> t (<span class="const token" data-verso-hover="317">gcView</span> p (<span class="kw">if</span> p = snd <span class="kw">then</span> <span class="const token" data-verso-hover="316">some</span> x <span class="kw">else</span> ib₀ snd) ib₁)</span>
+<span id="L59">  | _ =&gt; <span class="const token" data-verso-hover="320">none</span></span>
+<span id="L60"></span>
+<span id="L61"><span class="dc">/-- The 3-round gradecast of Ben-Or, Dolev and Hoch with sender `snd`, for `t` faults. -/</span></span>
+<span id="L62"><span class="kw">noncomputable</span> <span class="kw">def</span> <span class="const token" data-verso-hover="312">bdhGradecast</span> (t : <span class="const token" data-verso-hover="229">ℕ</span>) (snd : P) : <span class="const token" data-verso-hover="72">Protocol</span> P W W (W × <span class="const token" data-verso-hover="250">Fin</span> <span class="nu">3</span>) <span class="kw">where</span></span>
+<span id="L63">  <span class="const token" data-verso-hover="324">send</span> p x h _ := <span class="const token" data-verso-hover="322">gcMsg</span> t snd p x h</span>
+<span id="L64">  <span class="const token" data-verso-hover="325">decide</span> p x h := <span class="kw">match</span> h <span class="kw">with</span></span>
+<span id="L65">    | [ib₀, ib₁, ib₂] =&gt; <span class="const token" data-verso-hover="316">some</span> (<span class="const token" data-verso-hover="321">gcGrade</span> t x (<span class="const token" data-verso-hover="317">gcView</span> p (<span class="const token" data-verso-hover="322">gcMsg</span> t snd p x [ib₀, ib₁]) ib₂))</span>
+<span id="L66">    | _ =&gt; <span class="const token" data-verso-hover="320">none</span></span>
+<span id="L67"></span>
+<span id="L68"><span class="dc">/-! ### Counting -/</span></span>
+<span id="L69"></span>
+<span id="L70"><span class="kw">section</span> Counting</span>
+<span id="L71"></span>
+<span id="L72"><span class="kw">variable</span> {B : <span class="const token" data-verso-hover="46">Set</span> P} {t : <span class="const token" data-verso-hover="229">ℕ</span>}</span>
+<span id="L73"></span>
+<span id="L74"><span class="kw">omit</span> [<span class="const token" data-verso-hover="48">DecidableEq</span> P] <span class="kw">in</span></span>
+<span id="L75"><span class="kw">open</span> Classical <span class="kw">in</span></span>
+<span id="L76"><span class="dc">/-- At least `n - t` supporters, hence at least `n - 2t` supporters outside `B`; they are seen by</span></span>
+<span id="L77"><span class="dc">everybody who agrees with `c` outside `B`. -/</span></span>
+<span id="L78"><span class="kw">lemma</span> <span class="const token" data-verso-hover="326">gcCount_transfer</span> (hB : B.<span class="const token" data-verso-hover="327">ncard</span> ≤ t) {c c' : P → <span class="const token" data-verso-hover="315">Option</span> W}</span>
+<span id="L79">    (hcc : ∀ q, q ∉ B → c q = c' q) {w : W} (h : <span class="const token" data-verso-hover="248">Fintype.card</span> P - t ≤ <span class="const token" data-verso-hover="314">gcCount</span> c w) :</span>
+<span id="L80">    <span class="const token" data-verso-hover="248">Fintype.card</span> P - <span class="nu">2</span> * t ≤ <span class="const token" data-verso-hover="314">gcCount</span> c' w := <span class="kw">by</span></span>
+<span id="L81">  <span class="kw">have</span> := <span class="const token" data-verso-hover="328">Finset.countEq_sub_ncard_le_countEq</span> (s := <span class="const token" data-verso-hover="187">.</span>univ) (<span class="kw">fun</span> q _ hq =&gt; hcc q hq) (<span class="const token" data-verso-hover="316">some</span> w)</span>
+<span id="L82">  <span class="kw">unfold</span> <span class="const token" data-verso-hover="314">gcCount</span> <span class="kw">at</span> *</span>
+<span id="L83">  <span class="kw">omega</span></span>
+<span id="L84"></span>
+<span id="L85"><span class="kw">omit</span> [<span class="const token" data-verso-hover="48">DecidableEq</span> P] <span class="kw">in</span></span>
+<span id="L86"><span class="kw">open</span> Classical <span class="kw">in</span></span>
+<span id="L87"><span class="kw">lemma</span> <span class="const token" data-verso-hover="329">gcCount_of_forall</span> (hB : B.<span class="const token" data-verso-hover="327">ncard</span> ≤ t) {c : P → <span class="const token" data-verso-hover="315">Option</span> W} {w : W}</span>
+<span id="L88">    (h : ∀ q, q ∉ B → c q = <span class="const token" data-verso-hover="316">some</span> w) : <span class="const token" data-verso-hover="248">Fintype.card</span> P - t ≤ <span class="const token" data-verso-hover="314">gcCount</span> c w := <span class="kw">by</span></span>
+<span id="L89">  <span class="kw">have</span> := <span class="const token" data-verso-hover="330">Finset.card_sub_ncard_le_countEq</span> (s := <span class="const token" data-verso-hover="187">.</span>univ) (B := B) <span class="kw">fun</span> q _ hq =&gt; h q hq</span>
+<span id="L90">  <span class="kw">rw</span> [<span class="const token" data-verso-hover="331">Finset.card_univ</span>] <span class="kw">at</span> this</span>
+<span id="L91">  <span class="kw">unfold</span> <span class="const token" data-verso-hover="314">gcCount</span></span>
+<span id="L92">  <span class="kw">omega</span></span>
+<span id="L93"></span>
+<span id="L94"><span class="kw">omit</span> [<span class="const token" data-verso-hover="48">DecidableEq</span> P] <span class="kw">in</span></span>
+<span id="L95"><span class="kw">lemma</span> <span class="const token" data-verso-hover="332">eq_of_gcCount</span> (ht : <span class="nu">3</span> * t &lt; <span class="const token" data-verso-hover="248">Fintype.card</span> P) {c : P → <span class="const token" data-verso-hover="315">Option</span> W} {w w' : W}</span>
+<span id="L96">    (h : <span class="const token" data-verso-hover="248">Fintype.card</span> P - t ≤ <span class="const token" data-verso-hover="314">gcCount</span> c w) (h' : <span class="const token" data-verso-hover="248">Fintype.card</span> P - t ≤ <span class="const token" data-verso-hover="314">gcCount</span> c w') : w = w' :=</span>
+<span id="L97">  <span class="const token" data-verso-hover="333">Option.some_injective</span> _ &lt;| <span class="const token" data-verso-hover="334">Finset.eq_of_card_lt_countEq_add_countEq</span> (s := <span class="const token" data-verso-hover="187">.</span>univ) (f := c) &lt;| <span class="kw">by</span></span>
+<span id="L98">    <span class="kw">rw</span> [<span class="const token" data-verso-hover="331">Finset.card_univ</span>]; <span class="kw">unfold</span> <span class="const token" data-verso-hover="314">gcCount</span> <span class="kw">at</span> h h'; <span class="kw">omega</span></span>
+<span id="L99"></span>
+<span id="L100"><span class="kw">omit</span> [<span class="const token" data-verso-hover="48">DecidableEq</span> P] <span class="kw">in</span></span>
+<span id="L101"><span class="kw">lemma</span> <span class="const token" data-verso-hover="335">gcReady_spec</span> {c : P → <span class="const token" data-verso-hover="315">Option</span> W} {w : W} (h : <span class="const token" data-verso-hover="319">gcReady</span> t c = <span class="const token" data-verso-hover="316">some</span> w) :</span>
+<span id="L102">    <span class="const token" data-verso-hover="248">Fintype.card</span> P - t ≤ <span class="const token" data-verso-hover="314">gcCount</span> c w := <span class="kw">by</span></span>
+<span id="L103">  <span class="kw">unfold</span> <span class="const token" data-verso-hover="319">gcReady</span> <span class="kw">at</span> h</span>
+<span id="L104">  <span class="kw">split_ifs</span> <span class="kw">at</span> h <span class="kw">with</span> h0</span>
+<span id="L105">  <span class="kw">cases</span> h</span>
+<span id="L106">  <span class="kw">exact</span> h0.<span class="const token" data-verso-hover="212">choose_spec</span></span>
+<span id="L107"></span>
+<span id="L108"><span class="kw">omit</span> [<span class="const token" data-verso-hover="48">DecidableEq</span> P] <span class="kw">in</span></span>
+<span id="L109"><span class="kw">lemma</span> <span class="const token" data-verso-hover="336">gcReady_eq</span> (ht : <span class="nu">3</span> * t &lt; <span class="const token" data-verso-hover="248">Fintype.card</span> P) {c : P → <span class="const token" data-verso-hover="315">Option</span> W} {w : W}</span>
+<span id="L110">    (h : <span class="const token" data-verso-hover="248">Fintype.card</span> P - t ≤ <span class="const token" data-verso-hover="314">gcCount</span> c w) : <span class="const token" data-verso-hover="319">gcReady</span> t c = <span class="const token" data-verso-hover="316">some</span> w := <span class="kw">by</span></span>
+<span id="L111">  <span class="kw">have</span> h0 : ∃ w, <span class="const token" data-verso-hover="248">Fintype.card</span> P - t ≤ <span class="const token" data-verso-hover="314">gcCount</span> c w := ⟨w, h⟩</span>
+<span id="L112">  <span class="kw">unfold</span> <span class="const token" data-verso-hover="319">gcReady</span></span>
+<span id="L113">  <span class="kw">rw</span> [<span class="const token" data-verso-hover="337">dite_eq_left_of_eq_true</span> (<span class="const token" data-verso-hover="338">eq_true</span> h0), <span class="const token" data-verso-hover="332">eq_of_gcCount</span> ht h0.<span class="const token" data-verso-hover="212">choose_spec</span> h]</span>
+<span id="L114"></span>
+<span id="L115"><span class="kw">omit</span> [<span class="const token" data-verso-hover="48">DecidableEq</span> P] <span class="kw">in</span></span>
+<span id="L116"><span class="kw">lemma</span> <span class="const token" data-verso-hover="339">gcGrade_eq</span> (ht : <span class="nu">3</span> * t &lt; <span class="const token" data-verso-hover="248">Fintype.card</span> P) (x : W) {c : P → <span class="const token" data-verso-hover="315">Option</span> W} {w : W}</span>
+<span id="L117">    (h : <span class="const token" data-verso-hover="248">Fintype.card</span> P - t ≤ <span class="const token" data-verso-hover="314">gcCount</span> c w) : <span class="const token" data-verso-hover="321">gcGrade</span> t x c = (w, <span class="nu">2</span>) := <span class="kw">by</span></span>
+<span id="L118">  <span class="kw">have</span> h0 : ∃ w, <span class="const token" data-verso-hover="248">Fintype.card</span> P - t ≤ <span class="const token" data-verso-hover="314">gcCount</span> c w := ⟨w, h⟩</span>
+<span id="L119">  <span class="kw">unfold</span> <span class="const token" data-verso-hover="321">gcGrade</span></span>
+<span id="L120">  <span class="kw">rw</span> [<span class="const token" data-verso-hover="337">dite_eq_left_of_eq_true</span> (<span class="const token" data-verso-hover="338">eq_true</span> h0), <span class="const token" data-verso-hover="332">eq_of_gcCount</span> ht h0.<span class="const token" data-verso-hover="212">choose_spec</span> h]</span>
+<span id="L121"></span>
+<span id="L122"><span class="kw">omit</span> [<span class="const token" data-verso-hover="48">DecidableEq</span> P] <span class="kw">in</span></span>
+<span id="L123"><span class="kw">lemma</span> <span class="const token" data-verso-hover="340">gcGrade_two</span> {x : W} {c : P → <span class="const token" data-verso-hover="315">Option</span> W} (h : (<span class="const token" data-verso-hover="321">gcGrade</span> t x c).<span class="const token" data-verso-hover="341">2</span> = <span class="nu">2</span>) :</span>
+<span id="L124">    <span class="const token" data-verso-hover="248">Fintype.card</span> P - t ≤ <span class="const token" data-verso-hover="314">gcCount</span> c (<span class="const token" data-verso-hover="321">gcGrade</span> t x c).<span class="const token" data-verso-hover="128">1</span> := <span class="kw">by</span></span>
+<span id="L125">  <span class="kw">unfold</span> <span class="const token" data-verso-hover="321">gcGrade</span> <span class="kw">at</span> *</span>
+<span id="L126">  <span class="kw">split_ifs</span> <span class="kw">at</span> * <span class="kw">with</span> h0 h1</span>
+<span id="L127">  · <span class="kw">exact</span> h0.<span class="const token" data-verso-hover="212">choose_spec</span></span>
+<span id="L128">  · <span class="kw">simp</span> <span class="kw">at</span> h</span>
+<span id="L129">  · <span class="kw">simp</span> <span class="kw">at</span> h</span>
+<span id="L130"></span>
+<span id="L131"><span class="kw">omit</span> [<span class="const token" data-verso-hover="48">DecidableEq</span> P] <span class="kw">in</span></span>
+<span id="L132"><span class="kw">lemma</span> <span class="const token" data-verso-hover="342">gcGrade_pos</span> (ht : <span class="nu">3</span> * t &lt; <span class="const token" data-verso-hover="248">Fintype.card</span> P) {x : W} {c : P → <span class="const token" data-verso-hover="315">Option</span> W}</span>
+<span id="L133">    (h : <span class="nu">0</span> &lt; (<span class="const token" data-verso-hover="321">gcGrade</span> t x c).<span class="const token" data-verso-hover="341">2</span>) : t + <span class="nu">1</span> ≤ <span class="const token" data-verso-hover="314">gcCount</span> c (<span class="const token" data-verso-hover="321">gcGrade</span> t x c).<span class="const token" data-verso-hover="128">1</span> := <span class="kw">by</span></span>
+<span id="L134">  <span class="kw">unfold</span> <span class="const token" data-verso-hover="321">gcGrade</span> <span class="kw">at</span> *</span>
+<span id="L135">  <span class="kw">split_ifs</span> <span class="kw">at</span> * <span class="kw">with</span> h0 h1</span>
+<span id="L136">  · <span class="kw">have</span> := h0.<span class="const token" data-verso-hover="212">choose_spec</span>; <span class="kw">show</span> t + <span class="nu">1</span> ≤ <span class="const token" data-verso-hover="314">gcCount</span> c h0.<span class="const token" data-verso-hover="70">choose</span>; <span class="kw">omega</span></span>
+<span id="L137">  · <span class="kw">exact</span> h1.<span class="const token" data-verso-hover="212">choose_spec</span></span>
+<span id="L138">  · <span class="kw">simp</span> <span class="kw">at</span> h</span>
+<span id="L139"></span>
+<span id="L140"><span class="kw">omit</span> [<span class="const token" data-verso-hover="48">DecidableEq</span> P] <span class="kw">in</span></span>
+<span id="L141"><span class="kw">lemma</span> <span class="const token" data-verso-hover="343">gcGrade_pos_of</span> {x : W} {c : P → <span class="const token" data-verso-hover="315">Option</span> W} {w : W} (h : t + <span class="nu">1</span> ≤ <span class="const token" data-verso-hover="314">gcCount</span> c w) :</span>
+<span id="L142">    <span class="nu">0</span> &lt; (<span class="const token" data-verso-hover="321">gcGrade</span> t x c).<span class="const token" data-verso-hover="341">2</span> := <span class="kw">by</span></span>
+<span id="L143">  <span class="kw">unfold</span> <span class="const token" data-verso-hover="321">gcGrade</span></span>
+<span id="L144">  <span class="kw">split_ifs</span> <span class="kw">with</span> h0 h1</span>
+<span id="L145">  · <span class="kw">simp</span></span>
+<span id="L146">  · <span class="kw">simp</span></span>
+<span id="L147">  · <span class="kw">exact</span> <span class="const token" data-verso-hover="202">absurd</span> ⟨w, h⟩ h1</span>
+<span id="L148"></span>
+<span id="L149"><span class="kw">end</span> Counting</span>
+<span id="L150"></span>
+<span id="L151"><span class="dc">/-! ### Runs -/</span></span>
+<span id="L152"></span>
+<span id="L153"><span class="kw">section</span> Runs</span>
+<span id="L154"></span>
+<span id="L155"><span class="kw">variable</span> {t : <span class="const token" data-verso-hover="229">ℕ</span>} {snd : P} (s : <span class="const token" data-verso-hover="344">Scenario</span> P W W)</span>
+<span id="L156"></span>
+<span id="L157"><span class="dc">/-- The inbox of `p` in round `r`. -/</span></span>
+<span id="L158"><span class="kw">noncomputable</span> <span class="kw">abbrev</span> <span class="const token" data-verso-hover="345">gcIb</span> (t : <span class="const token" data-verso-hover="229">ℕ</span>) (snd : P) (r : <span class="const token" data-verso-hover="229">ℕ</span>) (p : P) : <span class="const token" data-verso-hover="318">Inbox</span> P W :=</span>
+<span id="L159">  <span class="kw">fun</span> q =&gt; <span class="const token" data-verso-hover="346">deliver</span> ⊤ (<span class="const token" data-verso-hover="312">bdhGradecast</span> t snd) s (<span class="const token" data-verso-hover="347">hist</span> ⊤ (<span class="const token" data-verso-hover="312">bdhGradecast</span> t snd) s r) r q p</span>
+<span id="L160"></span>
+<span id="L161"><span class="dc">/-- What `p` sees in round `r`, its own message included. -/</span></span>
+<span id="L162"><span class="kw">noncomputable</span> <span class="kw">abbrev</span> <span class="const token" data-verso-hover="348">gcC</span> (t : <span class="const token" data-verso-hover="229">ℕ</span>) (snd : P) (r : <span class="const token" data-verso-hover="229">ℕ</span>) (p : P) : P → <span class="const token" data-verso-hover="315">Option</span> W :=</span>
+<span id="L163">  <span class="const token" data-verso-hover="317">gcView</span> p (<span class="const token" data-verso-hover="322">gcMsg</span> t snd p (s.<span class="const token" data-verso-hover="242">input</span> p) (<span class="const token" data-verso-hover="347">hist</span> ⊤ (<span class="const token" data-verso-hover="312">bdhGradecast</span> t snd) s r p)) (<span class="const token" data-verso-hover="345">gcIb</span> s t snd r p)</span>
+<span id="L164"></span>
+<span id="L165"><span class="kw">lemma</span> <span class="const token" data-verso-hover="349">gc_hist_one</span> (p : P) : <span class="const token" data-verso-hover="347">hist</span> ⊤ (<span class="const token" data-verso-hover="312">bdhGradecast</span> t snd) s <span class="nu">1</span> p = [<span class="const token" data-verso-hover="345">gcIb</span> s t snd <span class="nu">0</span> p] := <span class="kw">by</span></span>
+<span id="L166">  <span class="kw">simp</span> [<span class="const token" data-verso-hover="350">hist_succ</span>]</span>
+<span id="L167"></span>
+<span id="L168"><span class="kw">lemma</span> <span class="const token" data-verso-hover="351">gc_hist_two</span> (p : P) :</span>
+<span id="L169">    <span class="const token" data-verso-hover="347">hist</span> ⊤ (<span class="const token" data-verso-hover="312">bdhGradecast</span> t snd) s <span class="nu">2</span> p = [<span class="const token" data-verso-hover="345">gcIb</span> s t snd <span class="nu">0</span> p, <span class="const token" data-verso-hover="345">gcIb</span> s t snd <span class="nu">1</span> p] := <span class="kw">by</span></span>
+<span id="L170">  <span class="kw">rw</span> [<span class="const token" data-verso-hover="350">hist_succ</span>, <span class="const token" data-verso-hover="349">gc_hist_one</span>]; <span class="kw">rfl</span></span>
+<span id="L171"></span>
+<span id="L172"><span class="kw">lemma</span> <span class="const token" data-verso-hover="352">gc_hist_three</span> (p : P) : <span class="const token" data-verso-hover="347">hist</span> ⊤ (<span class="const token" data-verso-hover="312">bdhGradecast</span> t snd) s <span class="nu">3</span> p =</span>
+<span id="L173">    [<span class="const token" data-verso-hover="345">gcIb</span> s t snd <span class="nu">0</span> p, <span class="const token" data-verso-hover="345">gcIb</span> s t snd <span class="nu">1</span> p, <span class="const token" data-verso-hover="345">gcIb</span> s t snd <span class="nu">2</span> p] := <span class="kw">by</span></span>
+<span id="L174">  <span class="kw">rw</span> [<span class="const token" data-verso-hover="350">hist_succ</span>, <span class="const token" data-verso-hover="351">gc_hist_two</span>]; <span class="kw">rfl</span></span>
+<span id="L175"></span>
+<span id="L176"><span class="kw">lemma</span> <span class="const token" data-verso-hover="353">gc_msg_two</span> (p : P) :</span>
+<span id="L177">    <span class="const token" data-verso-hover="322">gcMsg</span> t snd p (s.<span class="const token" data-verso-hover="242">input</span> p) (<span class="const token" data-verso-hover="347">hist</span> ⊤ (<span class="const token" data-verso-hover="312">bdhGradecast</span> t snd) s <span class="nu">2</span> p) = <span class="const token" data-verso-hover="319">gcReady</span> t (<span class="const token" data-verso-hover="348">gcC</span> s t snd <span class="nu">1</span> p) := <span class="kw">by</span></span>
+<span id="L178">  <span class="kw">rw</span> [<span class="const token" data-verso-hover="351">gc_hist_two</span>, <span class="const token" data-verso-hover="348">gcC</span>, <span class="const token" data-verso-hover="349">gc_hist_one</span>]; <span class="kw">rfl</span></span>
+<span id="L179"></span>
+<span id="L180"><span class="kw">lemma</span> <span class="const token" data-verso-hover="354">gc_status_three</span> (p : P) :</span>
+<span id="L181">    <span class="const token" data-verso-hover="355">status</span> ⊤ (<span class="const token" data-verso-hover="312">bdhGradecast</span> t snd) s <span class="nu">3</span> p = <span class="const token" data-verso-hover="316">some</span> (<span class="const token" data-verso-hover="321">gcGrade</span> t (s.<span class="const token" data-verso-hover="242">input</span> p) (<span class="const token" data-verso-hover="348">gcC</span> s t snd <span class="nu">2</span> p)) := <span class="kw">by</span></span>
+<span id="L182">  <span class="kw">simp</span> only [<span class="const token" data-verso-hover="355">status</span>, <span class="const token" data-verso-hover="352">gc_hist_three</span>, <span class="const token" data-verso-hover="348">gcC</span>, <span class="const token" data-verso-hover="351">gc_hist_two</span>]; <span class="kw">rfl</span></span>
+<span id="L183"></span>
+<span id="L184"><span class="kw">lemma</span> <span class="const token" data-verso-hover="356">gc_decide_none</span> (p : P) (x : W) (l : <span class="const token" data-verso-hover="323">History</span> P W) (hl : l.<span class="const token" data-verso-hover="357">length</span> ≠ <span class="nu">3</span>) :</span>
+<span id="L185">    (<span class="const token" data-verso-hover="312">bdhGradecast</span> t snd).<span class="const token" data-verso-hover="325">decide</span> p x l = <span class="const token" data-verso-hover="320">none</span> := <span class="kw">by</span></span>
+<span id="L186">  <span class="kw">rcases</span> l <span class="kw">with</span> _ | ⟨a, _ | ⟨b, _ | ⟨c, _ | ⟨d, l⟩⟩⟩⟩ &lt;;&gt; <span class="kw">first</span> | <span class="kw">rfl</span> | <span class="kw">simp</span> <span class="kw">at</span> hl</span>
+<span id="L187"></span>
+<span id="L188"><span class="kw">lemma</span> <span class="const token" data-verso-hover="358">gc_decides_iff</span> (p : P) (o : W × <span class="const token" data-verso-hover="250">Fin</span> <span class="nu">3</span>) :</span>
+<span id="L189">    <span class="const token" data-verso-hover="241">Decides</span> ⊤ (<span class="const token" data-verso-hover="312">bdhGradecast</span> t snd) s p o ↔ o = <span class="const token" data-verso-hover="321">gcGrade</span> t (s.<span class="const token" data-verso-hover="242">input</span> p) (<span class="const token" data-verso-hover="348">gcC</span> s t snd <span class="nu">2</span> p) := <span class="kw">by</span></span>
+<span id="L190">  <span class="kw">have</span> hd : <span class="const token" data-verso-hover="241">Decides</span> ⊤ (<span class="const token" data-verso-hover="312">bdhGradecast</span> t snd) s p (<span class="const token" data-verso-hover="321">gcGrade</span> t (s.<span class="const token" data-verso-hover="242">input</span> p) (<span class="const token" data-verso-hover="348">gcC</span> s t snd <span class="nu">2</span> p)) :=</span>
+<span id="L191">    ⟨<span class="nu">3</span>, <span class="const token" data-verso-hover="354">gc_status_three</span> s p, <span class="kw">fun</span> r hr =&gt; <span class="const token" data-verso-hover="356">gc_decide_none</span> p _ _ (<span class="kw">by</span> <span class="kw">simp</span>; <span class="kw">omega</span>)⟩</span>
+<span id="L192">  <span class="kw">exact</span> ⟨<span class="kw">fun</span> h =&gt; <span class="const token" data-verso-hover="244">Decides.unique</span> _ _ h hd, <span class="kw">fun</span> h =&gt; h ▸ hd⟩</span>
+<span id="L193"></span>
+<span id="L194"><span class="kw">variable</span> {s}</span>
+<span id="L195"></span>
+<span id="L196"><span class="dc">/-- An honest party sees exactly the protocol message of every honest party. -/</span></span>
+<span id="L197"><span class="kw">lemma</span> <span class="const token" data-verso-hover="359">gcC_honest</span> (hrel : s.<span class="const token" data-verso-hover="360">Reliable</span>) (r : <span class="const token" data-verso-hover="229">ℕ</span>) {p q : P} (hp : p ∉ s.<span class="const token" data-verso-hover="361">byz</span>) (hq : q ∉ s.<span class="const token" data-verso-hover="361">byz</span>) :</span>
+<span id="L198">    <span class="const token" data-verso-hover="348">gcC</span> s t snd r p q = <span class="const token" data-verso-hover="322">gcMsg</span> t snd q (s.<span class="const token" data-verso-hover="242">input</span> q) (<span class="const token" data-verso-hover="347">hist</span> ⊤ (<span class="const token" data-verso-hover="312">bdhGradecast</span> t snd) s r q) := <span class="kw">by</span></span>
+<span id="L199">  <span class="kw">by_cases</span> hqp : q = p</span>
+<span id="L200">  · <span class="kw">subst</span> hqp; <span class="kw">simp</span> [<span class="const token" data-verso-hover="348">gcC</span>, <span class="const token" data-verso-hover="317">gcView</span>]</span>
+<span id="L201">  · <span class="kw">simp</span> [<span class="const token" data-verso-hover="348">gcC</span>, <span class="const token" data-verso-hover="317">gcView</span>, <span class="const token" data-verso-hover="345">gcIb</span>, <span class="const token" data-verso-hover="346">deliver</span>, hqp, hq, hrel r q p, <span class="const token" data-verso-hover="312">bdhGradecast</span>]</span>
+<span id="L202"></span>
+<span id="L203"><span class="kw">end</span> Runs</span>
+<span id="L204"></span>
+<span id="L205"><span class="dc">/-! ### Correctness -/</span></span>
+<span id="L206"></span>
+<span id="L207"><span class="dc">/-- **Theorem 4** (Theorem 1 of Ben-Or–Dolev–Hoch): the 3-round protocol `bdhGradecast`</span></span>
+<span id="L208"><span class="dc">achieves gradecast (Definition 4) against `t &lt; n/3` Byzantine parties on the complete network,</span></span>
+<span id="L209"><span class="dc">without signatures; every honest party decides at round 3. -/</span></span>
+<span id="L210"><span class="kw">theorem</span> <span class="const token" data-verso-hover="26">bdhGradecast_solves</span> {t : <span class="const token" data-verso-hover="229">ℕ</span>} (ht : <span class="nu">3</span> * t &lt; <span class="const token" data-verso-hover="248">Fintype.card</span> P) (snd : P) :</span>
+<span id="L211">    <span class="const token" data-verso-hover="231">SolvesAuthWithin</span> ⊤ (<span class="const token" data-verso-hover="312">bdhGradecast</span> t snd) (<span class="const token" data-verso-hover="10">Auth.none</span> P W) (<span class="const token" data-verso-hover="251">atMost</span> t) <span class="const token" data-verso-hover="232">noPre</span> (<span class="const token" data-verso-hover="252">Gradecast</span> snd) <span class="nu">3</span> := <span class="kw">by</span></span>
+<span id="L212">  <span class="kw">intro</span> s hB hrel _ _</span>
+<span id="L213">  <span class="kw">have</span> hB : s.<span class="const token" data-verso-hover="361">byz</span>.<span class="const token" data-verso-hover="327">ncard</span> ≤ t := hB</span>
+<span id="L214">  <span class="cm">--</span><span class="cm"> honest views agree on honest parties</span></span>
+<span id="L215">  <span class="kw">have</span> hagree : ∀ r p p', p ∉ s.<span class="const token" data-verso-hover="361">byz</span> → p' ∉ s.<span class="const token" data-verso-hover="361">byz</span> → ∀ q, q ∉ s.<span class="const token" data-verso-hover="361">byz</span> →</span>
+<span id="L216">      <span class="const token" data-verso-hover="348">gcC</span> s t snd r p q = <span class="const token" data-verso-hover="348">gcC</span> s t snd r p' q := <span class="kw">fun</span> r p p' hp hp' q hq =&gt; <span class="kw">by</span></span>
+<span id="L217">    <span class="kw">rw</span> [<span class="const token" data-verso-hover="359">gcC_honest</span> hrel r hp hq, <span class="const token" data-verso-hover="359">gcC_honest</span> hrel r hp' hq]</span>
+<span id="L218">  <span class="cm">--</span><span class="cm"> honest readies are consistent</span></span>
+<span id="L219">  <span class="kw">have</span> hready : ∀ q q' w w', q ∉ s.<span class="const token" data-verso-hover="361">byz</span> → q' ∉ s.<span class="const token" data-verso-hover="361">byz</span> →</span>
+<span id="L220">      <span class="const token" data-verso-hover="322">gcMsg</span> t snd q (s.<span class="const token" data-verso-hover="242">input</span> q) (<span class="const token" data-verso-hover="347">hist</span> ⊤ (<span class="const token" data-verso-hover="312">bdhGradecast</span> t snd) s <span class="nu">2</span> q) = <span class="const token" data-verso-hover="316">some</span> w →</span>
+<span id="L221">      <span class="const token" data-verso-hover="322">gcMsg</span> t snd q' (s.<span class="const token" data-verso-hover="242">input</span> q') (<span class="const token" data-verso-hover="347">hist</span> ⊤ (<span class="const token" data-verso-hover="312">bdhGradecast</span> t snd) s <span class="nu">2</span> q') = <span class="const token" data-verso-hover="316">some</span> w' → w = w' := <span class="kw">by</span></span>
+<span id="L222">    <span class="kw">intro</span> q q' w w' hq hq' h h'</span>
+<span id="L223">    <span class="kw">rw</span> [<span class="const token" data-verso-hover="353">gc_msg_two</span>] <span class="kw">at</span> h h'</span>
+<span id="L224">    <span class="kw">have</span> h1 := <span class="const token" data-verso-hover="335">gcReady_spec</span> h</span>
+<span id="L225">    <span class="kw">have</span> h2 := <span class="const token" data-verso-hover="335">gcReady_spec</span> h'</span>
+<span id="L226">    <span class="kw">unfold</span> <span class="const token" data-verso-hover="314">gcCount</span> <span class="const token" data-verso-hover="42">Finset.countEq</span> <span class="kw">at</span> h1 h2</span>
+<span id="L227">    <span class="kw">obtain</span> ⟨u, hu, hu', hub⟩ := <span class="const token" data-verso-hover="362">Finset.exists_mem_inter_notMem_of_ncard_le</span> hB (<span class="kw">by</span> <span class="kw">omega</span> :</span>
+<span id="L228">      <span class="const token" data-verso-hover="248">Fintype.card</span> P + t &lt; (<span class="const token" data-verso-hover="187">Finset.univ</span>.<span class="const token" data-verso-hover="188">filter</span> <span class="kw">fun</span> u =&gt; <span class="const token" data-verso-hover="348">gcC</span> s t snd <span class="nu">1</span> q u = <span class="const token" data-verso-hover="316">some</span> w).<span class="const token" data-verso-hover="49">card</span> +</span>
+<span id="L229">      (<span class="const token" data-verso-hover="187">Finset.univ</span>.<span class="const token" data-verso-hover="188">filter</span> <span class="kw">fun</span> u =&gt; <span class="const token" data-verso-hover="348">gcC</span> s t snd <span class="nu">1</span> q' u = <span class="const token" data-verso-hover="316">some</span> w').<span class="const token" data-verso-hover="49">card</span>)</span>
+<span id="L230">    <span class="kw">simp</span> only [<span class="const token" data-verso-hover="189">Finset.mem_filter</span>, <span class="const token" data-verso-hover="192">Finset.mem_univ</span>, <span class="const token" data-verso-hover="363">true_and</span>] <span class="kw">at</span> hu hu'</span>
+<span id="L231">    <span class="kw">rw</span> [hagree <span class="nu">1</span> q q' hq hq' u hub, hu'] <span class="kw">at</span> hu</span>
+<span id="L232">    <span class="kw">exact</span> (<span class="const token" data-verso-hover="333">Option.some_injective</span> _ hu).<span class="const token" data-verso-hover="196">symm</span></span>
+<span id="L233">  <span class="cm">--</span><span class="cm"> `t + 1` readies of `w` include an honest one</span></span>
+<span id="L234">  <span class="kw">have</span> hready' : ∀ p w, p ∉ s.<span class="const token" data-verso-hover="361">byz</span> → t + <span class="nu">1</span> ≤ <span class="const token" data-verso-hover="314">gcCount</span> (<span class="const token" data-verso-hover="348">gcC</span> s t snd <span class="nu">2</span> p) w →</span>
+<span id="L235">      ∃ q, q ∉ s.<span class="const token" data-verso-hover="361">byz</span> ∧</span>
+<span id="L236">        <span class="const token" data-verso-hover="322">gcMsg</span> t snd q (s.<span class="const token" data-verso-hover="242">input</span> q) (<span class="const token" data-verso-hover="347">hist</span> ⊤ (<span class="const token" data-verso-hover="312">bdhGradecast</span> t snd) s <span class="nu">2</span> q) = <span class="const token" data-verso-hover="316">some</span> w := <span class="kw">by</span></span>
+<span id="L237">    <span class="kw">intro</span> p w hp h</span>
+<span id="L238">    <span class="kw">obtain</span> ⟨u, hu, hub⟩ := <span class="const token" data-verso-hover="364">Finset.exists_mem_notMem_of_ncard_le_of_lt</span> hB</span>
+<span id="L239">      (s := {u | <span class="const token" data-verso-hover="348">gcC</span> s t snd <span class="nu">2</span> p u = <span class="const token" data-verso-hover="316">some</span> w}) (<span class="kw">by</span> <span class="kw">unfold</span> <span class="const token" data-verso-hover="314">gcCount</span> <span class="const token" data-verso-hover="42">Finset.countEq</span> <span class="kw">at</span> h; <span class="kw">omega</span>)</span>
+<span id="L240">    <span class="kw">exact</span> ⟨u, hub, <span class="kw">by</span> <span class="kw">rw</span> [← <span class="const token" data-verso-hover="359">gcC_honest</span> hrel <span class="nu">2</span> hp hub]; <span class="kw">exact</span> (<span class="const token" data-verso-hover="189">Finset.mem_filter</span>.<span class="const token" data-verso-hover="138">1</span> hu).<span class="const token" data-verso-hover="108">2</span>⟩</span>
+<span id="L241">  <span class="kw">refine</span> ⟨⟨<span class="kw">fun</span> p _ =&gt; ⟨_, (<span class="const token" data-verso-hover="358">gc_decides_iff</span> s p _).<span class="const token" data-verso-hover="88">2</span> <span class="const token" data-verso-hover="82">rfl</span>⟩, ?_, ?_⟩, ?_⟩</span>
+<span id="L242">  · <span class="cm">--</span><span class="cm"> integrity</span></span>
+<span id="L243">    <span class="kw">intro</span> hsnd p hp</span>
+<span id="L244">    <span class="kw">rw</span> [<span class="const token" data-verso-hover="358">gc_decides_iff</span>]</span>
+<span id="L245">    <span class="kw">have</span> hecho : ∀ q, q ∉ s.<span class="const token" data-verso-hover="361">byz</span> →</span>
+<span id="L246">        <span class="const token" data-verso-hover="322">gcMsg</span> t snd q (s.<span class="const token" data-verso-hover="242">input</span> q) (<span class="const token" data-verso-hover="347">hist</span> ⊤ (<span class="const token" data-verso-hover="312">bdhGradecast</span> t snd) s <span class="nu">1</span> q) = <span class="const token" data-verso-hover="316">some</span> (s.<span class="const token" data-verso-hover="242">input</span> snd) := <span class="kw">by</span></span>
+<span id="L247">      <span class="kw">intro</span> q hq</span>
+<span id="L248">      <span class="kw">by_cases</span> hqs : q = snd</span>
+<span id="L249">      · <span class="kw">subst</span> hqs; <span class="kw">rw</span> [<span class="const token" data-verso-hover="349">gc_hist_one</span>]; <span class="kw">simp</span> [<span class="const token" data-verso-hover="322">gcMsg</span>]</span>
+<span id="L250">      · <span class="kw">have</span> := <span class="const token" data-verso-hover="359">gcC_honest</span> (t := t) (snd := snd) hrel <span class="nu">0</span> hq hsnd</span>
+<span id="L251">        <span class="kw">simp</span> only [<span class="const token" data-verso-hover="348">gcC</span>, <span class="const token" data-verso-hover="317">gcView</span>, <span class="const token" data-verso-hover="221">Ne.symm</span> hqs, ↓<span class="const token" data-verso-hover="365">reduceIte</span>, <span class="const token" data-verso-hover="366">hist_zero</span>] <span class="kw">at</span> this</span>
+<span id="L252">        <span class="kw">rw</span> [<span class="const token" data-verso-hover="349">gc_hist_one</span>]; <span class="kw">simp</span> only [<span class="const token" data-verso-hover="322">gcMsg</span>, hqs, ↓<span class="const token" data-verso-hover="365">reduceIte</span>, this]</span>
+<span id="L253">    <span class="kw">have</span> hrd : ∀ q, q ∉ s.<span class="const token" data-verso-hover="361">byz</span> →</span>
+<span id="L254">        <span class="const token" data-verso-hover="322">gcMsg</span> t snd q (s.<span class="const token" data-verso-hover="242">input</span> q) (<span class="const token" data-verso-hover="347">hist</span> ⊤ (<span class="const token" data-verso-hover="312">bdhGradecast</span> t snd) s <span class="nu">2</span> q) = <span class="const token" data-verso-hover="316">some</span> (s.<span class="const token" data-verso-hover="242">input</span> snd) := <span class="kw">by</span></span>
+<span id="L255">      <span class="kw">intro</span> q hq</span>
+<span id="L256">      <span class="kw">rw</span> [<span class="const token" data-verso-hover="353">gc_msg_two</span>]</span>
+<span id="L257">      <span class="kw">exact</span> <span class="const token" data-verso-hover="336">gcReady_eq</span> ht (<span class="const token" data-verso-hover="329">gcCount_of_forall</span> hB <span class="kw">fun</span> u hu =&gt; <span class="kw">by</span></span>
+<span id="L258">        <span class="kw">rw</span> [<span class="const token" data-verso-hover="359">gcC_honest</span> hrel <span class="nu">1</span> hq hu]; <span class="kw">exact</span> hecho u hu)</span>
+<span id="L259">    <span class="kw">exact</span> (<span class="const token" data-verso-hover="339">gcGrade_eq</span> ht _ (<span class="const token" data-verso-hover="329">gcCount_of_forall</span> hB <span class="kw">fun</span> u hu =&gt; <span class="kw">by</span></span>
+<span id="L260">      <span class="kw">rw</span> [<span class="const token" data-verso-hover="359">gcC_honest</span> hrel <span class="nu">2</span> hp hu]; <span class="kw">exact</span> hrd u hu)).<span class="const token" data-verso-hover="196">symm</span></span>
+<span id="L261">  · <span class="cm">--</span><span class="cm"> consistency</span></span>
+<span id="L262">    <span class="kw">intro</span> p hp q hq v w g g' h1 h2</span>
+<span id="L263">    <span class="kw">rw</span> [<span class="const token" data-verso-hover="358">gc_decides_iff</span>] <span class="kw">at</span> h1 h2</span>
+<span id="L264">    <span class="kw">have</span> hp' : p ∉ s.<span class="const token" data-verso-hover="361">byz</span> := hp</span>
+<span id="L265">    <span class="kw">have</span> hq' : q ∉ s.<span class="const token" data-verso-hover="361">byz</span> := hq</span>
+<span id="L266">    <span class="kw">constructor</span></span>
+<span id="L267">    · <span class="kw">by_cases</span> hg : g = <span class="nu">2</span></span>
+<span id="L268">      · <span class="kw">have</span> hc := <span class="const token" data-verso-hover="340">gcGrade_two</span> (<span class="kw">show</span> (<span class="const token" data-verso-hover="321">gcGrade</span> t (s.<span class="const token" data-verso-hover="242">input</span> p) (<span class="const token" data-verso-hover="348">gcC</span> s t snd <span class="nu">2</span> p)).<span class="const token" data-verso-hover="341">2</span> = <span class="nu">2</span> <span class="kw">by</span></span>
+<span id="L269">          <span class="kw">rw</span> [← h1]; <span class="kw">exact</span> hg)</span>
+<span id="L270">        <span class="kw">have</span> hc' := <span class="const token" data-verso-hover="326">gcCount_transfer</span> hB (hagree <span class="nu">2</span> p q hp' hq') hc</span>
+<span id="L271">        <span class="kw">have</span> := <span class="const token" data-verso-hover="343">gcGrade_pos_of</span> (t := t) (x := s.<span class="const token" data-verso-hover="242">input</span> q) (c := <span class="const token" data-verso-hover="348">gcC</span> s t snd <span class="nu">2</span> q) (w := (<span class="const token" data-verso-hover="321">gcGrade</span> t (s.<span class="const token" data-verso-hover="242">input</span> p) (<span class="const token" data-verso-hover="348">gcC</span> s t snd <span class="nu">2</span> p)).<span class="const token" data-verso-hover="128">1</span>) (<span class="kw">by</span> <span class="kw">omega</span>)</span>
+<span id="L272">        <span class="kw">rw</span> [← h2] <span class="kw">at</span> this</span>
+<span id="L273">        <span class="kw">simp</span> only <span class="kw">at</span> this</span>
+<span id="L274">        <span class="kw">omega</span></span>
+<span id="L275">      · <span class="kw">have</span> := g.<span class="const token" data-verso-hover="367">isLt</span></span>
+<span id="L276">        <span class="kw">have</span> : (g : <span class="const token" data-verso-hover="229">ℕ</span>) ≠ <span class="nu">2</span> := <span class="kw">fun</span> h =&gt; hg (<span class="const token" data-verso-hover="368">Fin.ext</span> h)</span>
+<span id="L277">        <span class="kw">omega</span></span>
+<span id="L278">    · <span class="kw">intro</span> hg hg'</span>
+<span id="L279">      <span class="kw">have</span> c1 := <span class="const token" data-verso-hover="342">gcGrade_pos</span> ht (<span class="kw">show</span> <span class="nu">0</span> &lt; (<span class="const token" data-verso-hover="321">gcGrade</span> t (s.<span class="const token" data-verso-hover="242">input</span> p) (<span class="const token" data-verso-hover="348">gcC</span> s t snd <span class="nu">2</span> p)).<span class="const token" data-verso-hover="341">2</span> <span class="kw">by</span></span>
+<span id="L280">        <span class="kw">rw</span> [← h1]; <span class="kw">exact</span> hg)</span>
+<span id="L281">      <span class="kw">have</span> c2 := <span class="const token" data-verso-hover="342">gcGrade_pos</span> ht (<span class="kw">show</span> <span class="nu">0</span> &lt; (<span class="const token" data-verso-hover="321">gcGrade</span> t (s.<span class="const token" data-verso-hover="242">input</span> q) (<span class="const token" data-verso-hover="348">gcC</span> s t snd <span class="nu">2</span> q)).<span class="const token" data-verso-hover="341">2</span> <span class="kw">by</span></span>
+<span id="L282">        <span class="kw">rw</span> [← h2]; <span class="kw">exact</span> hg')</span>
+<span id="L283">      <span class="kw">rw</span> [← h1] <span class="kw">at</span> c1</span>
+<span id="L284">      <span class="kw">rw</span> [← h2] <span class="kw">at</span> c2</span>
+<span id="L285">      <span class="kw">obtain</span> ⟨a, ha, ha'⟩ := hready' p v hp' c1</span>
+<span id="L286">      <span class="kw">obtain</span> ⟨b, hb, hb'⟩ := hready' q w hq' c2</span>
+<span id="L287">      <span class="kw">exact</span> hready a b v w ha hb ha' hb'</span>
+<span id="L288">  · <span class="cm">--</span><span class="cm"> termination</span></span>
+<span id="L289">    <span class="kw">intro</span> p _</span>
+<span id="L290">    <span class="kw">exact</span> ⟨<span class="nu">3</span>, <span class="const token" data-verso-hover="369">le_rfl</span>, _, <span class="const token" data-verso-hover="354">gc_status_three</span> s p⟩</span>
+<span id="L291"></span>
+<span id="L292"><span class="kw">end</span> BDH</span>
+<span id="L293"></span>
+<span id="L294"><span class="kw">end</span> TreeAA</span>
+<span id="L295"></span>
+</code></div>
+        <script>
+          window.versoHoversUrl = "PODC2026/TreeAA/-hovers.json";</script>
+        <script src="static/lean/popper.js"></script>
+        <script src="static/lean/tippy.js"></script>
+        <script src="static/lean/marked.js"></script>
+        <script src="static/lean/highlighting.js"></script>
+        <script src="static/lean/lean.js"></script>
+        </article></main><footer class="site-footer"><div class="wrap">
+        Machine-checked formalizations of PODC papers in Lean 4. Generated with <a href="https://github.com/leanprover/verso">Verso</a> from the README files of <a href="https://github.com/vasnesterov/formal_podc">vasnesterov/formal_podc</a>.</div>
+      </footer></body>
+  </html>
+

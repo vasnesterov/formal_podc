@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="light dark">
+    <link rel="icon" href="data:,">
+    <title>AnonymousMutex: Alg2.lean · Formal PODC</title><base href="../../../.././"><link rel="stylesheet" href="static/lean/verso-vars.css">
+    <link rel="stylesheet" href="static/lean/highlighting.css">
+    <link rel="stylesheet" href="static/lean/tippy-border.css">
+    <link rel="stylesheet" href="static/style.css">
+    <script defer="defer" src="static/site.js"></script>
+    </head>
+  <body>
+    <header class="site-header">
+      <div class="wrap">
+        <a class="brand" href=".">Formal PODC</a><nav class="top">
+          <a href=".">Search</a><a href="about/">About</a><a href="https://github.com/vasnesterov/formal_podc">GitHub</a></nav>
+        </div>
+      </header>
+    <main class="wrap"><article><nav class="breadcrumbs" aria-label="Breadcrumb">
+          <a href=".">Search</a><span class="sep">›</span><a href="PODC2019/">PODC 2019</a><span class="sep">›</span><a href="PODC2019/AnonymousMutex/">AnonymousMutex</a><span class="sep">›</span><a href="PODC2019/AnonymousMutex/src/">Lean source</a><span class="sep">›</span><span aria-current="page">Alg2</span></nav>
+        <h1>
+          <code>Alg2.lean</code></h1>
+        <div class="paper-links">
+          <p>
+            Source of <a href="PODC2019/AnonymousMutex/">Memory-Anonymous Symmetric Mutual Exclusion — PODC 2019</a> · <a href="https://github.com/vasnesterov/formal_podc/blob/main/Papers/PODC2019/AnonymousMutex/Alg2.lean">GitHub</a> · hover over a name for its type and documentation</p>
+          </div>
+        <div class="lean-code lean-src">
+          <code class="hl lean block" data-lean-context="Alg2"><span id="L1"><span class="kw">import</span> Papers.PODC2019.AnonymousMutex.LowerBound</span>
+<span id="L2"><span class="kw">import</span> Mathlib.Data.Finset.Lattice.Fold</span>
+<span id="L3"></span>
+<span id="L4"><span class="dc">/-!</span></span>
+<span id="L5"><span class="dc"># Algorithm 2: read/modify/write (compare&amp;swap) memory-anonymous mutex</span></span>
+<span id="L6"></span>
+<span id="L7"><span class="dc">Aghazadeh, Imbs, Raynal, Taubenfeld, Woelfel, PODC 2019 (arXiv:1810.03723), Section 5.</span></span>
+<span id="L8"></span>
+<span id="L9"><span class="dc">```</span></span>
+<span id="L10"><span class="dc">operation lock() is</span></span>
+<span id="L11"><span class="dc">(1) repeat</span></span>
+<span id="L12"><span class="dc">(2)   for each x ∈ {1..m} do R.compare&amp;swap(x, ⊥, id)</span></span>
+<span id="L13"><span class="dc">(3)   for each x ∈ {1..m} do view[x] ← R.read(x)</span></span>
+<span id="L14"><span class="dc">(4)   most_present ← maximum number of times the same non-⊥ value appears in view</span></span>
+<span id="L15"><span class="dc">(5)   owned ← |{x : view[x] = id}|</span></span>
+<span id="L16"><span class="dc">(6)   if owned &lt; most_present then</span></span>
+<span id="L17"><span class="dc">(7)     for each x ∈ {1..m} do if view[x] = id then R.write(x, ⊥)</span></span>
+<span id="L18"><span class="dc">(8)     repeat</span></span>
+<span id="L19"><span class="dc">(9)       for each x ∈ {1..m} do view[x] ← R.read(x)</span></span>
+<span id="L20"><span class="dc">(10)    until ∀ x : view[x] = ⊥</span></span>
+<span id="L21"><span class="dc">(11)  end if</span></span>
+<span id="L22"><span class="dc">(12) until owned &gt; m/2</span></span>
+<span id="L23"><span class="dc">operation unlock() is</span></span>
+<span id="L24"><span class="dc">(13) for each x ∈ {1..m} do R.compare&amp;swap(x, id, ⊥)</span></span>
+<span id="L25"><span class="dc">```</span></span>
+<span id="L26"></span>
+<span id="L27"><span class="dc">Modelling choices (see `README.md`): registers hold `Option Id` (`none` = `⊥`); every loop</span></span>
+<span id="L28"><span class="dc">iteration is one atomic access (iterations of line 7 with `view[x] ≠ id` do nothing and are</span></span>
+<span id="L29"><span class="dc">skipped); loops run in the process's local order; the bookkeeping between accesses (lines 4–6,</span></span>
+<span id="L30"><span class="dc">10–12) is folded into the continuation of the preceding access; `owned &gt; m/2` is `m &lt; 2 owned`.</span></span>
+<span id="L31"><span class="dc">The loop of lines 8–10 keeps a flag `ab` ("all entries read so far were `⊥`").</span></span>
+<span id="L32"><span class="dc">-/</span></span>
+<span id="L33"></span>
+<span id="L34"><span class="kw">set_option</span> <span class="const token" data-verso-hover="13">linter.unusedSectionVars</span> false</span>
+<span id="L35"></span>
+<span id="L36"><span class="kw">open</span> Cslib.SharedMemory</span>
+<span id="L37"></span>
+<span id="L38"><span class="kw">namespace</span> AnonymousMutex.Alg2</span>
+<span id="L39"></span>
+<span id="L40"><span class="dc">/-- Program counters of Algorithm 2. -/</span></span>
+<span id="L41"><span class="kw">inductive</span> <span class="const token" data-verso-hover="319">PC</span></span>
+<span id="L42">  <span class="dc">/-- remainder section -/</span></span>
+<span id="L43">  | <span class="const token" data-verso-hover="320">rem</span></span>
+<span id="L44">  <span class="dc">/-- line 2: `compare&amp;swap(i, ⊥, id)` -/</span></span>
+<span id="L45">  | <span class="const token" data-verso-hover="321">cas</span> (i : <span class="const token" data-verso-hover="15">ℕ</span>)</span>
+<span id="L46">  <span class="dc">/-- line 3: `view[i] ← read(i)` -/</span></span>
+<span id="L47">  | <span class="const token" data-verso-hover="322">read</span> (i : <span class="const token" data-verso-hover="15">ℕ</span>)</span>
+<span id="L48">  <span class="dc">/-- line 7: `write(i, ⊥)` (only for `view[i] = id`) -/</span></span>
+<span id="L49">  | <span class="const token" data-verso-hover="323">wr</span> (i : <span class="const token" data-verso-hover="15">ℕ</span>)</span>
+<span id="L50">  <span class="dc">/-- line 9: `read(i)`; `ab` = all entries read so far in this scan were `⊥` -/</span></span>
+<span id="L51">  | <span class="const token" data-verso-hover="324">wait</span> (i : <span class="const token" data-verso-hover="15">ℕ</span>) (ab : <span class="const token" data-verso-hover="21">Bool</span>)</span>
+<span id="L52">  <span class="dc">/-- `lock()` returns -/</span></span>
+<span id="L53">  | <span class="const token" data-verso-hover="325">retLock</span></span>
+<span id="L54">  <span class="dc">/-- critical section -/</span></span>
+<span id="L55">  | <span class="const token" data-verso-hover="326">cs</span></span>
+<span id="L56">  <span class="dc">/-- line 13: `compare&amp;swap(i, id, ⊥)` -/</span></span>
+<span id="L57">  | <span class="const token" data-verso-hover="327">un</span> (i : <span class="const token" data-verso-hover="15">ℕ</span>)</span>
+<span id="L58">  <span class="dc">/-- `unlock()` returns -/</span></span>
+<span id="L59">  | <span class="const token" data-verso-hover="328">retUnlock</span></span>
+<span id="L60">  <span class="kw">deriving</span> <span class="const token" data-verso-hover="26">DecidableEq</span></span>
+<span id="L61"></span>
+<span id="L62"><span class="dc">/-- Local state: identifier, program counter, view. -/</span></span>
+<span id="L63"><span class="kw">structure</span> <span class="const token" data-verso-hover="329">St</span> (Id : <span class="kw">Type</span>) (m : <span class="const token" data-verso-hover="15">ℕ</span>) <span class="kw">where</span></span>
+<span id="L64">  <span class="const token" data-verso-hover="330">me</span> : Id</span>
+<span id="L65">  <span class="const token" data-verso-hover="331">pc</span> : <span class="const token" data-verso-hover="319">PC</span></span>
+<span id="L66">  <span class="const token" data-verso-hover="332">view</span> : <span class="const token" data-verso-hover="19">Fin</span> m → <span class="const token" data-verso-hover="31">Option</span> Id</span>
+<span id="L67"></span>
+<span id="L68"><span class="kw">variable</span> {Id : <span class="kw">Type</span>} [<span class="const token" data-verso-hover="26">DecidableEq</span> Id] {m : <span class="const token" data-verso-hover="15">ℕ</span>}</span>
+<span id="L69"></span>
+<span id="L70"><span class="dc">/-- The first local index `≥ i` whose view entry is the own identifier (`m` if none). -/</span></span>
+<span id="L71"><span class="kw">def</span> <span class="const token" data-verso-hover="333">nextOwn</span> (view : <span class="const token" data-verso-hover="19">Fin</span> m → <span class="const token" data-verso-hover="31">Option</span> Id) (me : Id) (i : <span class="const token" data-verso-hover="15">ℕ</span>) : <span class="const token" data-verso-hover="15">ℕ</span> :=</span>
+<span id="L72">  (((<span class="const token" data-verso-hover="33">List.finRange</span> m).<span class="const token" data-verso-hover="34">find?</span> (<span class="kw">fun</span> x =&gt; <span class="const token" data-verso-hover="35">decide</span> (i ≤ x.<span class="const token" data-verso-hover="36">val</span>) &amp;&amp; <span class="const token" data-verso-hover="35">decide</span> (view x = <span class="const token" data-verso-hover="37">some</span> me))).<span class="const token" data-verso-hover="38">map</span></span>
+<span id="L73">    <span class="const token" data-verso-hover="36">Fin.val</span>).<span class="const token" data-verso-hover="39">getD</span> m</span>
+<span id="L74"></span>
+<span id="L75"><span class="dc">/-- `owned`: number of entries of the view equal to `me`. -/</span></span>
+<span id="L76"><span class="kw">def</span> <span class="const token" data-verso-hover="334">owned</span> (view : <span class="const token" data-verso-hover="19">Fin</span> m → <span class="const token" data-verso-hover="31">Option</span> Id) (me : Id) : <span class="const token" data-verso-hover="15">ℕ</span> :=</span>
+<span id="L77">  (<span class="const token" data-verso-hover="42">Finset.univ</span>.<span class="const token" data-verso-hover="43">filter</span> (<span class="kw">fun</span> x =&gt; view x = <span class="const token" data-verso-hover="37">some</span> me)).<span class="const token" data-verso-hover="44">card</span></span>
+<span id="L78"></span>
+<span id="L79"><span class="dc">/-- `most_present`: the maximal number of occurrences of a non-`⊥` value in the view. -/</span></span>
+<span id="L80"><span class="kw">def</span> <span class="const token" data-verso-hover="335">mostPresent</span> (view : <span class="const token" data-verso-hover="19">Fin</span> m → <span class="const token" data-verso-hover="31">Option</span> Id) : <span class="const token" data-verso-hover="15">ℕ</span> :=</span>
+<span id="L81">  <span class="const token" data-verso-hover="42">Finset.univ</span>.<span class="const token" data-verso-hover="336">sup</span> (<span class="kw">fun</span> x =&gt; <span class="kw">if</span> view x = <span class="const token" data-verso-hover="48">none</span> <span class="kw">then</span> <span class="nu">0</span> <span class="kw">else</span></span>
+<span id="L82">    (<span class="const token" data-verso-hover="42">Finset.univ</span>.<span class="const token" data-verso-hover="43">filter</span> (<span class="kw">fun</span> y =&gt; view y = view x)).<span class="const token" data-verso-hover="44">card</span>)</span>
+<span id="L83"></span>
+<span id="L84"><span class="dc">/-- Continue the loop of line 7 at local index `i` (or start waiting, lines 8–10). -/</span></span>
+<span id="L85"><span class="kw">def</span> <span class="const token" data-verso-hover="337">wrFrom</span> (s : <span class="const token" data-verso-hover="329">St</span> Id m) (i : <span class="const token" data-verso-hover="15">ℕ</span>) : <span class="const token" data-verso-hover="329">St</span> Id m :=</span>
+<span id="L86">  <span class="kw">if</span> <span class="const token" data-verso-hover="333">nextOwn</span> s.<span class="const token" data-verso-hover="332">view</span> s.<span class="const token" data-verso-hover="330">me</span> i &lt; m <span class="kw">then</span> { s <span class="kw">with</span> <span class="const token" data-verso-hover="331">pc</span> := <span class="const token" data-verso-hover="323">.</span>wr (<span class="const token" data-verso-hover="333">nextOwn</span> s.<span class="const token" data-verso-hover="332">view</span> s.<span class="const token" data-verso-hover="330">me</span> i) }</span>
+<span id="L87">  <span class="kw">else</span> { s <span class="kw">with</span> <span class="const token" data-verso-hover="331">pc</span> := <span class="const token" data-verso-hover="324">.</span>wait <span class="nu">0</span> <span class="const token" data-verso-hover="59">true</span> }</span>
+<span id="L88"></span>
+<span id="L89"><span class="dc">/-- Lines 4–6 and 12 after the view `w` has been read. -/</span></span>
+<span id="L90"><span class="kw">def</span> <span class="const token" data-verso-hover="338">afterRead</span> (s : <span class="const token" data-verso-hover="329">St</span> Id m) (w : <span class="const token" data-verso-hover="19">Fin</span> m → <span class="const token" data-verso-hover="31">Option</span> Id) : <span class="const token" data-verso-hover="329">St</span> Id m :=</span>
+<span id="L91">  <span class="kw">if</span> <span class="const token" data-verso-hover="334">owned</span> w s.<span class="const token" data-verso-hover="330">me</span> &lt; <span class="const token" data-verso-hover="335">mostPresent</span> w <span class="kw">then</span> <span class="const token" data-verso-hover="337">wrFrom</span> { s <span class="kw">with</span> <span class="const token" data-verso-hover="332">view</span> := w } <span class="nu">0</span></span>
+<span id="L92">  <span class="kw">else</span> <span class="kw">if</span> m &lt; <span class="nu">2</span> * <span class="const token" data-verso-hover="334">owned</span> w s.<span class="const token" data-verso-hover="330">me</span> <span class="kw">then</span> { s <span class="kw">with</span> <span class="const token" data-verso-hover="332">view</span> := w, <span class="const token" data-verso-hover="331">pc</span> := <span class="const token" data-verso-hover="325">.</span>retLock }</span>
+<span id="L93">  <span class="kw">else</span> { s <span class="kw">with</span> <span class="const token" data-verso-hover="332">view</span> := w, <span class="const token" data-verso-hover="331">pc</span> := <span class="const token" data-verso-hover="321">.</span>cas <span class="nu">0</span> }</span>
+<span id="L94"></span>
+<span id="L95"><span class="dc">/-- Algorithm 2 as a symmetric algorithm. -/</span></span>
+<span id="L96"><span class="kw">def</span> <span class="const token" data-verso-hover="339">alg2</span> (Id : <span class="kw">Type</span>) [<span class="const token" data-verso-hover="26">DecidableEq</span> Id] (m : <span class="const token" data-verso-hover="15">ℕ</span>) : <span class="const token" data-verso-hover="52">SymAlg</span> <span class="const token" data-verso-hover="53">mutexObj</span> Id m (<span class="const token" data-verso-hover="31">Option</span> Id) (<span class="const token" data-verso-hover="329">St</span> Id m) <span class="kw">where</span></span>
+<span id="L97">  <span class="const token" data-verso-hover="54">bot</span> := <span class="const token" data-verso-hover="48">none</span></span>
+<span id="L98">  <span class="const token" data-verso-hover="55">init</span> a := ⟨a, <span class="const token" data-verso-hover="320">.</span>rem, <span class="kw">fun</span> _ =&gt; <span class="const token" data-verso-hover="48">none</span>⟩</span>
+<span id="L99">  <span class="const token" data-verso-hover="56">invoke</span> s o := <span class="kw">match</span> s.<span class="const token" data-verso-hover="331">pc</span>, o <span class="kw">with</span></span>
+<span id="L100">    | <span class="const token" data-verso-hover="320">.</span>rem, <span class="const token" data-verso-hover="57">.</span>lock =&gt; { s <span class="kw">with</span> <span class="const token" data-verso-hover="331">pc</span> := <span class="const token" data-verso-hover="321">.</span>cas <span class="nu">0</span> }</span>
+<span id="L101">    | <span class="const token" data-verso-hover="326">.</span>cs, <span class="const token" data-verso-hover="58">.</span>unlock =&gt; { s <span class="kw">with</span> <span class="const token" data-verso-hover="331">pc</span> := <span class="const token" data-verso-hover="327">.</span>un <span class="nu">0</span> }</span>
+<span id="L102">    | _, _ =&gt; s</span>
+<span id="L103">  <span class="const token" data-verso-hover="60">act</span> s := <span class="kw">match</span> s.<span class="const token" data-verso-hover="331">pc</span> <span class="kw">with</span></span>
+<span id="L104">    | <span class="const token" data-verso-hover="321">.</span>cas i =&gt;</span>
+<span id="L105">      <span class="kw">if</span> h : i &lt; m <span class="kw">then</span></span>
+<span id="L106">        <span class="const token" data-verso-hover="62">.</span>rmw ⟨i, h⟩ (<span class="kw">fun</span> v =&gt; <span class="kw">if</span> v = <span class="const token" data-verso-hover="48">none</span> <span class="kw">then</span> <span class="const token" data-verso-hover="37">some</span> s.<span class="const token" data-verso-hover="330">me</span> <span class="kw">else</span> v)</span>
+<span id="L107">          (<span class="kw">fun</span> _ =&gt; <span class="kw">if</span> i + <span class="nu">1</span> &lt; m <span class="kw">then</span> { s <span class="kw">with</span> <span class="const token" data-verso-hover="331">pc</span> := <span class="const token" data-verso-hover="321">.</span>cas (i + <span class="nu">1</span>) } <span class="kw">else</span> { s <span class="kw">with</span> <span class="const token" data-verso-hover="331">pc</span> := <span class="const token" data-verso-hover="322">.</span>read <span class="nu">0</span> })</span>
+<span id="L108">      <span class="kw">else</span> <span class="const token" data-verso-hover="63">.</span>ret <span class="const token" data-verso-hover="64">(</span>) s</span>
+<span id="L109">    | <span class="const token" data-verso-hover="322">.</span>read i =&gt;</span>
+<span id="L110">      <span class="kw">if</span> h : i &lt; m <span class="kw">then</span></span>
+<span id="L111">        <span class="const token" data-verso-hover="62">.</span>rmw ⟨i, h⟩ (<span class="kw">fun</span> v =&gt; v) (<span class="kw">fun</span> v =&gt;</span>
+<span id="L112">          <span class="kw">if</span> i + <span class="nu">1</span> &lt; m <span class="kw">then</span> { s <span class="kw">with</span> <span class="const token" data-verso-hover="332">view</span> := <span class="const token" data-verso-hover="210">Function.update</span> s.<span class="const token" data-verso-hover="332">view</span> ⟨i, h⟩ v, <span class="const token" data-verso-hover="331">pc</span> := <span class="const token" data-verso-hover="322">.</span>read (i + <span class="nu">1</span>) }</span>
+<span id="L113">          <span class="kw">else</span> <span class="const token" data-verso-hover="338">afterRead</span> s (<span class="const token" data-verso-hover="210">Function.update</span> s.<span class="const token" data-verso-hover="332">view</span> ⟨i, h⟩ v))</span>
+<span id="L114">      <span class="kw">else</span> <span class="const token" data-verso-hover="63">.</span>ret <span class="const token" data-verso-hover="64">(</span>) s</span>
+<span id="L115">    | <span class="const token" data-verso-hover="323">.</span>wr i =&gt;</span>
+<span id="L116">      <span class="kw">if</span> h : i &lt; m <span class="kw">then</span> <span class="const token" data-verso-hover="62">.</span>rmw ⟨i, h⟩ (<span class="kw">fun</span> _ =&gt; <span class="const token" data-verso-hover="48">none</span>) (<span class="kw">fun</span> _ =&gt; <span class="const token" data-verso-hover="337">wrFrom</span> s (i + <span class="nu">1</span>))</span>
+<span id="L117">      <span class="kw">else</span> <span class="const token" data-verso-hover="63">.</span>ret <span class="const token" data-verso-hover="64">(</span>) s</span>
+<span id="L118">    | <span class="const token" data-verso-hover="324">.</span>wait i ab =&gt;</span>
+<span id="L119">      <span class="kw">if</span> h : i &lt; m <span class="kw">then</span></span>
+<span id="L120">        <span class="const token" data-verso-hover="62">.</span>rmw ⟨i, h⟩ (<span class="kw">fun</span> v =&gt; v) (<span class="kw">fun</span> v =&gt;</span>
+<span id="L121">          <span class="kw">if</span> i + <span class="nu">1</span> &lt; m <span class="kw">then</span> { s <span class="kw">with</span> <span class="const token" data-verso-hover="331">pc</span> := <span class="const token" data-verso-hover="324">.</span>wait (i + <span class="nu">1</span>) (ab &amp;&amp; v == <span class="const token" data-verso-hover="48">none</span>) }</span>
+<span id="L122">          <span class="kw">else</span> <span class="kw">if</span> ab &amp;&amp; v == <span class="const token" data-verso-hover="48">none</span> <span class="kw">then</span> { s <span class="kw">with</span> <span class="const token" data-verso-hover="331">pc</span> := <span class="const token" data-verso-hover="321">.</span>cas <span class="nu">0</span> } <span class="kw">else</span> { s <span class="kw">with</span> <span class="const token" data-verso-hover="331">pc</span> := <span class="const token" data-verso-hover="324">.</span>wait <span class="nu">0</span> <span class="const token" data-verso-hover="59">true</span> })</span>
+<span id="L123">      <span class="kw">else</span> <span class="const token" data-verso-hover="63">.</span>ret <span class="const token" data-verso-hover="64">(</span>) s</span>
+<span id="L124">    | <span class="const token" data-verso-hover="325">.</span>retLock =&gt; <span class="const token" data-verso-hover="63">.</span>ret <span class="const token" data-verso-hover="64">(</span>) { s <span class="kw">with</span> <span class="const token" data-verso-hover="331">pc</span> := <span class="const token" data-verso-hover="326">.</span>cs }</span>
+<span id="L125">    | <span class="const token" data-verso-hover="327">.</span>un i =&gt;</span>
+<span id="L126">      <span class="kw">if</span> h : i &lt; m <span class="kw">then</span></span>
+<span id="L127">        <span class="const token" data-verso-hover="62">.</span>rmw ⟨i, h⟩ (<span class="kw">fun</span> v =&gt; <span class="kw">if</span> v = <span class="const token" data-verso-hover="37">some</span> s.<span class="const token" data-verso-hover="330">me</span> <span class="kw">then</span> <span class="const token" data-verso-hover="48">none</span> <span class="kw">else</span> v)</span>
+<span id="L128">          (<span class="kw">fun</span> _ =&gt; <span class="kw">if</span> i + <span class="nu">1</span> &lt; m <span class="kw">then</span> { s <span class="kw">with</span> <span class="const token" data-verso-hover="331">pc</span> := <span class="const token" data-verso-hover="327">.</span>un (i + <span class="nu">1</span>) } <span class="kw">else</span> { s <span class="kw">with</span> <span class="const token" data-verso-hover="331">pc</span> := <span class="const token" data-verso-hover="328">.</span>retUnlock })</span>
+<span id="L129">      <span class="kw">else</span> <span class="const token" data-verso-hover="63">.</span>ret <span class="const token" data-verso-hover="64">(</span>) s</span>
+<span id="L130">    | <span class="const token" data-verso-hover="328">.</span>retUnlock =&gt; <span class="const token" data-verso-hover="63">.</span>ret <span class="const token" data-verso-hover="64">(</span>) { s <span class="kw">with</span> <span class="const token" data-verso-hover="331">pc</span> := <span class="const token" data-verso-hover="320">.</span>rem }</span>
+<span id="L131">    | _ =&gt; <span class="const token" data-verso-hover="63">.</span>ret <span class="const token" data-verso-hover="64">(</span>) s</span>
+<span id="L132"></span>
+<span id="L133"><span class="kw">end</span> AnonymousMutex.Alg2</span>
+<span id="L134"></span>
+</code></div>
+        <script>
+          window.versoHoversUrl = "PODC2019/AnonymousMutex/-hovers.json";</script>
+        <script src="static/lean/popper.js"></script>
+        <script src="static/lean/tippy.js"></script>
+        <script src="static/lean/marked.js"></script>
+        <script src="static/lean/highlighting.js"></script>
+        <script src="static/lean/lean.js"></script>
+        </article></main><footer class="site-footer"><div class="wrap">
+        Machine-checked formalizations of PODC papers in Lean 4. Generated with <a href="https://github.com/leanprover/verso">Verso</a> from the README files of <a href="https://github.com/vasnesterov/formal_podc">vasnesterov/formal_podc</a>.</div>
+      </footer></body>
+  </html>
+

@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="light dark">
+    <link rel="icon" href="data:,">
+    <title>LockFreeLinearProbing: Defs.lean · Formal PODC</title><base href="../../../.././"><link rel="stylesheet" href="static/lean/verso-vars.css">
+    <link rel="stylesheet" href="static/lean/highlighting.css">
+    <link rel="stylesheet" href="static/lean/tippy-border.css">
+    <link rel="stylesheet" href="static/style.css">
+    <script defer="defer" src="static/site.js"></script>
+    </head>
+  <body>
+    <header class="site-header">
+      <div class="wrap">
+        <a class="brand" href=".">Formal PODC</a><nav class="top">
+          <a href=".">Search</a><a href="about/">About</a><a href="https://github.com/vasnesterov/formal_podc">GitHub</a></nav>
+        </div>
+      </header>
+    <main class="wrap"><article><nav class="breadcrumbs" aria-label="Breadcrumb">
+          <a href=".">Search</a><span class="sep">›</span><a href="PODC2026/">PODC 2026</a><span class="sep">›</span><a href="PODC2026/LockFreeLinearProbing/">LockFreeLinearProbing</a><span class="sep">›</span><a href="PODC2026/LockFreeLinearProbing/src/">Lean source</a><span class="sep">›</span><span aria-current="page">Defs</span></nav>
+        <h1>
+          <code>Defs.lean</code></h1>
+        <div class="paper-links">
+          <p>
+            Source of <a href="PODC2026/LockFreeLinearProbing/">Space-Efficient Lock-Free Linear-Probing Hash Table — PODC 2026</a> · <a href="https://github.com/vasnesterov/formal_podc/blob/main/Papers/PODC2026/LockFreeLinearProbing/Defs.lean">GitHub</a> · hover over a name for its type and documentation</p>
+          </div>
+        <div class="lean-code lean-src">
+          <code class="hl lean block" data-lean-context="Defs"><span id="L1"><span class="kw">import</span> Cslib.Computability.Distributed.SharedMemory.Model</span>
+<span id="L2"><span class="kw">import</span> Cslib.Computability.Distributed.SharedMemory.Objects.LLSC</span>
+<span id="L3"><span class="kw">import</span> Mathlib</span>
+<span id="L4"></span>
+<span id="L5"><span class="dc">/-!</span></span>
+<span id="L6"><span class="dc"># The LL/SC lock-free linear-probing hash table (Algorithms 1–5)</span></span>
+<span id="L7"></span>
+<span id="L8"><span class="dc">Attiya, Oshman, Schiller, *Space-Efficient Lock-Free Linear-Probing Hash Table*,</span></span>
+<span id="L9"><span class="dc">arXiv 2606.17315v1 (full version of the PODC 2026 brief announcement).</span></span>
+<span id="L10"></span>
+<span id="L11"><span class="dc">The table `table[0..m-1]` is modelled in CSLib's asynchronous shared-memory model</span></span>
+<span id="L12"><span class="dc">(`Cslib.SharedMemory.Impl`): base object `i : Fin m` is an LL/SC object (`llscObj`) holding a</span></span>
+<span id="L13"><span class="dc">`Cell`. Following Algorithm 5, `Read` is `LL`, `Modify(loc, old, new)` is `SC(loc, new)` and the</span></span>
+<span id="L14"><span class="dc">plain reads `table[i]` of lines 94, 102 and 105 are `VL` (which returns the current value and</span></span>
+<span id="L15"><span class="dc">does not touch any link). Indices are `Fin m`, so `i + 1` and `i - 1` wrap around (the paper:</span></span>
+<span id="L16"><span class="dc">"we use modular arithmetic that wraps at the m-th cell"); the comparison `i − h(v) &lt; j − h(v)`</span></span>
+<span id="L17"><span class="dc">of line 51 is `dist v i &lt; dist v j` with `dist v i = (i - h v).val ∈ [0, m)`.</span></span>
+<span id="L18"></span>
+<span id="L19"><span class="dc">Each process runs the pseudocode as a state machine: the program counter `PC` names the next</span></span>
+<span id="L20"><span class="dc">shared-memory access (one primitive per step, as in Section 3); the local computation between</span></span>
+<span id="L21"><span class="dc">two accesses (control flow of Algorithms 1–4, including the `goto`s and the returns of the helper</span></span>
+<span id="L22"><span class="dc">functions) is done by the functions `fsBody`, `vcRet`, `dsBody`, … below.</span></span>
+<span id="L23"></span>
+<span id="L24"><span class="dc">The dictionary (Section 4) is the nondeterministic specification `dictSpec`: `insert` may also</span></span>
+<span id="L25"><span class="dc">return `ABORT` at any time without changing the state.</span></span>
+<span id="L26"><span class="dc">-/</span></span>
+<span id="L27"></span>
+<span id="L28"><span class="kw">namespace</span> Podc.LockFreeLinearProbing</span>
+<span id="L29"></span>
+<span id="L30"><span class="kw">open</span> Cslib.SharedMemory</span>
+<span id="L31"></span>
+<span id="L32"><span class="dc">/-! ## Cells, operations, responses -/</span></span>
+<span id="L33"></span>
+<span id="L34"><span class="dc">/-- The tag of a stored key: `tentative`, `final` or `revalidate`. -/</span></span>
+<span id="L35"><span class="kw">inductive</span> <span class="const token" data-verso-hover="103">Tag</span> <span class="kw">where</span></span>
+<span id="L36">  | <span class="const token" data-verso-hover="104">tent</span></span>
+<span id="L37">  | <span class="const token" data-verso-hover="105">fin</span></span>
+<span id="L38">  | <span class="const token" data-verso-hover="106">reval</span></span>
+<span id="L39">  <span class="kw">deriving</span> <span class="const token" data-verso-hover="107">DecidableEq</span>, <span class="const token" data-verso-hover="108">Repr</span></span>
+<span id="L40"></span>
+<span id="L41"><span class="dc">/-- The content of a table cell (LL/SC version): `EMPTY`, `TOMBSTONE`, the cleanup states</span></span>
+<span id="L42"><span class="dc">`DELETED`, `COLLIDED`, or a tagged key `⟨v, tag⟩`. -/</span></span>
+<span id="L43"><span class="kw">inductive</span> <span class="const token" data-verso-hover="109">Cell</span> (K : <span class="kw">Type</span>) <span class="kw">where</span></span>
+<span id="L44">  | <span class="const token" data-verso-hover="110">empty</span></span>
+<span id="L45">  | <span class="const token" data-verso-hover="111">tomb</span></span>
+<span id="L46">  | <span class="const token" data-verso-hover="112">deleted</span></span>
+<span id="L47">  | <span class="const token" data-verso-hover="113">collided</span></span>
+<span id="L48">  | <span class="const token" data-verso-hover="114">key</span> (v : K) (t : <span class="const token" data-verso-hover="103">Tag</span>)</span>
+<span id="L49">  <span class="kw">deriving</span> <span class="const token" data-verso-hover="107">DecidableEq</span>, <span class="const token" data-verso-hover="108">Repr</span></span>
+<span id="L50"></span>
+<span id="L51"><span class="dc">/-- The key stored in a cell (`val(x)` of the paper), if any. -/</span></span>
+<span id="L52"><span class="kw">def</span> <span class="const token" data-verso-hover="115">Cell.key?</span> {K : <span class="kw">Type</span>} : <span class="const token" data-verso-hover="109">Cell</span> K → <span class="const token" data-verso-hover="72">Option</span> K</span>
+<span id="L53">  | <span class="const token" data-verso-hover="114">.</span>key v _ =&gt; <span class="const token" data-verso-hover="68">some</span> v</span>
+<span id="L54">  | _ =&gt; <span class="const token" data-verso-hover="71">none</span></span>
+<span id="L55"></span>
+<span id="L56">@[<span class="kw">simp</span>] <span class="kw">lemma</span> <span class="const token" data-verso-hover="116">Cell.key?_key</span> {K : <span class="kw">Type</span>} (v : K) (t : <span class="const token" data-verso-hover="103">Tag</span>) : (<span class="const token" data-verso-hover="114">Cell.key</span> v t).<span class="const token" data-verso-hover="115">key?</span> = <span class="const token" data-verso-hover="68">some</span> v := <span class="const token" data-verso-hover="117">rfl</span></span>
+<span id="L57">@[<span class="kw">simp</span>] <span class="kw">lemma</span> <span class="const token" data-verso-hover="118">Cell.key?_empty</span> {K : <span class="kw">Type</span>} : (<span class="const token" data-verso-hover="110">Cell.empty</span> : <span class="const token" data-verso-hover="109">Cell</span> K).<span class="const token" data-verso-hover="115">key?</span> = <span class="const token" data-verso-hover="71">none</span> := <span class="const token" data-verso-hover="117">rfl</span></span>
+<span id="L58">@[<span class="kw">simp</span>] <span class="kw">lemma</span> <span class="const token" data-verso-hover="119">Cell.key?_tomb</span> {K : <span class="kw">Type</span>} : (<span class="const token" data-verso-hover="111">Cell.tomb</span> : <span class="const token" data-verso-hover="109">Cell</span> K).<span class="const token" data-verso-hover="115">key?</span> = <span class="const token" data-verso-hover="71">none</span> := <span class="const token" data-verso-hover="117">rfl</span></span>
+<span id="L59">@[<span class="kw">simp</span>] <span class="kw">lemma</span> <span class="const token" data-verso-hover="120">Cell.key?_deleted</span> {K : <span class="kw">Type</span>} : (<span class="const token" data-verso-hover="112">Cell.deleted</span> : <span class="const token" data-verso-hover="109">Cell</span> K).<span class="const token" data-verso-hover="115">key?</span> = <span class="const token" data-verso-hover="71">none</span> := <span class="const token" data-verso-hover="117">rfl</span></span>
+<span id="L60">@[<span class="kw">simp</span>] <span class="kw">lemma</span> <span class="const token" data-verso-hover="121">Cell.key?_collided</span> {K : <span class="kw">Type</span>} : (<span class="const token" data-verso-hover="113">Cell.collided</span> : <span class="const token" data-verso-hover="109">Cell</span> K).<span class="const token" data-verso-hover="115">key?</span> = <span class="const token" data-verso-hover="71">none</span> := <span class="const token" data-verso-hover="117">rfl</span></span>
+<span id="L61"></span>
+<span id="L62"><span class="dc">/-- Dictionary operations. -/</span></span>
+<span id="L63"><span class="kw">inductive</span> <span class="const token" data-verso-hover="47">DOp</span> (K : <span class="kw">Type</span>) <span class="kw">where</span></span>
+<span id="L64">  | <span class="const token" data-verso-hover="3">insert</span> (v : K)</span>
+<span id="L65">  | <span class="const token" data-verso-hover="4">delete</span> (v : K)</span>
+<span id="L66">  | <span class="const token" data-verso-hover="51">lookup</span> (v : K)</span>
+<span id="L67">  <span class="kw">deriving</span> <span class="const token" data-verso-hover="107">DecidableEq</span>, <span class="const token" data-verso-hover="108">Repr</span></span>
+<span id="L68"></span>
+<span id="L69"><span class="dc">/-- The key of an operation. -/</span></span>
+<span id="L70"><span class="kw">def</span> <span class="const token" data-verso-hover="122">DOp.key</span> {K : <span class="kw">Type</span>} : <span class="const token" data-verso-hover="47">DOp</span> K → K</span>
+<span id="L71">  | <span class="const token" data-verso-hover="3">.</span>insert v | <span class="const token" data-verso-hover="4">.</span>delete v | <span class="const token" data-verso-hover="51">.</span>lookup v =&gt; v</span>
+<span id="L72"></span>
+<span id="L73"><span class="dc">/-- Responses: `true`, `false`, or `ABORT` (only for `insert`). -/</span></span>
+<span id="L74"><span class="kw">inductive</span> <span class="const token" data-verso-hover="48">Res</span> <span class="kw">where</span></span>
+<span id="L75">  | <span class="const token" data-verso-hover="41">ok</span> (b : <span class="const token" data-verso-hover="46">Bool</span>)</span>
+<span id="L76">  | <span class="const token" data-verso-hover="49">abort</span></span>
+<span id="L77">  <span class="kw">deriving</span> <span class="const token" data-verso-hover="107">DecidableEq</span>, <span class="const token" data-verso-hover="108">Repr</span></span>
+<span id="L78"></span>
+<span id="L79"><span class="dc">/-- The dictionary as a deterministic object (no aborts); the state says which keys are in the</span></span>
+<span id="L80"><span class="dc">set. Used for the operation and response types of the implementation. -/</span></span>
+<span id="L81"><span class="kw">def</span> <span class="const token" data-verso-hover="23">dict</span> (K : <span class="kw">Type</span>) [<span class="const token" data-verso-hover="107">DecidableEq</span> K] : <span class="const token" data-verso-hover="123">ObjSpec</span> <span class="kw">where</span></span>
+<span id="L82">  <span class="const token" data-verso-hover="124">State</span> := K → <span class="const token" data-verso-hover="46">Bool</span></span>
+<span id="L83">  <span class="const token" data-verso-hover="58">Op</span> := <span class="const token" data-verso-hover="47">DOp</span> K</span>
+<span id="L84">  <span class="const token" data-verso-hover="59">Resp</span> := <span class="const token" data-verso-hover="48">Res</span></span>
+<span id="L85">  <span class="const token" data-verso-hover="125">init</span> := <span class="kw">fun</span> _ =&gt; <span class="const token" data-verso-hover="1">false</span></span>
+<span id="L86">  <span class="const token" data-verso-hover="126">δ</span> s</span>
+<span id="L87">    | <span class="const token" data-verso-hover="3">.</span>insert v =&gt; (<span class="const token" data-verso-hover="50">Function.update</span> s v <span class="const token" data-verso-hover="2">true</span>, <span class="const token" data-verso-hover="41">.</span>ok (!s v))</span>
+<span id="L88">    | <span class="const token" data-verso-hover="4">.</span>delete v =&gt; (<span class="const token" data-verso-hover="50">Function.update</span> s v <span class="const token" data-verso-hover="1">false</span>, <span class="const token" data-verso-hover="41">.</span>ok (s v))</span>
+<span id="L89">    | <span class="const token" data-verso-hover="51">.</span>lookup v =&gt; (s, <span class="const token" data-verso-hover="41">.</span>ok (s v))</span>
+<span id="L90"></span>
+<span id="L91"><span class="const token" data-verso-hover="127">instance</span> (K : <span class="kw">Type</span>) [<span class="const token" data-verso-hover="107">DecidableEq</span> K] : <span class="const token" data-verso-hover="107">DecidableEq</span> (<span class="const token" data-verso-hover="23">dict</span> K).<span class="const token" data-verso-hover="59">Resp</span> := inferInstanceAs (<span class="const token" data-verso-hover="107">DecidableEq</span> <span class="const token" data-verso-hover="48">Res</span>)</span>
+<span id="L92"><span class="const token" data-verso-hover="128">instance</span> (K : <span class="kw">Type</span>) [<span class="const token" data-verso-hover="107">DecidableEq</span> K] : <span class="const token" data-verso-hover="107">DecidableEq</span> (<span class="const token" data-verso-hover="23">dict</span> K).<span class="const token" data-verso-hover="58">Op</span> := inferInstanceAs (<span class="const token" data-verso-hover="107">DecidableEq</span> (<span class="const token" data-verso-hover="47">DOp</span> K))</span>
+<span id="L93"></span>
+<span id="L94"><span class="dc">/-- The sequential specification of Section 4: the dictionary, where an `insert` may in</span></span>
+<span id="L95"><span class="dc">addition return `ABORT` at any point without modifying the set. -/</span></span>
+<span id="L96"><span class="kw">def</span> <span class="const token" data-verso-hover="8">dictSpec</span> (K : <span class="kw">Type</span>) [<span class="const token" data-verso-hover="107">DecidableEq</span> K] : <span class="const token" data-verso-hover="9">NSpec</span> (<span class="const token" data-verso-hover="23">dict</span> K).<span class="const token" data-verso-hover="58">Op</span> (<span class="const token" data-verso-hover="23">dict</span> K).<span class="const token" data-verso-hover="59">Resp</span> <span class="kw">where</span></span>
+<span id="L97">  <span class="const token" data-verso-hover="129">State</span> := K → <span class="const token" data-verso-hover="46">Bool</span></span>
+<span id="L98">  <span class="const token" data-verso-hover="130">init</span> := <span class="kw">fun</span> _ =&gt; <span class="const token" data-verso-hover="1">false</span></span>
+<span id="L99">  <span class="const token" data-verso-hover="131">Step</span> s o r s' := ((<span class="const token" data-verso-hover="23">dict</span> K).<span class="const token" data-verso-hover="126">δ</span> s o = (s', r)) ∨ (∃ v, o = <span class="const token" data-verso-hover="3">.</span>insert v ∧ r = <span class="const token" data-verso-hover="49">.</span>abort ∧ s' = s)</span>
+<span id="L100"></span>
+<span id="L101"><span class="dc">/-! ## Local states -/</span></span>
+<span id="L102"></span>
+<span id="L103"><span class="dc">/-- Program counters: the next shared-memory access of a process (named after the pseudocode</span></span>
+<span id="L104"><span class="dc">line), `ret` (about to return `rsp`) and `idle` (no pending operation). -/</span></span>
+<span id="L105"><span class="kw">inductive</span> <span class="const token" data-verso-hover="132">PC</span> <span class="kw">where</span></span>
+<span id="L106">  | <span class="const token" data-verso-hover="133">idle</span></span>
+<span id="L107">  <span class="dc">/-- line 2/11: `LL(table[i])` in the forward scan -/</span></span>
+<span id="L108">  | <span class="const token" data-verso-hover="134">fsLL</span></span>
+<span id="L109">  <span class="dc">/-- line 16: `LL(table[i])` in the backward scan -/</span></span>
+<span id="L110">  | <span class="const token" data-verso-hover="135">bsLL</span></span>
+<span id="L111">  <span class="dc">/-- line 93: `SC(table[i], ⟨v, revalidate⟩)` -/</span></span>
+<span id="L112">  | <span class="const token" data-verso-hover="136">vcSC</span></span>
+<span id="L113">  <span class="dc">/-- line 94: plain read of `table[i]` -/</span></span>
+<span id="L114">  | <span class="const token" data-verso-hover="137">vcRD</span></span>
+<span id="L115">  <span class="dc">/-- line 86: `SC(table[i], TOMBSTONE)` -/</span></span>
+<span id="L116">  | <span class="const token" data-verso-hover="138">tdSCF</span></span>
+<span id="L117">  <span class="dc">/-- line 88: `SC(table[i], DELETED)` -/</span></span>
+<span id="L118">  | <span class="const token" data-verso-hover="139">tdSCD</span></span>
+<span id="L119">  <span class="dc">/-- line 89: `LL(table[i])` -/</span></span>
+<span id="L120">  | <span class="const token" data-verso-hover="140">tdLL</span></span>
+<span id="L121">  <span class="dc">/-- line 41/47: `LL(table[j])` while looking for a free cell -/</span></span>
+<span id="L122">  | <span class="const token" data-verso-hover="141">iLL</span></span>
+<span id="L123">  <span class="dc">/-- line 43: `SC(table[j], ⟨v, tentative⟩)` -/</span></span>
+<span id="L124">  | <span class="const token" data-verso-hover="142">iSC</span></span>
+<span id="L125">  <span class="dc">/-- line 48/65: `LL(table[i])` in the duplicate scan -/</span></span>
+<span id="L126">  | <span class="const token" data-verso-hover="143">dsLL</span></span>
+<span id="L127">  <span class="dc">/-- line 102: plain read of `table[j]` (in `del_other_copy`) -/</span></span>
+<span id="L128">  | <span class="const token" data-verso-hover="144">docRD</span></span>
+<span id="L129">  <span class="dc">/-- line 104: `SC(table[i], COLLIDED)` -/</span></span>
+<span id="L130">  | <span class="const token" data-verso-hover="145">docSC</span></span>
+<span id="L131">  <span class="dc">/-- line 105: plain read of `table[i]` -/</span></span>
+<span id="L132">  | <span class="const token" data-verso-hover="146">docRD2</span></span>
+<span id="L133">  <span class="dc">/-- line 57: `LL(table[j])` -/</span></span>
+<span id="L134">  | <span class="const token" data-verso-hover="147">l57LL</span></span>
+<span id="L135">  <span class="dc">/-- line 58: `SC(table[j], ⟨v, tentative⟩)` -/</span></span>
+<span id="L136">  | <span class="const token" data-verso-hover="148">l58SC</span></span>
+<span id="L137">  <span class="dc">/-- line 66: `LL(table[j])` -/</span></span>
+<span id="L138">  | <span class="const token" data-verso-hover="149">l66LL</span></span>
+<span id="L139">  <span class="dc">/-- line 67: `SC(table[j], ⟨v, final⟩)` -/</span></span>
+<span id="L140">  | <span class="const token" data-verso-hover="150">l67SC</span></span>
+<span id="L141">  <span class="dc">/-- line 69: `SC(table[j], ⟨v, tentative⟩)` -/</span></span>
+<span id="L142">  | <span class="const token" data-verso-hover="151">l69SC</span></span>
+<span id="L143">  <span class="dc">/-- line 76: `LL(table[j])` in `del_copy` -/</span></span>
+<span id="L144">  | <span class="const token" data-verso-hover="152">dcLL76</span></span>
+<span id="L145">  <span class="dc">/-- line 78: `SC(table[j], ⟨v, tentative⟩)` -/</span></span>
+<span id="L146">  | <span class="const token" data-verso-hover="153">dcSC78</span></span>
+<span id="L147">  <span class="dc">/-- line 79: `LL(table[j])` -/</span></span>
+<span id="L148">  | <span class="const token" data-verso-hover="154">dcLL79</span></span>
+<span id="L149">  <span class="dc">/-- line 80: `SC(table[j], TOMBSTONE)` -/</span></span>
+<span id="L150">  | <span class="const token" data-verso-hover="155">dcSC80</span></span>
+<span id="L151">  <span class="dc">/-- about to return `rsp` -/</span></span>
+<span id="L152">  | <span class="const token" data-verso-hover="156">ret</span></span>
+<span id="L153">  <span class="kw">deriving</span> <span class="const token" data-verso-hover="107">DecidableEq</span>, <span class="const token" data-verso-hover="108">Repr</span></span>
+<span id="L154"></span>
+<span id="L155"><span class="dc">/-- The local state of a process: current operation, program counter and the local variables of</span></span>
+<span id="L156"><span class="dc">the pseudocode (`i`, `j`, `val`, `cur val`, and `fwd` = whether the current helper call</span></span>
+<span id="L157"><span class="dc">`validate_copy`/`try_delete` was made from the forward scan). -/</span></span>
+<span id="L158"><span class="kw">structure</span> <span class="const token" data-verso-hover="157">Loc</span> (K : <span class="kw">Type</span>) (m : <span class="const token" data-verso-hover="20">ℕ</span>) <span class="kw">where</span></span>
+<span id="L159">  <span class="const token" data-verso-hover="158">op</span> : <span class="const token" data-verso-hover="47">DOp</span> K</span>
+<span id="L160">  <span class="const token" data-verso-hover="159">pc</span> : <span class="const token" data-verso-hover="132">PC</span></span>
+<span id="L161">  <span class="const token" data-verso-hover="160">i</span> : <span class="const token" data-verso-hover="21">Fin</span> m</span>
+<span id="L162">  <span class="const token" data-verso-hover="161">j</span> : <span class="const token" data-verso-hover="21">Fin</span> m</span>
+<span id="L163">  <span class="const token" data-verso-hover="162">val</span> : <span class="const token" data-verso-hover="109">Cell</span> K</span>
+<span id="L164">  <span class="const token" data-verso-hover="163">cur</span> : <span class="const token" data-verso-hover="109">Cell</span> K</span>
+<span id="L165">  <span class="const token" data-verso-hover="164">fwd</span> : <span class="const token" data-verso-hover="46">Bool</span></span>
+<span id="L166">  <span class="const token" data-verso-hover="165">rsp</span> : <span class="const token" data-verso-hover="48">Res</span></span>
+<span id="L167"></span>
+<span id="L168"><span class="dc">/-- Results of the scans: `true`, `false`, an index, or `⊥`. -/</span></span>
+<span id="L169"><span class="kw">inductive</span> <span class="const token" data-verso-hover="166">SR</span> (m : <span class="const token" data-verso-hover="20">ℕ</span>) <span class="kw">where</span></span>
+<span id="L170">  | <span class="const token" data-verso-hover="167">tt</span></span>
+<span id="L171">  | <span class="const token" data-verso-hover="168">ff</span></span>
+<span id="L172">  | <span class="const token" data-verso-hover="169">idx</span> (i : <span class="const token" data-verso-hover="21">Fin</span> m)</span>
+<span id="L173">  | <span class="const token" data-verso-hover="170">bot</span></span>
+<span id="L174"></span>
+<span id="L175"><span class="kw">section</span> Program</span>
+<span id="L176"></span>
+<span id="L177"><span class="kw">variable</span> {K : <span class="kw">Type</span>} [<span class="const token" data-verso-hover="107">DecidableEq</span> K] {m : <span class="const token" data-verso-hover="20">ℕ</span>} [<span class="const token" data-verso-hover="171">NeZero</span> m] (h : K → <span class="const token" data-verso-hover="21">Fin</span> m)</span>
+<span id="L178"></span>
+<span id="L179"><span class="dc">/-- The probe distance `i − h(v) (mod m)` of cell `i` for key `v`. -/</span></span>
+<span id="L180"><span class="kw">def</span> <span class="const token" data-verso-hover="172">dist</span> (v : K) (i : <span class="const token" data-verso-hover="21">Fin</span> m) : <span class="const token" data-verso-hover="20">ℕ</span> := ((i - h v : <span class="const token" data-verso-hover="21">Fin</span> m) : <span class="const token" data-verso-hover="20">ℕ</span>)</span>
+<span id="L181"></span>
+<span id="L182"><span class="dc">/-- Return `r`. -/</span></span>
+<span id="L183"><span class="kw">def</span> <span class="const token" data-verso-hover="173">retL</span> (l : <span class="const token" data-verso-hover="157">Loc</span> K m) (r : <span class="const token" data-verso-hover="48">Res</span>) : <span class="const token" data-verso-hover="157">Loc</span> K m := { l <span class="kw">with</span> <span class="const token" data-verso-hover="159">pc</span> := <span class="const token" data-verso-hover="156">.</span>ret, <span class="const token" data-verso-hover="165">rsp</span> := r }</span>
+<span id="L184"></span>
+<span id="L185"><span class="dc">/-- Lines 25–26, 31–32, 37–38: what an operation does with the result of `forward_scan`. -/</span></span>
+<span id="L186"><span class="kw">def</span> <span class="const token" data-verso-hover="174">fsReturn</span> (l : <span class="const token" data-verso-hover="157">Loc</span> K m) (r : <span class="const token" data-verso-hover="166">SR</span> m) : <span class="const token" data-verso-hover="157">Loc</span> K m :=</span>
+<span id="L187">  <span class="kw">match</span> l.<span class="const token" data-verso-hover="158">op</span>, r <span class="kw">with</span></span>
+<span id="L188">  | <span class="const token" data-verso-hover="4">.</span>delete _, <span class="const token" data-verso-hover="167">.</span>tt =&gt; <span class="const token" data-verso-hover="173">retL</span> l (<span class="const token" data-verso-hover="41">.</span>ok <span class="const token" data-verso-hover="2">true</span>)</span>
+<span id="L189">  | <span class="const token" data-verso-hover="4">.</span>delete _, <span class="const token" data-verso-hover="168">.</span>ff =&gt; <span class="const token" data-verso-hover="173">retL</span> l (<span class="const token" data-verso-hover="41">.</span>ok <span class="const token" data-verso-hover="1">false</span>)</span>
+<span id="L190">  | <span class="const token" data-verso-hover="51">.</span>lookup _, <span class="const token" data-verso-hover="167">.</span>tt =&gt; <span class="const token" data-verso-hover="173">retL</span> l (<span class="const token" data-verso-hover="41">.</span>ok <span class="const token" data-verso-hover="2">true</span>)</span>
+<span id="L191">  | <span class="const token" data-verso-hover="3">.</span>insert _, <span class="const token" data-verso-hover="167">.</span>tt =&gt; <span class="const token" data-verso-hover="173">retL</span> l (<span class="const token" data-verso-hover="41">.</span>ok <span class="const token" data-verso-hover="1">false</span>)</span>
+<span id="L192">  | _, <span class="const token" data-verso-hover="169">.</span>idx i =&gt; { l <span class="kw">with</span> <span class="const token" data-verso-hover="160">i</span> := i, <span class="const token" data-verso-hover="159">pc</span> := <span class="const token" data-verso-hover="135">.</span>bsLL }</span>
+<span id="L193">  | _, _ =&gt; <span class="const token" data-verso-hover="173">retL</span> l (<span class="const token" data-verso-hover="41">.</span>ok <span class="const token" data-verso-hover="1">false</span>)</span>
+<span id="L194"></span>
+<span id="L195"><span class="dc">/-- Lines 12–13: end of the forward scan. -/</span></span>
+<span id="L196"><span class="kw">def</span> <span class="const token" data-verso-hover="175">fsEnd</span> (l : <span class="const token" data-verso-hover="157">Loc</span> K m) : <span class="const token" data-verso-hover="157">Loc</span> K m :=</span>
+<span id="L197">  <span class="kw">if</span> l.<span class="const token" data-verso-hover="160">i</span> = h l.<span class="const token" data-verso-hover="158">op</span>.<span class="const token" data-verso-hover="122">key</span> ∧ l.<span class="const token" data-verso-hover="162">val</span> = <span class="const token" data-verso-hover="110">.</span>empty <span class="kw">then</span> <span class="const token" data-verso-hover="174">fsReturn</span> l (<span class="const token" data-verso-hover="169">.</span>idx l.<span class="const token" data-verso-hover="160">i</span>)</span>
+<span id="L198">  <span class="kw">else</span> <span class="const token" data-verso-hover="174">fsReturn</span> l (<span class="const token" data-verso-hover="169">.</span>idx (l.<span class="const token" data-verso-hover="160">i</span> - <span class="nu">1</span>))</span>
+<span id="L199"></span>
+<span id="L200"><span class="dc">/-- Lines 9–11: advance the forward scan. -/</span></span>
+<span id="L201"><span class="kw">def</span> <span class="const token" data-verso-hover="176">fsNext</span> (l : <span class="const token" data-verso-hover="157">Loc</span> K m) : <span class="const token" data-verso-hover="157">Loc</span> K m :=</span>
+<span id="L202">  <span class="kw">if</span> l.<span class="const token" data-verso-hover="160">i</span> + <span class="nu">1</span> = h l.<span class="const token" data-verso-hover="158">op</span>.<span class="const token" data-verso-hover="122">key</span> <span class="kw">then</span> <span class="const token" data-verso-hover="175">fsEnd</span> h { l <span class="kw">with</span> <span class="const token" data-verso-hover="160">i</span> := l.<span class="const token" data-verso-hover="160">i</span> + <span class="nu">1</span> }</span>
+<span id="L203">  <span class="kw">else</span> { l <span class="kw">with</span> <span class="const token" data-verso-hover="160">i</span> := l.<span class="const token" data-verso-hover="160">i</span> + <span class="nu">1</span>, <span class="const token" data-verso-hover="159">pc</span> := <span class="const token" data-verso-hover="134">.</span>fsLL }</span>
+<span id="L204"></span>
+<span id="L205"><span class="dc">/-- Lines 27–29, 33–35, 39–41: what an operation does with the result of `backward_scan`. -/</span></span>
+<span id="L206"><span class="kw">def</span> <span class="const token" data-verso-hover="177">bsReturn</span> (l : <span class="const token" data-verso-hover="157">Loc</span> K m) (r : <span class="const token" data-verso-hover="166">SR</span> m) : <span class="const token" data-verso-hover="157">Loc</span> K m :=</span>
+<span id="L207">  <span class="kw">match</span> l.<span class="const token" data-verso-hover="158">op</span>, r <span class="kw">with</span></span>
+<span id="L208">  | <span class="const token" data-verso-hover="4">.</span>delete _, <span class="const token" data-verso-hover="167">.</span>tt =&gt; <span class="const token" data-verso-hover="173">retL</span> l (<span class="const token" data-verso-hover="41">.</span>ok <span class="const token" data-verso-hover="2">true</span>)</span>
+<span id="L209">  | <span class="const token" data-verso-hover="4">.</span>delete _, _ =&gt; <span class="const token" data-verso-hover="173">retL</span> l (<span class="const token" data-verso-hover="41">.</span>ok <span class="const token" data-verso-hover="1">false</span>)</span>
+<span id="L210">  | <span class="const token" data-verso-hover="51">.</span>lookup _, <span class="const token" data-verso-hover="167">.</span>tt =&gt; <span class="const token" data-verso-hover="173">retL</span> l (<span class="const token" data-verso-hover="41">.</span>ok <span class="const token" data-verso-hover="2">true</span>)</span>
+<span id="L211">  | <span class="const token" data-verso-hover="51">.</span>lookup _, _ =&gt; <span class="const token" data-verso-hover="173">retL</span> l (<span class="const token" data-verso-hover="41">.</span>ok <span class="const token" data-verso-hover="1">false</span>)</span>
+<span id="L212">  | <span class="const token" data-verso-hover="3">.</span>insert _, <span class="const token" data-verso-hover="167">.</span>tt =&gt; <span class="const token" data-verso-hover="173">retL</span> l (<span class="const token" data-verso-hover="41">.</span>ok <span class="const token" data-verso-hover="1">false</span>)</span>
+<span id="L213">  | <span class="const token" data-verso-hover="3">.</span>insert v, _ =&gt; { l <span class="kw">with</span> <span class="const token" data-verso-hover="161">j</span> := h v, <span class="const token" data-verso-hover="159">pc</span> := <span class="const token" data-verso-hover="141">.</span>iLL }</span>
+<span id="L214"></span>
+<span id="L215"><span class="dc">/-- Lines 22–23: advance the backward scan. -/</span></span>
+<span id="L216"><span class="kw">def</span> <span class="const token" data-verso-hover="178">bsCheck</span> (l : <span class="const token" data-verso-hover="157">Loc</span> K m) : <span class="const token" data-verso-hover="157">Loc</span> K m :=</span>
+<span id="L217">  <span class="kw">if</span> l.<span class="const token" data-verso-hover="160">i</span> = h l.<span class="const token" data-verso-hover="158">op</span>.<span class="const token" data-verso-hover="122">key</span> <span class="kw">then</span> <span class="const token" data-verso-hover="177">bsReturn</span> h l <span class="const token" data-verso-hover="170">.</span>bot <span class="kw">else</span> { l <span class="kw">with</span> <span class="const token" data-verso-hover="160">i</span> := l.<span class="const token" data-verso-hover="160">i</span> - <span class="nu">1</span>, <span class="const token" data-verso-hover="159">pc</span> := <span class="const token" data-verso-hover="135">.</span>bsLL }</span>
+<span id="L218"></span>
+<span id="L219"><span class="dc">/-- Return of `validate_copy` with result `b` (lines 5, 18). -/</span></span>
+<span id="L220"><span class="kw">def</span> <span class="const token" data-verso-hover="179">vcRet</span> (l : <span class="const token" data-verso-hover="157">Loc</span> K m) (b : <span class="const token" data-verso-hover="46">Bool</span>) : <span class="const token" data-verso-hover="157">Loc</span> K m :=</span>
+<span id="L221">  <span class="kw">if</span> l.<span class="const token" data-verso-hover="164">fwd</span> <span class="kw">then</span> (<span class="kw">if</span> b <span class="kw">then</span> <span class="const token" data-verso-hover="174">fsReturn</span> l <span class="const token" data-verso-hover="167">.</span>tt <span class="kw">else</span> <span class="const token" data-verso-hover="176">fsNext</span> h l)</span>
+<span id="L222">  <span class="kw">else</span> (<span class="kw">if</span> b <span class="kw">then</span> <span class="const token" data-verso-hover="177">bsReturn</span> h l <span class="const token" data-verso-hover="167">.</span>tt <span class="kw">else</span> <span class="const token" data-verso-hover="178">bsCheck</span> h l)</span>
+<span id="L223"></span>
+<span id="L224"><span class="dc">/-- Line 92 (`validate_copy`, local part). -/</span></span>
+<span id="L225"><span class="kw">def</span> <span class="const token" data-verso-hover="180">vcStart</span> (l : <span class="const token" data-verso-hover="157">Loc</span> K m) : <span class="const token" data-verso-hover="157">Loc</span> K m :=</span>
+<span id="L226">  <span class="kw">if</span> l.<span class="const token" data-verso-hover="162">val</span> = <span class="const token" data-verso-hover="114">.</span>key l.<span class="const token" data-verso-hover="158">op</span>.<span class="const token" data-verso-hover="122">key</span> <span class="const token" data-verso-hover="105">.</span>fin ∨ l.<span class="const token" data-verso-hover="162">val</span> = <span class="const token" data-verso-hover="114">.</span>key l.<span class="const token" data-verso-hover="158">op</span>.<span class="const token" data-verso-hover="122">key</span> <span class="const token" data-verso-hover="106">.</span>reval <span class="kw">then</span> <span class="const token" data-verso-hover="179">vcRet</span> h l <span class="const token" data-verso-hover="2">true</span></span>
+<span id="L227">  <span class="kw">else</span> { l <span class="kw">with</span> <span class="const token" data-verso-hover="159">pc</span> := <span class="const token" data-verso-hover="136">.</span>vcSC }</span>
+<span id="L228"></span>
+<span id="L229"><span class="dc">/-- Return of `try_delete` with result `r` (lines 7–8, 20–21). -/</span></span>
+<span id="L230"><span class="kw">def</span> <span class="const token" data-verso-hover="181">tdRet</span> (l : <span class="const token" data-verso-hover="157">Loc</span> K m) (r : <span class="const token" data-verso-hover="166">SR</span> m) : <span class="const token" data-verso-hover="157">Loc</span> K m :=</span>
+<span id="L231">  <span class="kw">match</span> r <span class="kw">with</span></span>
+<span id="L232">  | <span class="const token" data-verso-hover="170">.</span>bot =&gt; <span class="kw">if</span> l.<span class="const token" data-verso-hover="164">fwd</span> <span class="kw">then</span> <span class="const token" data-verso-hover="176">fsNext</span> h l <span class="kw">else</span> <span class="const token" data-verso-hover="178">bsCheck</span> h l</span>
+<span id="L233">  | r =&gt; <span class="kw">if</span> l.<span class="const token" data-verso-hover="164">fwd</span> <span class="kw">then</span> <span class="const token" data-verso-hover="174">fsReturn</span> l r <span class="kw">else</span> <span class="const token" data-verso-hover="177">bsReturn</span> h l r</span>
+<span id="L234"></span>
+<span id="L235"><span class="dc">/-- Lines 84–85, 87, 90 (`try_delete`, local part). -/</span></span>
+<span id="L236"><span class="kw">def</span> <span class="const token" data-verso-hover="182">tdBody</span> (l : <span class="const token" data-verso-hover="157">Loc</span> K m) : <span class="const token" data-verso-hover="157">Loc</span> K m :=</span>
+<span id="L237">  <span class="kw">if</span> l.<span class="const token" data-verso-hover="162">val</span>.<span class="const token" data-verso-hover="115">key?</span> = <span class="const token" data-verso-hover="68">some</span> l.<span class="const token" data-verso-hover="158">op</span>.<span class="const token" data-verso-hover="122">key</span> <span class="kw">then</span></span>
+<span id="L238">    (<span class="kw">if</span> l.<span class="const token" data-verso-hover="162">val</span> = <span class="const token" data-verso-hover="114">.</span>key l.<span class="const token" data-verso-hover="158">op</span>.<span class="const token" data-verso-hover="122">key</span> <span class="const token" data-verso-hover="105">.</span>fin <span class="kw">then</span> { l <span class="kw">with</span> <span class="const token" data-verso-hover="159">pc</span> := <span class="const token" data-verso-hover="138">.</span>tdSCF } <span class="kw">else</span> { l <span class="kw">with</span> <span class="const token" data-verso-hover="159">pc</span> := <span class="const token" data-verso-hover="139">.</span>tdSCD })</span>
+<span id="L239">  <span class="kw">else</span> <span class="const token" data-verso-hover="181">tdRet</span> h l <span class="const token" data-verso-hover="170">.</span>bot</span>
+<span id="L240"></span>
+<span id="L241"><span class="dc">/-- Is the operation an `insert` or a `lookup`? -/</span></span>
+<span id="L242"><span class="kw">def</span> <span class="const token" data-verso-hover="183">DOp.isInsLook</span> : <span class="const token" data-verso-hover="47">DOp</span> K → <span class="const token" data-verso-hover="46">Bool</span></span>
+<span id="L243">  | <span class="const token" data-verso-hover="4">.</span>delete _ =&gt; <span class="const token" data-verso-hover="1">false</span></span>
+<span id="L244">  | _ =&gt; <span class="const token" data-verso-hover="2">true</span></span>
+<span id="L245"></span>
+<span id="L246"><span class="dc">/-- Lines 3–8 (`forward_scan`, after reading `val`). -/</span></span>
+<span id="L247"><span class="kw">def</span> <span class="const token" data-verso-hover="184">fsBody</span> (l : <span class="const token" data-verso-hover="157">Loc</span> K m) : <span class="const token" data-verso-hover="157">Loc</span> K m :=</span>
+<span id="L248">  <span class="kw">if</span> l.<span class="const token" data-verso-hover="162">val</span> = <span class="const token" data-verso-hover="110">.</span>empty <span class="kw">then</span> <span class="const token" data-verso-hover="175">fsEnd</span> h l</span>
+<span id="L249">  <span class="kw">else</span> <span class="kw">if</span> l.<span class="const token" data-verso-hover="162">val</span>.<span class="const token" data-verso-hover="115">key?</span> = <span class="const token" data-verso-hover="68">some</span> l.<span class="const token" data-verso-hover="158">op</span>.<span class="const token" data-verso-hover="122">key</span> <span class="kw">then</span></span>
+<span id="L250">    (<span class="kw">if</span> l.<span class="const token" data-verso-hover="158">op</span>.<span class="const token" data-verso-hover="183">isInsLook</span> <span class="kw">then</span> <span class="const token" data-verso-hover="180">vcStart</span> h { l <span class="kw">with</span> <span class="const token" data-verso-hover="164">fwd</span> := <span class="const token" data-verso-hover="2">true</span> } <span class="kw">else</span> <span class="const token" data-verso-hover="182">tdBody</span> h { l <span class="kw">with</span> <span class="const token" data-verso-hover="164">fwd</span> := <span class="const token" data-verso-hover="2">true</span> })</span>
+<span id="L251">  <span class="kw">else</span> <span class="const token" data-verso-hover="176">fsNext</span> h l</span>
+<span id="L252"></span>
+<span id="L253"><span class="dc">/-- Lines 17–21 (`backward_scan`, after reading `val`). -/</span></span>
+<span id="L254"><span class="kw">def</span> <span class="const token" data-verso-hover="185">bsBody</span> (l : <span class="const token" data-verso-hover="157">Loc</span> K m) : <span class="const token" data-verso-hover="157">Loc</span> K m :=</span>
+<span id="L255">  <span class="kw">if</span> l.<span class="const token" data-verso-hover="162">val</span>.<span class="const token" data-verso-hover="115">key?</span> = <span class="const token" data-verso-hover="68">some</span> l.<span class="const token" data-verso-hover="158">op</span>.<span class="const token" data-verso-hover="122">key</span> <span class="kw">then</span></span>
+<span id="L256">    (<span class="kw">if</span> l.<span class="const token" data-verso-hover="158">op</span>.<span class="const token" data-verso-hover="183">isInsLook</span> <span class="kw">then</span> <span class="const token" data-verso-hover="180">vcStart</span> h { l <span class="kw">with</span> <span class="const token" data-verso-hover="164">fwd</span> := <span class="const token" data-verso-hover="1">false</span> } <span class="kw">else</span> <span class="const token" data-verso-hover="182">tdBody</span> h { l <span class="kw">with</span> <span class="const token" data-verso-hover="164">fwd</span> := <span class="const token" data-verso-hover="1">false</span> })</span>
+<span id="L257">  <span class="kw">else</span> <span class="const token" data-verso-hover="178">bsCheck</span> h l</span>
+<span id="L258"></span>
+<span id="L259"><span class="dc">/-- Lines 45–47: try the next cell for the tentative copy (`ABORT` after a full cycle). -/</span></span>
+<span id="L260"><span class="kw">def</span> <span class="const token" data-verso-hover="186">iNext</span> (l : <span class="const token" data-verso-hover="157">Loc</span> K m) : <span class="const token" data-verso-hover="157">Loc</span> K m :=</span>
+<span id="L261">  <span class="kw">if</span> l.<span class="const token" data-verso-hover="161">j</span> + <span class="nu">1</span> = h l.<span class="const token" data-verso-hover="158">op</span>.<span class="const token" data-verso-hover="122">key</span> <span class="kw">then</span> <span class="const token" data-verso-hover="173">retL</span> l <span class="const token" data-verso-hover="49">.</span>abort <span class="kw">else</span> { l <span class="kw">with</span> <span class="const token" data-verso-hover="161">j</span> := l.<span class="const token" data-verso-hover="161">j</span> + <span class="nu">1</span>, <span class="const token" data-verso-hover="159">pc</span> := <span class="const token" data-verso-hover="141">.</span>iLL }</span>
+<span id="L262"></span>
+<span id="L263"><span class="dc">/-- Line 43 (local part): try to write the tentative copy into an available cell. -/</span></span>
+<span id="L264"><span class="kw">def</span> <span class="const token" data-verso-hover="187">iBody</span> (l : <span class="const token" data-verso-hover="157">Loc</span> K m) : <span class="const token" data-verso-hover="157">Loc</span> K m :=</span>
+<span id="L265">  <span class="kw">if</span> l.<span class="const token" data-verso-hover="162">val</span> = <span class="const token" data-verso-hover="110">.</span>empty ∨ l.<span class="const token" data-verso-hover="162">val</span> = <span class="const token" data-verso-hover="111">.</span>tomb <span class="kw">then</span> { l <span class="kw">with</span> <span class="const token" data-verso-hover="159">pc</span> := <span class="const token" data-verso-hover="142">.</span>iSC } <span class="kw">else</span> <span class="const token" data-verso-hover="186">iNext</span> h l</span>
+<span id="L266"></span>
+<span id="L267"><span class="dc">/-- Line 48 (`goto 48`): restart the duplicate scan at `h(v)`. -/</span></span>
+<span id="L268"><span class="kw">def</span> <span class="const token" data-verso-hover="188">ds48</span> (l : <span class="const token" data-verso-hover="157">Loc</span> K m) : <span class="const token" data-verso-hover="157">Loc</span> K m := { l <span class="kw">with</span> <span class="const token" data-verso-hover="160">i</span> := h l.<span class="const token" data-verso-hover="158">op</span>.<span class="const token" data-verso-hover="122">key</span>, <span class="const token" data-verso-hover="159">pc</span> := <span class="const token" data-verso-hover="143">.</span>dsLL }</span>
+<span id="L269"></span>
+<span id="L270"><span class="dc">/-- Lines 63–65: advance the duplicate scan. -/</span></span>
+<span id="L271"><span class="kw">def</span> <span class="const token" data-verso-hover="189">dsNext</span> (l : <span class="const token" data-verso-hover="157">Loc</span> K m) : <span class="const token" data-verso-hover="157">Loc</span> K m :=</span>
+<span id="L272">  <span class="kw">if</span> l.<span class="const token" data-verso-hover="160">i</span> + <span class="nu">1</span> = h l.<span class="const token" data-verso-hover="158">op</span>.<span class="const token" data-verso-hover="122">key</span> <span class="kw">then</span> { l <span class="kw">with</span> <span class="const token" data-verso-hover="160">i</span> := l.<span class="const token" data-verso-hover="160">i</span> + <span class="nu">1</span>, <span class="const token" data-verso-hover="159">pc</span> := <span class="const token" data-verso-hover="149">.</span>l66LL }</span>
+<span id="L273">  <span class="kw">else</span> { l <span class="kw">with</span> <span class="const token" data-verso-hover="160">i</span> := l.<span class="const token" data-verso-hover="160">i</span> + <span class="nu">1</span>, <span class="const token" data-verso-hover="159">pc</span> := <span class="const token" data-verso-hover="143">.</span>dsLL }</span>
+<span id="L274"></span>
+<span id="L275"><span class="dc">/-- Lines 49–56 (duplicate scan, after reading `val`). -/</span></span>
+<span id="L276"><span class="kw">def</span> <span class="const token" data-verso-hover="190">dsBody</span> (l : <span class="const token" data-verso-hover="157">Loc</span> K m) : <span class="const token" data-verso-hover="157">Loc</span> K m :=</span>
+<span id="L277">  <span class="kw">if</span> l.<span class="const token" data-verso-hover="162">val</span> = <span class="const token" data-verso-hover="110">.</span>empty <span class="kw">then</span> { l <span class="kw">with</span> <span class="const token" data-verso-hover="159">pc</span> := <span class="const token" data-verso-hover="149">.</span>l66LL }</span>
+<span id="L278">  <span class="kw">else</span> <span class="kw">if</span> l.<span class="const token" data-verso-hover="160">i</span> ≠ l.<span class="const token" data-verso-hover="161">j</span> ∧ l.<span class="const token" data-verso-hover="162">val</span>.<span class="const token" data-verso-hover="115">key?</span> = <span class="const token" data-verso-hover="68">some</span> l.<span class="const token" data-verso-hover="158">op</span>.<span class="const token" data-verso-hover="122">key</span> <span class="kw">then</span></span>
+<span id="L279">    (<span class="kw">if</span> <span class="const token" data-verso-hover="172">dist</span> h l.<span class="const token" data-verso-hover="158">op</span>.<span class="const token" data-verso-hover="122">key</span> l.<span class="const token" data-verso-hover="160">i</span> &lt; <span class="const token" data-verso-hover="172">dist</span> h l.<span class="const token" data-verso-hover="158">op</span>.<span class="const token" data-verso-hover="122">key</span> l.<span class="const token" data-verso-hover="161">j</span> ∨ l.<span class="const token" data-verso-hover="162">val</span> = <span class="const token" data-verso-hover="114">.</span>key l.<span class="const token" data-verso-hover="158">op</span>.<span class="const token" data-verso-hover="122">key</span> <span class="const token" data-verso-hover="105">.</span>fin <span class="kw">then</span></span>
+<span id="L280">      { l <span class="kw">with</span> <span class="const token" data-verso-hover="159">pc</span> := <span class="const token" data-verso-hover="152">.</span>dcLL76 }</span>
+<span id="L281">    <span class="kw">else</span> <span class="kw">if</span> l.<span class="const token" data-verso-hover="162">val</span> ≠ <span class="const token" data-verso-hover="114">.</span>key l.<span class="const token" data-verso-hover="158">op</span>.<span class="const token" data-verso-hover="122">key</span> <span class="const token" data-verso-hover="106">.</span>reval <span class="kw">then</span> { l <span class="kw">with</span> <span class="const token" data-verso-hover="159">pc</span> := <span class="const token" data-verso-hover="144">.</span>docRD }</span>
+<span id="L282">    <span class="kw">else</span> <span class="const token" data-verso-hover="189">dsNext</span> h l)</span>
+<span id="L283">  <span class="kw">else</span> <span class="const token" data-verso-hover="189">dsNext</span> h l</span>
+<span id="L284"></span>
+<span id="L285"><span class="dc">/-- Return of `del_other_copy` with result `b` (line 56). -/</span></span>
+<span id="L286"><span class="kw">def</span> <span class="const token" data-verso-hover="191">docRet</span> (l : <span class="const token" data-verso-hover="157">Loc</span> K m) (b : <span class="const token" data-verso-hover="46">Bool</span>) : <span class="const token" data-verso-hover="157">Loc</span> K m :=</span>
+<span id="L287">  <span class="kw">if</span> b <span class="kw">then</span> <span class="const token" data-verso-hover="189">dsNext</span> h l <span class="kw">else</span> { l <span class="kw">with</span> <span class="const token" data-verso-hover="159">pc</span> := <span class="const token" data-verso-hover="147">.</span>l57LL }</span>
+<span id="L288"></span>
+<span id="L289"><span class="dc">/-- The initial local state of an operation (lines 2, 25, 31, 37). -/</span></span>
+<span id="L290"><span class="kw">def</span> <span class="const token" data-verso-hover="192">start</span> (o : <span class="const token" data-verso-hover="47">DOp</span> K) : <span class="const token" data-verso-hover="157">Loc</span> K m :=</span>
+<span id="L291">  { <span class="const token" data-verso-hover="158">op</span> := o, <span class="const token" data-verso-hover="159">pc</span> := <span class="const token" data-verso-hover="134">.</span>fsLL, <span class="const token" data-verso-hover="160">i</span> := h o.<span class="const token" data-verso-hover="122">key</span>, <span class="const token" data-verso-hover="161">j</span> := h o.<span class="const token" data-verso-hover="122">key</span>, <span class="const token" data-verso-hover="162">val</span> := <span class="const token" data-verso-hover="110">.</span>empty, <span class="const token" data-verso-hover="163">cur</span> := <span class="const token" data-verso-hover="110">.</span>empty, <span class="const token" data-verso-hover="164">fwd</span> := <span class="const token" data-verso-hover="2">true</span>,</span>
+<span id="L292">    <span class="const token" data-verso-hover="165">rsp</span> := <span class="const token" data-verso-hover="49">.</span>abort }</span>
+<span id="L293"></span>
+<span id="L294"><span class="dc">/-- The base objects: an LL/SC cell per index. -/</span></span>
+<span id="L295"><span class="kw">abbrev</span> <span class="const token" data-verso-hover="193">Mem</span> (K : <span class="kw">Type</span>) (m : <span class="const token" data-verso-hover="20">ℕ</span>) (P : <span class="kw">Type</span>) [<span class="const token" data-verso-hover="107">DecidableEq</span> P] : <span class="const token" data-verso-hover="21">Fin</span> m → <span class="const token" data-verso-hover="123">ObjSpec</span> :=</span>
+<span id="L296">  <span class="kw">fun</span> _ =&gt; <span class="const token" data-verso-hover="6">llscObj</span> (<span class="const token" data-verso-hover="109">Cell</span> K) P <span class="const token" data-verso-hover="110">.</span>empty</span>
+<span id="L297"></span>
+<span id="L298"><span class="kw">variable</span> {P : <span class="kw">Type</span>} [<span class="const token" data-verso-hover="107">DecidableEq</span> P]</span>
+<span id="L299"></span>
+<span id="L300"><span class="dc">/-- One step of process `p` in local state `l` (Algorithms 1–5). -/</span></span>
+<span id="L301"><span class="kw">def</span> <span class="const token" data-verso-hover="194">act</span> (p : P) (l : <span class="const token" data-verso-hover="157">Loc</span> K m) : <span class="const token" data-verso-hover="195">Action</span> (<span class="const token" data-verso-hover="23">dict</span> K) (<span class="const token" data-verso-hover="193">Mem</span> K m P) (<span class="const token" data-verso-hover="157">Loc</span> K m) :=</span>
+<span id="L302">  <span class="kw">let</span> v := l.<span class="const token" data-verso-hover="158">op</span>.<span class="const token" data-verso-hover="122">key</span></span>
+<span id="L303">  <span class="kw">match</span> l.<span class="const token" data-verso-hover="159">pc</span> <span class="kw">with</span></span>
+<span id="L304">  | <span class="const token" data-verso-hover="134">.</span>fsLL =&gt; <span class="const token" data-verso-hover="196">.</span>access l.<span class="const token" data-verso-hover="160">i</span> (<span class="const token" data-verso-hover="197">.</span>ll p) <span class="kw">fun</span> r =&gt; <span class="const token" data-verso-hover="184">fsBody</span> h { l <span class="kw">with</span> <span class="const token" data-verso-hover="162">val</span> := r.<span class="const token" data-verso-hover="67">1</span> }</span>
+<span id="L305">  | <span class="const token" data-verso-hover="135">.</span>bsLL =&gt; <span class="const token" data-verso-hover="196">.</span>access l.<span class="const token" data-verso-hover="160">i</span> (<span class="const token" data-verso-hover="197">.</span>ll p) <span class="kw">fun</span> r =&gt; <span class="const token" data-verso-hover="185">bsBody</span> h { l <span class="kw">with</span> <span class="const token" data-verso-hover="162">val</span> := r.<span class="const token" data-verso-hover="67">1</span> }</span>
+<span id="L306">  | <span class="const token" data-verso-hover="136">.</span>vcSC =&gt; <span class="const token" data-verso-hover="196">.</span>access l.<span class="const token" data-verso-hover="160">i</span> (<span class="const token" data-verso-hover="198">.</span>sc p (<span class="const token" data-verso-hover="114">.</span>key v <span class="const token" data-verso-hover="106">.</span>reval)) <span class="kw">fun</span> r =&gt;</span>
+<span id="L307">      <span class="kw">if</span> r.<span class="const token" data-verso-hover="69">2</span> <span class="kw">then</span> <span class="const token" data-verso-hover="179">vcRet</span> h l <span class="const token" data-verso-hover="2">true</span> <span class="kw">else</span> { l <span class="kw">with</span> <span class="const token" data-verso-hover="159">pc</span> := <span class="const token" data-verso-hover="137">.</span>vcRD }</span>
+<span id="L308">  | <span class="const token" data-verso-hover="137">.</span>vcRD =&gt; <span class="const token" data-verso-hover="196">.</span>access l.<span class="const token" data-verso-hover="160">i</span> (<span class="const token" data-verso-hover="199">.</span>vl p) <span class="kw">fun</span> r =&gt; <span class="const token" data-verso-hover="179">vcRet</span> h { l <span class="kw">with</span> <span class="const token" data-verso-hover="162">val</span> := r.<span class="const token" data-verso-hover="67">1</span> } (r.<span class="const token" data-verso-hover="67">1</span>.<span class="const token" data-verso-hover="115">key?</span> = <span class="const token" data-verso-hover="68">some</span> v)</span>
+<span id="L309">  | <span class="const token" data-verso-hover="138">.</span>tdSCF =&gt; <span class="const token" data-verso-hover="196">.</span>access l.<span class="const token" data-verso-hover="160">i</span> (<span class="const token" data-verso-hover="198">.</span>sc p <span class="const token" data-verso-hover="111">.</span>tomb) <span class="kw">fun</span> r =&gt; <span class="const token" data-verso-hover="181">tdRet</span> h l (<span class="kw">if</span> r.<span class="const token" data-verso-hover="69">2</span> <span class="kw">then</span> <span class="const token" data-verso-hover="167">.</span>tt <span class="kw">else</span> <span class="const token" data-verso-hover="168">.</span>ff)</span>
+<span id="L310">  | <span class="const token" data-verso-hover="139">.</span>tdSCD =&gt; <span class="const token" data-verso-hover="196">.</span>access l.<span class="const token" data-verso-hover="160">i</span> (<span class="const token" data-verso-hover="198">.</span>sc p <span class="const token" data-verso-hover="112">.</span>deleted) <span class="kw">fun</span> r =&gt;</span>
+<span id="L311">      <span class="kw">if</span> r.<span class="const token" data-verso-hover="69">2</span> <span class="kw">then</span> <span class="const token" data-verso-hover="181">tdRet</span> h l <span class="const token" data-verso-hover="167">.</span>tt <span class="kw">else</span> { l <span class="kw">with</span> <span class="const token" data-verso-hover="159">pc</span> := <span class="const token" data-verso-hover="140">.</span>tdLL }</span>
+<span id="L312">  | <span class="const token" data-verso-hover="140">.</span>tdLL =&gt; <span class="const token" data-verso-hover="196">.</span>access l.<span class="const token" data-verso-hover="160">i</span> (<span class="const token" data-verso-hover="197">.</span>ll p) <span class="kw">fun</span> r =&gt; <span class="const token" data-verso-hover="182">tdBody</span> h { l <span class="kw">with</span> <span class="const token" data-verso-hover="162">val</span> := r.<span class="const token" data-verso-hover="67">1</span> }</span>
+<span id="L313">  | <span class="const token" data-verso-hover="141">.</span>iLL =&gt; <span class="const token" data-verso-hover="196">.</span>access l.<span class="const token" data-verso-hover="161">j</span> (<span class="const token" data-verso-hover="197">.</span>ll p) <span class="kw">fun</span> r =&gt; <span class="const token" data-verso-hover="187">iBody</span> h { l <span class="kw">with</span> <span class="const token" data-verso-hover="162">val</span> := r.<span class="const token" data-verso-hover="67">1</span> }</span>
+<span id="L314">  | <span class="const token" data-verso-hover="142">.</span>iSC =&gt; <span class="const token" data-verso-hover="196">.</span>access l.<span class="const token" data-verso-hover="161">j</span> (<span class="const token" data-verso-hover="198">.</span>sc p (<span class="const token" data-verso-hover="114">.</span>key v <span class="const token" data-verso-hover="104">.</span>tent)) <span class="kw">fun</span> r =&gt; <span class="kw">if</span> r.<span class="const token" data-verso-hover="69">2</span> <span class="kw">then</span> <span class="const token" data-verso-hover="188">ds48</span> h l <span class="kw">else</span> <span class="const token" data-verso-hover="186">iNext</span> h l</span>
+<span id="L315">  | <span class="const token" data-verso-hover="143">.</span>dsLL =&gt; <span class="const token" data-verso-hover="196">.</span>access l.<span class="const token" data-verso-hover="160">i</span> (<span class="const token" data-verso-hover="197">.</span>ll p) <span class="kw">fun</span> r =&gt; <span class="const token" data-verso-hover="190">dsBody</span> h { l <span class="kw">with</span> <span class="const token" data-verso-hover="162">val</span> := r.<span class="const token" data-verso-hover="67">1</span> }</span>
+<span id="L316">  | <span class="const token" data-verso-hover="144">.</span>docRD =&gt; <span class="const token" data-verso-hover="196">.</span>access l.<span class="const token" data-verso-hover="161">j</span> (<span class="const token" data-verso-hover="199">.</span>vl p) <span class="kw">fun</span> r =&gt;</span>
+<span id="L317">      <span class="kw">if</span> r.<span class="const token" data-verso-hover="67">1</span> = <span class="const token" data-verso-hover="114">.</span>key v <span class="const token" data-verso-hover="104">.</span>tent <span class="kw">then</span> { l <span class="kw">with</span> <span class="const token" data-verso-hover="163">cur</span> := r.<span class="const token" data-verso-hover="67">1</span>, <span class="const token" data-verso-hover="159">pc</span> := <span class="const token" data-verso-hover="145">.</span>docSC }</span>
+<span id="L318">      <span class="kw">else</span> <span class="const token" data-verso-hover="191">docRet</span> h { l <span class="kw">with</span> <span class="const token" data-verso-hover="163">cur</span> := r.<span class="const token" data-verso-hover="67">1</span> } <span class="const token" data-verso-hover="1">false</span></span>
+<span id="L319">  | <span class="const token" data-verso-hover="145">.</span>docSC =&gt; <span class="const token" data-verso-hover="196">.</span>access l.<span class="const token" data-verso-hover="160">i</span> (<span class="const token" data-verso-hover="198">.</span>sc p <span class="const token" data-verso-hover="113">.</span>collided) <span class="kw">fun</span> r =&gt;</span>
+<span id="L320">      <span class="kw">if</span> r.<span class="const token" data-verso-hover="69">2</span> <span class="kw">then</span> <span class="const token" data-verso-hover="191">docRet</span> h l <span class="const token" data-verso-hover="2">true</span> <span class="kw">else</span> { l <span class="kw">with</span> <span class="const token" data-verso-hover="159">pc</span> := <span class="const token" data-verso-hover="146">.</span>docRD2 }</span>
+<span id="L321">  | <span class="const token" data-verso-hover="146">.</span>docRD2 =&gt; <span class="const token" data-verso-hover="196">.</span>access l.<span class="const token" data-verso-hover="160">i</span> (<span class="const token" data-verso-hover="199">.</span>vl p) <span class="kw">fun</span> r =&gt; <span class="const token" data-verso-hover="191">docRet</span> h l (r.<span class="const token" data-verso-hover="67">1</span> ≠ <span class="const token" data-verso-hover="114">.</span>key v <span class="const token" data-verso-hover="105">.</span>fin)</span>
+<span id="L322">  | <span class="const token" data-verso-hover="147">.</span>l57LL =&gt; <span class="const token" data-verso-hover="196">.</span>access l.<span class="const token" data-verso-hover="161">j</span> (<span class="const token" data-verso-hover="197">.</span>ll p) <span class="kw">fun</span> r =&gt;</span>
+<span id="L323">      <span class="kw">if</span> r.<span class="const token" data-verso-hover="67">1</span> = <span class="const token" data-verso-hover="114">.</span>key v <span class="const token" data-verso-hover="106">.</span>reval <span class="kw">then</span> { l <span class="kw">with</span> <span class="const token" data-verso-hover="163">cur</span> := r.<span class="const token" data-verso-hover="67">1</span>, <span class="const token" data-verso-hover="159">pc</span> := <span class="const token" data-verso-hover="148">.</span>l58SC }</span>
+<span id="L324">      <span class="kw">else</span> { l <span class="kw">with</span> <span class="const token" data-verso-hover="163">cur</span> := r.<span class="const token" data-verso-hover="67">1</span>, <span class="const token" data-verso-hover="159">pc</span> := <span class="const token" data-verso-hover="152">.</span>dcLL76 }</span>
+<span id="L325">  | <span class="const token" data-verso-hover="148">.</span>l58SC =&gt; <span class="const token" data-verso-hover="196">.</span>access l.<span class="const token" data-verso-hover="161">j</span> (<span class="const token" data-verso-hover="198">.</span>sc p (<span class="const token" data-verso-hover="114">.</span>key v <span class="const token" data-verso-hover="104">.</span>tent)) <span class="kw">fun</span> r =&gt;</span>
+<span id="L326">      <span class="kw">if</span> r.<span class="const token" data-verso-hover="69">2</span> <span class="kw">then</span> <span class="const token" data-verso-hover="188">ds48</span> h l <span class="kw">else</span> { l <span class="kw">with</span> <span class="const token" data-verso-hover="159">pc</span> := <span class="const token" data-verso-hover="152">.</span>dcLL76 }</span>
+<span id="L327">  | <span class="const token" data-verso-hover="149">.</span>l66LL =&gt; <span class="const token" data-verso-hover="196">.</span>access l.<span class="const token" data-verso-hover="161">j</span> (<span class="const token" data-verso-hover="197">.</span>ll p) <span class="kw">fun</span> r =&gt;</span>
+<span id="L328">      <span class="kw">if</span> r.<span class="const token" data-verso-hover="67">1</span> = <span class="const token" data-verso-hover="114">.</span>key v <span class="const token" data-verso-hover="104">.</span>tent <span class="kw">then</span> { l <span class="kw">with</span> <span class="const token" data-verso-hover="163">cur</span> := r.<span class="const token" data-verso-hover="67">1</span>, <span class="const token" data-verso-hover="159">pc</span> := <span class="const token" data-verso-hover="150">.</span>l67SC }</span>
+<span id="L329">      <span class="kw">else</span> <span class="kw">if</span> r.<span class="const token" data-verso-hover="67">1</span> = <span class="const token" data-verso-hover="114">.</span>key v <span class="const token" data-verso-hover="106">.</span>reval <span class="kw">then</span> { l <span class="kw">with</span> <span class="const token" data-verso-hover="163">cur</span> := r.<span class="const token" data-verso-hover="67">1</span>, <span class="const token" data-verso-hover="159">pc</span> := <span class="const token" data-verso-hover="151">.</span>l69SC }</span>
+<span id="L330">      <span class="kw">else</span> { l <span class="kw">with</span> <span class="const token" data-verso-hover="163">cur</span> := r.<span class="const token" data-verso-hover="67">1</span>, <span class="const token" data-verso-hover="159">pc</span> := <span class="const token" data-verso-hover="152">.</span>dcLL76 }</span>
+<span id="L331">  | <span class="const token" data-verso-hover="150">.</span>l67SC =&gt; <span class="const token" data-verso-hover="196">.</span>access l.<span class="const token" data-verso-hover="161">j</span> (<span class="const token" data-verso-hover="198">.</span>sc p (<span class="const token" data-verso-hover="114">.</span>key v <span class="const token" data-verso-hover="105">.</span>fin)) <span class="kw">fun</span> r =&gt;</span>
+<span id="L332">      <span class="kw">if</span> r.<span class="const token" data-verso-hover="69">2</span> <span class="kw">then</span> <span class="const token" data-verso-hover="173">retL</span> l (<span class="const token" data-verso-hover="41">.</span>ok <span class="const token" data-verso-hover="2">true</span>) <span class="kw">else</span> { l <span class="kw">with</span> <span class="const token" data-verso-hover="159">pc</span> := <span class="const token" data-verso-hover="152">.</span>dcLL76 }</span>
+<span id="L333">  | <span class="const token" data-verso-hover="151">.</span>l69SC =&gt; <span class="const token" data-verso-hover="196">.</span>access l.<span class="const token" data-verso-hover="161">j</span> (<span class="const token" data-verso-hover="198">.</span>sc p (<span class="const token" data-verso-hover="114">.</span>key v <span class="const token" data-verso-hover="104">.</span>tent)) <span class="kw">fun</span> r =&gt;</span>
+<span id="L334">      <span class="kw">if</span> r.<span class="const token" data-verso-hover="69">2</span> <span class="kw">then</span> <span class="const token" data-verso-hover="188">ds48</span> h l <span class="kw">else</span> { l <span class="kw">with</span> <span class="const token" data-verso-hover="159">pc</span> := <span class="const token" data-verso-hover="152">.</span>dcLL76 }</span>
+<span id="L335">  | <span class="const token" data-verso-hover="152">.</span>dcLL76 =&gt; <span class="const token" data-verso-hover="196">.</span>access l.<span class="const token" data-verso-hover="161">j</span> (<span class="const token" data-verso-hover="197">.</span>ll p) <span class="kw">fun</span> r =&gt;</span>
+<span id="L336">      <span class="kw">if</span> r.<span class="const token" data-verso-hover="67">1</span> = <span class="const token" data-verso-hover="114">.</span>key v <span class="const token" data-verso-hover="106">.</span>reval <span class="kw">then</span> { l <span class="kw">with</span> <span class="const token" data-verso-hover="162">val</span> := r.<span class="const token" data-verso-hover="67">1</span>, <span class="const token" data-verso-hover="159">pc</span> := <span class="const token" data-verso-hover="153">.</span>dcSC78 }</span>
+<span id="L337">      <span class="kw">else</span> { l <span class="kw">with</span> <span class="const token" data-verso-hover="162">val</span> := r.<span class="const token" data-verso-hover="67">1</span>, <span class="const token" data-verso-hover="159">pc</span> := <span class="const token" data-verso-hover="155">.</span>dcSC80 }</span>
+<span id="L338">  | <span class="const token" data-verso-hover="153">.</span>dcSC78 =&gt; <span class="const token" data-verso-hover="196">.</span>access l.<span class="const token" data-verso-hover="161">j</span> (<span class="const token" data-verso-hover="198">.</span>sc p (<span class="const token" data-verso-hover="114">.</span>key v <span class="const token" data-verso-hover="104">.</span>tent)) <span class="kw">fun</span> r =&gt;</span>
+<span id="L339">      <span class="kw">if</span> r.<span class="const token" data-verso-hover="69">2</span> <span class="kw">then</span> <span class="const token" data-verso-hover="188">ds48</span> h l <span class="kw">else</span> { l <span class="kw">with</span> <span class="const token" data-verso-hover="159">pc</span> := <span class="const token" data-verso-hover="154">.</span>dcLL79 }</span>
+<span id="L340">  | <span class="const token" data-verso-hover="154">.</span>dcLL79 =&gt; <span class="const token" data-verso-hover="196">.</span>access l.<span class="const token" data-verso-hover="161">j</span> (<span class="const token" data-verso-hover="197">.</span>ll p) <span class="kw">fun</span> r =&gt; { l <span class="kw">with</span> <span class="const token" data-verso-hover="162">val</span> := r.<span class="const token" data-verso-hover="67">1</span>, <span class="const token" data-verso-hover="159">pc</span> := <span class="const token" data-verso-hover="155">.</span>dcSC80 }</span>
+<span id="L341">  | <span class="const token" data-verso-hover="155">.</span>dcSC80 =&gt; <span class="const token" data-verso-hover="196">.</span>access l.<span class="const token" data-verso-hover="161">j</span> (<span class="const token" data-verso-hover="198">.</span>sc p <span class="const token" data-verso-hover="111">.</span>tomb) <span class="kw">fun</span> r =&gt;</span>
+<span id="L342">      <span class="kw">if</span> r.<span class="const token" data-verso-hover="69">2</span> <span class="kw">then</span> <span class="const token" data-verso-hover="173">retL</span> l (<span class="const token" data-verso-hover="41">.</span>ok (<span class="const token" data-verso-hover="200">decide</span> (l.<span class="const token" data-verso-hover="162">val</span> = <span class="const token" data-verso-hover="112">.</span>deleted))) <span class="kw">else</span> { l <span class="kw">with</span> <span class="const token" data-verso-hover="159">pc</span> := <span class="const token" data-verso-hover="152">.</span>dcLL76 }</span>
+<span id="L343">  | <span class="const token" data-verso-hover="156">.</span>ret =&gt; <span class="const token" data-verso-hover="201">.</span>ret l.<span class="const token" data-verso-hover="165">rsp</span> { l <span class="kw">with</span> <span class="const token" data-verso-hover="159">pc</span> := <span class="const token" data-verso-hover="133">.</span>idle }</span>
+<span id="L344">  | <span class="const token" data-verso-hover="133">.</span>idle =&gt; <span class="const token" data-verso-hover="201">.</span>ret <span class="const token" data-verso-hover="49">.</span>abort l</span>
+<span id="L345"></span>
+<span id="L346"><span class="dc">/-- The hash table of Algorithms 1–5 (LL/SC version) for `n` processes `P`, keys `K`, a table</span></span>
+<span id="L347"><span class="dc">of `m` cells and hash function `h`, starting from the empty table. -/</span></span>
+<span id="L348"><span class="kw">def</span> <span class="const token" data-verso-hover="202">impl</span> [<span class="const token" data-verso-hover="203">Inhabited</span> K] : <span class="const token" data-verso-hover="5">Impl</span> (<span class="const token" data-verso-hover="23">dict</span> K) (<span class="const token" data-verso-hover="193">Mem</span> K m P) P (<span class="const token" data-verso-hover="157">Loc</span> K m) <span class="kw">where</span></span>
+<span id="L349">  <span class="const token" data-verso-hover="204">memInit</span> _ := (<span class="const token" data-verso-hover="110">.</span>empty, [])</span>
+<span id="L350">  <span class="const token" data-verso-hover="205">locInit</span> _ := { <span class="const token" data-verso-hover="192">start</span> h (<span class="const token" data-verso-hover="51">.</span>lookup <span class="const token" data-verso-hover="206">default</span>) <span class="kw">with</span> <span class="const token" data-verso-hover="159">pc</span> := <span class="const token" data-verso-hover="133">.</span>idle }</span>
+<span id="L351">  <span class="const token" data-verso-hover="207">invoke</span> _ _ o := <span class="const token" data-verso-hover="192">start</span> h o</span>
+<span id="L352">  <span class="const token" data-verso-hover="208">act</span> := <span class="const token" data-verso-hover="194">act</span> h</span>
+<span id="L353"></span>
+<span id="L354"><span class="kw">end</span> Program</span>
+<span id="L355"></span>
+<span id="L356"><span class="kw">end</span> Podc.LockFreeLinearProbing</span>
+<span id="L357"></span>
+</code></div>
+        <script>
+          window.versoHoversUrl = "PODC2026/LockFreeLinearProbing/-hovers.json";</script>
+        <script src="static/lean/popper.js"></script>
+        <script src="static/lean/tippy.js"></script>
+        <script src="static/lean/marked.js"></script>
+        <script src="static/lean/highlighting.js"></script>
+        <script src="static/lean/lean.js"></script>
+        </article></main><footer class="site-footer"><div class="wrap">
+        Machine-checked formalizations of PODC papers in Lean 4. Generated with <a href="https://github.com/leanprover/verso">Verso</a> from the README files of <a href="https://github.com/vasnesterov/formal_podc">vasnesterov/formal_podc</a>.</div>
+      </footer></body>
+  </html>
+

@@ -1,0 +1,498 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="light dark">
+    <link rel="icon" href="data:,">
+    <title>LineTreeScheduling: Framework.lean · Formal PODC</title><base href="../../../.././"><link rel="stylesheet" href="static/lean/verso-vars.css">
+    <link rel="stylesheet" href="static/lean/highlighting.css">
+    <link rel="stylesheet" href="static/lean/tippy-border.css">
+    <link rel="stylesheet" href="static/style.css">
+    <script defer="defer" src="static/site.js"></script>
+    </head>
+  <body>
+    <header class="site-header">
+      <div class="wrap">
+        <a class="brand" href=".">Formal PODC</a><nav class="top">
+          <a href=".">Search</a><a href="about/">About</a><a href="https://github.com/vasnesterov/formal_podc">GitHub</a></nav>
+        </div>
+      </header>
+    <main class="wrap"><article><nav class="breadcrumbs" aria-label="Breadcrumb">
+          <a href=".">Search</a><span class="sep">›</span><a href="PODC2012/">PODC 2012</a><span class="sep">›</span><a href="PODC2012/LineTreeScheduling/">LineTreeScheduling</a><span class="sep">›</span><a href="PODC2012/LineTreeScheduling/src/">Lean source</a><span class="sep">›</span><span aria-current="page">Framework</span></nav>
+        <h1>
+          <code>Framework.lean</code></h1>
+        <div class="paper-links">
+          <p>
+            Source of <a href="PODC2012/LineTreeScheduling/">Scheduling on Line and Tree Networks — PODC 2012</a> · <a href="https://github.com/vasnesterov/formal_podc/blob/main/Papers/PODC2012/LineTreeScheduling/Framework.lean">GitHub</a> · hover over a name for its type and documentation</p>
+          </div>
+        <div class="lean-code lean-src">
+          <code class="hl lean block" data-lean-context="Framework"><span id="L1"><span class="kw">import</span> Papers.PODC2012.LineTreeScheduling.Basic</span>
+<span id="L2"></span>
+<span id="L3"><span class="dc">/-!</span></span>
+<span id="L4"><span class="dc"># The two-phase primal–dual framework (Sections 3.2 and 6.1)</span></span>
+<span id="L5"></span>
+<span id="L6"><span class="dc">The first phase starts from the zero dual assignment and performs a sequence of iterations</span></span>
+<span id="L7"><span class="dc">`t = 0, 1, …, T-1`; iteration `t` raises every demand instance of a set `Is t`. Raising `d` at the</span></span>
+<span id="L8"><span class="dc">current dual assignment `y` (Section 3.2, and its height variant in Section 6.1):</span></span>
+<span id="L9"></span>
+<span id="L10"><span class="dc">* `δ(d) = s / (1 + h(d) c(d) |π(d)|)` where `s = p(d) - lhs(d)` is the slackness;</span></span>
+<span id="L11"><span class="dc">* `α(a_d) += δ(d)` and `β(e) += c(d) δ(d)` for every critical edge `e ∈ π(d)`.</span></span>
+<span id="L12"></span>
+<span id="L13"><span class="dc">With `h = c = 1` this is the rule of Section 3.2 (`δ(d) = s/(|π(d)|+1)`); with `h` the heights and</span></span>
+<span id="L14"><span class="dc">`c(d) = 2|π(d)|` it is the rule of Section 6.1 (`δ(d) = s/(1 + 2h(d)|π(d)|²)`, `β(e) += 2|π(d)|δ(d)`).</span></span>
+<span id="L15"><span class="dc">In both cases the dual constraint of `d` becomes tight. A `Rule` packages `h`, `c` and `π`.</span></span>
+<span id="L16"></span>
+<span id="L17"><span class="dc">All instances of an iteration are raised simultaneously, each with the `δ` computed from the dual</span></span>
+<span id="L18"><span class="dc">assignment at the beginning of the iteration; the paper does the same (its sets are independent,</span></span>
+<span id="L19"><span class="dc">so the raises do not interact).</span></span>
+<span id="L20"></span>
+<span id="L21"><span class="dc">Main results of this file:</span></span>
+<span id="L22"><span class="dc">* `lhs_run`, `val_run` — closed forms of the dual constraints and of the dual objective after `t`</span></span>
+<span id="L23"><span class="dc">  iterations as sums over the earlier raises.</span></span>
+<span id="L24"><span class="dc">* `profit_le_lhs_of_mem` and `not_mem_of_mem_of_lt` — a raised instance is satisfied afterwards and</span></span>
+<span id="L25"><span class="dc">  is never raised again.</span></span>
+<span id="L26"><span class="dc">* `sum_raise_le_profitOf` — the charging argument of Lemmas 3.1 and 6.1: if every raised instance</span></span>
+<span id="L27"><span class="dc">  not in the final solution `S` is "covered" by later raises of instances of `S` (with total</span></span>
+<span id="L28"><span class="dc">  weight `≥ 1`), then `∑_{raised} δ ≤ p(S)`.</span></span>
+<span id="L29"><span class="dc">* `lam_mul_lpValue_le` — the resulting approximation bound `λ · LP ≤ M · p(S)`.</span></span>
+<span id="L30"><span class="dc">* `phase2` — the second phase (pop the stack, add an instance if an acceptance test passes), with its</span></span>
+<span id="L31"><span class="dc">  generic invariants.</span></span>
+<span id="L32"><span class="dc">-/</span></span>
+<span id="L33"></span>
+<span id="L34"><span class="cm">--</span><span class="cm"> CSLib candidate: abstract two-phase primal–dual framework for packing problems</span></span>
+<span id="L35"></span>
+<span id="L36"><span class="kw">set_option</span> <span class="const token" data-verso-hover="47">linter.unusedSectionVars</span> false</span>
+<span id="L37"></span>
+<span id="L38"><span class="kw">namespace</span> Podc.LineTreeScheduling</span>
+<span id="L39"></span>
+<span id="L40"><span class="kw">open</span> Finset</span>
+<span id="L41"></span>
+<span id="L42"><span class="kw">variable</span> {A D E : <span class="kw">Type</span>*} [<span class="const token" data-verso-hover="48">DecidableEq</span> A] [<span class="const token" data-verso-hover="48">DecidableEq</span> D] [<span class="const token" data-verso-hover="48">DecidableEq</span> E]</span>
+<span id="L43"></span>
+<span id="L44"><span class="dc">/-- The parameters of the raising rule: the heights `h` used in the dual constraints, the</span></span>
+<span id="L45"><span class="dc">multiplier `c` of the raise of the edge variables, and the critical edges `π(d)`. -/</span></span>
+<span id="L46"><span class="kw">structure</span> <span class="const token" data-verso-hover="87">Rule</span> (D E : <span class="kw">Type</span>*) <span class="kw">where</span></span>
+<span id="L47">  <span class="dc">/-- Heights (`1` in the unit-height case). -/</span></span>
+<span id="L48">  <span class="const token" data-verso-hover="95">h</span> : D → <span class="const token" data-verso-hover="86">ℝ</span></span>
+<span id="L49">  <span class="dc">/-- The edge variables of `π(d)` are raised by `c(d) δ(d)`. -/</span></span>
+<span id="L50">  <span class="const token" data-verso-hover="303">c</span> : D → <span class="const token" data-verso-hover="86">ℝ</span></span>
+<span id="L51">  <span class="dc">/-- The critical edges `π(d)`. -/</span></span>
+<span id="L52">  <span class="const token" data-verso-hover="118">crit</span> : D → <span class="const token" data-verso-hover="51">Finset</span> E</span>
+<span id="L53"></span>
+<span id="L54"><span class="dc">/-- A rule is well-formed if `h, c ≥ 0` and `π(d) ⊆ path(d)`. -/</span></span>
+<span id="L55"><span class="kw">structure</span> <span class="const token" data-verso-hover="107">Rule.WF</span> (R : <span class="const token" data-verso-hover="87">Rule</span> D E) (I : <span class="const token" data-verso-hover="49">Inst</span> A D E) : <span class="kw">Prop</span> <span class="kw">where</span></span>
+<span id="L56">  <span class="const token" data-verso-hover="129">h_nonneg</span> : ∀ d, <span class="nu">0</span> ≤ R.<span class="const token" data-verso-hover="95">h</span> d</span>
+<span id="L57">  <span class="const token" data-verso-hover="304">c_nonneg</span> : ∀ d, <span class="nu">0</span> ≤ R.<span class="const token" data-verso-hover="303">c</span> d</span>
+<span id="L58">  <span class="const token" data-verso-hover="305">crit_subset</span> : ∀ d, R.<span class="const token" data-verso-hover="118">crit</span> d ⊆ I.<span class="const token" data-verso-hover="119">path</span> d</span>
+<span id="L59"></span>
+<span id="L60"><span class="dc">/-- The denominator `1 + h(d) c(d) |π(d)|` of the raise amount. -/</span></span>
+<span id="L61"><span class="kw">def</span> <span class="const token" data-verso-hover="135">Rule.denom</span> (R : <span class="const token" data-verso-hover="87">Rule</span> D E) (d : D) : <span class="const token" data-verso-hover="86">ℝ</span> := <span class="nu">1</span> + R.<span class="const token" data-verso-hover="95">h</span> d * R.<span class="const token" data-verso-hover="303">c</span> d * (R.<span class="const token" data-verso-hover="118">crit</span> d).<span class="const token" data-verso-hover="172">card</span></span>
+<span id="L62"></span>
+<span id="L63"><span class="kw">noncomputable</span> <span class="kw">section</span></span>
+<span id="L64"></span>
+<span id="L65"><span class="kw">namespace</span> Inst</span>
+<span id="L66"></span>
+<span id="L67"><span class="kw">variable</span> (I : <span class="const token" data-verso-hover="49">Inst</span> A D E) (R : <span class="const token" data-verso-hover="87">Rule</span> D E)</span>
+<span id="L68"></span>
+<span id="L69"><span class="dc">/-- The raise amount `δ(d) = (p(d) - lhs(d)) / (1 + h(d) c(d) |π(d)|)`. -/</span></span>
+<span id="L70"><span class="kw">def</span> <span class="const token" data-verso-hover="136">amt</span> (y : <span class="const token" data-verso-hover="92">Duals</span> A E) (d : D) : <span class="const token" data-verso-hover="86">ℝ</span> := (I.<span class="const token" data-verso-hover="96">profit</span> d - I.<span class="const token" data-verso-hover="94">lhs</span> R.<span class="const token" data-verso-hover="95">h</span> y d) / R.<span class="const token" data-verso-hover="135">denom</span> d</span>
+<span id="L71"></span>
+<span id="L72"><span class="dc">/-- One iteration: raise every instance of `S`. -/</span></span>
+<span id="L73"><span class="kw">def</span> <span class="const token" data-verso-hover="98">raise</span> (y : <span class="const token" data-verso-hover="92">Duals</span> A E) (S : <span class="const token" data-verso-hover="51">Finset</span> D) : <span class="const token" data-verso-hover="92">Duals</span> A E :=</span>
+<span id="L74">  ⟨<span class="kw">fun</span> a =&gt; y.<span class="const token" data-verso-hover="230">α</span> a + ∑ d ∈ S <span class="kw">with</span> I.<span class="const token" data-verso-hover="200">dem</span> d = a, I.<span class="const token" data-verso-hover="136">amt</span> R y d,</span>
+<span id="L75">   <span class="kw">fun</span> e =&gt; y.<span class="const token" data-verso-hover="231">β</span> e + ∑ d ∈ S <span class="kw">with</span> e ∈ R.<span class="const token" data-verso-hover="118">crit</span> d, R.<span class="const token" data-verso-hover="303">c</span> d * I.<span class="const token" data-verso-hover="136">amt</span> R y d⟩</span>
+<span id="L76"></span>
+<span id="L77"><span class="dc">/-- The dual assignment after the first `t` iterations, raising `Is 0, Is 1, …`. -/</span></span>
+<span id="L78"><span class="kw">def</span> <span class="const token" data-verso-hover="101">run</span> (Is : <span class="const token" data-verso-hover="78">ℕ</span> → <span class="const token" data-verso-hover="51">Finset</span> D) : <span class="const token" data-verso-hover="78">ℕ</span> → <span class="const token" data-verso-hover="92">Duals</span> A E</span>
+<span id="L79">  | <span class="nu">0</span> =&gt; <span class="nu">0</span></span>
+<span id="L80">  | t + <span class="nu">1</span> =&gt; I.<span class="const token" data-verso-hover="98">raise</span> R (<span class="const token" data-verso-hover="101">run</span> Is t) (Is t)</span>
+<span id="L81"></span>
+<span id="L82"><span class="dc">/-- The contribution factor of a raise of `d'` to the dual constraint of `d`:</span></span>
+<span id="L83"><span class="dc">`[a_{d'} = a_d] + h(d) c(d') |π(d') ∩ path(d)|`. -/</span></span>
+<span id="L84"><span class="kw">def</span> <span class="const token" data-verso-hover="134">weight</span> (d' d : D) : <span class="const token" data-verso-hover="86">ℝ</span> :=</span>
+<span id="L85">  (<span class="kw">if</span> I.<span class="const token" data-verso-hover="200">dem</span> d' = I.<span class="const token" data-verso-hover="200">dem</span> d <span class="kw">then</span> <span class="nu">1</span> <span class="kw">else</span> <span class="nu">0</span>) + R.<span class="const token" data-verso-hover="95">h</span> d * R.<span class="const token" data-verso-hover="303">c</span> d' * (R.<span class="const token" data-verso-hover="118">crit</span> d' ∩ I.<span class="const token" data-verso-hover="119">path</span> d).<span class="const token" data-verso-hover="172">card</span></span>
+<span id="L86"></span>
+<span id="L87">@[<span class="kw">simp</span>] <span class="kw">lemma</span> <span class="const token" data-verso-hover="306">run_zero</span> (Is : <span class="const token" data-verso-hover="78">ℕ</span> → <span class="const token" data-verso-hover="51">Finset</span> D) : I.<span class="const token" data-verso-hover="101">run</span> R Is <span class="nu">0</span> = <span class="nu">0</span> := <span class="const token" data-verso-hover="157">rfl</span></span>
+<span id="L88"></span>
+<span id="L89"><span class="kw">lemma</span> <span class="const token" data-verso-hover="104">run_succ</span> (Is : <span class="const token" data-verso-hover="78">ℕ</span> → <span class="const token" data-verso-hover="51">Finset</span> D) (t : <span class="const token" data-verso-hover="78">ℕ</span>) :</span>
+<span id="L90">    I.<span class="const token" data-verso-hover="101">run</span> R Is (t + <span class="nu">1</span>) = I.<span class="const token" data-verso-hover="98">raise</span> R (I.<span class="const token" data-verso-hover="101">run</span> R Is t) (Is t) := <span class="const token" data-verso-hover="157">rfl</span></span>
+<span id="L91"></span>
+<span id="L92"><span class="kw">lemma</span> <span class="const token" data-verso-hover="140">lhs_raise</span> (y : <span class="const token" data-verso-hover="92">Duals</span> A E) (S : <span class="const token" data-verso-hover="51">Finset</span> D) (d : D) :</span>
+<span id="L93">    I.<span class="const token" data-verso-hover="94">lhs</span> R.<span class="const token" data-verso-hover="95">h</span> (I.<span class="const token" data-verso-hover="98">raise</span> R y S) d = I.<span class="const token" data-verso-hover="94">lhs</span> R.<span class="const token" data-verso-hover="95">h</span> y d + ∑ d' ∈ S, I.<span class="const token" data-verso-hover="136">amt</span> R y d' * I.<span class="const token" data-verso-hover="134">weight</span> R d' d := <span class="kw">by</span></span>
+<span id="L94">  <span class="kw">have</span> hβ : ∑ e ∈ I.<span class="const token" data-verso-hover="119">path</span> d, ∑ d' ∈ S <span class="kw">with</span> e ∈ R.<span class="const token" data-verso-hover="118">crit</span> d', R.<span class="const token" data-verso-hover="303">c</span> d' * I.<span class="const token" data-verso-hover="136">amt</span> R y d' =</span>
+<span id="L95">      ∑ d' ∈ S, R.<span class="const token" data-verso-hover="303">c</span> d' * I.<span class="const token" data-verso-hover="136">amt</span> R y d' * ((R.<span class="const token" data-verso-hover="118">crit</span> d' ∩ I.<span class="const token" data-verso-hover="119">path</span> d).<span class="const token" data-verso-hover="172">card</span> : <span class="const token" data-verso-hover="86">ℝ</span>) := <span class="kw">by</span></span>
+<span id="L96">    simp_rw [<span class="const token" data-verso-hover="228">Finset.sum_filter</span>]</span>
+<span id="L97">    <span class="kw">rw</span> [<span class="const token" data-verso-hover="307">Finset.sum_comm</span>]</span>
+<span id="L98">    <span class="kw">refine</span> <span class="const token" data-verso-hover="229">Finset.sum_congr</span> <span class="const token" data-verso-hover="157">rfl</span> <span class="kw">fun</span> d' _ =&gt; ?_</span>
+<span id="L99">    <span class="kw">rw</span> [← <span class="const token" data-verso-hover="228">Finset.sum_filter</span>, <span class="const token" data-verso-hover="308">Finset.sum_const</span>, <span class="const token" data-verso-hover="309">nsmul_eq_mul</span>, <span class="const token" data-verso-hover="310">Finset.filter_mem_eq_inter</span>,</span>
+<span id="L100">      <span class="const token" data-verso-hover="211">Finset.inter_comm</span>]</span>
+<span id="L101">    <span class="kw">ring</span></span>
+<span id="L102">  <span class="kw">have</span> hα : ∑ d' ∈ S <span class="kw">with</span> I.<span class="const token" data-verso-hover="200">dem</span> d' = I.<span class="const token" data-verso-hover="200">dem</span> d, I.<span class="const token" data-verso-hover="136">amt</span> R y d' =</span>
+<span id="L103">      ∑ d' ∈ S, I.<span class="const token" data-verso-hover="136">amt</span> R y d' * (<span class="kw">if</span> I.<span class="const token" data-verso-hover="200">dem</span> d' = I.<span class="const token" data-verso-hover="200">dem</span> d <span class="kw">then</span> <span class="nu">1</span> <span class="kw">else</span> <span class="nu">0</span>) := <span class="kw">by</span></span>
+<span id="L104">    <span class="kw">rw</span> [<span class="const token" data-verso-hover="228">Finset.sum_filter</span>]</span>
+<span id="L105">    <span class="kw">refine</span> <span class="const token" data-verso-hover="229">Finset.sum_congr</span> <span class="const token" data-verso-hover="157">rfl</span> <span class="kw">fun</span> d' _ =&gt; ?_</span>
+<span id="L106">    <span class="kw">split_ifs</span> &lt;;&gt; <span class="kw">simp</span></span>
+<span id="L107">  <span class="kw">simp</span> only [<span class="const token" data-verso-hover="94">lhs</span>, <span class="const token" data-verso-hover="98">raise</span>, <span class="const token" data-verso-hover="240">Finset.sum_add_distrib</span>, hβ, hα, <span class="const token" data-verso-hover="134">weight</span>, <span class="const token" data-verso-hover="239">mul_add</span>, <span class="const token" data-verso-hover="237">Finset.mul_sum</span>]</span>
+<span id="L108">  <span class="kw">have</span> : ∀ x ∈ S, R.<span class="const token" data-verso-hover="95">h</span> d * (R.<span class="const token" data-verso-hover="303">c</span> x * I.<span class="const token" data-verso-hover="136">amt</span> R y x * ((R.<span class="const token" data-verso-hover="118">crit</span> x ∩ I.<span class="const token" data-verso-hover="119">path</span> d).<span class="const token" data-verso-hover="172">card</span> : <span class="const token" data-verso-hover="86">ℝ</span>)) =</span>
+<span id="L109">      I.<span class="const token" data-verso-hover="136">amt</span> R y x * (R.<span class="const token" data-verso-hover="95">h</span> d * R.<span class="const token" data-verso-hover="303">c</span> x * ((R.<span class="const token" data-verso-hover="118">crit</span> x ∩ I.<span class="const token" data-verso-hover="119">path</span> d).<span class="const token" data-verso-hover="172">card</span> : <span class="const token" data-verso-hover="86">ℝ</span>)) := <span class="kw">fun</span> _ _ =&gt; <span class="kw">by</span> <span class="kw">ring</span></span>
+<span id="L110">  <span class="kw">rw</span> [<span class="const token" data-verso-hover="229">Finset.sum_congr</span> <span class="const token" data-verso-hover="157">rfl</span> this]</span>
+<span id="L111">  <span class="kw">ring</span></span>
+<span id="L112"></span>
+<span id="L113"><span class="kw">lemma</span> <span class="const token" data-verso-hover="311">val_raise</span> [<span class="const token" data-verso-hover="88">Fintype</span> A] [<span class="const token" data-verso-hover="88">Fintype</span> E] (y : <span class="const token" data-verso-hover="92">Duals</span> A E) (S : <span class="const token" data-verso-hover="51">Finset</span> D) :</span>
+<span id="L114">    (I.<span class="const token" data-verso-hover="98">raise</span> R y S).<span class="const token" data-verso-hover="234">val</span> = y.<span class="const token" data-verso-hover="234">val</span> + ∑ d' ∈ S, I.<span class="const token" data-verso-hover="136">amt</span> R y d' * (<span class="nu">1</span> + R.<span class="const token" data-verso-hover="303">c</span> d' * (R.<span class="const token" data-verso-hover="118">crit</span> d').<span class="const token" data-verso-hover="172">card</span>) := <span class="kw">by</span></span>
+<span id="L115">  <span class="kw">simp</span> only [<span class="const token" data-verso-hover="234">Duals.val</span>, <span class="const token" data-verso-hover="98">raise</span>, <span class="const token" data-verso-hover="240">Finset.sum_add_distrib</span>, <span class="const token" data-verso-hover="239">mul_add</span>, <span class="const token" data-verso-hover="219">mul_one</span>]</span>
+<span id="L116">  <span class="kw">have</span> h1 : ∑ a, ∑ d ∈ S <span class="kw">with</span> I.<span class="const token" data-verso-hover="200">dem</span> d = a, I.<span class="const token" data-verso-hover="136">amt</span> R y d = ∑ d' ∈ S, I.<span class="const token" data-verso-hover="136">amt</span> R y d' := <span class="kw">by</span></span>
+<span id="L117">    simp_rw [<span class="const token" data-verso-hover="228">Finset.sum_filter</span>]</span>
+<span id="L118">    <span class="kw">rw</span> [<span class="const token" data-verso-hover="307">Finset.sum_comm</span>]</span>
+<span id="L119">    <span class="kw">refine</span> <span class="const token" data-verso-hover="229">Finset.sum_congr</span> <span class="const token" data-verso-hover="157">rfl</span> <span class="kw">fun</span> d' _ =&gt; ?_</span>
+<span id="L120">    <span class="kw">simp</span></span>
+<span id="L121">  <span class="kw">have</span> h2 : ∑ e, ∑ d ∈ S <span class="kw">with</span> e ∈ R.<span class="const token" data-verso-hover="118">crit</span> d, R.<span class="const token" data-verso-hover="303">c</span> d * I.<span class="const token" data-verso-hover="136">amt</span> R y d =</span>
+<span id="L122">      ∑ d' ∈ S, I.<span class="const token" data-verso-hover="136">amt</span> R y d' * (R.<span class="const token" data-verso-hover="303">c</span> d' * (R.<span class="const token" data-verso-hover="118">crit</span> d').<span class="const token" data-verso-hover="172">card</span>) := <span class="kw">by</span></span>
+<span id="L123">    simp_rw [<span class="const token" data-verso-hover="228">Finset.sum_filter</span>]</span>
+<span id="L124">    <span class="kw">rw</span> [<span class="const token" data-verso-hover="307">Finset.sum_comm</span>]</span>
+<span id="L125">    <span class="kw">refine</span> <span class="const token" data-verso-hover="229">Finset.sum_congr</span> <span class="const token" data-verso-hover="157">rfl</span> <span class="kw">fun</span> d' _ =&gt; ?_</span>
+<span id="L126">    <span class="kw">rw</span> [← <span class="const token" data-verso-hover="228">Finset.sum_filter</span>, <span class="const token" data-verso-hover="308">Finset.sum_const</span>, <span class="const token" data-verso-hover="309">nsmul_eq_mul</span>]</span>
+<span id="L127">    <span class="kw">simp</span> only [<span class="const token" data-verso-hover="310">Finset.filter_mem_eq_inter</span>, <span class="const token" data-verso-hover="312">Finset.univ_inter</span>]</span>
+<span id="L128">    <span class="kw">ring</span></span>
+<span id="L129">  <span class="kw">rw</span> [h1, h2]; <span class="kw">ring</span></span>
+<span id="L130"></span>
+<span id="L131"><span class="dc">/-- Closed form of the left-hand side of a dual constraint after `t` iterations. -/</span></span>
+<span id="L132"><span class="kw">lemma</span> <span class="const token" data-verso-hover="313">lhs_run</span> (Is : <span class="const token" data-verso-hover="78">ℕ</span> → <span class="const token" data-verso-hover="51">Finset</span> D) (t : <span class="const token" data-verso-hover="78">ℕ</span>) (d : D) :</span>
+<span id="L133">    I.<span class="const token" data-verso-hover="94">lhs</span> R.<span class="const token" data-verso-hover="95">h</span> (I.<span class="const token" data-verso-hover="101">run</span> R Is t) d =</span>
+<span id="L134">      ∑ s ∈ <span class="const token" data-verso-hover="314">range</span> t, ∑ d' ∈ Is s, I.<span class="const token" data-verso-hover="136">amt</span> R (I.<span class="const token" data-verso-hover="101">run</span> R Is s) d' * I.<span class="const token" data-verso-hover="134">weight</span> R d' d := <span class="kw">by</span></span>
+<span id="L135">  <span class="kw">induction</span> t <span class="kw">with</span></span>
+<span id="L136">  | <span class="const token" data-verso-hover="102">zero</span> =&gt; <span class="kw">simp</span> [<span class="const token" data-verso-hover="94">lhs</span>]</span>
+<span id="L137">  | <span class="const token" data-verso-hover="103">succ</span> t ih =&gt; <span class="kw">rw</span> [<span class="const token" data-verso-hover="104">run_succ</span>, <span class="const token" data-verso-hover="140">lhs_raise</span>, ih, <span class="const token" data-verso-hover="315">Finset.sum_range_succ</span>]</span>
+<span id="L138"></span>
+<span id="L139"><span class="dc">/-- Closed form of the dual objective after `t` iterations. -/</span></span>
+<span id="L140"><span class="kw">lemma</span> <span class="const token" data-verso-hover="316">val_run</span> [<span class="const token" data-verso-hover="88">Fintype</span> A] [<span class="const token" data-verso-hover="88">Fintype</span> E] (Is : <span class="const token" data-verso-hover="78">ℕ</span> → <span class="const token" data-verso-hover="51">Finset</span> D) (t : <span class="const token" data-verso-hover="78">ℕ</span>) :</span>
+<span id="L141">    (I.<span class="const token" data-verso-hover="101">run</span> R Is t).<span class="const token" data-verso-hover="234">val</span> =</span>
+<span id="L142">      ∑ s ∈ <span class="const token" data-verso-hover="314">range</span> t, ∑ d' ∈ Is s, I.<span class="const token" data-verso-hover="136">amt</span> R (I.<span class="const token" data-verso-hover="101">run</span> R Is s) d' * (<span class="nu">1</span> + R.<span class="const token" data-verso-hover="303">c</span> d' * (R.<span class="const token" data-verso-hover="118">crit</span> d').<span class="const token" data-verso-hover="172">card</span>) := <span class="kw">by</span></span>
+<span id="L143">  <span class="kw">induction</span> t <span class="kw">with</span></span>
+<span id="L144">  | <span class="const token" data-verso-hover="102">zero</span> =&gt; <span class="kw">simp</span> [<span class="const token" data-verso-hover="234">Duals.val</span>]</span>
+<span id="L145">  | <span class="const token" data-verso-hover="103">succ</span> t ih =&gt; <span class="kw">rw</span> [<span class="const token" data-verso-hover="104">run_succ</span>, <span class="const token" data-verso-hover="311">val_raise</span>, ih, <span class="const token" data-verso-hover="315">Finset.sum_range_succ</span>]</span>
+<span id="L146"></span>
+<span id="L147"><span class="dc">/-- A valid run of the first phase with `T` iterations: every set `Is t` is independent and</span></span>
+<span id="L148"><span class="dc">consists of instances whose dual constraint is unsatisfied at the beginning of iteration `t`</span></span>
+<span id="L149"><span class="dc">(Section 3.2: `I ⊆ U`). -/</span></span>
+<span id="L150"><span class="kw">structure</span> <span class="const token" data-verso-hover="114">ValidRun</span> (Is : <span class="const token" data-verso-hover="78">ℕ</span> → <span class="const token" data-verso-hover="51">Finset</span> D) (T : <span class="const token" data-verso-hover="78">ℕ</span>) : <span class="kw">Prop</span> <span class="kw">where</span></span>
+<span id="L151">  <span class="const token" data-verso-hover="317">indep</span> : ∀ t &lt; T, I.<span class="const token" data-verso-hover="54">IsIndep</span> (Is t)</span>
+<span id="L152">  <span class="const token" data-verso-hover="318">unsat</span> : ∀ t &lt; T, ∀ d ∈ Is t, I.<span class="const token" data-verso-hover="94">lhs</span> R.<span class="const token" data-verso-hover="95">h</span> (I.<span class="const token" data-verso-hover="101">run</span> R Is t) d &lt; I.<span class="const token" data-verso-hover="96">profit</span> d</span>
+<span id="L153"></span>
+<span id="L154"><span class="dc">/-- The interference property (Section 3.2): if overlapping instances `d₁, d₂` are raised in this</span></span>
+<span id="L155"><span class="dc">order, then `path(d₂)` contains a critical edge of `d₁`. -/</span></span>
+<span id="L156"><span class="kw">def</span> <span class="const token" data-verso-hover="121">Interference</span> (Is : <span class="const token" data-verso-hover="78">ℕ</span> → <span class="const token" data-verso-hover="51">Finset</span> D) (T : <span class="const token" data-verso-hover="78">ℕ</span>) : <span class="kw">Prop</span> :=</span>
+<span id="L157">  ∀ s t, s &lt; t → t &lt; T → ∀ d₁ ∈ Is s, ∀ d₂ ∈ Is t, I.<span class="const token" data-verso-hover="117">Overlap</span> d₁ d₂ →</span>
+<span id="L158">    (R.<span class="const token" data-verso-hover="118">crit</span> d₁ ∩ I.<span class="const token" data-verso-hover="119">path</span> d₂).<span class="const token" data-verso-hover="120">Nonempty</span></span>
+<span id="L159"></span>
+<span id="L160"><span class="kw">variable</span> {I R}</span>
+<span id="L161"></span>
+<span id="L162"><span class="kw">lemma</span> <span class="const token" data-verso-hover="146">denom_pos</span> (hR : R.<span class="const token" data-verso-hover="107">WF</span> I) (d : D) : <span class="nu">0</span> &lt; R.<span class="const token" data-verso-hover="135">denom</span> d := <span class="kw">by</span></span>
+<span id="L163">  <span class="kw">unfold</span> <span class="const token" data-verso-hover="135">Rule.denom</span></span>
+<span id="L164">  <span class="kw">have</span> := <span class="const token" data-verso-hover="128">mul_nonneg</span> (<span class="const token" data-verso-hover="128">mul_nonneg</span> (hR.<span class="const token" data-verso-hover="129">h_nonneg</span> d) (hR.<span class="const token" data-verso-hover="304">c_nonneg</span> d)) (<span class="const token" data-verso-hover="193">Nat.cast_nonneg</span> (R.<span class="const token" data-verso-hover="118">crit</span> d).<span class="const token" data-verso-hover="172">card</span>)</span>
+<span id="L165">  <span class="kw">linarith</span></span>
+<span id="L166"></span>
+<span id="L167"><span class="kw">lemma</span> <span class="const token" data-verso-hover="319">one_le_denom</span> (hR : R.<span class="const token" data-verso-hover="107">WF</span> I) (d : D) : <span class="nu">1</span> ≤ R.<span class="const token" data-verso-hover="135">denom</span> d := <span class="kw">by</span></span>
+<span id="L168">  <span class="kw">unfold</span> <span class="const token" data-verso-hover="135">Rule.denom</span></span>
+<span id="L169">  <span class="kw">have</span> := <span class="const token" data-verso-hover="128">mul_nonneg</span> (<span class="const token" data-verso-hover="128">mul_nonneg</span> (hR.<span class="const token" data-verso-hover="129">h_nonneg</span> d) (hR.<span class="const token" data-verso-hover="304">c_nonneg</span> d)) (<span class="const token" data-verso-hover="193">Nat.cast_nonneg</span> (R.<span class="const token" data-verso-hover="118">crit</span> d).<span class="const token" data-verso-hover="172">card</span>)</span>
+<span id="L170">  <span class="kw">linarith</span></span>
+<span id="L171"></span>
+<span id="L172"><span class="kw">lemma</span> <span class="const token" data-verso-hover="141">weight_nonneg</span> (hR : R.<span class="const token" data-verso-hover="107">WF</span> I) (d' d : D) : <span class="nu">0</span> ≤ I.<span class="const token" data-verso-hover="134">weight</span> R d' d := <span class="kw">by</span></span>
+<span id="L173">  <span class="kw">unfold</span> <span class="const token" data-verso-hover="134">weight</span></span>
+<span id="L174">  <span class="kw">have</span> := <span class="const token" data-verso-hover="128">mul_nonneg</span> (<span class="const token" data-verso-hover="128">mul_nonneg</span> (hR.<span class="const token" data-verso-hover="129">h_nonneg</span> d) (hR.<span class="const token" data-verso-hover="304">c_nonneg</span> d'))</span>
+<span id="L175">    (<span class="const token" data-verso-hover="193">Nat.cast_nonneg</span> (R.<span class="const token" data-verso-hover="118">crit</span> d' ∩ I.<span class="const token" data-verso-hover="119">path</span> d).<span class="const token" data-verso-hover="172">card</span>)</span>
+<span id="L176">  <span class="kw">have</span> : (<span class="nu">0</span> : <span class="const token" data-verso-hover="86">ℝ</span>) ≤ <span class="kw">if</span> I.<span class="const token" data-verso-hover="200">dem</span> d' = I.<span class="const token" data-verso-hover="200">dem</span> d <span class="kw">then</span> <span class="nu">1</span> <span class="kw">else</span> <span class="nu">0</span> := <span class="kw">by</span> <span class="kw">split_ifs</span> &lt;;&gt; <span class="kw">norm_num</span></span>
+<span id="L177">  <span class="kw">linarith</span></span>
+<span id="L178"></span>
+<span id="L179"><span class="kw">lemma</span> <span class="const token" data-verso-hover="320">weight_self</span> (hR : R.<span class="const token" data-verso-hover="107">WF</span> I) (d : D) : I.<span class="const token" data-verso-hover="134">weight</span> R d d = R.<span class="const token" data-verso-hover="135">denom</span> d := <span class="kw">by</span></span>
+<span id="L180">  <span class="kw">unfold</span> <span class="const token" data-verso-hover="134">weight</span> <span class="const token" data-verso-hover="135">Rule.denom</span></span>
+<span id="L181">  <span class="kw">rw</span> [<span class="const token" data-verso-hover="321">Finset.inter_eq_left</span>.<span class="const token" data-verso-hover="61">2</span> (hR.<span class="const token" data-verso-hover="305">crit_subset</span> d)]</span>
+<span id="L182">  <span class="kw">simp</span></span>
+<span id="L183"></span>
+<span id="L184"><span class="dc">/-- `δ(d) · (1 + h c |π|)` is the slackness: after the raise the constraint is tight. -/</span></span>
+<span id="L185"><span class="kw">lemma</span> <span class="const token" data-verso-hover="137">amt_mul_denom</span> (hR : R.<span class="const token" data-verso-hover="107">WF</span> I) (y : <span class="const token" data-verso-hover="92">Duals</span> A E) (d : D) :</span>
+<span id="L186">    I.<span class="const token" data-verso-hover="136">amt</span> R y d * R.<span class="const token" data-verso-hover="135">denom</span> d = I.<span class="const token" data-verso-hover="96">profit</span> d - I.<span class="const token" data-verso-hover="94">lhs</span> R.<span class="const token" data-verso-hover="95">h</span> y d := <span class="kw">by</span></span>
+<span id="L187">  <span class="kw">unfold</span> <span class="const token" data-verso-hover="136">amt</span>; <span class="kw">field_simp</span> [(<span class="const token" data-verso-hover="146">denom_pos</span> hR d).<span class="const token" data-verso-hover="322">ne'</span>]</span>
+<span id="L188"></span>
+<span id="L189"><span class="kw">variable</span> {Is : <span class="const token" data-verso-hover="78">ℕ</span> → <span class="const token" data-verso-hover="51">Finset</span> D} {T : <span class="const token" data-verso-hover="78">ℕ</span>}</span>
+<span id="L190"></span>
+<span id="L191"><span class="kw">lemma</span> <span class="const token" data-verso-hover="138">amt_pos</span> (hR : R.<span class="const token" data-verso-hover="107">WF</span> I) (hv : I.<span class="const token" data-verso-hover="114">ValidRun</span> R Is T) {t : <span class="const token" data-verso-hover="78">ℕ</span>} (ht : t &lt; T) {d : D}</span>
+<span id="L192">    (hd : d ∈ Is t) : <span class="nu">0</span> &lt; I.<span class="const token" data-verso-hover="136">amt</span> R (I.<span class="const token" data-verso-hover="101">run</span> R Is t) d := <span class="kw">by</span></span>
+<span id="L193">  <span class="kw">unfold</span> <span class="const token" data-verso-hover="136">amt</span></span>
+<span id="L194">  <span class="kw">exact</span> <span class="const token" data-verso-hover="323">div_pos</span> (<span class="kw">by</span> <span class="kw">linarith</span> [hv.<span class="const token" data-verso-hover="318">unsat</span> t ht d hd]) (<span class="const token" data-verso-hover="146">denom_pos</span> hR d)</span>
+<span id="L195"></span>
+<span id="L196"><span class="kw">lemma</span> <span class="const token" data-verso-hover="133">lhs_mono</span> (hR : R.<span class="const token" data-verso-hover="107">WF</span> I) (hv : I.<span class="const token" data-verso-hover="114">ValidRun</span> R Is T) {s t : <span class="const token" data-verso-hover="78">ℕ</span>} (hst : s ≤ t) (htT : t ≤ T)</span>
+<span id="L197">    (d : D) : I.<span class="const token" data-verso-hover="94">lhs</span> R.<span class="const token" data-verso-hover="95">h</span> (I.<span class="const token" data-verso-hover="101">run</span> R Is s) d ≤ I.<span class="const token" data-verso-hover="94">lhs</span> R.<span class="const token" data-verso-hover="95">h</span> (I.<span class="const token" data-verso-hover="101">run</span> R Is t) d := <span class="kw">by</span></span>
+<span id="L198">  <span class="kw">rw</span> [<span class="const token" data-verso-hover="313">lhs_run</span>, <span class="const token" data-verso-hover="313">lhs_run</span>]</span>
+<span id="L199">  <span class="kw">refine</span> <span class="const token" data-verso-hover="286">Finset.sum_le_sum_of_subset_of_nonneg</span> (<span class="const token" data-verso-hover="324">Finset.range_mono</span> hst) <span class="kw">fun</span> u hu _ =&gt; ?_</span>
+<span id="L200">  <span class="kw">refine</span> <span class="const token" data-verso-hover="130">Finset.sum_nonneg</span> <span class="kw">fun</span> d' hd' =&gt; ?_</span>
+<span id="L201">  <span class="kw">have</span> hu : u &lt; T := <span class="kw">by</span> <span class="kw">have</span> := <span class="const token" data-verso-hover="325">Finset.mem_range</span>.<span class="const token" data-verso-hover="70">1</span> hu; <span class="kw">omega</span></span>
+<span id="L202">  <span class="kw">exact</span> <span class="const token" data-verso-hover="128">mul_nonneg</span> (<span class="const token" data-verso-hover="138">amt_pos</span> hR hv hu hd').<span class="const token" data-verso-hover="123">le</span> (<span class="const token" data-verso-hover="141">weight_nonneg</span> hR d' d)</span>
+<span id="L203"></span>
+<span id="L204"><span class="dc">/-- After `d` is raised at iteration `t`, its dual constraint is satisfied. -/</span></span>
+<span id="L205"><span class="kw">lemma</span> <span class="const token" data-verso-hover="326">profit_le_lhs_of_mem</span> (hR : R.<span class="const token" data-verso-hover="107">WF</span> I) (hv : I.<span class="const token" data-verso-hover="114">ValidRun</span> R Is T) {t : <span class="const token" data-verso-hover="78">ℕ</span>} (ht : t &lt; T) {d : D}</span>
+<span id="L206">    (hd : d ∈ Is t) : I.<span class="const token" data-verso-hover="96">profit</span> d ≤ I.<span class="const token" data-verso-hover="94">lhs</span> R.<span class="const token" data-verso-hover="95">h</span> (I.<span class="const token" data-verso-hover="101">run</span> R Is (t + <span class="nu">1</span>)) d := <span class="kw">by</span></span>
+<span id="L207">  <span class="kw">rw</span> [<span class="const token" data-verso-hover="104">run_succ</span>, <span class="const token" data-verso-hover="140">lhs_raise</span>, ← <span class="const token" data-verso-hover="327">Finset.add_sum_erase</span> _ _ hd, <span class="const token" data-verso-hover="320">weight_self</span> hR, <span class="const token" data-verso-hover="137">amt_mul_denom</span> hR]</span>
+<span id="L208">  <span class="kw">have</span> : <span class="nu">0</span> ≤ ∑ d' ∈ (Is t).<span class="const token" data-verso-hover="328">erase</span> d, I.<span class="const token" data-verso-hover="136">amt</span> R (I.<span class="const token" data-verso-hover="101">run</span> R Is t) d' * I.<span class="const token" data-verso-hover="134">weight</span> R d' d :=</span>
+<span id="L209">    <span class="const token" data-verso-hover="130">Finset.sum_nonneg</span> <span class="kw">fun</span> d' hd' =&gt;</span>
+<span id="L210">      <span class="const token" data-verso-hover="128">mul_nonneg</span> (<span class="const token" data-verso-hover="138">amt_pos</span> hR hv ht (<span class="const token" data-verso-hover="329">Finset.mem_of_mem_erase</span> hd')).<span class="const token" data-verso-hover="123">le</span> (<span class="const token" data-verso-hover="141">weight_nonneg</span> hR d' d)</span>
+<span id="L211">  <span class="kw">linarith</span></span>
+<span id="L212"></span>
+<span id="L213"><span class="dc">/-- An instance is raised at most once. -/</span></span>
+<span id="L214"><span class="kw">lemma</span> <span class="const token" data-verso-hover="330">not_mem_of_mem_of_lt</span> (hR : R.<span class="const token" data-verso-hover="107">WF</span> I) (hv : I.<span class="const token" data-verso-hover="114">ValidRun</span> R Is T) {s t : <span class="const token" data-verso-hover="78">ℕ</span>} (hst : s &lt; t)</span>
+<span id="L215">    (ht : t &lt; T) {d : D} (hd : d ∈ Is s) : d ∉ Is t := <span class="kw">by</span></span>
+<span id="L216">  <span class="kw">intro</span> hd'</span>
+<span id="L217">  <span class="kw">have</span> h1 := <span class="const token" data-verso-hover="326">profit_le_lhs_of_mem</span> hR hv (hst.<span class="const token" data-verso-hover="331">trans</span> ht) hd</span>
+<span id="L218">  <span class="kw">have</span> h2 := <span class="const token" data-verso-hover="133">lhs_mono</span> hR hv (<span class="const token" data-verso-hover="332">Nat.succ_le_of_lt</span> hst) ht.<span class="const token" data-verso-hover="123">le</span> d</span>
+<span id="L219">  <span class="kw">have</span> h3 := hv.<span class="const token" data-verso-hover="318">unsat</span> t ht d hd'</span>
+<span id="L220">  <span class="kw">linarith</span></span>
+<span id="L221"></span>
+<span id="L222"><span class="kw">lemma</span> <span class="const token" data-verso-hover="333">disjoint_of_ne</span> (hR : R.<span class="const token" data-verso-hover="107">WF</span> I) (hv : I.<span class="const token" data-verso-hover="114">ValidRun</span> R Is T) {s t : <span class="const token" data-verso-hover="78">ℕ</span>} (hs : s &lt; T) (ht : t &lt; T)</span>
+<span id="L223">    (hst : s ≠ t) : <span class="const token" data-verso-hover="264">Disjoint</span> (Is s) (Is t) := <span class="kw">by</span></span>
+<span id="L224">  <span class="kw">rw</span> [<span class="const token" data-verso-hover="289">Finset.disjoint_left</span>]</span>
+<span id="L225">  <span class="kw">intro</span> d h1 h2</span>
+<span id="L226">  <span class="kw">rcases</span> <span class="const token" data-verso-hover="334">lt_or_gt_of_ne</span> hst <span class="kw">with</span> h | h</span>
+<span id="L227">  · <span class="kw">exact</span> <span class="const token" data-verso-hover="330">not_mem_of_mem_of_lt</span> hR hv h ht h1 h2</span>
+<span id="L228">  · <span class="kw">exact</span> <span class="const token" data-verso-hover="330">not_mem_of_mem_of_lt</span> hR hv h hs h2 h1</span>
+<span id="L229"></span>
+<span id="L230"><span class="kw">lemma</span> <span class="const token" data-verso-hover="126">run_α_nonneg</span> (hR : R.<span class="const token" data-verso-hover="107">WF</span> I) (hv : I.<span class="const token" data-verso-hover="114">ValidRun</span> R Is T) {t : <span class="const token" data-verso-hover="78">ℕ</span>} (ht : t ≤ T) (a : A) :</span>
+<span id="L231">    <span class="nu">0</span> ≤ (I.<span class="const token" data-verso-hover="101">run</span> R Is t).<span class="const token" data-verso-hover="230">α</span> a := <span class="kw">by</span></span>
+<span id="L232">  <span class="kw">induction</span> t <span class="kw">with</span></span>
+<span id="L233">  | <span class="const token" data-verso-hover="102">zero</span> =&gt; <span class="kw">simp</span></span>
+<span id="L234">  | <span class="const token" data-verso-hover="103">succ</span> t ih =&gt;</span>
+<span id="L235">    <span class="kw">simp</span> only [<span class="const token" data-verso-hover="104">run_succ</span>, <span class="const token" data-verso-hover="98">raise</span>]</span>
+<span id="L236">    <span class="kw">exact</span> <span class="const token" data-verso-hover="125">add_nonneg</span> (ih (<span class="kw">by</span> <span class="kw">omega</span>)) (<span class="const token" data-verso-hover="130">Finset.sum_nonneg</span> <span class="kw">fun</span> d hd =&gt;</span>
+<span id="L237">      (<span class="const token" data-verso-hover="138">amt_pos</span> hR hv (<span class="kw">by</span> <span class="kw">omega</span>) (<span class="const token" data-verso-hover="60">Finset.mem_filter</span>.<span class="const token" data-verso-hover="70">1</span> hd).<span class="const token" data-verso-hover="64">1</span>).<span class="const token" data-verso-hover="123">le</span>)</span>
+<span id="L238"></span>
+<span id="L239"><span class="kw">lemma</span> <span class="const token" data-verso-hover="131">run_β_nonneg</span> (hR : R.<span class="const token" data-verso-hover="107">WF</span> I) (hv : I.<span class="const token" data-verso-hover="114">ValidRun</span> R Is T) {t : <span class="const token" data-verso-hover="78">ℕ</span>} (ht : t ≤ T) (e : E) :</span>
+<span id="L240">    <span class="nu">0</span> ≤ (I.<span class="const token" data-verso-hover="101">run</span> R Is t).<span class="const token" data-verso-hover="231">β</span> e := <span class="kw">by</span></span>
+<span id="L241">  <span class="kw">induction</span> t <span class="kw">with</span></span>
+<span id="L242">  | <span class="const token" data-verso-hover="102">zero</span> =&gt; <span class="kw">simp</span></span>
+<span id="L243">  | <span class="const token" data-verso-hover="103">succ</span> t ih =&gt;</span>
+<span id="L244">    <span class="kw">simp</span> only [<span class="const token" data-verso-hover="104">run_succ</span>, <span class="const token" data-verso-hover="98">raise</span>]</span>
+<span id="L245">    <span class="kw">exact</span> <span class="const token" data-verso-hover="125">add_nonneg</span> (ih (<span class="kw">by</span> <span class="kw">omega</span>)) (<span class="const token" data-verso-hover="130">Finset.sum_nonneg</span> <span class="kw">fun</span> d hd =&gt;</span>
+<span id="L246">      <span class="const token" data-verso-hover="128">mul_nonneg</span> (hR.<span class="const token" data-verso-hover="304">c_nonneg</span> d) (<span class="const token" data-verso-hover="138">amt_pos</span> hR hv (<span class="kw">by</span> <span class="kw">omega</span>) (<span class="const token" data-verso-hover="60">Finset.mem_filter</span>.<span class="const token" data-verso-hover="70">1</span> hd).<span class="const token" data-verso-hover="64">1</span>).<span class="const token" data-verso-hover="123">le</span>)</span>
+<span id="L247"></span>
+<span id="L248"><span class="dc">/-- The set `R` of all instances raised in the first phase. -/</span></span>
+<span id="L249"><span class="kw">def</span> <span class="const token" data-verso-hover="335">raised</span> (Is : <span class="const token" data-verso-hover="78">ℕ</span> → <span class="const token" data-verso-hover="51">Finset</span> D) (T : <span class="const token" data-verso-hover="78">ℕ</span>) : <span class="const token" data-verso-hover="51">Finset</span> D := (<span class="const token" data-verso-hover="314">range</span> T).<span class="const token" data-verso-hover="336">biUnion</span> Is</span>
+<span id="L250"></span>
+<span id="L251"><span class="dc">/-- Sum over the instances of `S` raised at some iteration in `[0, T)`, split by iteration. -/</span></span>
+<span id="L252"><span class="kw">lemma</span> <span class="const token" data-verso-hover="337">sum_filter_raised</span> (hR : R.<span class="const token" data-verso-hover="107">WF</span> I) (hv : I.<span class="const token" data-verso-hover="114">ValidRun</span> R Is T) (P : <span class="const token" data-verso-hover="78">ℕ</span> → <span class="kw">Prop</span>) [<span class="const token" data-verso-hover="258">DecidablePred</span> P]</span>
+<span id="L253">    (S : <span class="const token" data-verso-hover="51">Finset</span> D) (f : D → <span class="const token" data-verso-hover="86">ℝ</span>) :</span>
+<span id="L254">    ∑ t ∈ (<span class="const token" data-verso-hover="314">range</span> T).<span class="const token" data-verso-hover="58">filter</span> P, ∑ d ∈ (Is t).<span class="const token" data-verso-hover="58">filter</span> (· ∈ S), f d =</span>
+<span id="L255">      ∑ d ∈ ((<span class="const token" data-verso-hover="314">range</span> T).<span class="const token" data-verso-hover="58">filter</span> P).<span class="const token" data-verso-hover="336">biUnion</span> (<span class="kw">fun</span> t =&gt; (Is t).<span class="const token" data-verso-hover="58">filter</span> (· ∈ S)), f d := <span class="kw">by</span></span>
+<span id="L256">  <span class="kw">rw</span> [<span class="const token" data-verso-hover="338">Finset.sum_biUnion</span>]</span>
+<span id="L257">  <span class="kw">intro</span> s hs t ht hst</span>
+<span id="L258">  <span class="kw">have</span> hs' := <span class="const token" data-verso-hover="325">Finset.mem_range</span>.<span class="const token" data-verso-hover="70">1</span> (<span class="const token" data-verso-hover="60">Finset.mem_filter</span>.<span class="const token" data-verso-hover="70">1</span> hs).<span class="const token" data-verso-hover="64">1</span></span>
+<span id="L259">  <span class="kw">have</span> ht' := <span class="const token" data-verso-hover="325">Finset.mem_range</span>.<span class="const token" data-verso-hover="70">1</span> (<span class="const token" data-verso-hover="60">Finset.mem_filter</span>.<span class="const token" data-verso-hover="70">1</span> ht).<span class="const token" data-verso-hover="64">1</span></span>
+<span id="L260">  <span class="kw">exact</span> <span class="const token" data-verso-hover="266">Finset.disjoint_filter_filter</span> (<span class="const token" data-verso-hover="333">disjoint_of_ne</span> hR hv hs' ht' hst)</span>
+<span id="L261"></span>
+<span id="L262"><span class="dc">/-- **Charging argument** of Lemmas 3.1 and 6.1. Let `S ⊆ R` and suppose every raised instance</span></span>
+<span id="L263"><span class="dc">`d' ∉ S` (raised at iteration `s`) is covered: the raises... more precisely the weights</span></span>
+<span id="L264"><span class="dc">`weight d' d` towards the instances `d ∈ S` raised after `s` sum to at least `1`. Then</span></span>
+<span id="L265"><span class="dc">`∑_{d ∈ R} δ(d) ≤ p(S)`. -/</span></span>
+<span id="L266"><span class="kw">theorem</span> <span class="const token" data-verso-hover="12">sum_raise_le_profitOf</span> (hR : R.<span class="const token" data-verso-hover="107">WF</span> I) (hv : I.<span class="const token" data-verso-hover="114">ValidRun</span> R Is T) {S : <span class="const token" data-verso-hover="51">Finset</span> D}</span>
+<span id="L267">    (hS : S ⊆ <span class="const token" data-verso-hover="335">raised</span> Is T)</span>
+<span id="L268">    (hcov : ∀ s &lt; T, ∀ d' ∈ Is s, d' ∉ S →</span>
+<span id="L269">      <span class="nu">1</span> ≤ ∑ t ∈ (<span class="const token" data-verso-hover="314">range</span> T).<span class="const token" data-verso-hover="58">filter</span> (s &lt; ·), ∑ d ∈ (Is t).<span class="const token" data-verso-hover="58">filter</span> (· ∈ S), I.<span class="const token" data-verso-hover="134">weight</span> R d' d) :</span>
+<span id="L270">    ∑ s ∈ <span class="const token" data-verso-hover="314">range</span> T, ∑ d' ∈ Is s, I.<span class="const token" data-verso-hover="136">amt</span> R (I.<span class="const token" data-verso-hover="101">run</span> R Is s) d' ≤ I.<span class="const token" data-verso-hover="192">profitOf</span> S := <span class="kw">by</span></span>
+<span id="L271">  <span class="kw">set</span> δ : <span class="const token" data-verso-hover="78">ℕ</span> → D → <span class="const token" data-verso-hover="86">ℝ</span> := <span class="kw">fun</span> s d =&gt; I.<span class="const token" data-verso-hover="136">amt</span> R (I.<span class="const token" data-verso-hover="101">run</span> R Is s) d <span class="kw">with</span> hδ</span>
+<span id="L272">  <span class="cm">--</span><span class="cm"> split `p(S)` by iterations</span></span>
+<span id="L273">  <span class="kw">have</span> hsplit : I.<span class="const token" data-verso-hover="192">profitOf</span> S = ∑ t ∈ <span class="const token" data-verso-hover="314">range</span> T, ∑ d ∈ (Is t).<span class="const token" data-verso-hover="58">filter</span> (· ∈ S), I.<span class="const token" data-verso-hover="96">profit</span> d := <span class="kw">by</span></span>
+<span id="L274">    <span class="kw">rw</span> [<span class="kw">show</span> <span class="const token" data-verso-hover="314">range</span> T = (<span class="const token" data-verso-hover="314">range</span> T).<span class="const token" data-verso-hover="58">filter</span> (<span class="kw">fun</span> _ =&gt; <span class="const token" data-verso-hover="339">True</span>) <span class="kw">by</span> <span class="kw">simp</span>, <span class="const token" data-verso-hover="337">sum_filter_raised</span> hR hv]</span>
+<span id="L275">    <span class="kw">unfold</span> <span class="const token" data-verso-hover="192">profitOf</span></span>
+<span id="L276">    <span class="kw">congr</span> <span class="nu">1</span></span>
+<span id="L277">    <span class="kw">ext</span> d</span>
+<span id="L278">    <span class="kw">simp</span> only [<span class="const token" data-verso-hover="340">Finset.mem_biUnion</span>, <span class="const token" data-verso-hover="60">Finset.mem_filter</span>, <span class="const token" data-verso-hover="325">Finset.mem_range</span>, <span class="const token" data-verso-hover="341">and_true</span>]</span>
+<span id="L279">    <span class="kw">constructor</span></span>
+<span id="L280">    · <span class="kw">intro</span> hd</span>
+<span id="L281">      <span class="kw">obtain</span> ⟨t, ht, hdt⟩ := <span class="const token" data-verso-hover="340">Finset.mem_biUnion</span>.<span class="const token" data-verso-hover="70">1</span> (hS hd)</span>
+<span id="L282">      <span class="kw">exact</span> ⟨t, <span class="const token" data-verso-hover="325">Finset.mem_range</span>.<span class="const token" data-verso-hover="70">1</span> ht, hdt, hd⟩</span>
+<span id="L283">    · <span class="kw">rintro</span> ⟨t, _, _, hd⟩; <span class="kw">exact</span> hd</span>
+<span id="L284">  <span class="cm">--</span><span class="cm"> each selected instance pays for its own raise and for all earlier raises</span></span>
+<span id="L285">  <span class="kw">have</span> hpay : ∀ t &lt; T, ∀ d ∈ Is t, δ t d + ∑ s ∈ <span class="const token" data-verso-hover="314">range</span> t, ∑ d' ∈ Is s, δ s d' * I.<span class="const token" data-verso-hover="134">weight</span> R d' d ≤</span>
+<span id="L286">      I.<span class="const token" data-verso-hover="96">profit</span> d := <span class="kw">by</span></span>
+<span id="L287">    <span class="kw">intro</span> t ht d hd</span>
+<span id="L288">    <span class="kw">have</span> h1 := <span class="const token" data-verso-hover="137">amt_mul_denom</span> hR (I.<span class="const token" data-verso-hover="101">run</span> R Is t) d</span>
+<span id="L289">    <span class="kw">have</span> h2 := <span class="const token" data-verso-hover="319">one_le_denom</span> hR (R := R) (I := I) d</span>
+<span id="L290">    <span class="kw">have</span> h3 := <span class="const token" data-verso-hover="138">amt_pos</span> hR hv ht hd</span>
+<span id="L291">    <span class="kw">rw</span> [← <span class="const token" data-verso-hover="313">lhs_run</span>]</span>
+<span id="L292">    <span class="kw">have</span> : δ t d ≤ δ t d * R.<span class="const token" data-verso-hover="135">denom</span> d := <span class="const token" data-verso-hover="342">le_mul_of_one_le_right</span> h3.<span class="const token" data-verso-hover="123">le</span> h2</span>
+<span id="L293">    <span class="kw">simp</span> only [hδ] <span class="kw">at</span> this ⊢</span>
+<span id="L294">    <span class="kw">linarith</span></span>
+<span id="L295">  <span class="kw">have</span> hge : ∑ t ∈ <span class="const token" data-verso-hover="314">range</span> T, ∑ d ∈ (Is t).<span class="const token" data-verso-hover="58">filter</span> (· ∈ S),</span>
+<span id="L296">      (δ t d + ∑ s ∈ <span class="const token" data-verso-hover="314">range</span> t, ∑ d' ∈ Is s, δ s d' * I.<span class="const token" data-verso-hover="134">weight</span> R d' d) ≤ I.<span class="const token" data-verso-hover="192">profitOf</span> S := <span class="kw">by</span></span>
+<span id="L297">    <span class="kw">rw</span> [hsplit]</span>
+<span id="L298">    <span class="kw">exact</span> <span class="const token" data-verso-hover="238">Finset.sum_le_sum</span> <span class="kw">fun</span> t ht =&gt; <span class="const token" data-verso-hover="238">Finset.sum_le_sum</span> <span class="kw">fun</span> d hd =&gt;</span>
+<span id="L299">      hpay t (<span class="const token" data-verso-hover="325">Finset.mem_range</span>.<span class="const token" data-verso-hover="70">1</span> ht) d (<span class="const token" data-verso-hover="60">Finset.mem_filter</span>.<span class="const token" data-verso-hover="70">1</span> hd).<span class="const token" data-verso-hover="64">1</span></span>
+<span id="L300">  <span class="cm">--</span><span class="cm"> swap the order of summation in the second part</span></span>
+<span id="L301">  <span class="kw">have</span> hswap : ∑ t ∈ <span class="const token" data-verso-hover="314">range</span> T, ∑ d ∈ (Is t).<span class="const token" data-verso-hover="58">filter</span> (· ∈ S),</span>
+<span id="L302">      ∑ s ∈ <span class="const token" data-verso-hover="314">range</span> t, ∑ d' ∈ Is s, δ s d' * I.<span class="const token" data-verso-hover="134">weight</span> R d' d =</span>
+<span id="L303">      ∑ s ∈ <span class="const token" data-verso-hover="314">range</span> T, ∑ d' ∈ Is s, δ s d' *</span>
+<span id="L304">        ∑ t ∈ (<span class="const token" data-verso-hover="314">range</span> T).<span class="const token" data-verso-hover="58">filter</span> (s &lt; ·), ∑ d ∈ (Is t).<span class="const token" data-verso-hover="58">filter</span> (· ∈ S), I.<span class="const token" data-verso-hover="134">weight</span> R d' d := <span class="kw">by</span></span>
+<span id="L305">    <span class="kw">have</span> e1 : ∀ t ∈ <span class="const token" data-verso-hover="314">range</span> T, ∑ d ∈ (Is t).<span class="const token" data-verso-hover="58">filter</span> (· ∈ S),</span>
+<span id="L306">        ∑ s ∈ <span class="const token" data-verso-hover="314">range</span> t, ∑ d' ∈ Is s, δ s d' * I.<span class="const token" data-verso-hover="134">weight</span> R d' d =</span>
+<span id="L307">        ∑ s ∈ <span class="const token" data-verso-hover="314">range</span> T, ∑ d' ∈ Is s, ∑ d ∈ (Is t).<span class="const token" data-verso-hover="58">filter</span> (· ∈ S),</span>
+<span id="L308">          (<span class="kw">if</span> s &lt; t <span class="kw">then</span> δ s d' * I.<span class="const token" data-verso-hover="134">weight</span> R d' d <span class="kw">else</span> <span class="nu">0</span>) := <span class="kw">by</span></span>
+<span id="L309">      <span class="kw">intro</span> t ht</span>
+<span id="L310">      <span class="kw">rw</span> [<span class="const token" data-verso-hover="307">Finset.sum_comm</span>]</span>
+<span id="L311">      <span class="kw">have</span> : <span class="const token" data-verso-hover="314">range</span> t = (<span class="const token" data-verso-hover="314">range</span> T).<span class="const token" data-verso-hover="58">filter</span> (· &lt; t) := <span class="kw">by</span></span>
+<span id="L312">        <span class="kw">ext</span> s; <span class="kw">simp</span> only [<span class="const token" data-verso-hover="325">Finset.mem_range</span>, <span class="const token" data-verso-hover="60">Finset.mem_filter</span>]</span>
+<span id="L313">        <span class="kw">have</span> := <span class="const token" data-verso-hover="325">Finset.mem_range</span>.<span class="const token" data-verso-hover="70">1</span> ht; <span class="kw">constructor</span> &lt;;&gt; <span class="kw">intro</span> h &lt;;&gt; <span class="kw">omega</span></span>
+<span id="L314">      <span class="kw">rw</span> [this, <span class="const token" data-verso-hover="228">Finset.sum_filter</span>]</span>
+<span id="L315">      <span class="kw">refine</span> <span class="const token" data-verso-hover="229">Finset.sum_congr</span> <span class="const token" data-verso-hover="157">rfl</span> <span class="kw">fun</span> s _ =&gt; ?_</span>
+<span id="L316">      <span class="kw">split_ifs</span> <span class="kw">with</span> hst</span>
+<span id="L317">      · <span class="kw">rw</span> [<span class="const token" data-verso-hover="307">Finset.sum_comm</span>]</span>
+<span id="L318">      · <span class="kw">simp</span></span>
+<span id="L319">    <span class="kw">rw</span> [<span class="const token" data-verso-hover="229">Finset.sum_congr</span> <span class="const token" data-verso-hover="157">rfl</span> e1, <span class="const token" data-verso-hover="307">Finset.sum_comm</span>]</span>
+<span id="L320">    <span class="kw">refine</span> <span class="const token" data-verso-hover="229">Finset.sum_congr</span> <span class="const token" data-verso-hover="157">rfl</span> <span class="kw">fun</span> s _ =&gt; ?_</span>
+<span id="L321">    <span class="kw">rw</span> [<span class="const token" data-verso-hover="307">Finset.sum_comm</span>]</span>
+<span id="L322">    <span class="kw">refine</span> <span class="const token" data-verso-hover="229">Finset.sum_congr</span> <span class="const token" data-verso-hover="157">rfl</span> <span class="kw">fun</span> d' _ =&gt; ?_</span>
+<span id="L323">    <span class="kw">rw</span> [<span class="const token" data-verso-hover="237">Finset.mul_sum</span>, <span class="const token" data-verso-hover="228">Finset.sum_filter</span>]</span>
+<span id="L324">    <span class="kw">refine</span> <span class="const token" data-verso-hover="229">Finset.sum_congr</span> <span class="const token" data-verso-hover="157">rfl</span> <span class="kw">fun</span> t _ =&gt; ?_</span>
+<span id="L325">    <span class="kw">split_ifs</span> <span class="kw">with</span> hst</span>
+<span id="L326">    · <span class="kw">rw</span> [<span class="const token" data-verso-hover="237">Finset.mul_sum</span>]</span>
+<span id="L327">    · <span class="kw">simp</span></span>
+<span id="L328">  <span class="kw">have</span> hfirst : ∑ t ∈ <span class="const token" data-verso-hover="314">range</span> T, ∑ d ∈ (Is t).<span class="const token" data-verso-hover="58">filter</span> (· ∈ S), δ t d =</span>
+<span id="L329">      ∑ s ∈ <span class="const token" data-verso-hover="314">range</span> T, ∑ d' ∈ Is s, (<span class="kw">if</span> d' ∈ S <span class="kw">then</span> δ s d' <span class="kw">else</span> <span class="nu">0</span>) := <span class="kw">by</span></span>
+<span id="L330">    <span class="kw">refine</span> <span class="const token" data-verso-hover="229">Finset.sum_congr</span> <span class="const token" data-verso-hover="157">rfl</span> <span class="kw">fun</span> t _ =&gt; ?_</span>
+<span id="L331">    <span class="kw">rw</span> [<span class="const token" data-verso-hover="228">Finset.sum_filter</span>]</span>
+<span id="L332">  <span class="kw">rw</span> [<span class="const token" data-verso-hover="229">Finset.sum_congr</span> <span class="const token" data-verso-hover="157">rfl</span> <span class="kw">fun</span> t _ =&gt; <span class="const token" data-verso-hover="240">Finset.sum_add_distrib</span>, <span class="const token" data-verso-hover="240">Finset.sum_add_distrib</span>, hswap,</span>
+<span id="L333">    hfirst, ← <span class="const token" data-verso-hover="240">Finset.sum_add_distrib</span>] <span class="kw">at</span> hge</span>
+<span id="L334">  <span class="kw">refine</span> <span class="const token" data-verso-hover="203">le_trans</span> (<span class="const token" data-verso-hover="238">Finset.sum_le_sum</span> <span class="kw">fun</span> s hs =&gt; ?_) hge</span>
+<span id="L335">  <span class="kw">rw</span> [← <span class="const token" data-verso-hover="240">Finset.sum_add_distrib</span>]</span>
+<span id="L336">  <span class="kw">refine</span> <span class="const token" data-verso-hover="238">Finset.sum_le_sum</span> <span class="kw">fun</span> d' hd' =&gt; ?_</span>
+<span id="L337">  <span class="kw">have</span> hsT := <span class="const token" data-verso-hover="325">Finset.mem_range</span>.<span class="const token" data-verso-hover="70">1</span> hs</span>
+<span id="L338">  <span class="kw">have</span> hpos := (<span class="const token" data-verso-hover="138">amt_pos</span> hR hv hsT hd').<span class="const token" data-verso-hover="123">le</span></span>
+<span id="L339">  <span class="kw">have</span> hC : <span class="nu">0</span> ≤ ∑ t ∈ (<span class="const token" data-verso-hover="314">range</span> T).<span class="const token" data-verso-hover="58">filter</span> (s &lt; ·), ∑ d ∈ (Is t).<span class="const token" data-verso-hover="58">filter</span> (· ∈ S), I.<span class="const token" data-verso-hover="134">weight</span> R d' d :=</span>
+<span id="L340">    <span class="const token" data-verso-hover="130">Finset.sum_nonneg</span> <span class="kw">fun</span> _ _ =&gt; <span class="const token" data-verso-hover="130">Finset.sum_nonneg</span> <span class="kw">fun</span> _ _ =&gt; <span class="const token" data-verso-hover="141">weight_nonneg</span> hR _ _</span>
+<span id="L341">  <span class="kw">by_cases</span> hmem : d' ∈ S</span>
+<span id="L342">  · <span class="kw">simp</span> only [hmem, ↓<span class="const token" data-verso-hover="197">reduceIte</span>]</span>
+<span id="L343">    <span class="kw">have</span> := <span class="const token" data-verso-hover="128">mul_nonneg</span> hpos hC</span>
+<span id="L344">    <span class="kw">simp</span> only [hδ] <span class="kw">at</span> this ⊢</span>
+<span id="L345">    <span class="kw">linarith</span></span>
+<span id="L346">  · <span class="kw">simp</span> only [hmem, ↓<span class="const token" data-verso-hover="197">reduceIte</span>, <span class="const token" data-verso-hover="275">zero_add</span>]</span>
+<span id="L347">    <span class="kw">have</span> := <span class="const token" data-verso-hover="143">mul_le_mul_of_nonneg_left</span> (hcov s hsT d' hd' hmem) hpos</span>
+<span id="L348">    <span class="kw">simp</span> only [hδ] <span class="kw">at</span> this ⊢</span>
+<span id="L349">    <span class="kw">linarith</span></span>
+<span id="L350"></span>
+<span id="L351"><span class="dc">/-- **Approximation bound of the framework** (common core of Lemmas 3.1 and 6.1): if all dual</span></span>
+<span id="L352"><span class="dc">constraints are `λ`-satisfied at the end of the first phase, every raise increases the dual</span></span>
+<span id="L353"><span class="dc">objective by at most `M δ(d)`, and the coverage condition of `sum_raise_le_profitOf` holds, then</span></span>
+<span id="L354"><span class="dc">`λ · LP(x) ≤ M · p(S)` for every feasible LP solution `x`. -/</span></span>
+<span id="L355"><span class="kw">theorem</span> <span class="const token" data-verso-hover="13">lam_mul_lpValue_le</span> [<span class="const token" data-verso-hover="88">Fintype</span> D] [<span class="const token" data-verso-hover="88">Fintype</span> A] [<span class="const token" data-verso-hover="88">Fintype</span> E] (hR : R.<span class="const token" data-verso-hover="107">WF</span> I)</span>
+<span id="L356">    (hv : I.<span class="const token" data-verso-hover="114">ValidRun</span> R Is T) {S : <span class="const token" data-verso-hover="51">Finset</span> D} (hS : S ⊆ <span class="const token" data-verso-hover="335">raised</span> Is T)</span>
+<span id="L357">    (hcov : ∀ s &lt; T, ∀ d' ∈ Is s, d' ∉ S →</span>
+<span id="L358">      <span class="nu">1</span> ≤ ∑ t ∈ (<span class="const token" data-verso-hover="314">range</span> T).<span class="const token" data-verso-hover="58">filter</span> (s &lt; ·), ∑ d ∈ (Is t).<span class="const token" data-verso-hover="58">filter</span> (· ∈ S), I.<span class="const token" data-verso-hover="134">weight</span> R d' d)</span>
+<span id="L359">    {M : <span class="const token" data-verso-hover="86">ℝ</span>} (hM0 : <span class="nu">0</span> ≤ M) (hM : ∀ s &lt; T, ∀ d ∈ Is s, <span class="nu">1</span> + R.<span class="const token" data-verso-hover="303">c</span> d * (R.<span class="const token" data-verso-hover="118">crit</span> d).<span class="const token" data-verso-hover="172">card</span> ≤ M)</span>
+<span id="L360">    {lam : <span class="const token" data-verso-hover="86">ℝ</span>} (hlam : ∀ d, lam * I.<span class="const token" data-verso-hover="96">profit</span> d ≤ I.<span class="const token" data-verso-hover="94">lhs</span> R.<span class="const token" data-verso-hover="95">h</span> (I.<span class="const token" data-verso-hover="101">run</span> R Is T) d)</span>
+<span id="L361">    {x : D → <span class="const token" data-verso-hover="86">ℝ</span>} (hx : I.<span class="const token" data-verso-hover="188">IsLPFeasible</span> R.<span class="const token" data-verso-hover="95">h</span> x) :</span>
+<span id="L362">    lam * I.<span class="const token" data-verso-hover="191">lpValue</span> x ≤ M * I.<span class="const token" data-verso-hover="192">profitOf</span> S := <span class="kw">by</span></span>
+<span id="L363">  <span class="kw">have</span> h1 := I.<span class="const token" data-verso-hover="9">weak_duality</span> hx (<span class="const token" data-verso-hover="126">run_α_nonneg</span> hR hv <span class="const token" data-verso-hover="127">le_rfl</span>) (<span class="const token" data-verso-hover="131">run_β_nonneg</span> hR hv <span class="const token" data-verso-hover="127">le_rfl</span>) hlam</span>
+<span id="L364">  <span class="kw">have</span> h2 : (I.<span class="const token" data-verso-hover="101">run</span> R Is T).<span class="const token" data-verso-hover="234">val</span> ≤ M * ∑ s ∈ <span class="const token" data-verso-hover="314">range</span> T, ∑ d' ∈ Is s, I.<span class="const token" data-verso-hover="136">amt</span> R (I.<span class="const token" data-verso-hover="101">run</span> R Is s) d' := <span class="kw">by</span></span>
+<span id="L365">    <span class="kw">rw</span> [<span class="const token" data-verso-hover="316">val_run</span>, <span class="const token" data-verso-hover="237">Finset.mul_sum</span>]</span>
+<span id="L366">    <span class="kw">refine</span> <span class="const token" data-verso-hover="238">Finset.sum_le_sum</span> <span class="kw">fun</span> s hs =&gt; ?_</span>
+<span id="L367">    <span class="kw">rw</span> [<span class="const token" data-verso-hover="237">Finset.mul_sum</span>]</span>
+<span id="L368">    <span class="kw">refine</span> <span class="const token" data-verso-hover="238">Finset.sum_le_sum</span> <span class="kw">fun</span> d hd =&gt; ?_</span>
+<span id="L369">    <span class="kw">have</span> := <span class="const token" data-verso-hover="143">mul_le_mul_of_nonneg_left</span> (hM s (<span class="const token" data-verso-hover="325">Finset.mem_range</span>.<span class="const token" data-verso-hover="70">1</span> hs) d hd)</span>
+<span id="L370">      (<span class="const token" data-verso-hover="138">amt_pos</span> hR hv (<span class="const token" data-verso-hover="325">Finset.mem_range</span>.<span class="const token" data-verso-hover="70">1</span> hs) hd).<span class="const token" data-verso-hover="123">le</span></span>
+<span id="L371">    <span class="kw">linarith</span></span>
+<span id="L372">  <span class="kw">have</span> h3 := <span class="const token" data-verso-hover="12">sum_raise_le_profitOf</span> hR hv hS hcov</span>
+<span id="L373">  <span class="kw">calc</span> lam * I.<span class="const token" data-verso-hover="191">lpValue</span> x ≤ (I.<span class="const token" data-verso-hover="101">run</span> R Is T).<span class="const token" data-verso-hover="234">val</span> := h1</span>
+<span id="L374">    _ ≤ M * ∑ s ∈ <span class="const token" data-verso-hover="314">range</span> T, ∑ d' ∈ Is s, I.<span class="const token" data-verso-hover="136">amt</span> R (I.<span class="const token" data-verso-hover="101">run</span> R Is s) d' := h2</span>
+<span id="L375">    _ ≤ M * I.<span class="const token" data-verso-hover="192">profitOf</span> S := <span class="const token" data-verso-hover="143">mul_le_mul_of_nonneg_left</span> h3 hM0</span>
+<span id="L376"></span>
+<span id="L377"><span class="dc">/-! ### The second phase -/</span></span>
+<span id="L378"></span>
+<span id="L379"><span class="kw">variable</span> (Is T)</span>
+<span id="L380"></span>
+<span id="L381"><span class="dc">/-- The second phase, generic in the acceptance test `acc S d` ("adding `d` to the current</span></span>
+<span id="L382"><span class="dc">solution `S` keeps it feasible"). The stack holds `Is 0, …, Is (T-1)` with `Is (T-1)` on top;</span></span>
+<span id="L383"><span class="dc">`phase2 n` is the solution after popping the top `n` sets. All members of a popped set are tested</span></span>
+<span id="L384"><span class="dc">against the solution built before that set was popped (for independent sets this is the same as</span></span>
+<span id="L385"><span class="dc">testing them one by one). -/</span></span>
+<span id="L386"><span class="kw">def</span> <span class="const token" data-verso-hover="343">phase2</span> (acc : <span class="const token" data-verso-hover="51">Finset</span> D → D → <span class="kw">Prop</span>) [∀ S d, <span class="const token" data-verso-hover="344">Decidable</span> (acc S d)] : <span class="const token" data-verso-hover="78">ℕ</span> → <span class="const token" data-verso-hover="51">Finset</span> D</span>
+<span id="L387">  | <span class="nu">0</span> =&gt; ∅</span>
+<span id="L388">  | n + <span class="nu">1</span> =&gt; <span class="const token" data-verso-hover="343">phase2</span> acc n ∪ (Is (T - <span class="nu">1</span> - n)).<span class="const token" data-verso-hover="58">filter</span> (acc (<span class="const token" data-verso-hover="343">phase2</span> acc n))</span>
+<span id="L389"></span>
+<span id="L390"><span class="kw">variable</span> {Is T}</span>
+<span id="L391"><span class="kw">variable</span> (acc : <span class="const token" data-verso-hover="51">Finset</span> D → D → <span class="kw">Prop</span>) [∀ S d, <span class="const token" data-verso-hover="344">Decidable</span> (acc S d)]</span>
+<span id="L392"></span>
+<span id="L393"><span class="kw">lemma</span> <span class="const token" data-verso-hover="345">phase2_mono</span> {m n : <span class="const token" data-verso-hover="78">ℕ</span>} (h : m ≤ n) : <span class="const token" data-verso-hover="343">phase2</span> Is T acc m ⊆ <span class="const token" data-verso-hover="343">phase2</span> Is T acc n := <span class="kw">by</span></span>
+<span id="L394">  <span class="kw">induction</span> h <span class="kw">with</span></span>
+<span id="L395">  | <span class="const token" data-verso-hover="346">refl</span> =&gt; <span class="kw">exact</span> <span class="const token" data-verso-hover="127">le_rfl</span></span>
+<span id="L396">  | <span class="const token" data-verso-hover="347">step</span> _ ih =&gt; <span class="kw">exact</span> ih.<span class="const token" data-verso-hover="161">trans</span> <span class="const token" data-verso-hover="348">Finset.subset_union_left</span></span>
+<span id="L397"></span>
+<span id="L398"><span class="dc">/-- The solution after popping `n` sets consists of instances raised at iterations `≥ T - n`. -/</span></span>
+<span id="L399"><span class="kw">lemma</span> <span class="const token" data-verso-hover="349">mem_phase2</span> {n : <span class="const token" data-verso-hover="78">ℕ</span>} (hn : n ≤ T) {d : D} (hd : d ∈ <span class="const token" data-verso-hover="343">phase2</span> Is T acc n) :</span>
+<span id="L400">    ∃ t, t &lt; T ∧ T - n ≤ t ∧ d ∈ Is t := <span class="kw">by</span></span>
+<span id="L401">  <span class="kw">induction</span> n <span class="kw">with</span></span>
+<span id="L402">  | <span class="const token" data-verso-hover="102">zero</span> =&gt; <span class="kw">simp</span> [<span class="const token" data-verso-hover="343">phase2</span>] <span class="kw">at</span> hd</span>
+<span id="L403">  | <span class="const token" data-verso-hover="103">succ</span> n ih =&gt;</span>
+<span id="L404">    <span class="kw">rcases</span> <span class="const token" data-verso-hover="283">Finset.mem_union</span>.<span class="const token" data-verso-hover="70">1</span> hd <span class="kw">with</span> h | h</span>
+<span id="L405">    · <span class="kw">obtain</span> ⟨t, h1, h2, h3⟩ := ih (<span class="kw">by</span> <span class="kw">omega</span>) h; <span class="kw">exact</span> ⟨t, h1, <span class="kw">by</span> <span class="kw">omega</span>, h3⟩</span>
+<span id="L406">    · <span class="kw">exact</span> ⟨T - <span class="nu">1</span> - n, <span class="kw">by</span> <span class="kw">omega</span>, <span class="kw">by</span> <span class="kw">omega</span>, (<span class="const token" data-verso-hover="60">Finset.mem_filter</span>.<span class="const token" data-verso-hover="70">1</span> h).<span class="const token" data-verso-hover="64">1</span>⟩</span>
+<span id="L407"></span>
+<span id="L408"><span class="dc">/-- The solution `S` produced by the second phase. -/</span></span>
+<span id="L409"><span class="kw">abbrev</span> <span class="const token" data-verso-hover="350">sol</span> (Is : <span class="const token" data-verso-hover="78">ℕ</span> → <span class="const token" data-verso-hover="51">Finset</span> D) (T : <span class="const token" data-verso-hover="78">ℕ</span>) (acc : <span class="const token" data-verso-hover="51">Finset</span> D → D → <span class="kw">Prop</span>) [∀ S d, <span class="const token" data-verso-hover="344">Decidable</span> (acc S d)] :</span>
+<span id="L410">    <span class="const token" data-verso-hover="51">Finset</span> D := <span class="const token" data-verso-hover="343">phase2</span> Is T acc T</span>
+<span id="L411"></span>
+<span id="L412"><span class="kw">lemma</span> <span class="const token" data-verso-hover="351">sol_subset_raised</span> : <span class="const token" data-verso-hover="350">sol</span> Is T acc ⊆ <span class="const token" data-verso-hover="335">raised</span> Is T := <span class="kw">by</span></span>
+<span id="L413">  <span class="kw">intro</span> d hd</span>
+<span id="L414">  <span class="kw">obtain</span> ⟨t, ht, -, hdt⟩ := <span class="const token" data-verso-hover="349">mem_phase2</span> acc <span class="const token" data-verso-hover="127">le_rfl</span> hd</span>
+<span id="L415">  <span class="kw">exact</span> <span class="const token" data-verso-hover="340">Finset.mem_biUnion</span>.<span class="const token" data-verso-hover="61">2</span> ⟨t, <span class="const token" data-verso-hover="325">Finset.mem_range</span>.<span class="const token" data-verso-hover="61">2</span> ht, hdt⟩</span>
+<span id="L416"></span>
+<span id="L417"><span class="dc">/-- Every instance raised at iteration `t` is either in the final solution, or it failed the</span></span>
+<span id="L418"><span class="dc">acceptance test against the solution built from the iterations after `t`. -/</span></span>
+<span id="L419"><span class="kw">lemma</span> <span class="const token" data-verso-hover="352">mem_sol_or_not_acc</span> {t : <span class="const token" data-verso-hover="78">ℕ</span>} (ht : t &lt; T) {d : D} (hd : d ∈ Is t) :</span>
+<span id="L420">    d ∈ <span class="const token" data-verso-hover="350">sol</span> Is T acc ∨ ¬ acc (<span class="const token" data-verso-hover="343">phase2</span> Is T acc (T - <span class="nu">1</span> - t)) d := <span class="kw">by</span></span>
+<span id="L421">  <span class="kw">by_cases</span> hacc : acc (<span class="const token" data-verso-hover="343">phase2</span> Is T acc (T - <span class="nu">1</span> - t)) d</span>
+<span id="L422">  · <span class="kw">left</span></span>
+<span id="L423">    <span class="kw">refine</span> <span class="const token" data-verso-hover="345">phase2_mono</span> acc (<span class="kw">show</span> T - <span class="nu">1</span> - t + <span class="nu">1</span> ≤ T <span class="kw">by</span> <span class="kw">omega</span>) ?_</span>
+<span id="L424">    <span class="kw">refine</span> <span class="const token" data-verso-hover="353">Finset.mem_union_right</span> _ (<span class="const token" data-verso-hover="60">Finset.mem_filter</span>.<span class="const token" data-verso-hover="61">2</span> ⟨?_, hacc⟩)</span>
+<span id="L425">    <span class="kw">rwa</span> [<span class="kw">show</span> T - <span class="nu">1</span> - (T - <span class="nu">1</span> - t) = t <span class="kw">by</span> <span class="kw">omega</span>]</span>
+<span id="L426">  · <span class="kw">exact</span> <span class="const token" data-verso-hover="225">Or.inr</span> hacc</span>
+<span id="L427"></span>
+<span id="L428"><span class="dc">/-- The solution against which iteration `t` is tested consists of instances raised later. -/</span></span>
+<span id="L429"><span class="kw">lemma</span> <span class="const token" data-verso-hover="354">mem_phase2_later</span> {t : <span class="const token" data-verso-hover="78">ℕ</span>} (ht : t &lt; T) {d : D} (hd : d ∈ <span class="const token" data-verso-hover="343">phase2</span> Is T acc (T - <span class="nu">1</span> - t)) :</span>
+<span id="L430">    ∃ t', t &lt; t' ∧ t' &lt; T ∧ d ∈ Is t' := <span class="kw">by</span></span>
+<span id="L431">  <span class="kw">obtain</span> ⟨t', h1, h2, h3⟩ := <span class="const token" data-verso-hover="349">mem_phase2</span> acc (<span class="kw">by</span> <span class="kw">omega</span>) hd</span>
+<span id="L432">  <span class="kw">exact</span> ⟨t', <span class="kw">by</span> <span class="kw">omega</span>, h1, h3⟩</span>
+<span id="L433"></span>
+<span id="L434"><span class="kw">lemma</span> <span class="const token" data-verso-hover="355">phase2_subset_sol</span> {t : <span class="const token" data-verso-hover="78">ℕ</span>} :</span>
+<span id="L435">    <span class="const token" data-verso-hover="343">phase2</span> Is T acc (T - <span class="nu">1</span> - t) ⊆ <span class="const token" data-verso-hover="350">sol</span> Is T acc :=</span>
+<span id="L436">  <span class="const token" data-verso-hover="345">phase2_mono</span> acc (<span class="kw">by</span> <span class="kw">omega</span>)</span>
+<span id="L437"></span>
+<span id="L438"><span class="dc">/-- Coverage by a single later instance of the solution. -/</span></span>
+<span id="L439"><span class="kw">lemma</span> <span class="const token" data-verso-hover="356">one_le_cover_of_mem</span> (hR : R.<span class="const token" data-verso-hover="107">WF</span> I) (_hv : I.<span class="const token" data-verso-hover="114">ValidRun</span> R Is T) {S : <span class="const token" data-verso-hover="51">Finset</span> D} {s : <span class="const token" data-verso-hover="78">ℕ</span>}</span>
+<span id="L440">    {d' d₀ : D} {t₀ : <span class="const token" data-verso-hover="78">ℕ</span>} (hst : s &lt; t₀) (ht₀ : t₀ &lt; T) (hd₀ : d₀ ∈ Is t₀) (hd₀S : d₀ ∈ S)</span>
+<span id="L441">    (hw : <span class="nu">1</span> ≤ I.<span class="const token" data-verso-hover="134">weight</span> R d' d₀) :</span>
+<span id="L442">    <span class="nu">1</span> ≤ ∑ t ∈ (<span class="const token" data-verso-hover="314">range</span> T).<span class="const token" data-verso-hover="58">filter</span> (s &lt; ·), ∑ d ∈ (Is t).<span class="const token" data-verso-hover="58">filter</span> (· ∈ S), I.<span class="const token" data-verso-hover="134">weight</span> R d' d := <span class="kw">by</span></span>
+<span id="L443">  <span class="kw">refine</span> hw.<span class="const token" data-verso-hover="161">trans</span> ?_</span>
+<span id="L444">  <span class="kw">have</span> h1 : I.<span class="const token" data-verso-hover="134">weight</span> R d' d₀ ≤ ∑ d ∈ (Is t₀).<span class="const token" data-verso-hover="58">filter</span> (· ∈ S), I.<span class="const token" data-verso-hover="134">weight</span> R d' d :=</span>
+<span id="L445">    <span class="const token" data-verso-hover="142">Finset.single_le_sum</span> (f := <span class="kw">fun</span> d =&gt; I.<span class="const token" data-verso-hover="134">weight</span> R d' d) (<span class="kw">fun</span> d _ =&gt; <span class="const token" data-verso-hover="141">weight_nonneg</span> hR d' d)</span>
+<span id="L446">      (<span class="const token" data-verso-hover="60">Finset.mem_filter</span>.<span class="const token" data-verso-hover="61">2</span> ⟨hd₀, hd₀S⟩)</span>
+<span id="L447">  <span class="kw">refine</span> h1.<span class="const token" data-verso-hover="161">trans</span> (<span class="const token" data-verso-hover="142">Finset.single_le_sum</span> (f := <span class="kw">fun</span> t =&gt; ∑ d ∈ (Is t).<span class="const token" data-verso-hover="58">filter</span> (· ∈ S),</span>
+<span id="L448">    I.<span class="const token" data-verso-hover="134">weight</span> R d' d) (<span class="kw">fun</span> t _ =&gt; <span class="const token" data-verso-hover="130">Finset.sum_nonneg</span> <span class="kw">fun</span> d _ =&gt; <span class="const token" data-verso-hover="141">weight_nonneg</span> hR d' d)</span>
+<span id="L449">    (<span class="const token" data-verso-hover="60">Finset.mem_filter</span>.<span class="const token" data-verso-hover="61">2</span> ⟨<span class="const token" data-verso-hover="325">Finset.mem_range</span>.<span class="const token" data-verso-hover="61">2</span> ht₀, hst⟩))</span>
+<span id="L450"></span>
+<span id="L451"><span class="kw">end</span> Inst</span>
+<span id="L452"></span>
+<span id="L453"><span class="kw">end</span></span>
+<span id="L454"></span>
+<span id="L455"><span class="kw">end</span> Podc.LineTreeScheduling</span>
+<span id="L456"></span>
+</code></div>
+        <script>
+          window.versoHoversUrl = "PODC2012/LineTreeScheduling/-hovers.json";</script>
+        <script src="static/lean/popper.js"></script>
+        <script src="static/lean/tippy.js"></script>
+        <script src="static/lean/marked.js"></script>
+        <script src="static/lean/highlighting.js"></script>
+        <script src="static/lean/lean.js"></script>
+        </article></main><footer class="site-footer"><div class="wrap">
+        Machine-checked formalizations of PODC papers in Lean 4. Generated with <a href="https://github.com/leanprover/verso">Verso</a> from the README files of <a href="https://github.com/vasnesterov/formal_podc">vasnesterov/formal_podc</a>.</div>
+      </footer></body>
+  </html>
+

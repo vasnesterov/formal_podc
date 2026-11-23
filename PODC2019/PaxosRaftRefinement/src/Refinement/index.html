@@ -1,0 +1,568 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="light dark">
+    <link rel="icon" href="data:,">
+    <title>PaxosRaftRefinement: Refinement.lean · Formal PODC</title><base href="../../../.././"><link rel="stylesheet" href="static/lean/verso-vars.css">
+    <link rel="stylesheet" href="static/lean/highlighting.css">
+    <link rel="stylesheet" href="static/lean/tippy-border.css">
+    <link rel="stylesheet" href="static/style.css">
+    <script defer="defer" src="static/site.js"></script>
+    </head>
+  <body>
+    <header class="site-header">
+      <div class="wrap">
+        <a class="brand" href=".">Formal PODC</a><nav class="top">
+          <a href=".">Search</a><a href="about/">About</a><a href="https://github.com/vasnesterov/formal_podc">GitHub</a></nav>
+        </div>
+      </header>
+    <main class="wrap"><article><nav class="breadcrumbs" aria-label="Breadcrumb">
+          <a href=".">Search</a><span class="sep">›</span><a href="PODC2019/">PODC 2019</a><span class="sep">›</span><a href="PODC2019/PaxosRaftRefinement/">PaxosRaftRefinement</a><span class="sep">›</span><a href="PODC2019/PaxosRaftRefinement/src/">Lean source</a><span class="sep">›</span><span aria-current="page">Refinement</span></nav>
+        <h1>
+          <code>Refinement.lean</code></h1>
+        <div class="paper-links">
+          <p>
+            Source of <a href="PODC2019/PaxosRaftRefinement/">Paxos vs. Raft, and porting optimizations — PODC 2019</a> · <a href="https://github.com/vasnesterov/formal_podc/blob/main/Papers/PODC2019/PaxosRaftRefinement/Refinement.lean">GitHub</a> · hover over a name for its type and documentation</p>
+          </div>
+        <div class="lean-code lean-src">
+          <code class="hl lean block" data-lean-context="Refinement"><span id="L1"><span class="kw">import</span> Papers.PODC2019.PaxosRaftRefinement.RaftInv</span>
+<span id="L2"><span class="kw">import</span> Papers.PODC2019.PaxosRaftRefinement.PaxosBatch</span>
+<span id="L3"><span class="kw">import</span> Papers.PODC2019.PaxosRaftRefinement.PaxosSafety</span>
+<span id="L4"></span>
+<span id="L5"><span class="dc">/-!</span></span>
+<span id="L6"><span class="dc"># Raft* refines MultiPaxos (Appendix C of [paper])</span></span>
+<span id="L7"></span>
+<span id="L8"><span class="dc">The refinement mapping of Appendix C:</span></span>
+<span id="L9"></span>
+<span id="L10"><span class="dc">| Paxos | Raft* |</span></span>
+<span id="L11"><span class="dc">|---|---|</span></span>
+<span id="L12"><span class="dc">| `ballot` | `currentTerm` |</span></span>
+<span id="L13"><span class="dc">| `phase1Succeeded` | `isLeader` |</span></span>
+<span id="L14"><span class="dc">| `instance i` = `(accBallot, value)` | `(lastLogEntry.term, log[i].value)` |</span></span>
+<span id="L15"><span class="dc">| `chosenSet` | `log[0, commitIndex]` |</span></span>
+<span id="L16"><span class="dc">| `prepare` / `prepareOK` | `requestVote` / `requestVoteOK` |</span></span>
+<span id="L17"><span class="dc">| `accept` / `acceptOK` | (implicit and explicit) `append` / `appendOK` (ghosts `props`, `acks`) |</span></span>
+<span id="L18"></span>
+<span id="L19"><span class="dc">Every step of (repaired) Raft* maps to a finite sequence of MultiPaxos steps</span></span>
+<span id="L20"><span class="dc">(`RequestVote` ↦ `Phase1a`, `ReceiveVote` ↦ `Phase1b`, `BecomeLeader` ↦ `Phase1Succeed` followed,</span></span>
+<span id="L21"><span class="dc">if new entries are adopted, by `Phase2a` and `Phase2b` for every entry; `AppendEntries` ↦</span></span>
+<span id="L22"><span class="dc">`Phase2a` + `Phase2b` for every entry; `ReceiveAppend` ↦ `Phase2b` for every entry + `Learn` for</span></span>
+<span id="L23"><span class="dc">the committed ones; `LeaderLearn` ↦ `Learn`), so the image of every reachable Raft* state is a</span></span>
+<span id="L24"><span class="dc">reachable MultiPaxos state (`refinement`), and Raft*'s state machine safety follows from MultiPaxos</span></span>
+<span id="L25"><span class="dc">safety (`raftStar_commitSafe`).</span></span>
+<span id="L26"></span>
+<span id="L27"><span class="dc">The accepted ballot of *every* entry is the term of the *last* entry (as in Appendix C), not the</span></span>
+<span id="L28"><span class="dc">per-entry `bal` field of Figure 2/Figure 3.</span></span>
+<span id="L29"><span class="dc">-/</span></span>
+<span id="L30"></span>
+<span id="L31"><span class="kw">namespace</span> Podc.PaxosRaftRefinement</span>
+<span id="L32"></span>
+<span id="L33"><span class="kw">open</span> Raft</span>
+<span id="L34"></span>
+<span id="L35"><span class="kw">variable</span> {N V : <span class="kw">Type</span>*} [<span class="const token" data-verso-hover="86">DecidableEq</span> N] {Q : <span class="const token" data-verso-hover="33">QuorumSystem</span> N}</span>
+<span id="L36"></span>
+<span id="L37"><span class="dc">/-- Paxos view of a Raft* log: every entry carries the last term as its accepted ballot. -/</span></span>
+<span id="L38"><span class="kw">def</span> <span class="const token" data-verso-hover="355">absLog</span> (L : <span class="const token" data-verso-hover="39">List</span> (<span class="const token" data-verso-hover="37">ℕ</span> × V)) : <span class="const token" data-verso-hover="37">ℕ</span> → <span class="const token" data-verso-hover="102">Option</span> (<span class="const token" data-verso-hover="37">ℕ</span> × V) :=</span>
+<span id="L39">  <span class="kw">fun</span> i =&gt; L[i]?.<span class="const token" data-verso-hover="74">map</span> <span class="kw">fun</span> e =&gt; (<span class="const token" data-verso-hover="73">lastTerm</span> L, e.<span class="const token" data-verso-hover="75">2</span>)</span>
+<span id="L40"></span>
+<span id="L41"><span class="dc">/-- Paxos view of a committed prefix: `chosenSet = log[0, commitIndex]`. -/</span></span>
+<span id="L42"><span class="kw">def</span> <span class="const token" data-verso-hover="356">chosenOf</span> (L : <span class="const token" data-verso-hover="39">List</span> (<span class="const token" data-verso-hover="37">ℕ</span> × V)) (c : <span class="const token" data-verso-hover="37">ℕ</span>) : <span class="const token" data-verso-hover="108">Set</span> (<span class="const token" data-verso-hover="37">ℕ</span> × V) :=</span>
+<span id="L43">  {x | ∃ h : x.<span class="const token" data-verso-hover="234">1</span> &lt; L.<span class="const token" data-verso-hover="131">length</span>, x.<span class="const token" data-verso-hover="234">1</span> &lt; c ∧ L[x.<span class="const token" data-verso-hover="234">1</span>].<span class="const token" data-verso-hover="75">2</span> = x.<span class="const token" data-verso-hover="75">2</span>}</span>
+<span id="L44"></span>
+<span id="L45"><span class="dc">/-- A `requestVoteOK` seen as a `prepareOK`. -/</span></span>
+<span id="L46"><span class="kw">def</span> <span class="const token" data-verso-hover="357">absVote</span> (m : <span class="const token" data-verso-hover="252">RVOKMsg</span> N V) : <span class="const token" data-verso-hover="97">Paxos.Msg1b</span> N V := ⟨m.<span class="const token" data-verso-hover="255">src</span>, m.<span class="const token" data-verso-hover="253">dst</span>, m.<span class="const token" data-verso-hover="254">term</span>, <span class="const token" data-verso-hover="355">absLog</span> m.<span class="const token" data-verso-hover="248">log</span>⟩</span>
+<span id="L47"></span>
+<span id="L48"><span class="dc">/-- The refinement mapping from Raft* states to MultiPaxos states (Appendix C). -/</span></span>
+<span id="L49"><span class="kw">def</span> <span class="const token" data-verso-hover="358">abs</span> (r : <span class="const token" data-verso-hover="36">Raft.State</span> N V) : <span class="const token" data-verso-hover="103">Paxos.State</span> N V <span class="kw">where</span></span>
+<span id="L50">  <span class="const token" data-verso-hover="104">ballot</span> := r.<span class="const token" data-verso-hover="40">term</span></span>
+<span id="L51">  <span class="const token" data-verso-hover="105">leader</span> := r.<span class="const token" data-verso-hover="41">leader</span></span>
+<span id="L52">  <span class="const token" data-verso-hover="106">inst</span> s := <span class="const token" data-verso-hover="355">absLog</span> (r.<span class="const token" data-verso-hover="42">log</span> s)</span>
+<span id="L53">  <span class="const token" data-verso-hover="107">chosen</span> s := <span class="const token" data-verso-hover="356">chosenOf</span> (r.<span class="const token" data-verso-hover="42">log</span> s) (r.<span class="const token" data-verso-hover="43">commit</span> s)</span>
+<span id="L54">  <span class="const token" data-verso-hover="109">m1a</span> := (<span class="kw">fun</span> m : <span class="const token" data-verso-hover="313">RVMsg</span> N =&gt; (m.<span class="const token" data-verso-hover="271">cand</span>, m.<span class="const token" data-verso-hover="272">term</span>)) '' r.<span class="const token" data-verso-hover="270">rv</span></span>
+<span id="L55">  <span class="const token" data-verso-hover="110">m1b</span> := <span class="const token" data-verso-hover="357">absVote</span> '' r.<span class="const token" data-verso-hover="70">rvok</span></span>
+<span id="L56">  <span class="const token" data-verso-hover="111">m2a</span> := r.<span class="const token" data-verso-hover="259">props</span></span>
+<span id="L57">  <span class="const token" data-verso-hover="112">m2b</span> := r.<span class="const token" data-verso-hover="257">acks</span></span>
+<span id="L58"></span>
+<span id="L59"><span class="kw">theorem</span> <span class="const token" data-verso-hover="359">absLog_lt</span> {L : <span class="const token" data-verso-hover="39">List</span> (<span class="const token" data-verso-hover="37">ℕ</span> × V)} {i : <span class="const token" data-verso-hover="37">ℕ</span>} (h : i &lt; L.<span class="const token" data-verso-hover="131">length</span>) :</span>
+<span id="L60">    <span class="const token" data-verso-hover="355">absLog</span> L i = <span class="const token" data-verso-hover="116">some</span> (<span class="const token" data-verso-hover="73">lastTerm</span> L, L[i].<span class="const token" data-verso-hover="75">2</span>) := <span class="kw">by</span></span>
+<span id="L61">  <span class="kw">simp</span> [<span class="const token" data-verso-hover="355">absLog</span>, <span class="const token" data-verso-hover="330">List.getElem?_eq_getElem</span> h]</span>
+<span id="L62"></span>
+<span id="L63"><span class="kw">theorem</span> <span class="const token" data-verso-hover="360">absLog_ge</span> {L : <span class="const token" data-verso-hover="39">List</span> (<span class="const token" data-verso-hover="37">ℕ</span> × V)} {i : <span class="const token" data-verso-hover="37">ℕ</span>} (h : L.<span class="const token" data-verso-hover="131">length</span> ≤ i) : <span class="const token" data-verso-hover="355">absLog</span> L i = <span class="const token" data-verso-hover="114">none</span> := <span class="kw">by</span></span>
+<span id="L64">  <span class="kw">simp</span> [<span class="const token" data-verso-hover="355">absLog</span>, <span class="const token" data-verso-hover="329">List.getElem?_eq_none</span> h]</span>
+<span id="L65"></span>
+<span id="L66"><span class="kw">theorem</span> <span class="const token" data-verso-hover="361">chosenOf_append</span> {L : <span class="const token" data-verso-hover="39">List</span> (<span class="const token" data-verso-hover="37">ℕ</span> × V)} (X : <span class="const token" data-verso-hover="39">List</span> (<span class="const token" data-verso-hover="37">ℕ</span> × V)) {c : <span class="const token" data-verso-hover="37">ℕ</span>} (hc : c ≤ L.<span class="const token" data-verso-hover="131">length</span>) :</span>
+<span id="L67">    <span class="const token" data-verso-hover="356">chosenOf</span> (L ++ X) c = <span class="const token" data-verso-hover="356">chosenOf</span> L c := <span class="kw">by</span></span>
+<span id="L68">  <span class="kw">ext</span> ⟨i, v⟩</span>
+<span id="L69">  <span class="kw">simp</span> only [<span class="const token" data-verso-hover="356">chosenOf</span>, <span class="const token" data-verso-hover="132">Set.mem_setOf_eq</span>]</span>
+<span id="L70">  <span class="kw">constructor</span></span>
+<span id="L71">  · <span class="kw">rintro</span> ⟨h, hi, hv⟩</span>
+<span id="L72">    <span class="kw">exact</span> ⟨<span class="kw">by</span> <span class="kw">omega</span>, hi, <span class="kw">by</span> <span class="kw">rwa</span> [<span class="const token" data-verso-hover="136">List.getElem_append_left</span> (<span class="kw">by</span> <span class="kw">omega</span>)] <span class="kw">at</span> hv⟩</span>
+<span id="L73">  · <span class="kw">rintro</span> ⟨h, hi, hv⟩</span>
+<span id="L74">    <span class="kw">exact</span> ⟨<span class="kw">by</span> <span class="kw">simp</span>; <span class="kw">omega</span>, hi, <span class="kw">by</span> <span class="kw">rwa</span> [<span class="const token" data-verso-hover="136">List.getElem_append_left</span> h]⟩</span>
+<span id="L75"></span>
+<span id="L76"><span class="kw">theorem</span> <span class="const token" data-verso-hover="362">propsOf_eq</span> (L : <span class="const token" data-verso-hover="39">List</span> (<span class="const token" data-verso-hover="37">ℕ</span> × V)) (t : <span class="const token" data-verso-hover="37">ℕ</span>) :</span>
+<span id="L77">    <span class="const token" data-verso-hover="317">propsOf</span> L t = {x | ∃ i, ∃ h : i &lt; (L.<span class="const token" data-verso-hover="296">map</span> <span class="const token" data-verso-hover="75">Prod.snd</span>).<span class="const token" data-verso-hover="131">length</span>, x = (i, t, (L.<span class="const token" data-verso-hover="296">map</span> <span class="const token" data-verso-hover="75">Prod.snd</span>)[i])} := <span class="kw">by</span></span>
+<span id="L78">  <span class="kw">ext</span> x; <span class="kw">simp</span> [<span class="const token" data-verso-hover="317">propsOf</span>]</span>
+<span id="L79"></span>
+<span id="L80"><span class="kw">theorem</span> <span class="const token" data-verso-hover="363">acksOf_eq</span> (s : N) (L : <span class="const token" data-verso-hover="39">List</span> (<span class="const token" data-verso-hover="37">ℕ</span> × V)) (t : <span class="const token" data-verso-hover="37">ℕ</span>) :</span>
+<span id="L81">    <span class="const token" data-verso-hover="318">acksOf</span> s L t =</span>
+<span id="L82">      {x | ∃ i, ∃ h : i &lt; (L.<span class="const token" data-verso-hover="296">map</span> <span class="const token" data-verso-hover="75">Prod.snd</span>).<span class="const token" data-verso-hover="131">length</span>, x = (s, i, t, (L.<span class="const token" data-verso-hover="296">map</span> <span class="const token" data-verso-hover="75">Prod.snd</span>)[i])} := <span class="kw">by</span></span>
+<span id="L83">  <span class="kw">ext</span> x; <span class="kw">simp</span> [<span class="const token" data-verso-hover="318">acksOf</span>]</span>
+<span id="L84"></span>
+<span id="L85"><span class="kw">theorem</span> <span class="const token" data-verso-hover="364">abs_init</span> : <span class="const token" data-verso-hover="358">abs</span> (<span class="const token" data-verso-hover="58">Raft.init</span> : <span class="const token" data-verso-hover="36">Raft.State</span> N V) = <span class="const token" data-verso-hover="113">Paxos.init</span> := <span class="kw">by</span></span>
+<span id="L86">  <span class="kw">ext</span> &lt;;&gt; <span class="kw">simp</span> [<span class="const token" data-verso-hover="358">abs</span>, <span class="const token" data-verso-hover="58">Raft.init</span>, <span class="const token" data-verso-hover="113">Paxos.init</span>, <span class="const token" data-verso-hover="355">absLog</span>, <span class="const token" data-verso-hover="356">chosenOf</span>]</span>
+<span id="L87"></span>
+<span id="L88"><span class="dc">/-! ### Simulation of the individual steps -/</span></span>
+<span id="L89"></span>
+<span id="L90"><span class="dc">/-- `RequestVote(s)` implies `Phase1a(s)` (Appendix C, step 2.1). -/</span></span>
+<span id="L91"><span class="kw">theorem</span> <span class="const token" data-verso-hover="365">sim_requestVote</span> (r : <span class="const token" data-verso-hover="36">Raft.State</span> N V) (s : N) :</span>
+<span id="L92">    <span class="const token" data-verso-hover="128">Relation.ReflTransGen</span> (<span class="const token" data-verso-hover="117">Paxos.Step</span> Q) (<span class="const token" data-verso-hover="358">abs</span> r) (<span class="const token" data-verso-hover="358">abs</span> { r <span class="kw">with</span></span>
+<span id="L93">        <span class="const token" data-verso-hover="40">term</span> := <span class="const token" data-verso-hover="119">Function.update</span> r.<span class="const token" data-verso-hover="40">term</span> s (r.<span class="const token" data-verso-hover="40">term</span> s + <span class="nu">1</span>)</span>
+<span id="L94">        <span class="const token" data-verso-hover="41">leader</span> := <span class="const token" data-verso-hover="119">Function.update</span> r.<span class="const token" data-verso-hover="41">leader</span> s <span class="const token" data-verso-hover="57">false</span></span>
+<span id="L95">        <span class="const token" data-verso-hover="270">rv</span> := <span class="const token" data-verso-hover="120">insert</span> ⟨s, r.<span class="const token" data-verso-hover="40">term</span> s + <span class="nu">1</span>, (r.<span class="const token" data-verso-hover="42">log</span> s).<span class="const token" data-verso-hover="131">length</span>, <span class="const token" data-verso-hover="73">lastTerm</span> (r.<span class="const token" data-verso-hover="42">log</span> s)⟩ r.<span class="const token" data-verso-hover="270">rv</span></span>
+<span id="L96">        <span class="const token" data-verso-hover="70">rvok</span> := <span class="const token" data-verso-hover="120">insert</span> ⟨s, s, r.<span class="const token" data-verso-hover="40">term</span> s + <span class="nu">1</span>, r.<span class="const token" data-verso-hover="42">log</span> s⟩ r.<span class="const token" data-verso-hover="70">rvok</span> }) := <span class="kw">by</span></span>
+<span id="L97">  <span class="kw">refine</span> <span class="const token" data-verso-hover="151">Relation.ReflTransGen.single</span> ?_</span>
+<span id="L98">  <span class="kw">convert</span> <span class="const token" data-verso-hover="118">Paxos.Step.phase1a</span> (Q := Q) (<span class="const token" data-verso-hover="358">abs</span> r) s <span class="kw">using</span> <span class="nu">1</span></span>
+<span id="L99">  <span class="kw">apply</span> <span class="const token" data-verso-hover="366">Paxos.State.ext</span> &lt;;&gt; (<span class="kw">try</span> <span class="kw">rfl</span>) &lt;;&gt; <span class="kw">simp</span> [<span class="const token" data-verso-hover="358">abs</span>, <span class="const token" data-verso-hover="367">Set.image_insert_eq</span>, <span class="const token" data-verso-hover="357">absVote</span>]</span>
+<span id="L100"></span>
+<span id="L101"><span class="dc">/-- `ReceiveVote(s)` implies `Phase1b(s)` (Appendix C, step 2.2). -/</span></span>
+<span id="L102"><span class="kw">theorem</span> <span class="const token" data-verso-hover="368">sim_receiveVote</span> (r : <span class="const token" data-verso-hover="36">Raft.State</span> N V) (s : N) (m : <span class="const token" data-verso-hover="313">RVMsg</span> N) (hm : m ∈ r.<span class="const token" data-verso-hover="270">rv</span>)</span>
+<span id="L103">    (ht : r.<span class="const token" data-verso-hover="40">term</span> s &lt; m.<span class="const token" data-verso-hover="272">term</span>) :</span>
+<span id="L104">    <span class="const token" data-verso-hover="128">Relation.ReflTransGen</span> (<span class="const token" data-verso-hover="117">Paxos.Step</span> Q) (<span class="const token" data-verso-hover="358">abs</span> r) (<span class="const token" data-verso-hover="358">abs</span> { r <span class="kw">with</span></span>
+<span id="L105">        <span class="const token" data-verso-hover="40">term</span> := <span class="const token" data-verso-hover="119">Function.update</span> r.<span class="const token" data-verso-hover="40">term</span> s m.<span class="const token" data-verso-hover="272">term</span></span>
+<span id="L106">        <span class="const token" data-verso-hover="41">leader</span> := <span class="const token" data-verso-hover="119">Function.update</span> r.<span class="const token" data-verso-hover="41">leader</span> s <span class="const token" data-verso-hover="57">false</span></span>
+<span id="L107">        <span class="const token" data-verso-hover="70">rvok</span> := <span class="const token" data-verso-hover="120">insert</span> ⟨s, m.<span class="const token" data-verso-hover="271">cand</span>, m.<span class="const token" data-verso-hover="272">term</span>, r.<span class="const token" data-verso-hover="42">log</span> s⟩ r.<span class="const token" data-verso-hover="70">rvok</span> }) := <span class="kw">by</span></span>
+<span id="L108">  <span class="kw">refine</span> <span class="const token" data-verso-hover="151">Relation.ReflTransGen.single</span> ?_</span>
+<span id="L109">  <span class="kw">convert</span> <span class="const token" data-verso-hover="121">Paxos.Step.phase1b</span> (Q := Q) (<span class="const token" data-verso-hover="358">abs</span> r) s m.<span class="const token" data-verso-hover="271">cand</span> m.<span class="const token" data-verso-hover="272">term</span> ⟨m, hm, <span class="const token" data-verso-hover="146">rfl</span>⟩ ht <span class="kw">using</span> <span class="nu">1</span></span>
+<span id="L110">  <span class="kw">apply</span> <span class="const token" data-verso-hover="366">Paxos.State.ext</span> &lt;;&gt; (<span class="kw">try</span> <span class="kw">rfl</span>) &lt;;&gt; <span class="kw">simp</span> [<span class="const token" data-verso-hover="358">abs</span>, <span class="const token" data-verso-hover="367">Set.image_insert_eq</span>, <span class="const token" data-verso-hover="357">absVote</span>]</span>
+<span id="L111"></span>
+<span id="L112"><span class="dc">/-- `LeaderLearn(s)` implies `Learn(s)` for each newly committed entry (Appendix C, step 2.6). -/</span></span>
+<span id="L113"><span class="kw">theorem</span> <span class="const token" data-verso-hover="369">sim_leaderLearn</span> {r : <span class="const token" data-verso-hover="36">Raft.State</span> N V} (I : <span class="const token" data-verso-hover="18">Inv</span> Q r) (s : N) (S : <span class="const token" data-verso-hover="83">Finset</span> (<span class="const token" data-verso-hover="342">AEOKMsg</span> N))</span>
+<span id="L114">    (k : <span class="const token" data-verso-hover="37">ℕ</span>) (hl : r.<span class="const token" data-verso-hover="41">leader</span> s = <span class="const token" data-verso-hover="56">true</span>)</span>
+<span id="L115">    (hS : ∀ m ∈ S, m ∈ r.<span class="const token" data-verso-hover="287">aeok</span> ∧ m.<span class="const token" data-verso-hover="343">dst</span> = s ∧ m.<span class="const token" data-verso-hover="290">term</span> = r.<span class="const token" data-verso-hover="40">term</span> s)</span>
+<span id="L116">    (hQ : Q.<span class="const token" data-verso-hover="82">IsQuorum</span> (<span class="const token" data-verso-hover="120">insert</span> s (S.<span class="const token" data-verso-hover="123">image</span> <span class="const token" data-verso-hover="289">AEOKMsg.src</span>)))</span>
+<span id="L117">    (hk : ∀ m ∈ S, k ≤ m.<span class="const token" data-verso-hover="288">len</span>) (hkl : k ≤ (r.<span class="const token" data-verso-hover="42">log</span> s).<span class="const token" data-verso-hover="131">length</span>) :</span>
+<span id="L118">    <span class="const token" data-verso-hover="128">Relation.ReflTransGen</span> (<span class="const token" data-verso-hover="117">Paxos.Step</span> Q) (<span class="const token" data-verso-hover="358">abs</span> r)</span>
+<span id="L119">      (<span class="const token" data-verso-hover="358">abs</span> { r <span class="kw">with</span> <span class="const token" data-verso-hover="43">commit</span> := <span class="const token" data-verso-hover="119">Function.update</span> r.<span class="const token" data-verso-hover="43">commit</span> s (<span class="const token" data-verso-hover="336">max</span> (r.<span class="const token" data-verso-hover="43">commit</span> s) k) }) := <span class="kw">by</span></span>
+<span id="L120">  <span class="kw">have</span> hacks := I.<span class="const token" data-verso-hover="341">leaderLearn_acks</span> s S k hl hS hk</span>
+<span id="L121">  <span class="kw">set</span> C := ((r.<span class="const token" data-verso-hover="42">log</span> s).<span class="const token" data-verso-hover="293">take</span> k).<span class="const token" data-verso-hover="296">map</span> <span class="const token" data-verso-hover="75">Prod.snd</span> <span class="kw">with</span> hC</span>
+<span id="L122">  <span class="kw">have</span> hCl : C.<span class="const token" data-verso-hover="131">length</span> = k := <span class="kw">by</span> <span class="kw">simp</span> [hC]; <span class="kw">omega</span></span>
+<span id="L123">  <span class="kw">have</span> hCget : ∀ i (h : i &lt; C.<span class="const token" data-verso-hover="131">length</span>), C[i] = ((r.<span class="const token" data-verso-hover="42">log</span> s)[i]'(<span class="kw">by</span> <span class="kw">omega</span>)).<span class="const token" data-verso-hover="75">2</span> := <span class="kw">by</span></span>
+<span id="L124">    <span class="kw">intro</span> i h; <span class="kw">simp</span> only [hC, <span class="const token" data-verso-hover="320">List.getElem_map</span>, <span class="const token" data-verso-hover="370">List.getElem_take</span>]</span>
+<span id="L125">  <span class="kw">have</span> := <span class="const token" data-verso-hover="153">Paxos.learn_batch</span> (Q := Q) (<span class="const token" data-verso-hover="358">abs</span> r) s C (<span class="kw">fun</span> i h =&gt; ⟨_, _, hQ, <span class="kw">fun</span> a ha =&gt; <span class="kw">by</span></span>
+<span id="L126">    <span class="kw">rw</span> [hCget]; <span class="kw">exact</span> hacks i _ (<span class="kw">by</span> <span class="kw">omega</span>) a ha⟩)</span>
+<span id="L127">  <span class="kw">convert</span> this <span class="kw">using</span> <span class="nu">1</span></span>
+<span id="L128">  <span class="kw">apply</span> <span class="const token" data-verso-hover="366">Paxos.State.ext</span> &lt;;&gt; (<span class="kw">try</span> <span class="kw">rfl</span>)</span>
+<span id="L129">  <span class="kw">funext</span> a</span>
+<span id="L130">  <span class="kw">by_cases</span> ha : a = s</span>
+<span id="L131">  · <span class="kw">subst</span> ha</span>
+<span id="L132">    <span class="kw">simp</span> only [<span class="const token" data-verso-hover="358">abs</span>, <span class="const token" data-verso-hover="152">Function.update_self</span>]</span>
+<span id="L133">    <span class="kw">ext</span> ⟨i, v⟩</span>
+<span id="L134">    <span class="kw">simp</span> only [<span class="const token" data-verso-hover="356">chosenOf</span>, <span class="const token" data-verso-hover="132">Set.mem_setOf_eq</span>, <span class="const token" data-verso-hover="371">Set.mem_union</span>, <span class="const token" data-verso-hover="143">Prod.mk.injEq</span>]</span>
+<span id="L135">    <span class="kw">constructor</span></span>
+<span id="L136">    · <span class="kw">rintro</span> ⟨h, hi, hv⟩</span>
+<span id="L137">      <span class="kw">rcases</span> <span class="const token" data-verso-hover="340">lt_max_iff</span>.<span class="const token" data-verso-hover="174">1</span> hi <span class="kw">with</span> hi | hi</span>
+<span id="L138">      · <span class="kw">exact</span> <span class="const token" data-verso-hover="159">Or.inl</span> ⟨h, hi, hv⟩</span>
+<span id="L139">      · <span class="kw">exact</span> <span class="const token" data-verso-hover="135">Or.inr</span> ⟨i, <span class="kw">by</span> <span class="kw">omega</span>, <span class="const token" data-verso-hover="146">rfl</span>, <span class="kw">by</span> <span class="kw">rw</span> [hCget, hv]⟩</span>
+<span id="L140">    · <span class="kw">rintro</span> (⟨h, hi, hv⟩ | ⟨j, hj, hij, hjv⟩)</span>
+<span id="L141">      · <span class="kw">exact</span> ⟨h, <span class="const token" data-verso-hover="372">lt_max_of_lt_left</span> hi, hv⟩</span>
+<span id="L142">      · <span class="kw">subst</span> hij hjv</span>
+<span id="L143">        <span class="kw">exact</span> ⟨<span class="kw">by</span> <span class="kw">omega</span>, <span class="const token" data-verso-hover="373">lt_max_of_lt_right</span> (<span class="kw">by</span> <span class="kw">omega</span>), (hCget _ hj).<span class="const token" data-verso-hover="211">symm</span>⟩</span>
+<span id="L144">  · <span class="kw">simp</span> [<span class="const token" data-verso-hover="358">abs</span>, <span class="const token" data-verso-hover="147">Function.update_of_ne</span> ha]</span>
+<span id="L145"></span>
+<span id="L146"></span>
+<span id="L147"><span class="dc">/-- `abs` of a state whose log at `s` is `L'` has the expected `inst` after a batch of</span></span>
+<span id="L148"><span class="dc">`Phase2b` steps accepting all of `L'` in ballot `lastTerm L'`. -/</span></span>
+<span id="L149"><span class="kw">theorem</span> <span class="const token" data-verso-hover="374">absLog_eq_batch</span> (L L' : <span class="const token" data-verso-hover="39">List</span> (<span class="const token" data-verso-hover="37">ℕ</span> × V)) (t : <span class="const token" data-verso-hover="37">ℕ</span>) (hLt : <span class="const token" data-verso-hover="73">lastTerm</span> L' = t)</span>
+<span id="L150">    (hlen : L.<span class="const token" data-verso-hover="131">length</span> ≤ L'.<span class="const token" data-verso-hover="131">length</span>) :</span>
+<span id="L151">    <span class="const token" data-verso-hover="355">absLog</span> L' = <span class="kw">fun</span> i =&gt; <span class="kw">if</span> h : i &lt; (L'.<span class="const token" data-verso-hover="296">map</span> <span class="const token" data-verso-hover="75">Prod.snd</span>).<span class="const token" data-verso-hover="131">length</span></span>
+<span id="L152">      <span class="kw">then</span> <span class="const token" data-verso-hover="116">some</span> (t, (L'.<span class="const token" data-verso-hover="296">map</span> <span class="const token" data-verso-hover="75">Prod.snd</span>)[i]) <span class="kw">else</span> <span class="const token" data-verso-hover="355">absLog</span> L i := <span class="kw">by</span></span>
+<span id="L153">  <span class="kw">funext</span> i</span>
+<span id="L154">  <span class="kw">by_cases</span> hi : i &lt; L'.<span class="const token" data-verso-hover="131">length</span></span>
+<span id="L155">  · <span class="kw">rw</span> [<span class="const token" data-verso-hover="359">absLog_lt</span> hi, <span class="const token" data-verso-hover="148">dif_pos</span> (<span class="kw">by</span> <span class="kw">simpa</span> <span class="kw">using</span> hi), hLt]; <span class="kw">simp</span></span>
+<span id="L156">  · <span class="kw">rw</span> [<span class="const token" data-verso-hover="360">absLog_ge</span> (<span class="kw">by</span> <span class="kw">omega</span>), <span class="const token" data-verso-hover="149">dif_neg</span> (<span class="kw">by</span> <span class="kw">simpa</span> <span class="kw">using</span> hi), <span class="const token" data-verso-hover="360">absLog_ge</span> (<span class="kw">by</span> <span class="kw">omega</span>)]</span>
+<span id="L157"></span>
+<span id="L158"><span class="dc">/-- `AppendEntries(s, vals, prev)` implies `Phase2a` and `Phase2b` for every entry of the</span></span>
+<span id="L159"><span class="dc">leader's log (Appendix C, step 2.4; the leader implicitly accepts its own entries). -/</span></span>
+<span id="L160"><span class="kw">theorem</span> <span class="const token" data-verso-hover="375">sim_appendEntries</span> {r : <span class="const token" data-verso-hover="36">Raft.State</span> N V} (I : <span class="const token" data-verso-hover="18">Inv</span> Q r) (s : N) (vals : <span class="const token" data-verso-hover="39">List</span> V)</span>
+<span id="L161">    (prevLen : <span class="const token" data-verso-hover="37">ℕ</span>) (hl : r.<span class="const token" data-verso-hover="41">leader</span> s = <span class="const token" data-verso-hover="56">true</span>) (hvals : vals ≠ []) :</span>
+<span id="L162">    <span class="const token" data-verso-hover="128">Relation.ReflTransGen</span> (<span class="const token" data-verso-hover="117">Paxos.Step</span> Q) (<span class="const token" data-verso-hover="358">abs</span> r) (<span class="const token" data-verso-hover="358">abs</span> { r <span class="kw">with</span></span>
+<span id="L163">        <span class="const token" data-verso-hover="42">log</span> := <span class="const token" data-verso-hover="119">Function.update</span> r.<span class="const token" data-verso-hover="42">log</span> s (r.<span class="const token" data-verso-hover="42">log</span> s ++ vals.<span class="const token" data-verso-hover="296">map</span> (<span class="kw">fun</span> v =&gt; (r.<span class="const token" data-verso-hover="40">term</span> s, v)))</span>
+<span id="L164">        <span class="const token" data-verso-hover="249">ae</span> := <span class="const token" data-verso-hover="120">insert</span> ⟨s, r.<span class="const token" data-verso-hover="40">term</span> s, prevLen, r.<span class="const token" data-verso-hover="42">log</span> s ++ vals.<span class="const token" data-verso-hover="296">map</span> (<span class="kw">fun</span> v =&gt; (r.<span class="const token" data-verso-hover="40">term</span> s, v)),</span>
+<span id="L165">          r.<span class="const token" data-verso-hover="43">commit</span> s⟩ r.<span class="const token" data-verso-hover="249">ae</span></span>
+<span id="L166">        <span class="const token" data-verso-hover="259">props</span> := r.<span class="const token" data-verso-hover="259">props</span> ∪ <span class="const token" data-verso-hover="317">propsOf</span> (r.<span class="const token" data-verso-hover="42">log</span> s ++ vals.<span class="const token" data-verso-hover="296">map</span> (<span class="kw">fun</span> v =&gt; (r.<span class="const token" data-verso-hover="40">term</span> s, v))) (r.<span class="const token" data-verso-hover="40">term</span> s)</span>
+<span id="L167">        <span class="const token" data-verso-hover="257">acks</span> := r.<span class="const token" data-verso-hover="257">acks</span> ∪ <span class="const token" data-verso-hover="318">acksOf</span> s (r.<span class="const token" data-verso-hover="42">log</span> s ++ vals.<span class="const token" data-verso-hover="296">map</span> (<span class="kw">fun</span> v =&gt; (r.<span class="const token" data-verso-hover="40">term</span> s, v))) (r.<span class="const token" data-verso-hover="40">term</span> s) }) := <span class="kw">by</span></span>
+<span id="L168">  <span class="kw">set</span> t := r.<span class="const token" data-verso-hover="40">term</span> s <span class="kw">with</span> ht</span>
+<span id="L169">  <span class="kw">set</span> L' := r.<span class="const token" data-verso-hover="42">log</span> s ++ vals.<span class="const token" data-verso-hover="296">map</span> (<span class="kw">fun</span> v =&gt; (t, v)) <span class="kw">with</span> hL'</span>
+<span id="L170">  <span class="kw">set</span> W := L'.<span class="const token" data-verso-hover="296">map</span> <span class="const token" data-verso-hover="75">Prod.snd</span> <span class="kw">with</span> hW</span>
+<span id="L171">  <span class="kw">have</span> hLt : <span class="const token" data-verso-hover="73">lastTerm</span> L' = t := <span class="const token" data-verso-hover="295">lastTerm_append_map</span> t hvals</span>
+<span id="L172">  <span class="kw">have</span> hlen : (r.<span class="const token" data-verso-hover="42">log</span> s).<span class="const token" data-verso-hover="131">length</span> ≤ L'.<span class="const token" data-verso-hover="131">length</span> := <span class="kw">by</span> <span class="kw">simp</span> [hL']</span>
+<span id="L173">  <span class="kw">have</span> hWne : W ≠ [] := <span class="kw">by</span> <span class="kw">simp</span> [hW, hL', hvals]</span>
+<span id="L174">  <span class="kw">have</span> hWget : ∀ i (h : i &lt; W.<span class="const token" data-verso-hover="131">length</span>), W[i] = (L'[i]'(<span class="kw">by</span> <span class="kw">simpa</span> [hW] <span class="kw">using</span> h)).<span class="const token" data-verso-hover="75">2</span> := <span class="kw">by</span></span>
+<span id="L175">    <span class="kw">intro</span> i h; <span class="kw">simp</span> [hW]</span>
+<span id="L176">  <span class="kw">have</span> hleft : ∀ i (h : i &lt; (r.<span class="const token" data-verso-hover="42">log</span> s).<span class="const token" data-verso-hover="131">length</span>), L'[i]'(<span class="const token" data-verso-hover="160">lt_of_lt_of_le</span> h hlen) = (r.<span class="const token" data-verso-hover="42">log</span> s)[i] := <span class="kw">by</span></span>
+<span id="L177">    <span class="kw">intro</span> i h; <span class="kw">simp</span> only [hL', <span class="const token" data-verso-hover="136">List.getElem_append_left</span> h]</span>
+<span id="L178">  <span class="kw">have</span> h1 := <span class="const token" data-verso-hover="138">Paxos.phase2a_batch</span> (Q := Q) (<span class="const token" data-verso-hover="358">abs</span> r) s W hl (<span class="kw">by</span></span>
+<span id="L179">      <span class="kw">intro</span> i h</span>
+<span id="L180">      <span class="kw">by_cases</span> hi : i &lt; (r.<span class="const token" data-verso-hover="42">log</span> s).<span class="const token" data-verso-hover="131">length</span></span>
+<span id="L181">      · <span class="kw">right</span>; <span class="kw">refine</span> ⟨<span class="const token" data-verso-hover="73">lastTerm</span> (r.<span class="const token" data-verso-hover="42">log</span> s), ?_⟩</span>
+<span id="L182">        <span class="kw">show</span> <span class="const token" data-verso-hover="355">absLog</span> (r.<span class="const token" data-verso-hover="42">log</span> s) i = _</span>
+<span id="L183">        <span class="kw">rw</span> [<span class="const token" data-verso-hover="359">absLog_lt</span> hi, hWget, hleft i hi]</span>
+<span id="L184">      · <span class="kw">left</span>; <span class="kw">exact</span> <span class="const token" data-verso-hover="360">absLog_ge</span> (<span class="kw">by</span> <span class="kw">omega</span>)) (<span class="kw">by</span></span>
+<span id="L185">      <span class="kw">intro</span> i h w hw</span>
+<span id="L186">      <span class="kw">obtain</span> ⟨-, hi, hiw⟩ := I.<span class="const token" data-verso-hover="307">props_of_leader</span> hl hw</span>
+<span id="L187">      <span class="kw">rw</span> [hWget, hleft i hi, hiw])</span>
+<span id="L188">  <span class="kw">have</span> h2 := <span class="const token" data-verso-hover="144">Paxos.phase2b_batch</span> (Q := Q)</span>
+<span id="L189">    { <span class="const token" data-verso-hover="358">abs</span> r <span class="kw">with</span> <span class="const token" data-verso-hover="111">m2a</span> := (<span class="const token" data-verso-hover="358">abs</span> r).<span class="const token" data-verso-hover="111">m2a</span> ∪ {x | ∃ i, ∃ h : i &lt; W.<span class="const token" data-verso-hover="131">length</span>, x = (i, (<span class="const token" data-verso-hover="358">abs</span> r).<span class="const token" data-verso-hover="104">ballot</span> s, W[i])} }</span>
+<span id="L190">    s t W hWne <span class="const token" data-verso-hover="172">le_rfl</span> (<span class="kw">fun</span> i h =&gt; <span class="const token" data-verso-hover="135">Or.inr</span> ⟨i, h, <span class="const token" data-verso-hover="146">rfl</span>⟩)</span>
+<span id="L191">  <span class="kw">refine</span> h1.<span class="const token" data-verso-hover="376">trans</span> ?_</span>
+<span id="L192">  <span class="kw">convert</span> h2 <span class="kw">using</span> <span class="nu">1</span></span>
+<span id="L193">  <span class="kw">apply</span> <span class="const token" data-verso-hover="366">Paxos.State.ext</span> &lt;;&gt; (<span class="kw">try</span> <span class="kw">rfl</span>)</span>
+<span id="L194">  · <span class="kw">simp</span> [<span class="const token" data-verso-hover="358">abs</span>, ht]</span>
+<span id="L195">  · <span class="kw">simp</span> [<span class="const token" data-verso-hover="358">abs</span>, ht]</span>
+<span id="L196">  · <span class="kw">funext</span> a</span>
+<span id="L197">    <span class="kw">by_cases</span> ha : a = s</span>
+<span id="L198">    · <span class="kw">subst</span> ha</span>
+<span id="L199">      <span class="kw">simp</span> only [<span class="const token" data-verso-hover="358">abs</span>, <span class="const token" data-verso-hover="152">Function.update_self</span>]</span>
+<span id="L200">      <span class="kw">exact</span> <span class="const token" data-verso-hover="374">absLog_eq_batch</span> _ _ t hLt hlen</span>
+<span id="L201">    · <span class="kw">simp</span> [<span class="const token" data-verso-hover="358">abs</span>, <span class="const token" data-verso-hover="147">Function.update_of_ne</span> ha]</span>
+<span id="L202">  · <span class="kw">funext</span> a</span>
+<span id="L203">    <span class="kw">by_cases</span> ha : a = s</span>
+<span id="L204">    · <span class="kw">subst</span> ha</span>
+<span id="L205">      <span class="kw">simp</span> only [<span class="const token" data-verso-hover="358">abs</span>, <span class="const token" data-verso-hover="152">Function.update_self</span>]</span>
+<span id="L206">      <span class="kw">exact</span> <span class="const token" data-verso-hover="361">chosenOf_append</span> _ (I.<span class="const token" data-verso-hover="282">commit_le</span> a)</span>
+<span id="L207">    · <span class="kw">simp</span> [<span class="const token" data-verso-hover="358">abs</span>, <span class="const token" data-verso-hover="147">Function.update_of_ne</span> ha]</span>
+<span id="L208">  · <span class="kw">simp</span> only [<span class="const token" data-verso-hover="358">abs</span>]; <span class="kw">rw</span> [<span class="const token" data-verso-hover="362">propsOf_eq</span>]</span>
+<span id="L209">  · <span class="kw">simp</span> only [<span class="const token" data-verso-hover="358">abs</span>]; <span class="kw">rw</span> [<span class="const token" data-verso-hover="363">acksOf_eq</span>]</span>
+<span id="L210"></span>
+<span id="L211"></span>
+<span id="L212"><span class="dc">/-- `ReceiveAppend(s)` (with the follower's new log already identified with the leader's log,</span></span>
+<span id="L213"><span class="dc">`Inv.receiveAppend_log`) implies `Phase2b` for every entry and `Learn` for the committed ones</span></span>
+<span id="L214"><span class="dc">(Appendix C, step 2.5). -/</span></span>
+<span id="L215"><span class="kw">theorem</span> <span class="const token" data-verso-hover="19">sim_receiveAppend</span> {r : <span class="const token" data-verso-hover="36">Raft.State</span> N V} (I : <span class="const token" data-verso-hover="18">Inv</span> Q r) (hsafe : <span class="const token" data-verso-hover="258">PropSafe</span> Q r) (s : N)</span>
+<span id="L216">    (m : <span class="const token" data-verso-hover="326">AEMsg</span> N V) (hm : m ∈ r.<span class="const token" data-verso-hover="249">ae</span>) (ht : r.<span class="const token" data-verso-hover="40">term</span> s ≤ m.<span class="const token" data-verso-hover="279">term</span>)</span>
+<span id="L217">    (hlen : (r.<span class="const token" data-verso-hover="42">log</span> s).<span class="const token" data-verso-hover="131">length</span> ≤ m.<span class="const token" data-verso-hover="250">full</span>.<span class="const token" data-verso-hover="131">length</span>) :</span>
+<span id="L218">    <span class="const token" data-verso-hover="128">Relation.ReflTransGen</span> (<span class="const token" data-verso-hover="117">Paxos.Step</span> Q) (<span class="const token" data-verso-hover="358">abs</span> r) (<span class="const token" data-verso-hover="358">abs</span> { r <span class="kw">with</span></span>
+<span id="L219">        <span class="const token" data-verso-hover="40">term</span> := <span class="const token" data-verso-hover="119">Function.update</span> r.<span class="const token" data-verso-hover="40">term</span> s m.<span class="const token" data-verso-hover="279">term</span></span>
+<span id="L220">        <span class="const token" data-verso-hover="41">leader</span> := <span class="const token" data-verso-hover="119">Function.update</span> r.<span class="const token" data-verso-hover="41">leader</span> s (<span class="kw">if</span> r.<span class="const token" data-verso-hover="40">term</span> s &lt; m.<span class="const token" data-verso-hover="279">term</span> <span class="kw">then</span> <span class="const token" data-verso-hover="57">false</span> <span class="kw">else</span> r.<span class="const token" data-verso-hover="41">leader</span> s)</span>
+<span id="L221">        <span class="const token" data-verso-hover="42">log</span> := <span class="const token" data-verso-hover="119">Function.update</span> r.<span class="const token" data-verso-hover="42">log</span> s m.<span class="const token" data-verso-hover="250">full</span></span>
+<span id="L222">        <span class="const token" data-verso-hover="43">commit</span> := <span class="const token" data-verso-hover="119">Function.update</span> r.<span class="const token" data-verso-hover="43">commit</span> s (<span class="const token" data-verso-hover="336">max</span> m.<span class="const token" data-verso-hover="281">commit</span> (r.<span class="const token" data-verso-hover="43">commit</span> s))</span>
+<span id="L223">        <span class="const token" data-verso-hover="287">aeok</span> := <span class="const token" data-verso-hover="120">insert</span> ⟨s, m.<span class="const token" data-verso-hover="278">src</span>, m.<span class="const token" data-verso-hover="279">term</span>, m.<span class="const token" data-verso-hover="250">full</span>.<span class="const token" data-verso-hover="131">length</span>⟩ r.<span class="const token" data-verso-hover="287">aeok</span></span>
+<span id="L224">        <span class="const token" data-verso-hover="257">acks</span> := r.<span class="const token" data-verso-hover="257">acks</span> ∪ <span class="const token" data-verso-hover="318">acksOf</span> s m.<span class="const token" data-verso-hover="250">full</span> m.<span class="const token" data-verso-hover="279">term</span> }) := <span class="kw">by</span></span>
+<span id="L225">  <span class="kw">obtain</span> ⟨hcand, hsrc, hFne, hFt, hpF, hcF, hcm⟩ := I.<span class="const token" data-verso-hover="277">ae_ok</span> m hm</span>
+<span id="L226">  <span class="kw">set</span> t := m.<span class="const token" data-verso-hover="279">term</span> <span class="kw">with</span> ht'</span>
+<span id="L227">  <span class="kw">set</span> F := m.<span class="const token" data-verso-hover="250">full</span> <span class="kw">with</span> hF</span>
+<span id="L228">  <span class="kw">have</span> hFin : <span class="const token" data-verso-hover="247">InLogs</span> r F := <span class="const token" data-verso-hover="135">Or.inr</span> (<span class="const token" data-verso-hover="135">Or.inr</span> ⟨m, hm, <span class="const token" data-verso-hover="146">rfl</span>⟩)</span>
+<span id="L229">  <span class="kw">have</span> hFp : ∀ i (h : i &lt; F.<span class="const token" data-verso-hover="131">length</span>), (i, t, F[i].<span class="const token" data-verso-hover="75">2</span>) ∈ r.<span class="const token" data-verso-hover="259">props</span> := <span class="kw">fun</span> i h =&gt; <span class="kw">by</span></span>
+<span id="L230">    <span class="kw">have</span> := I.<span class="const token" data-verso-hover="263">last_props</span> F hFin i h; <span class="kw">rwa</span> [hFt] <span class="kw">at</span> this</span>
+<span id="L231">  <span class="kw">set</span> W := F.<span class="const token" data-verso-hover="296">map</span> <span class="const token" data-verso-hover="75">Prod.snd</span> <span class="kw">with</span> hW</span>
+<span id="L232">  <span class="kw">have</span> hWne : W ≠ [] := <span class="kw">by</span> <span class="kw">simp</span> [hW, hFne]</span>
+<span id="L233">  <span class="kw">have</span> hWget : ∀ i (h : i &lt; W.<span class="const token" data-verso-hover="131">length</span>), W[i] = (F[i]'(<span class="kw">by</span> <span class="kw">simpa</span> [hW] <span class="kw">using</span> h)).<span class="const token" data-verso-hover="75">2</span> := <span class="kw">by</span></span>
+<span id="L234">    <span class="kw">intro</span> i h; <span class="kw">simp</span> [hW]</span>
+<span id="L235">  <span class="kw">have</span> h1 := <span class="const token" data-verso-hover="144">Paxos.phase2b_batch</span> (Q := Q) (<span class="const token" data-verso-hover="358">abs</span> r) s t W hWne ht (<span class="kw">fun</span> i h =&gt; <span class="kw">by</span></span>
+<span id="L236">    <span class="kw">rw</span> [hWget]; <span class="kw">exact</span> hFp i _)</span>
+<span id="L237">  <span class="kw">set</span> C := (F.<span class="const token" data-verso-hover="293">take</span> m.<span class="const token" data-verso-hover="281">commit</span>).<span class="const token" data-verso-hover="296">map</span> <span class="const token" data-verso-hover="75">Prod.snd</span> <span class="kw">with</span> hC</span>
+<span id="L238">  <span class="kw">have</span> hCl : C.<span class="const token" data-verso-hover="131">length</span> = m.<span class="const token" data-verso-hover="281">commit</span> := <span class="kw">by</span> <span class="kw">simp</span> [hC]; <span class="kw">omega</span></span>
+<span id="L239">  <span class="kw">have</span> hCget : ∀ i (h : i &lt; C.<span class="const token" data-verso-hover="131">length</span>), C[i] = (F[i]'(<span class="kw">by</span> <span class="kw">rw</span> [hCl] <span class="kw">at</span> h; <span class="kw">omega</span>)).<span class="const token" data-verso-hover="75">2</span> := <span class="kw">by</span></span>
+<span id="L240">    <span class="kw">intro</span> i h; <span class="kw">simp</span> only [hC, <span class="const token" data-verso-hover="320">List.getElem_map</span>, <span class="const token" data-verso-hover="370">List.getElem_take</span>]</span>
+<span id="L241">  <span class="kw">set</span> P₁ : <span class="const token" data-verso-hover="103">Paxos.State</span> N V := { <span class="const token" data-verso-hover="358">abs</span> r <span class="kw">with</span></span>
+<span id="L242">        <span class="const token" data-verso-hover="104">ballot</span> := <span class="const token" data-verso-hover="119">Function.update</span> (<span class="const token" data-verso-hover="358">abs</span> r).<span class="const token" data-verso-hover="104">ballot</span> s t</span>
+<span id="L243">        <span class="const token" data-verso-hover="105">leader</span> := <span class="const token" data-verso-hover="119">Function.update</span> (<span class="const token" data-verso-hover="358">abs</span> r).<span class="const token" data-verso-hover="105">leader</span> s</span>
+<span id="L244">          (<span class="kw">if</span> (<span class="const token" data-verso-hover="358">abs</span> r).<span class="const token" data-verso-hover="104">ballot</span> s &lt; t <span class="kw">then</span> <span class="const token" data-verso-hover="57">false</span> <span class="kw">else</span> (<span class="const token" data-verso-hover="358">abs</span> r).<span class="const token" data-verso-hover="105">leader</span> s)</span>
+<span id="L245">        <span class="const token" data-verso-hover="106">inst</span> := <span class="const token" data-verso-hover="119">Function.update</span> (<span class="const token" data-verso-hover="358">abs</span> r).<span class="const token" data-verso-hover="106">inst</span> s</span>
+<span id="L246">          (<span class="kw">fun</span> i =&gt; <span class="kw">if</span> h : i &lt; W.<span class="const token" data-verso-hover="131">length</span> <span class="kw">then</span> <span class="const token" data-verso-hover="116">some</span> (t, W[i]) <span class="kw">else</span> (<span class="const token" data-verso-hover="358">abs</span> r).<span class="const token" data-verso-hover="106">inst</span> s i)</span>
+<span id="L247">        <span class="const token" data-verso-hover="112">m2b</span> := (<span class="const token" data-verso-hover="358">abs</span> r).<span class="const token" data-verso-hover="112">m2b</span> ∪ {x | ∃ i, ∃ h : i &lt; W.<span class="const token" data-verso-hover="131">length</span>, x = (s, i, t, W[i])} } <span class="kw">with</span> hP₁</span>
+<span id="L248">  <span class="kw">have</span> h2 := <span class="const token" data-verso-hover="153">Paxos.learn_batch</span> (Q := Q) P₁ s C (<span class="kw">fun</span> i h =&gt; <span class="kw">by</span></span>
+<span id="L249">    <span class="kw">obtain</span> ⟨b, -, A, hA, hA'⟩ := hcm i (<span class="kw">by</span> <span class="kw">omega</span>) (<span class="kw">by</span> <span class="kw">omega</span>)</span>
+<span id="L250">    <span class="kw">exact</span> ⟨b, A, hA, <span class="kw">fun</span> a ha =&gt; <span class="kw">by</span> <span class="kw">rw</span> [hCget]; <span class="kw">exact</span> <span class="const token" data-verso-hover="159">Or.inl</span> (hA' a ha)⟩)</span>
+<span id="L251">  <span class="kw">refine</span> h1.<span class="const token" data-verso-hover="376">trans</span> ?_</span>
+<span id="L252">  <span class="kw">convert</span> h2 <span class="kw">using</span> <span class="nu">1</span></span>
+<span id="L253">  <span class="kw">apply</span> <span class="const token" data-verso-hover="366">Paxos.State.ext</span> &lt;;&gt; (<span class="kw">try</span> <span class="kw">rfl</span>)</span>
+<span id="L254">  · <span class="kw">funext</span> a</span>
+<span id="L255">    <span class="kw">by_cases</span> ha : a = s</span>
+<span id="L256">    · <span class="kw">subst</span> ha</span>
+<span id="L257">      <span class="kw">simp</span> only [<span class="const token" data-verso-hover="358">abs</span>, hP₁, <span class="const token" data-verso-hover="152">Function.update_self</span>]</span>
+<span id="L258">      <span class="kw">exact</span> <span class="const token" data-verso-hover="374">absLog_eq_batch</span> _ _ t hFt hlen</span>
+<span id="L259">    · <span class="kw">simp</span> [<span class="const token" data-verso-hover="358">abs</span>, hP₁, <span class="const token" data-verso-hover="147">Function.update_of_ne</span> ha]</span>
+<span id="L260">  · <span class="kw">funext</span> a</span>
+<span id="L261">    <span class="kw">by_cases</span> ha : a = s</span>
+<span id="L262">    · <span class="kw">subst</span> ha</span>
+<span id="L263">      <span class="kw">simp</span> only [<span class="const token" data-verso-hover="358">abs</span>, hP₁, <span class="const token" data-verso-hover="152">Function.update_self</span>]</span>
+<span id="L264">      <span class="kw">ext</span> ⟨i, v⟩</span>
+<span id="L265">      <span class="kw">simp</span> only [<span class="const token" data-verso-hover="356">chosenOf</span>, <span class="const token" data-verso-hover="132">Set.mem_setOf_eq</span>, <span class="const token" data-verso-hover="371">Set.mem_union</span>]</span>
+<span id="L266">      <span class="kw">constructor</span></span>
+<span id="L267">      · <span class="kw">rintro</span> ⟨h, hi, hv⟩</span>
+<span id="L268">        <span class="kw">rcases</span> <span class="const token" data-verso-hover="340">lt_max_iff</span>.<span class="const token" data-verso-hover="174">1</span> hi <span class="kw">with</span> hi | hi</span>
+<span id="L269">        · <span class="kw">exact</span> <span class="const token" data-verso-hover="135">Or.inr</span> ⟨i, <span class="kw">by</span> <span class="kw">omega</span>, <span class="kw">by</span> <span class="kw">rw</span> [hCget, hv]⟩</span>
+<span id="L270">        · <span class="kw">have</span> hi' : i &lt; (r.<span class="const token" data-verso-hover="42">log</span> a).<span class="const token" data-verso-hover="131">length</span> := <span class="const token" data-verso-hover="160">lt_of_lt_of_le</span> hi (I.<span class="const token" data-verso-hover="282">commit_le</span> a)</span>
+<span id="L271">          <span class="kw">refine</span> <span class="const token" data-verso-hover="159">Or.inl</span> ⟨hi', hi, ?_⟩</span>
+<span id="L272">          <span class="kw">obtain</span> ⟨b, hb, A, hA, hA'⟩ := I.<span class="const token" data-verso-hover="283">commit_ok</span> a i hi hi'</span>
+<span id="L273">          <span class="kw">rw</span> [← hv]</span>
+<span id="L274">          <span class="kw">exact</span> (hsafe i b t _ _ ⟨A, hA, hA'⟩ (hFp i h) (hb.<span class="const token" data-verso-hover="205">trans</span> ht)).<span class="const token" data-verso-hover="211">symm</span></span>
+<span id="L275">      · <span class="kw">rintro</span> (⟨h, hi, hv⟩ | ⟨j, hj, hjv⟩)</span>
+<span id="L276">        · <span class="kw">have</span> hi' : i &lt; F.<span class="const token" data-verso-hover="131">length</span> := <span class="kw">by</span> <span class="kw">omega</span></span>
+<span id="L277">          <span class="kw">refine</span> ⟨hi', <span class="const token" data-verso-hover="373">lt_max_of_lt_right</span> hi, ?_⟩</span>
+<span id="L278">          <span class="kw">obtain</span> ⟨b, hb, A, hA, hA'⟩ := I.<span class="const token" data-verso-hover="283">commit_ok</span> a i hi h</span>
+<span id="L279">          <span class="kw">rw</span> [← hv]</span>
+<span id="L280">          <span class="kw">exact</span> hsafe i b t _ _ ⟨A, hA, hA'⟩ (hFp i hi') (hb.<span class="const token" data-verso-hover="205">trans</span> ht)</span>
+<span id="L281">        · <span class="kw">simp</span> only [<span class="const token" data-verso-hover="143">Prod.mk.injEq</span>] <span class="kw">at</span> hjv</span>
+<span id="L282">          <span class="kw">obtain</span> ⟨<span class="kw">rfl</span>, <span class="kw">rfl</span>⟩ := hjv</span>
+<span id="L283">          <span class="kw">exact</span> ⟨<span class="kw">by</span> <span class="kw">omega</span>, <span class="const token" data-verso-hover="372">lt_max_of_lt_left</span> (<span class="kw">by</span> <span class="kw">omega</span>), (hCget _ hj).<span class="const token" data-verso-hover="211">symm</span>⟩</span>
+<span id="L284">    · <span class="kw">simp</span> [<span class="const token" data-verso-hover="358">abs</span>, hP₁, <span class="const token" data-verso-hover="147">Function.update_of_ne</span> ha]</span>
+<span id="L285">  · <span class="kw">simp</span> only [<span class="const token" data-verso-hover="358">abs</span>, hP₁]; <span class="kw">rw</span> [<span class="const token" data-verso-hover="363">acksOf_eq</span>]</span>
+<span id="L286"></span>
+<span id="L287"></span>
+<span id="L288"><span class="dc">/-- `BecomeLeader(s)` implies `Phase1Succeed(s)` (Appendix C, step 2.3), followed — when the new</span></span>
+<span id="L289"><span class="dc">leader adopts entries from the votes — by `Phase2a` and `Phase2b` for every entry. The heart of the</span></span>
+<span id="L290"><span class="dc">proof (step 4.2 of Appendix C): the candidate's own entries are safe entries of the votes, because</span></span>
+<span id="L291"><span class="dc">its own vote carries its current log and every voter's last term is at most the candidate's. -/</span></span>
+<span id="L292"><span class="kw">theorem</span> <span class="const token" data-verso-hover="17">sim_becomeLeader</span> {r : <span class="const token" data-verso-hover="36">Raft.State</span> N V} (I : <span class="const token" data-verso-hover="18">Inv</span> Q r) (s : N) (S : <span class="const token" data-verso-hover="83">Finset</span> (<span class="const token" data-verso-hover="252">RVOKMsg</span> N V))</span>
+<span id="L293">    (<span class="kw">ext</span> : <span class="const token" data-verso-hover="39">List</span> V) (hl : r.<span class="const token" data-verso-hover="41">leader</span> s = <span class="const token" data-verso-hover="57">false</span>)</span>
+<span id="L294">    (hS : ∀ m ∈ S, m ∈ r.<span class="const token" data-verso-hover="70">rvok</span> ∧ m.<span class="const token" data-verso-hover="253">dst</span> = s ∧ m.<span class="const token" data-verso-hover="254">term</span> = r.<span class="const token" data-verso-hover="40">term</span> s)</span>
+<span id="L295">    (hself : ∃ m ∈ S, m.<span class="const token" data-verso-hover="255">src</span> = s) (hQ : Q.<span class="const token" data-verso-hover="82">IsQuorum</span> (S.<span class="const token" data-verso-hover="123">image</span> <span class="const token" data-verso-hover="255">RVOKMsg.src</span>))</span>
+<span id="L296">    (hext : <span class="const token" data-verso-hover="354">ExtOK</span> S (r.<span class="const token" data-verso-hover="42">log</span> s).<span class="const token" data-verso-hover="131">length</span> <span class="kw">ext</span>) :</span>
+<span id="L297">    <span class="const token" data-verso-hover="128">Relation.ReflTransGen</span> (<span class="const token" data-verso-hover="117">Paxos.Step</span> Q) (<span class="const token" data-verso-hover="358">abs</span> r) (<span class="const token" data-verso-hover="358">abs</span> { r <span class="kw">with</span></span>
+<span id="L298">        <span class="const token" data-verso-hover="41">leader</span> := <span class="const token" data-verso-hover="119">Function.update</span> r.<span class="const token" data-verso-hover="41">leader</span> s <span class="const token" data-verso-hover="56">true</span></span>
+<span id="L299">        <span class="const token" data-verso-hover="42">log</span> := <span class="const token" data-verso-hover="119">Function.update</span> r.<span class="const token" data-verso-hover="42">log</span> s (r.<span class="const token" data-verso-hover="42">log</span> s ++ ext.<span class="const token" data-verso-hover="296">map</span> (<span class="kw">fun</span> v =&gt; (r.<span class="const token" data-verso-hover="40">term</span> s, v)))</span>
+<span id="L300">        <span class="const token" data-verso-hover="259">props</span> := <span class="kw">if</span> <span class="kw">ext</span> = [] <span class="kw">then</span> r.<span class="const token" data-verso-hover="259">props</span> <span class="kw">else</span></span>
+<span id="L301">          r.<span class="const token" data-verso-hover="259">props</span> ∪ <span class="const token" data-verso-hover="317">propsOf</span> (r.<span class="const token" data-verso-hover="42">log</span> s ++ ext.<span class="const token" data-verso-hover="296">map</span> (<span class="kw">fun</span> v =&gt; (r.<span class="const token" data-verso-hover="40">term</span> s, v))) (r.<span class="const token" data-verso-hover="40">term</span> s)</span>
+<span id="L302">        <span class="const token" data-verso-hover="257">acks</span> := <span class="kw">if</span> <span class="kw">ext</span> = [] <span class="kw">then</span> r.<span class="const token" data-verso-hover="257">acks</span> <span class="kw">else</span></span>
+<span id="L303">          r.<span class="const token" data-verso-hover="257">acks</span> ∪ <span class="const token" data-verso-hover="318">acksOf</span> s (r.<span class="const token" data-verso-hover="42">log</span> s ++ ext.<span class="const token" data-verso-hover="296">map</span> (<span class="kw">fun</span> v =&gt; (r.<span class="const token" data-verso-hover="40">term</span> s, v))) (r.<span class="const token" data-verso-hover="40">term</span> s) }) := <span class="kw">by</span></span>
+<span id="L304">  <span class="kw">classical</span></span>
+<span id="L305">  <span class="kw">set</span> t := r.<span class="const token" data-verso-hover="40">term</span> s <span class="kw">with</span> ht</span>
+<span id="L306">  <span class="kw">set</span> n := (r.<span class="const token" data-verso-hover="42">log</span> s).<span class="const token" data-verso-hover="131">length</span> <span class="kw">with</span> hn</span>
+<span id="L307">  <span class="kw">set</span> T := <span class="const token" data-verso-hover="73">lastTerm</span> (r.<span class="const token" data-verso-hover="42">log</span> s) <span class="kw">with</span> hT</span>
+<span id="L308">  <span class="kw">have</span> hc : <span class="const token" data-verso-hover="251">Cand</span> Q r s t := ⟨S, hS, hQ⟩</span>
+<span id="L309">  <span class="kw">obtain</span> ⟨m₀, hm₀S, hm₀src⟩ := hself</span>
+<span id="L310">  <span class="kw">have</span> hm₀ : m₀ = ⟨s, s, t, m₀.<span class="const token" data-verso-hover="248">log</span>⟩ := <span class="kw">by</span></span>
+<span id="L311">    <span class="kw">obtain</span> ⟨-, h2, h3⟩ := hS m₀ hm₀S</span>
+<span id="L312">    <span class="kw">ext</span> &lt;;&gt; <span class="kw">simp</span> [hm₀src, h2, h3]</span>
+<span id="L313">  <span class="kw">have</span> hm₀log : m₀.<span class="const token" data-verso-hover="248">log</span> = r.<span class="const token" data-verso-hover="42">log</span> s := <span class="kw">by</span></span>
+<span id="L314">    <span class="kw">by_contra</span> hne</span>
+<span id="L315">    <span class="kw">have</span> hmem := (hS m₀ hm₀S).<span class="const token" data-verso-hover="199">1</span></span>
+<span id="L316">    <span class="kw">rw</span> [hm₀] <span class="kw">at</span> hmem</span>
+<span id="L317">    <span class="kw">obtain</span> ⟨c', hc'ne, hc'⟩ := I.<span class="const token" data-verso-hover="276">cand_log</span> s m₀.<span class="const token" data-verso-hover="248">log</span> hmem hl (<span class="const token" data-verso-hover="377">Ne.symm</span> hne)</span>
+<span id="L318">    <span class="kw">exact</span> hc'ne (I.<span class="const token" data-verso-hover="304">cand_unique</span> hc hc').<span class="const token" data-verso-hover="211">symm</span></span>
+<span id="L319">  <span class="kw">have</span> hvote : ∀ m ∈ S, <span class="const token" data-verso-hover="73">lastTerm</span> m.<span class="const token" data-verso-hover="248">log</span> ≤ T := <span class="kw">by</span></span>
+<span id="L320">    <span class="kw">intro</span> m hm</span>
+<span id="L321">    <span class="kw">obtain</span> ⟨L, hL, hle⟩ := I.<span class="const token" data-verso-hover="268">rvok_vote</span> m (hS m hm).<span class="const token" data-verso-hover="199">1</span></span>
+<span id="L322">    <span class="kw">rw</span> [(hS m hm).<span class="const token" data-verso-hover="208">2</span><span class="nu">.</span><span class="const token" data-verso-hover="199">1</span>, (hS m hm).<span class="const token" data-verso-hover="208">2</span><span class="nu">.</span><span class="const token" data-verso-hover="208">2</span>] <span class="kw">at</span> hL</span>
+<span id="L323">    <span class="kw">have</span> := I.<span class="const token" data-verso-hover="266">rvok_unique</span> _ hL _ (hS m₀ hm₀S).<span class="const token" data-verso-hover="199">1</span> hm₀src.<span class="const token" data-verso-hover="211">symm</span> (hS m₀ hm₀S).<span class="const token" data-verso-hover="208">2</span><span class="nu">.</span><span class="const token" data-verso-hover="208">2</span>.<span class="const token" data-verso-hover="211">symm</span></span>
+<span id="L324">    <span class="kw">simp</span> only <span class="kw">at</span> this</span>
+<span id="L325">    <span class="kw">rw</span> [this.<span class="const token" data-verso-hover="208">2</span>, hm₀log] <span class="kw">at</span> hle</span>
+<span id="L326">    <span class="kw">exact</span> hle</span>
+<span id="L327">  <span class="kw">obtain</span> ⟨hextlen, hext2⟩ := hext</span>
+<span id="L328">  <span class="kw">choose</span> mf hmfS c hc' hmax <span class="kw">using</span> hext2</span>
+<span id="L329">  <span class="kw">let</span> newInst : <span class="const token" data-verso-hover="37">ℕ</span> → <span class="const token" data-verso-hover="102">Option</span> (<span class="const token" data-verso-hover="37">ℕ</span> × V) := <span class="kw">fun</span> i =&gt;</span>
+<span id="L330">    <span class="kw">if</span> i &lt; n <span class="kw">then</span> <span class="const token" data-verso-hover="355">absLog</span> (r.<span class="const token" data-verso-hover="42">log</span> s) i <span class="kw">else</span></span>
+<span id="L331">      <span class="kw">if</span> h : i - n &lt; ext.<span class="const token" data-verso-hover="131">length</span> <span class="kw">then</span> <span class="const token" data-verso-hover="116">some</span> (<span class="const token" data-verso-hover="73">lastTerm</span> (mf (i - n) h).<span class="const token" data-verso-hover="248">log</span>, <span class="kw">ext</span>[i - n]) <span class="kw">else</span> <span class="const token" data-verso-hover="114">none</span></span>
+<span id="L332">  <span class="kw">have</span> hsafe : ∀ i, <span class="const token" data-verso-hover="115">Paxos.IsSafeEntry</span> (S.<span class="const token" data-verso-hover="123">image</span> <span class="const token" data-verso-hover="357">absVote</span>) i (newInst i) := <span class="kw">by</span></span>
+<span id="L333">    <span class="kw">intro</span> i</span>
+<span id="L334">    <span class="kw">by_cases</span> hi : i &lt; n</span>
+<span id="L335">    · <span class="kw">simp</span> only [newInst, <span class="const token" data-verso-hover="378">if_pos</span> hi, <span class="const token" data-verso-hover="359">absLog_lt</span> hi]</span>
+<span id="L336">      <span class="kw">refine</span> ⟨⟨<span class="const token" data-verso-hover="357">absVote</span> m₀, <span class="const token" data-verso-hover="379">Finset.mem_image_of_mem</span> _ hm₀S, ?_⟩, ?_⟩</span>
+<span id="L337">      · <span class="kw">simp</span> only [<span class="const token" data-verso-hover="357">absVote</span>, hm₀log, <span class="const token" data-verso-hover="359">absLog_lt</span> hi]</span>
+<span id="L338">      · <span class="kw">intro</span> m' hm' c' v' hcv</span>
+<span id="L339">        <span class="kw">obtain</span> ⟨m, hm, <span class="kw">rfl</span>⟩ := <span class="const token" data-verso-hover="200">Finset.mem_image</span>.<span class="const token" data-verso-hover="174">1</span> hm'</span>
+<span id="L340">        <span class="kw">simp</span> only [<span class="const token" data-verso-hover="357">absVote</span>, <span class="const token" data-verso-hover="355">absLog</span>, <span class="const token" data-verso-hover="380">Option.map_eq_some_iff</span>] <span class="kw">at</span> hcv</span>
+<span id="L341">        <span class="kw">obtain</span> ⟨_, _, hcv⟩ := hcv</span>
+<span id="L342">        <span class="kw">simp</span> only [<span class="const token" data-verso-hover="143">Prod.mk.injEq</span>] <span class="kw">at</span> hcv</span>
+<span id="L343">        <span class="kw">rw</span> [← hcv.<span class="const token" data-verso-hover="199">1</span>]; <span class="kw">exact</span> hvote m hm</span>
+<span id="L344">    · <span class="kw">by_cases</span> hj : i - n &lt; ext.<span class="const token" data-verso-hover="131">length</span></span>
+<span id="L345">      · <span class="kw">simp</span> only [newInst, <span class="const token" data-verso-hover="337">if_neg</span> hi, <span class="const token" data-verso-hover="148">dif_pos</span> hj]</span>
+<span id="L346">        <span class="kw">have</span> hi' : i = n + (i - n) := <span class="kw">by</span> <span class="kw">omega</span></span>
+<span id="L347">        <span class="kw">refine</span> ⟨⟨<span class="const token" data-verso-hover="357">absVote</span> (mf _ hj), <span class="const token" data-verso-hover="379">Finset.mem_image_of_mem</span> _ (hmfS _ hj), ?_⟩, ?_⟩</span>
+<span id="L348">        · <span class="kw">have</span> := hc' _ hj</span>
+<span id="L349">          <span class="kw">rw</span> [<span class="kw">show</span> n + (i - n) = i <span class="kw">by</span> <span class="kw">omega</span>] <span class="kw">at</span> this</span>
+<span id="L350">          <span class="kw">simp</span> only [<span class="const token" data-verso-hover="357">absVote</span>, <span class="const token" data-verso-hover="355">absLog</span>, this]; <span class="kw">rfl</span></span>
+<span id="L351">        · <span class="kw">intro</span> m' hm' c'' v' hcv</span>
+<span id="L352">          <span class="kw">obtain</span> ⟨m, hm, <span class="kw">rfl</span>⟩ := <span class="const token" data-verso-hover="200">Finset.mem_image</span>.<span class="const token" data-verso-hover="174">1</span> hm'</span>
+<span id="L353">          <span class="kw">simp</span> only [<span class="const token" data-verso-hover="357">absVote</span>, <span class="const token" data-verso-hover="355">absLog</span>, <span class="const token" data-verso-hover="380">Option.map_eq_some_iff</span>] <span class="kw">at</span> hcv</span>
+<span id="L354">          <span class="kw">obtain</span> ⟨e, he, hcv⟩ := hcv</span>
+<span id="L355">          <span class="kw">simp</span> only [<span class="const token" data-verso-hover="143">Prod.mk.injEq</span>] <span class="kw">at</span> hcv</span>
+<span id="L356">          <span class="kw">rw</span> [← hcv.<span class="const token" data-verso-hover="199">1</span>]</span>
+<span id="L357">          <span class="kw">have</span> hlt : i &lt; m.<span class="const token" data-verso-hover="248">log</span>.<span class="const token" data-verso-hover="131">length</span> := (<span class="const token" data-verso-hover="381">List.getElem?_eq_some_iff</span>.<span class="const token" data-verso-hover="174">1</span> he).<span class="nu">1</span></span>
+<span id="L358">          <span class="kw">exact</span> hmax _ hj m hm (<span class="kw">by</span> <span class="kw">omega</span>)</span>
+<span id="L359">      · <span class="kw">simp</span> only [newInst, <span class="const token" data-verso-hover="337">if_neg</span> hi, <span class="const token" data-verso-hover="149">dif_neg</span> hj]</span>
+<span id="L360">        <span class="kw">intro</span> m' hm'</span>
+<span id="L361">        <span class="kw">obtain</span> ⟨m, hm, <span class="kw">rfl</span>⟩ := <span class="const token" data-verso-hover="200">Finset.mem_image</span>.<span class="const token" data-verso-hover="174">1</span> hm'</span>
+<span id="L362">        <span class="kw">simp</span> only [<span class="const token" data-verso-hover="357">absVote</span>]</span>
+<span id="L363">        <span class="kw">exact</span> <span class="const token" data-verso-hover="360">absLog_ge</span> (<span class="kw">by</span> <span class="kw">have</span> := hextlen m hm; <span class="kw">omega</span>)</span>
+<span id="L364">  <span class="kw">have</span> hstep := <span class="const token" data-verso-hover="122">Paxos.Step.phase1Succeed</span> (Q := Q) (<span class="const token" data-verso-hover="358">abs</span> r) s (S.<span class="const token" data-verso-hover="123">image</span> <span class="const token" data-verso-hover="357">absVote</span>) newInst hl</span>
+<span id="L365">    (<span class="kw">by</span></span>
+<span id="L366">      <span class="kw">intro</span> m' hm'</span>
+<span id="L367">      <span class="kw">obtain</span> ⟨m, hm, <span class="kw">rfl</span>⟩ := <span class="const token" data-verso-hover="200">Finset.mem_image</span>.<span class="const token" data-verso-hover="174">1</span> hm'</span>
+<span id="L368">      <span class="kw">exact</span> ⟨⟨m, (hS m hm).<span class="const token" data-verso-hover="199">1</span>, <span class="const token" data-verso-hover="146">rfl</span>⟩, (hS m hm).<span class="const token" data-verso-hover="208">2</span><span class="nu">.</span><span class="const token" data-verso-hover="199">1</span>, (hS m hm).<span class="const token" data-verso-hover="208">2</span><span class="nu">.</span><span class="const token" data-verso-hover="208">2</span>⟩)</span>
+<span id="L369">    (<span class="kw">by</span> <span class="kw">rw</span> [<span class="const token" data-verso-hover="382">Finset.image_image</span>]; <span class="kw">exact</span> hQ)</span>
+<span id="L370">    ⟨<span class="const token" data-verso-hover="357">absVote</span> m₀, <span class="const token" data-verso-hover="379">Finset.mem_image_of_mem</span> _ hm₀S, hm₀src⟩ hsafe</span>
+<span id="L371">  <span class="kw">refine</span> (<span class="const token" data-verso-hover="151">Relation.ReflTransGen.single</span> hstep).<span class="const token" data-verso-hover="376">trans</span> ?_</span>
+<span id="L372">  <span class="kw">rcases</span> <span class="const token" data-verso-hover="150">eq_or_ne</span> <span class="kw">ext</span> [] <span class="kw">with</span> <span class="kw">rfl</span> | he</span>
+<span id="L373">  · <span class="kw">have</span> : newInst = <span class="const token" data-verso-hover="355">absLog</span> (r.<span class="const token" data-verso-hover="42">log</span> s) := <span class="kw">by</span></span>
+<span id="L374">      <span class="kw">funext</span> i</span>
+<span id="L375">      <span class="kw">by_cases</span> hi : i &lt; n</span>
+<span id="L376">      · <span class="kw">simp</span> only [newInst, <span class="const token" data-verso-hover="378">if_pos</span> hi]</span>
+<span id="L377">      · <span class="kw">simp</span> only [newInst, <span class="const token" data-verso-hover="337">if_neg</span> hi, <span class="const token" data-verso-hover="383">List.length_nil</span>, <span class="const token" data-verso-hover="384">Nat.not_lt_zero</span>, <span class="const token" data-verso-hover="149">dif_neg</span>, <span class="const token" data-verso-hover="385">not_false_eq_true</span>]</span>
+<span id="L378">        <span class="kw">exact</span> (<span class="const token" data-verso-hover="360">absLog_ge</span> (<span class="kw">by</span> <span class="kw">omega</span>)).<span class="const token" data-verso-hover="211">symm</span></span>
+<span id="L379">    <span class="kw">convert</span> <span class="const token" data-verso-hover="59">Relation.ReflTransGen.refl</span> <span class="kw">using</span> <span class="nu">1</span></span>
+<span id="L380">    <span class="kw">apply</span> <span class="const token" data-verso-hover="366">Paxos.State.ext</span> &lt;;&gt; (<span class="kw">try</span> <span class="kw">rfl</span>)</span>
+<span id="L381">    · <span class="kw">funext</span> a</span>
+<span id="L382">      <span class="kw">by_cases</span> ha : a = s</span>
+<span id="L383">      · <span class="kw">subst</span> ha; <span class="kw">simp</span> [<span class="const token" data-verso-hover="358">abs</span>, this]</span>
+<span id="L384">      · <span class="kw">simp</span> [<span class="const token" data-verso-hover="358">abs</span>, <span class="const token" data-verso-hover="147">Function.update_of_ne</span> ha]</span>
+<span id="L385">    · <span class="kw">funext</span> a</span>
+<span id="L386">      <span class="kw">by_cases</span> ha : a = s</span>
+<span id="L387">      · <span class="kw">subst</span> ha; <span class="kw">simp</span> [<span class="const token" data-verso-hover="358">abs</span>]</span>
+<span id="L388">      · <span class="kw">simp</span> [<span class="const token" data-verso-hover="358">abs</span>, <span class="const token" data-verso-hover="147">Function.update_of_ne</span> ha]</span>
+<span id="L389">  · <span class="kw">set</span> L' := r.<span class="const token" data-verso-hover="42">log</span> s ++ ext.<span class="const token" data-verso-hover="296">map</span> (<span class="kw">fun</span> v =&gt; (t, v)) <span class="kw">with</span> hL'</span>
+<span id="L390">    <span class="kw">set</span> W := L'.<span class="const token" data-verso-hover="296">map</span> <span class="const token" data-verso-hover="75">Prod.snd</span> <span class="kw">with</span> hW</span>
+<span id="L391">    <span class="kw">have</span> hLt : <span class="const token" data-verso-hover="73">lastTerm</span> L' = t := <span class="const token" data-verso-hover="295">lastTerm_append_map</span> t he</span>
+<span id="L392">    <span class="kw">have</span> hlen : n ≤ L'.<span class="const token" data-verso-hover="131">length</span> := <span class="kw">by</span> <span class="kw">simp</span> [hL', hn]</span>
+<span id="L393">    <span class="kw">have</span> hWne : W ≠ [] := <span class="kw">by</span> <span class="kw">simp</span> [hW, hL', he]</span>
+<span id="L394">    <span class="kw">have</span> hWget : ∀ i (h : i &lt; W.<span class="const token" data-verso-hover="131">length</span>), W[i] = (L'[i]'(<span class="kw">by</span> <span class="kw">simpa</span> [hW] <span class="kw">using</span> h)).<span class="const token" data-verso-hover="75">2</span> := <span class="kw">by</span></span>
+<span id="L395">      <span class="kw">intro</span> i h; <span class="kw">simp</span> [hW]</span>
+<span id="L396">    <span class="kw">have</span> hL'l : L'.<span class="const token" data-verso-hover="131">length</span> = n + ext.<span class="const token" data-verso-hover="131">length</span> := <span class="kw">by</span> <span class="kw">simp</span> [hL', hn]</span>
+<span id="L397">    <span class="kw">have</span> hL'get : ∀ i (h : i &lt; L'.<span class="const token" data-verso-hover="131">length</span>) (hi : n ≤ i),</span>
+<span id="L398">        L'[i] = (t, <span class="kw">ext</span>[i - n]'(<span class="kw">by</span> <span class="kw">rw</span> [hL'l] <span class="kw">at</span> h; <span class="kw">omega</span>)) := <span class="kw">by</span></span>
+<span id="L399">      <span class="kw">intro</span> i h hi</span>
+<span id="L400">      <span class="kw">simp</span> only [hL', <span class="const token" data-verso-hover="319">List.getElem_append_right</span> (<span class="kw">show</span> (r.<span class="const token" data-verso-hover="42">log</span> s).<span class="const token" data-verso-hover="131">length</span> ≤ i <span class="kw">from</span> hi),</span>
+<span id="L401">        <span class="const token" data-verso-hover="320">List.getElem_map</span>]</span>
+<span id="L402">      <span class="kw">rfl</span></span>
+<span id="L403">    <span class="kw">have</span> hleft : ∀ i (h : i &lt; n), L'[i]'(<span class="const token" data-verso-hover="160">lt_of_lt_of_le</span> h hlen) = (r.<span class="const token" data-verso-hover="42">log</span> s)[i] := <span class="kw">by</span></span>
+<span id="L404">      <span class="kw">intro</span> i h; <span class="kw">simp</span> only [hL', <span class="const token" data-verso-hover="136">List.getElem_append_left</span> h]</span>
+<span id="L405">    <span class="kw">set</span> P₁ : <span class="const token" data-verso-hover="103">Paxos.State</span> N V := { <span class="const token" data-verso-hover="358">abs</span> r <span class="kw">with</span></span>
+<span id="L406">      <span class="const token" data-verso-hover="106">inst</span> := <span class="const token" data-verso-hover="119">Function.update</span> (<span class="const token" data-verso-hover="358">abs</span> r).<span class="const token" data-verso-hover="106">inst</span> s newInst</span>
+<span id="L407">      <span class="const token" data-verso-hover="105">leader</span> := <span class="const token" data-verso-hover="119">Function.update</span> (<span class="const token" data-verso-hover="358">abs</span> r).<span class="const token" data-verso-hover="105">leader</span> s <span class="const token" data-verso-hover="56">true</span> } <span class="kw">with</span> hP₁</span>
+<span id="L408">    <span class="kw">have</span> h1 := <span class="const token" data-verso-hover="138">Paxos.phase2a_batch</span> (Q := Q) P₁ s W (<span class="kw">by</span> <span class="kw">simp</span> [hP₁]) (<span class="kw">by</span></span>
+<span id="L409">        <span class="kw">intro</span> i h</span>
+<span id="L410">        <span class="kw">right</span></span>
+<span id="L411">        <span class="kw">simp</span> only [hP₁, <span class="const token" data-verso-hover="152">Function.update_self</span>, newInst]</span>
+<span id="L412">        <span class="kw">by_cases</span> hi : i &lt; n</span>
+<span id="L413">        · <span class="kw">refine</span> ⟨T, ?_⟩</span>
+<span id="L414">          <span class="kw">rw</span> [<span class="const token" data-verso-hover="378">if_pos</span> hi, <span class="const token" data-verso-hover="359">absLog_lt</span> hi, hWget, hleft i hi]</span>
+<span id="L415">        · <span class="kw">have</span> hj : i - n &lt; ext.<span class="const token" data-verso-hover="131">length</span> := <span class="kw">by</span> <span class="kw">simp</span> [hW] <span class="kw">at</span> h; <span class="kw">omega</span></span>
+<span id="L416">          <span class="kw">refine</span> ⟨<span class="const token" data-verso-hover="73">lastTerm</span> (mf (i - n) hj).<span class="const token" data-verso-hover="248">log</span>, ?_⟩</span>
+<span id="L417">          <span class="kw">rw</span> [<span class="const token" data-verso-hover="337">if_neg</span> hi, <span class="const token" data-verso-hover="148">dif_pos</span> hj, hWget, hL'get i _ (<span class="kw">by</span> <span class="kw">omega</span>)]) (<span class="kw">by</span></span>
+<span id="L418">        <span class="kw">intro</span> i h w hw</span>
+<span id="L419">        <span class="kw">exact</span> <span class="const token" data-verso-hover="145">absurd</span> hw (I.<span class="const token" data-verso-hover="306">no_props_of_cand</span> hc hl))</span>
+<span id="L420">    <span class="kw">have</span> h2 := <span class="const token" data-verso-hover="144">Paxos.phase2b_batch</span> (Q := Q)</span>
+<span id="L421">      { P₁ <span class="kw">with</span> <span class="const token" data-verso-hover="111">m2a</span> := P₁.<span class="const token" data-verso-hover="111">m2a</span> ∪ {x | ∃ i, ∃ h : i &lt; W.<span class="const token" data-verso-hover="131">length</span>, x = (i, P₁.<span class="const token" data-verso-hover="104">ballot</span> s, W[i])} }</span>
+<span id="L422">      s t W hWne <span class="const token" data-verso-hover="172">le_rfl</span> (<span class="kw">fun</span> i h =&gt; <span class="const token" data-verso-hover="135">Or.inr</span> ⟨i, h, <span class="const token" data-verso-hover="146">rfl</span>⟩)</span>
+<span id="L423">    <span class="kw">refine</span> h1.<span class="const token" data-verso-hover="376">trans</span> ?_</span>
+<span id="L424">    <span class="kw">convert</span> h2 <span class="kw">using</span> <span class="nu">1</span></span>
+<span id="L425">    <span class="kw">apply</span> <span class="const token" data-verso-hover="366">Paxos.State.ext</span> &lt;;&gt; (<span class="kw">try</span> <span class="kw">rfl</span>)</span>
+<span id="L426">    · <span class="kw">simp</span> [<span class="const token" data-verso-hover="358">abs</span>, hP₁, ht]</span>
+<span id="L427">    · <span class="kw">simp</span> [<span class="const token" data-verso-hover="358">abs</span>, hP₁, ht]</span>
+<span id="L428">    · <span class="kw">funext</span> a</span>
+<span id="L429">      <span class="kw">by_cases</span> ha : a = s</span>
+<span id="L430">      · <span class="kw">subst</span> ha</span>
+<span id="L431">        <span class="kw">simp</span> only [<span class="const token" data-verso-hover="358">abs</span>, hP₁, <span class="const token" data-verso-hover="152">Function.update_self</span>]</span>
+<span id="L432">        <span class="kw">funext</span> i</span>
+<span id="L433">        <span class="kw">by_cases</span> hi : i &lt; L'.<span class="const token" data-verso-hover="131">length</span></span>
+<span id="L434">        · <span class="kw">rw</span> [<span class="const token" data-verso-hover="359">absLog_lt</span> hi, <span class="const token" data-verso-hover="148">dif_pos</span> (<span class="kw">by</span> <span class="kw">simpa</span> [hW] <span class="kw">using</span> hi), hLt, hWget]</span>
+<span id="L435">        · <span class="kw">rw</span> [<span class="const token" data-verso-hover="360">absLog_ge</span> (<span class="kw">by</span> <span class="kw">omega</span>), <span class="const token" data-verso-hover="149">dif_neg</span> (<span class="kw">by</span> <span class="kw">simpa</span> [hW] <span class="kw">using</span> hi)]</span>
+<span id="L436">          <span class="kw">simp</span> only [newInst]</span>
+<span id="L437">          <span class="kw">rw</span> [<span class="const token" data-verso-hover="337">if_neg</span> (<span class="kw">by</span> <span class="kw">omega</span>), <span class="const token" data-verso-hover="149">dif_neg</span> (<span class="kw">by</span> <span class="kw">omega</span>)]</span>
+<span id="L438">      · <span class="kw">simp</span> [<span class="const token" data-verso-hover="358">abs</span>, hP₁, <span class="const token" data-verso-hover="147">Function.update_of_ne</span> ha]</span>
+<span id="L439">    · <span class="kw">funext</span> a</span>
+<span id="L440">      <span class="kw">by_cases</span> ha : a = s</span>
+<span id="L441">      · <span class="kw">subst</span> ha</span>
+<span id="L442">        <span class="kw">simp</span> only [<span class="const token" data-verso-hover="358">abs</span>, hP₁, <span class="const token" data-verso-hover="152">Function.update_self</span>]</span>
+<span id="L443">        <span class="kw">exact</span> <span class="const token" data-verso-hover="361">chosenOf_append</span> _ (I.<span class="const token" data-verso-hover="282">commit_le</span> a)</span>
+<span id="L444">      · <span class="kw">simp</span> [<span class="const token" data-verso-hover="358">abs</span>, hP₁, <span class="const token" data-verso-hover="147">Function.update_of_ne</span> ha]</span>
+<span id="L445">    · <span class="kw">simp</span> only [<span class="const token" data-verso-hover="358">abs</span>, hP₁, <span class="const token" data-verso-hover="337">if_neg</span> he]; <span class="kw">rw</span> [<span class="const token" data-verso-hover="362">propsOf_eq</span>]</span>
+<span id="L446">    · <span class="kw">simp</span> only [<span class="const token" data-verso-hover="358">abs</span>, hP₁, <span class="const token" data-verso-hover="337">if_neg</span> he]; <span class="kw">rw</span> [<span class="const token" data-verso-hover="363">acksOf_eq</span>]</span>
+<span id="L447"></span>
+<span id="L448"></span>
+<span id="L449"><span class="dc">/-! ### The refinement theorem -/</span></span>
+<span id="L450"></span>
+<span id="L451"><span class="dc">/-- MultiPaxos safety, read back on the ghost variables of Raft*. -/</span></span>
+<span id="L452"><span class="kw">theorem</span> <span class="const token" data-verso-hover="386">propSafe_of_reachable</span> {r : <span class="const token" data-verso-hover="36">Raft.State</span> N V} (hP : <span class="const token" data-verso-hover="127">Paxos.Reachable</span> Q (<span class="const token" data-verso-hover="358">abs</span> r)) :</span>
+<span id="L453">    <span class="const token" data-verso-hover="258">PropSafe</span> Q r :=</span>
+<span id="L454">  <span class="kw">fun</span> _ _ _ _ _ hc hw hbb =&gt; <span class="const token" data-verso-hover="23">Paxos.proposal_eq_of_chosenAt</span> hP hc hw hbb</span>
+<span id="L455"></span>
+<span id="L456"><span class="dc">/-- **Appendix C, step 2**: every step of Raft* implies a (possibly empty) sequence of MultiPaxos</span></span>
+<span id="L457"><span class="dc">steps under the refinement mapping `abs`, from any state satisfying the invariant. -/</span></span>
+<span id="L458"><span class="kw">theorem</span> <span class="const token" data-verso-hover="24">refinement_step</span> {R : <span class="const token" data-verso-hover="45">Rules</span> V} (hhb : ¬ R.<span class="const token" data-verso-hover="345">heartbeat</span>) {r r' : <span class="const token" data-verso-hover="36">Raft.State</span> N V}</span>
+<span id="L459">    (I : <span class="const token" data-verso-hover="18">Inv</span> Q r) (hsafe : <span class="const token" data-verso-hover="258">PropSafe</span> Q r) (h : <span class="const token" data-verso-hover="346">Raft.Step</span> Q R r r') :</span>
+<span id="L460">    <span class="const token" data-verso-hover="128">Relation.ReflTransGen</span> (<span class="const token" data-verso-hover="117">Paxos.Step</span> Q) (<span class="const token" data-verso-hover="358">abs</span> r) (<span class="const token" data-verso-hover="358">abs</span> r') := <span class="kw">by</span></span>
+<span id="L461">  <span class="kw">cases</span> h <span class="kw">with</span></span>
+<span id="L462">  | <span class="const token" data-verso-hover="61">requestVote</span> s =&gt; <span class="kw">exact</span> <span class="const token" data-verso-hover="365">sim_requestVote</span> r s</span>
+<span id="L463">  | <span class="const token" data-verso-hover="62">receiveVote</span> s m hm ht hv =&gt; <span class="kw">exact</span> <span class="const token" data-verso-hover="368">sim_receiveVote</span> r s m hm ht</span>
+<span id="L464">  | <span class="const token" data-verso-hover="63">becomeLeader</span> s S <span class="kw">ext</span> hl hS hself hQ hext =&gt; <span class="kw">exact</span> <span class="const token" data-verso-hover="17">sim_becomeLeader</span> I s S <span class="kw">ext</span> hl hS hself hQ hext</span>
+<span id="L465">  | <span class="const token" data-verso-hover="64">appendEntries</span> s vals prevLen hl hvals hprev =&gt;</span>
+<span id="L466">    <span class="kw">exact</span> <span class="const token" data-verso-hover="375">sim_appendEntries</span> I s vals prevLen hl (hvals.<span class="const token" data-verso-hover="347">resolve_right</span> hhb)</span>
+<span id="L467">  | <span class="const token" data-verso-hover="67">receiveAppend</span> s m hm ht hprev hmatch hlen =&gt;</span>
+<span id="L468">    <span class="kw">rw</span> [I.<span class="const token" data-verso-hover="325">receiveAppend_log</span> s m hm hprev hmatch]</span>
+<span id="L469">    <span class="kw">exact</span> <span class="const token" data-verso-hover="19">sim_receiveAppend</span> I hsafe s m hm ht hlen</span>
+<span id="L470">  | <span class="const token" data-verso-hover="68">leaderLearn</span> s S k hl hS hQ hk hkl =&gt; <span class="kw">exact</span> <span class="const token" data-verso-hover="369">sim_leaderLearn</span> I s S k hl hS hQ hk hkl</span>
+<span id="L471"></span>
+<span id="L472"><span class="dc">/-- The invariant holds and the image is a reachable MultiPaxos state, for every reachable state of</span></span>
+<span id="L473"><span class="dc">Raft* whose vote rule never favours a candidate with a smaller last term and that has no</span></span>
+<span id="L474"><span class="dc">heartbeats. -/</span></span>
+<span id="L475"><span class="kw">theorem</span> <span class="const token" data-verso-hover="20">inv_and_reachable</span> {R : <span class="const token" data-verso-hover="45">Rules</span> V} (hR : <span class="const token" data-verso-hover="260">VoteMono</span> R) (hhb : ¬ R.<span class="const token" data-verso-hover="345">heartbeat</span>)</span>
+<span id="L476">    {r : <span class="const token" data-verso-hover="36">Raft.State</span> N V} (hr : <span class="const token" data-verso-hover="54">Raft.Reachable</span> Q R r) :</span>
+<span id="L477">    <span class="const token" data-verso-hover="18">Inv</span> Q r ∧ <span class="const token" data-verso-hover="127">Paxos.Reachable</span> Q (<span class="const token" data-verso-hover="358">abs</span> r) := <span class="kw">by</span></span>
+<span id="L478">  <span class="kw">induction</span> hr <span class="kw">with</span></span>
+<span id="L479">  | <span class="const token" data-verso-hover="59">refl</span> =&gt; <span class="kw">exact</span> ⟨<span class="const token" data-verso-hover="308">inv_init</span>, <span class="kw">by</span> <span class="kw">rw</span> [<span class="const token" data-verso-hover="364">abs_init</span>]; <span class="kw">exact</span> <span class="const token" data-verso-hover="59">Relation.ReflTransGen.refl</span>⟩</span>
+<span id="L480">  | <span class="const token" data-verso-hover="60">tail</span> _ hstep ih =&gt;</span>
+<span id="L481">    <span class="kw">obtain</span> ⟨I, hP⟩ := ih</span>
+<span id="L482">    <span class="kw">have</span> hsafe := <span class="const token" data-verso-hover="386">propSafe_of_reachable</span> hP</span>
+<span id="L483">    <span class="kw">exact</span> ⟨I.<span class="const token" data-verso-hover="26">step</span> hR hhb hsafe hstep, hP.<span class="const token" data-verso-hover="376">trans</span> (<span class="const token" data-verso-hover="24">refinement_step</span> hhb I hsafe hstep)⟩</span>
+<span id="L484"></span>
+<span id="L485"><span class="dc">/-- **Appendix C ("Raft* is a refinement of Paxos")**: under the refinement mapping of Appendix C,</span></span>
+<span id="L486"><span class="dc">the image of every reachable state of (repaired) Raft* is a reachable state of MultiPaxos. -/</span></span>
+<span id="L487"><span class="kw">theorem</span> <span class="const token" data-verso-hover="16">refinement</span> {R : <span class="const token" data-verso-hover="45">Rules</span> V} (hR : <span class="const token" data-verso-hover="260">VoteMono</span> R) (hhb : ¬ R.<span class="const token" data-verso-hover="345">heartbeat</span>)</span>
+<span id="L488">    {r : <span class="const token" data-verso-hover="36">Raft.State</span> N V} (hr : <span class="const token" data-verso-hover="54">Raft.Reachable</span> Q R r) : <span class="const token" data-verso-hover="127">Paxos.Reachable</span> Q (<span class="const token" data-verso-hover="358">abs</span> r) :=</span>
+<span id="L489">  (<span class="const token" data-verso-hover="20">inv_and_reachable</span> hR hhb hr).<span class="const token" data-verso-hover="208">2</span></span>
+<span id="L490"></span>
+<span id="L491"><span class="dc">/-- **State machine safety of Raft*** (Section 3: Raft* is correct because it refines Paxos):</span></span>
+<span id="L492"><span class="dc">committed entries of any two servers agree. -/</span></span>
+<span id="L493"><span class="kw">theorem</span> <span class="const token" data-verso-hover="25">raftStar_commitSafe</span> {R : <span class="const token" data-verso-hover="45">Rules</span> V} (hR : <span class="const token" data-verso-hover="260">VoteMono</span> R) (hhb : ¬ R.<span class="const token" data-verso-hover="345">heartbeat</span>)</span>
+<span id="L494">    {r : <span class="const token" data-verso-hover="36">Raft.State</span> N V} (hr : <span class="const token" data-verso-hover="54">Raft.Reachable</span> Q R r) : <span class="const token" data-verso-hover="72">CommitSafe</span> r := <span class="kw">by</span></span>
+<span id="L495">  <span class="kw">intro</span> s s' i h h' hc hc'</span>
+<span id="L496">  <span class="kw">have</span> hP := <span class="const token" data-verso-hover="16">refinement</span> hR hhb hr</span>
+<span id="L497">  <span class="kw">exact</span> <span class="const token" data-verso-hover="4">Paxos.safety</span> hP (s := s) (s' := s') (i := i)</span>
+<span id="L498">    (<span class="kw">show</span> (i, (r.<span class="const token" data-verso-hover="42">log</span> s)[i].<span class="const token" data-verso-hover="75">2</span>) ∈ <span class="const token" data-verso-hover="356">chosenOf</span> (r.<span class="const token" data-verso-hover="42">log</span> s) (r.<span class="const token" data-verso-hover="43">commit</span> s) <span class="kw">from</span> ⟨h, hc, <span class="const token" data-verso-hover="146">rfl</span>⟩)</span>
+<span id="L499">    (<span class="kw">show</span> (i, (r.<span class="const token" data-verso-hover="42">log</span> s')[i].<span class="const token" data-verso-hover="75">2</span>) ∈ <span class="const token" data-verso-hover="356">chosenOf</span> (r.<span class="const token" data-verso-hover="42">log</span> s') (r.<span class="const token" data-verso-hover="43">commit</span> s') <span class="kw">from</span> ⟨h', hc', <span class="const token" data-verso-hover="146">rfl</span>⟩)</span>
+<span id="L500"></span>
+<span id="L501"><span class="kw">theorem</span> <span class="const token" data-verso-hover="387">voteMono_repaired</span> : <span class="const token" data-verso-hover="260">VoteMono</span> (<span class="const token" data-verso-hover="80">Rules.repaired</span> : <span class="const token" data-verso-hover="45">Rules</span> V) := <span class="kw">fun</span> _ _ _ h =&gt; h</span>
+<span id="L502"></span>
+<span id="L503"><span class="kw">theorem</span> <span class="const token" data-verso-hover="388">voteMono_raft</span> : <span class="const token" data-verso-hover="260">VoteMono</span> (⟨<span class="const token" data-verso-hover="46">raftVoteOK</span>, <span class="const token" data-verso-hover="353">False</span>⟩ : <span class="const token" data-verso-hover="45">Rules</span> V) := <span class="kw">by</span></span>
+<span id="L504">  <span class="kw">rintro</span> L n t (h | ⟨h, -⟩) &lt;;&gt; <span class="kw">omega</span></span>
+<span id="L505"></span>
+<span id="L506"><span class="kw">theorem</span> <span class="const token" data-verso-hover="389">voteMono_fig2Fixed</span> : <span class="const token" data-verso-hover="260">VoteMono</span> (⟨<span class="const token" data-verso-hover="352">fig2FixedVoteOK</span>, <span class="const token" data-verso-hover="353">False</span>⟩ : <span class="const token" data-verso-hover="45">Rules</span> V) := <span class="kw">by</span></span>
+<span id="L507">  <span class="kw">rintro</span> L n t (h | ⟨h, -⟩) &lt;;&gt; <span class="kw">omega</span></span>
+<span id="L508"></span>
+<span id="L509"><span class="dc">/-- Repaired Raft* (any log lengths in the vote, every append carries a new value) refines</span></span>
+<span id="L510"><span class="dc">MultiPaxos. -/</span></span>
+<span id="L511"><span class="kw">theorem</span> <span class="const token" data-verso-hover="15">refinement_repaired</span> {r : <span class="const token" data-verso-hover="36">Raft.State</span> N V} (hr : <span class="const token" data-verso-hover="54">Raft.Reachable</span> Q <span class="const token" data-verso-hover="80">Rules.repaired</span> r) :</span>
+<span id="L512">    <span class="const token" data-verso-hover="127">Paxos.Reachable</span> Q (<span class="const token" data-verso-hover="358">abs</span> r) :=</span>
+<span id="L513">  <span class="const token" data-verso-hover="16">refinement</span> <span class="const token" data-verso-hover="387">voteMono_repaired</span> (<span class="kw">fun</span> h =&gt; h) hr</span>
+<span id="L514"></span>
+<span id="L515"><span class="dc">/-- Raft* with Raft's own vote rule (TLA+ spec B.2) and no heartbeats is safe. -/</span></span>
+<span id="L516"><span class="kw">theorem</span> <span class="const token" data-verso-hover="10">raftStar_commitSafe_raftVote</span> {r : <span class="const token" data-verso-hover="36">Raft.State</span> N V}</span>
+<span id="L517">    (hr : <span class="const token" data-verso-hover="54">Raft.Reachable</span> Q ⟨<span class="const token" data-verso-hover="46">raftVoteOK</span>, <span class="const token" data-verso-hover="353">False</span>⟩ r) : <span class="const token" data-verso-hover="72">CommitSafe</span> r :=</span>
+<span id="L518">  <span class="const token" data-verso-hover="25">raftStar_commitSafe</span> <span class="const token" data-verso-hover="388">voteMono_raft</span> (<span class="kw">fun</span> h =&gt; h) hr</span>
+<span id="L519"></span>
+<span id="L520"><span class="dc">/-- Raft* with Figure 2's vote rule read at the voter's *last* index, and no heartbeats, is safe. -/</span></span>
+<span id="L521"><span class="kw">theorem</span> <span class="const token" data-verso-hover="13">raftStar_commitSafe_fig2Fixed</span> {r : <span class="const token" data-verso-hover="36">Raft.State</span> N V}</span>
+<span id="L522">    (hr : <span class="const token" data-verso-hover="54">Raft.Reachable</span> Q ⟨<span class="const token" data-verso-hover="352">fig2FixedVoteOK</span>, <span class="const token" data-verso-hover="353">False</span>⟩ r) : <span class="const token" data-verso-hover="72">CommitSafe</span> r :=</span>
+<span id="L523">  <span class="const token" data-verso-hover="25">raftStar_commitSafe</span> <span class="const token" data-verso-hover="389">voteMono_fig2Fixed</span> (<span class="kw">fun</span> h =&gt; h) hr</span>
+<span id="L524"></span>
+<span id="L525"><span class="kw">end</span> Podc.PaxosRaftRefinement</span>
+<span id="L526"></span>
+</code></div>
+        <script>
+          window.versoHoversUrl = "PODC2019/PaxosRaftRefinement/-hovers.json";</script>
+        <script src="static/lean/popper.js"></script>
+        <script src="static/lean/tippy.js"></script>
+        <script src="static/lean/marked.js"></script>
+        <script src="static/lean/highlighting.js"></script>
+        <script src="static/lean/lean.js"></script>
+        </article></main><footer class="site-footer"><div class="wrap">
+        Machine-checked formalizations of PODC papers in Lean 4. Generated with <a href="https://github.com/leanprover/verso">Verso</a> from the README files of <a href="https://github.com/vasnesterov/formal_podc">vasnesterov/formal_podc</a>.</div>
+      </footer></body>
+  </html>
+

@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="light dark">
+    <link rel="icon" href="data:,">
+    <title>RoundEfficientBA: Protocol.lean · Formal PODC</title><base href="../../../.././"><link rel="stylesheet" href="static/lean/verso-vars.css">
+    <link rel="stylesheet" href="static/lean/highlighting.css">
+    <link rel="stylesheet" href="static/lean/tippy-border.css">
+    <link rel="stylesheet" href="static/style.css">
+    <script defer="defer" src="static/site.js"></script>
+    </head>
+  <body>
+    <header class="site-header">
+      <div class="wrap">
+        <a class="brand" href=".">Formal PODC</a><nav class="top">
+          <a href=".">Search</a><a href="about/">About</a><a href="https://github.com/vasnesterov/formal_podc">GitHub</a></nav>
+        </div>
+      </header>
+    <main class="wrap"><article><nav class="breadcrumbs" aria-label="Breadcrumb">
+          <a href=".">Search</a><span class="sep">›</span><a href="PODC2021/">PODC 2021</a><span class="sep">›</span><a href="PODC2021/RoundEfficientBA/">RoundEfficientBA</a><span class="sep">›</span><a href="PODC2021/RoundEfficientBA/src/">Lean source</a><span class="sep">›</span><span aria-current="page">Protocol</span></nav>
+        <h1>
+          <code>Protocol.lean</code></h1>
+        <div class="paper-links">
+          <p>
+            Source of <a href="PODC2021/RoundEfficientBA/">Round-Efficient BA via Proxcensus — PODC 2021</a> · <a href="https://github.com/vasnesterov/formal_podc/blob/main/Papers/PODC2021/RoundEfficientBA/Protocol.lean">GitHub</a> · hover over a name for its type and documentation</p>
+          </div>
+        <div class="lean-code lean-src">
+          <code class="hl lean block" data-lean-context="Protocol"><span id="L1"><span class="kw">import</span> Papers.PODC2021.RoundEfficientBA.Expansion</span>
+<span id="L2"><span class="kw">import</span> Cslib.Computability.Distributed.Byzantine.LockStep.Agreement</span>
+<span id="L3"></span>
+<span id="L4"><span class="dc">/-!</span></span>
+<span id="L5"><span class="dc"># The `r`-round Proxcensus protocol for `t &lt; n/3` (Corollary 3.3) and fixed-round BA (Cor. 3.8)</span></span>
+<span id="L6"></span>
+<span id="L7"><span class="dc">The protocol `proxProtocol t θ r` runs in CSLib's synchronous lock-step model</span></span>
+<span id="L8"><span class="dc">(`Cslib.Byzantine.LockStep`) on the complete network: every party starts with the output `(x, 0)`</span></span>
+<span id="L9"><span class="dc">of the trivial `Prox_2` (its input with grade `0`), and in each of `r` rounds echoes its current</span></span>
+<span id="L10"><span class="dc">output to everybody and applies the expansion step (`expandOut`) to the echoes it received</span></span>
+<span id="L11"><span class="dc">(including its own), turning `Prox_{2^k+1}` into `Prox_{2^{k+1}+1}`. After `r` rounds it decides.</span></span>
+<span id="L12"></span>
+<span id="L13"><span class="dc">* `proxProtocol_spec` (**Corollary 3.3, corrected**): with threshold `θ = t + 1`, for every</span></span>
+<span id="L14"><span class="dc">  `n &gt; 3t` and every static Byzantine adversary corrupting at most `t` parties, the honest outputs</span></span>
+<span id="L15"><span class="dc">  form a `(2^r + 1)`-slot Proxcensus after `r` rounds (perfect security, deterministic).</span></span>
+<span id="L16"><span class="dc">* `proxProtocol_spec_paper`: the paper's protocol (threshold `n - 2t`) for `n = 3t + 1`.</span></span>
+<span id="L17"><span class="dc">* `ba_third` (**Corollary 3.8, `t &lt; n/3`, corrected**): `κ` rounds of the protocol followed by one</span></span>
+<span id="L18"><span class="dc">  ideal `2^κ`-valued coin and the extraction function: binary BA with validity for every coin and</span></span>
+<span id="L19"><span class="dc">  error probability at most `2^{-κ}`; `κ + 1` rounds.</span></span>
+<span id="L20"></span>
+<span id="L21"><span class="dc">The adversary is static and deterministic (an arbitrary function `adv` of round, sender and</span></span>
+<span id="L22"><span class="dc">receiver); for a deterministic protocol this covers rushing, and an adaptive adversary is</span></span>
+<span id="L23"><span class="dc">simulated by statically corrupting the parties it corrupts by the end of the execution. In the BA</span></span>
+<span id="L24"><span class="dc">theorem the coin is drawn after the `κ` rounds (it is unknown to the adversary before the coin</span></span>
+<span id="L25"><span class="dc">round, as for the paper's ideal coin), and the adversary may still corrupt further parties after</span></span>
+<span id="L26"><span class="dc">seeing it (`Hc`).</span></span>
+<span id="L27"><span class="dc">-/</span></span>
+<span id="L28"></span>
+<span id="L29"><span class="kw">namespace</span> RoundEfficientBA</span>
+<span id="L30"></span>
+<span id="L31"><span class="kw">open</span> Cslib.Byzantine.LockStep</span>
+<span id="L32"></span>
+<span id="L33"><span class="kw">variable</span> {P D : <span class="kw">Type</span>*} [<span class="const token" data-verso-hover="89">Fintype</span> P] [<span class="const token" data-verso-hover="79">DecidableEq</span> P] [<span class="const token" data-verso-hover="89">Fintype</span> D] [<span class="const token" data-verso-hover="93">LinearOrder</span> D]</span>
+<span id="L34"></span>
+<span id="L35"><span class="dc">/-! ### The protocol -/</span></span>
+<span id="L36"></span>
+<span id="L37"><span class="dc">/-- The inbox `ib` completed with the party's own echo `own`. -/</span></span>
+<span id="L38"><span class="kw">def</span> <span class="const token" data-verso-hover="263">ownView</span> (p : P) (own : D × <span class="const token" data-verso-hover="32">ℕ</span>) (ib : <span class="const token" data-verso-hover="264">Inbox</span> P (D × <span class="const token" data-verso-hover="32">ℕ</span>)) : P → <span class="const token" data-verso-hover="34">Option</span> (D × <span class="const token" data-verso-hover="32">ℕ</span>) :=</span>
+<span id="L39">  <span class="kw">fun</span> q =&gt; <span class="kw">if</span> q = p <span class="kw">then</span> <span class="const token" data-verso-hover="36">some</span> own <span class="kw">else</span> ib q</span>
+<span id="L40"></span>
+<span id="L41"><span class="dc">/-- Processing the inboxes of rounds `k, k+1, …` starting from the current output `cur` (an output</span></span>
+<span id="L42"><span class="dc">of `Prox_{2^k+1}`). -/</span></span>
+<span id="L43"><span class="kw">def</span> <span class="const token" data-verso-hover="265">stepState</span> (t θ : <span class="const token" data-verso-hover="32">ℕ</span>) (p : P) : <span class="const token" data-verso-hover="32">ℕ</span> → D × <span class="const token" data-verso-hover="32">ℕ</span> → <span class="const token" data-verso-hover="266">History</span> P (D × <span class="const token" data-verso-hover="32">ℕ</span>) → D × <span class="const token" data-verso-hover="32">ℕ</span></span>
+<span id="L44">  | _, cur, [] =&gt; cur</span>
+<span id="L45">  | k, cur, ib :: rest =&gt;</span>
+<span id="L46">    <span class="const token" data-verso-hover="265">stepState</span> t θ p (k + <span class="nu">1</span>)</span>
+<span id="L47">      (<span class="const token" data-verso-hover="47">expandOut</span> (<span class="nu">2</span> ^ k + <span class="nu">1</span>) (<span class="const token" data-verso-hover="61">Fintype.card</span> P) t θ cur (<span class="const token" data-verso-hover="30">viewCnt</span> (<span class="const token" data-verso-hover="263">ownView</span> p cur ib))) rest</span>
+<span id="L48"></span>
+<span id="L49"><span class="dc">/-- The current Proxcensus output of `p` with input `x` after history `h`. -/</span></span>
+<span id="L50"><span class="kw">def</span> <span class="const token" data-verso-hover="267">proxState</span> (t θ : <span class="const token" data-verso-hover="32">ℕ</span>) (p : P) (x : D) (h : <span class="const token" data-verso-hover="266">History</span> P (D × <span class="const token" data-verso-hover="32">ℕ</span>)) : D × <span class="const token" data-verso-hover="32">ℕ</span> :=</span>
+<span id="L51">  <span class="const token" data-verso-hover="265">stepState</span> t θ p <span class="nu">0</span> (x, <span class="nu">0</span>) h</span>
+<span id="L52"></span>
+<span id="L53"><span class="dc">/-- **Protocol `Prox_{2^r+1}`** for `t &lt; n/3` (Section 3.3.1, iterated `r` times from `Prox_2`):</span></span>
+<span id="L54"><span class="dc">echo the current output every round, decide after `r` rounds. -/</span></span>
+<span id="L55"><span class="kw">def</span> <span class="const token" data-verso-hover="64">proxProtocol</span> (t θ r : <span class="const token" data-verso-hover="32">ℕ</span>) : <span class="const token" data-verso-hover="268">Protocol</span> P D (D × <span class="const token" data-verso-hover="32">ℕ</span>) (D × <span class="const token" data-verso-hover="32">ℕ</span>) <span class="kw">where</span></span>
+<span id="L56">  <span class="const token" data-verso-hover="269">send</span> p x h _ := <span class="const token" data-verso-hover="36">some</span> (<span class="const token" data-verso-hover="267">proxState</span> t θ p x h)</span>
+<span id="L57">  <span class="const token" data-verso-hover="270">decide</span> p x h := <span class="kw">if</span> h.<span class="const token" data-verso-hover="271">length</span> = r <span class="kw">then</span> <span class="const token" data-verso-hover="36">some</span> (<span class="const token" data-verso-hover="267">proxState</span> t θ p x h) <span class="kw">else</span> <span class="const token" data-verso-hover="39">none</span></span>
+<span id="L58"></span>
+<span id="L59"><span class="dc">/-! ### Unfolding the rounds -/</span></span>
+<span id="L60"></span>
+<span id="L61"><span class="kw">lemma</span> <span class="const token" data-verso-hover="272">stepState_append</span> (t θ : <span class="const token" data-verso-hover="32">ℕ</span>) (p : P) (k : <span class="const token" data-verso-hover="32">ℕ</span>) (cur : D × <span class="const token" data-verso-hover="32">ℕ</span>) (l : <span class="const token" data-verso-hover="266">History</span> P (D × <span class="const token" data-verso-hover="32">ℕ</span>))</span>
+<span id="L62">    (ib : <span class="const token" data-verso-hover="264">Inbox</span> P (D × <span class="const token" data-verso-hover="32">ℕ</span>)) :</span>
+<span id="L63">    <span class="const token" data-verso-hover="265">stepState</span> t θ p k cur (l ++ [ib]) =</span>
+<span id="L64">      <span class="const token" data-verso-hover="47">expandOut</span> (<span class="nu">2</span> ^ (k + l.<span class="const token" data-verso-hover="271">length</span>) + <span class="nu">1</span>) (<span class="const token" data-verso-hover="61">Fintype.card</span> P) t θ (<span class="const token" data-verso-hover="265">stepState</span> t θ p k cur l)</span>
+<span id="L65">        (<span class="const token" data-verso-hover="30">viewCnt</span> (<span class="const token" data-verso-hover="263">ownView</span> p (<span class="const token" data-verso-hover="265">stepState</span> t θ p k cur l) ib)) := <span class="kw">by</span></span>
+<span id="L66">  <span class="kw">induction</span> l generalizing k cur <span class="kw">with</span></span>
+<span id="L67">  | <span class="const token" data-verso-hover="273">nil</span> =&gt; <span class="kw">simp</span> [<span class="const token" data-verso-hover="265">stepState</span>]</span>
+<span id="L68">  | <span class="const token" data-verso-hover="274">cons</span> ib' l ih =&gt;</span>
+<span id="L69">    <span class="kw">simp</span> only [<span class="const token" data-verso-hover="275">List.cons_append</span>, <span class="const token" data-verso-hover="265">stepState</span>, <span class="const token" data-verso-hover="276">List.length_cons</span>]</span>
+<span id="L70">    <span class="kw">rw</span> [ih]</span>
+<span id="L71">    <span class="kw">congr</span> <span class="nu">3</span></span>
+<span id="L72">    <span class="kw">omega</span></span>
+<span id="L73"></span>
+<span id="L74"><span class="kw">variable</span> (t θ r : <span class="const token" data-verso-hover="32">ℕ</span>) (sc : <span class="const token" data-verso-hover="42">Scenario</span> P D (D × <span class="const token" data-verso-hover="32">ℕ</span>))</span>
+<span id="L75"></span>
+<span id="L76"><span class="dc">/-- The output of `p` after `k` rounds of the run. -/</span></span>
+<span id="L77"><span class="kw">noncomputable</span> <span class="kw">def</span> <span class="const token" data-verso-hover="50">roundOut</span> (k : <span class="const token" data-verso-hover="32">ℕ</span>) (p : P) : D × <span class="const token" data-verso-hover="32">ℕ</span> :=</span>
+<span id="L78">  <span class="const token" data-verso-hover="267">proxState</span> t θ p (sc.<span class="const token" data-verso-hover="44">input</span> p) (<span class="const token" data-verso-hover="277">hist</span> ⊤ (<span class="const token" data-verso-hover="64">proxProtocol</span> t θ r) sc k p)</span>
+<span id="L79"></span>
+<span id="L80"><span class="kw">open</span> Classical <span class="kw">in</span></span>
+<span id="L81"><span class="dc">/-- What an honest party `p` "sees" in round `k`: honest parties' current outputs (its own</span></span>
+<span id="L82"><span class="dc">included) and the Byzantine messages. -/</span></span>
+<span id="L83"><span class="kw">lemma</span> <span class="const token" data-verso-hover="54">roundOut_succ</span> (hrel : sc.<span class="const token" data-verso-hover="60">Reliable</span>) (k : <span class="const token" data-verso-hover="32">ℕ</span>) (p : P) (hp : p ∉ sc.<span class="const token" data-verso-hover="43">byz</span>) :</span>
+<span id="L84">    <span class="const token" data-verso-hover="50">roundOut</span> t θ r sc (k + <span class="nu">1</span>) p =</span>
+<span id="L85">      <span class="const token" data-verso-hover="47">expandOut</span> (<span class="nu">2</span> ^ k + <span class="nu">1</span>) (<span class="const token" data-verso-hover="61">Fintype.card</span> P) t θ (<span class="const token" data-verso-hover="50">roundOut</span> t θ r sc k p)</span>
+<span id="L86">        (<span class="const token" data-verso-hover="30">viewCnt</span> <span class="kw">fun</span> q =&gt; <span class="kw">if</span> q ∈ sc.<span class="const token" data-verso-hover="43">byz</span> <span class="kw">then</span> sc.<span class="const token" data-verso-hover="45">adv</span> k q p <span class="kw">else</span> <span class="const token" data-verso-hover="36">some</span> (<span class="const token" data-verso-hover="50">roundOut</span> t θ r sc k q)) := <span class="kw">by</span></span>
+<span id="L87">  <span class="kw">classical</span></span>
+<span id="L88">  <span class="kw">unfold</span> <span class="const token" data-verso-hover="50">roundOut</span> <span class="const token" data-verso-hover="267">proxState</span></span>
+<span id="L89">  <span class="kw">rw</span> [<span class="const token" data-verso-hover="278">hist_succ</span>, <span class="const token" data-verso-hover="272">stepState_append</span>, <span class="const token" data-verso-hover="279">length_hist</span>, <span class="const token" data-verso-hover="280">Nat.zero_add</span>]</span>
+<span id="L90">  <span class="kw">congr</span> <span class="nu">2</span></span>
+<span id="L91">  <span class="kw">funext</span> q</span>
+<span id="L92">  <span class="kw">unfold</span> <span class="const token" data-verso-hover="263">ownView</span> <span class="const token" data-verso-hover="281">deliver</span></span>
+<span id="L93">  <span class="kw">by_cases</span> hqp : q = p</span>
+<span id="L94">  · <span class="kw">subst</span> hqp; <span class="kw">simp</span> [<span class="const token" data-verso-hover="64">proxProtocol</span>, <span class="const token" data-verso-hover="267">proxState</span>, hp]</span>
+<span id="L95">  · <span class="kw">have</span> hadj : (⊤ : <span class="const token" data-verso-hover="282">SimpleGraph</span> P).<span class="const token" data-verso-hover="283">Adj</span> q p := hqp</span>
+<span id="L96">    <span class="kw">simp</span> only [hqp, <span class="const token" data-verso-hover="256">if_false</span>, hadj, <span class="const token" data-verso-hover="284">if_true</span>]</span>
+<span id="L97">    <span class="kw">by_cases</span> hq : q ∈ sc.<span class="const token" data-verso-hover="43">byz</span></span>
+<span id="L98">    · <span class="kw">simp</span> [hq]</span>
+<span id="L99">    · <span class="kw">simp</span> [hq, hrel k q p, <span class="const token" data-verso-hover="64">proxProtocol</span>, <span class="const token" data-verso-hover="267">proxState</span>]</span>
+<span id="L100"></span>
+<span id="L101"><span class="kw">lemma</span> <span class="const token" data-verso-hover="52">roundOut_zero</span> (p : P) : <span class="const token" data-verso-hover="50">roundOut</span> t θ r sc <span class="nu">0</span> p = (sc.<span class="const token" data-verso-hover="44">input</span> p, <span class="nu">0</span>) := <span class="kw">by</span></span>
+<span id="L102">  <span class="kw">simp</span> [<span class="const token" data-verso-hover="50">roundOut</span>, <span class="const token" data-verso-hover="267">proxState</span>, <span class="const token" data-verso-hover="265">stepState</span>]</span>
+<span id="L103"></span>
+<span id="L104"><span class="dc">/-! ### Corollary 3.3 -/</span></span>
+<span id="L105"></span>
+<span id="L106"><span class="kw">lemma</span> <span class="const token" data-verso-hover="285">isProx_two</span> (x : P → D) (H : <span class="const token" data-verso-hover="151">Set</span> P) : <span class="const token" data-verso-hover="9">IsProx</span> <span class="nu">2</span> x H (<span class="kw">fun</span> p =&gt; (x p, <span class="nu">0</span>)) := <span class="kw">by</span></span>
+<span id="L107">  <span class="kw">refine</span> ⟨<span class="kw">fun</span> p _ =&gt; <span class="kw">by</span> <span class="kw">simp</span> [<span class="const token" data-verso-hover="24">maxGrade</span>], <span class="kw">fun</span> v hv p hp =&gt; ?_, <span class="kw">fun</span> p _ q _ =&gt; ?_⟩</span>
+<span id="L108">  · <span class="kw">simp</span> [hv p hp, <span class="const token" data-verso-hover="24">maxGrade</span>]</span>
+<span id="L109">  · <span class="kw">simp</span> [<span class="const token" data-verso-hover="23">ProxCons</span>, <span class="const token" data-verso-hover="26">Cslib.Byzantine.Problem.Proxcensus.Consistent</span>]</span>
+<span id="L110"></span>
+<span id="L111"><span class="kw">open</span> Classical <span class="kw">in</span></span>
+<span id="L112"><span class="dc">/-- Main induction: after `k` rounds the honest outputs form a `(2^k + 1)`-slot Proxcensus. -/</span></span>
+<span id="L113"><span class="kw">theorem</span> <span class="const token" data-verso-hover="286">roundOut_isProx</span> (ht : <span class="nu">3</span> * t &lt; <span class="const token" data-verso-hover="61">Fintype.card</span> P) (hB : sc.<span class="const token" data-verso-hover="43">byz</span>.<span class="const token" data-verso-hover="59">ncard</span> ≤ t)</span>
+<span id="L114">    (hrel : sc.<span class="const token" data-verso-hover="60">Reliable</span>) (k : <span class="const token" data-verso-hover="32">ℕ</span>) :</span>
+<span id="L115">    <span class="const token" data-verso-hover="9">IsProx</span> (<span class="nu">2</span> ^ k + <span class="nu">1</span>) sc.<span class="const token" data-verso-hover="44">input</span> sc.<span class="const token" data-verso-hover="62">honest</span> (<span class="const token" data-verso-hover="50">roundOut</span> t (t + <span class="nu">1</span>) r sc k) := <span class="kw">by</span></span>
+<span id="L116">  <span class="kw">induction</span> k <span class="kw">with</span></span>
+<span id="L117">  | <span class="const token" data-verso-hover="51">zero</span> =&gt;</span>
+<span id="L118">    <span class="kw">have</span> h0 : <span class="const token" data-verso-hover="50">roundOut</span> t (t + <span class="nu">1</span>) r sc <span class="nu">0</span> = <span class="kw">fun</span> p =&gt; (sc.<span class="const token" data-verso-hover="44">input</span> p, <span class="nu">0</span>) :=</span>
+<span id="L119">      <span class="const token" data-verso-hover="287">funext</span> (<span class="const token" data-verso-hover="52">roundOut_zero</span> t (t + <span class="nu">1</span>) r sc)</span>
+<span id="L120">    <span class="kw">rw</span> [h0]</span>
+<span id="L121">    <span class="kw">simpa</span> <span class="kw">using</span> <span class="const token" data-verso-hover="285">isProx_two</span> sc.<span class="const token" data-verso-hover="44">input</span> sc.<span class="const token" data-verso-hover="62">honest</span></span>
+<span id="L122">  | <span class="const token" data-verso-hover="53">succ</span> k ih =&gt;</span>
+<span id="L123">    <span class="kw">have</span> hcard : sc.<span class="const token" data-verso-hover="288">honestFinset</span>.<span class="const token" data-verso-hover="109">card</span> + (<span class="const token" data-verso-hover="94">Finset.univ</span> \ sc.<span class="const token" data-verso-hover="288">honestFinset</span>).<span class="const token" data-verso-hover="109">card</span> =</span>
+<span id="L124">        <span class="const token" data-verso-hover="61">Fintype.card</span> P := <span class="kw">by</span></span>
+<span id="L125">      <span class="kw">rw</span> [<span class="const token" data-verso-hover="289">add_comm</span>, <span class="const token" data-verso-hover="290">Finset.card_sdiff_add_card_eq_card</span> (<span class="const token" data-verso-hover="291">Finset.subset_univ</span> _), <span class="const token" data-verso-hover="230">Finset.card_univ</span>]</span>
+<span id="L126">    <span class="kw">have</span> hf : (<span class="const token" data-verso-hover="94">Finset.univ</span> \ sc.<span class="const token" data-verso-hover="288">honestFinset</span>).<span class="const token" data-verso-hover="109">card</span> ≤ t := <span class="kw">by</span></span>
+<span id="L127">      <span class="kw">have</span> := sc.<span class="const token" data-verso-hover="292">card_honestFinset</span></span>
+<span id="L128">      <span class="kw">have</span> := sc.<span class="const token" data-verso-hover="288">honestFinset</span>.<span class="const token" data-verso-hover="293">card_le_univ</span></span>
+<span id="L129">      <span class="kw">omega</span></span>
+<span id="L130">    <span class="kw">rw</span> [← sc.<span class="const token" data-verso-hover="294">coe_honestFinset</span>] <span class="kw">at</span> ih ⊢</span>
+<span id="L131">    <span class="kw">have</span> hstep := <span class="const token" data-verso-hover="5">expand_isProx</span> (s := <span class="nu">2</span> ^ k + <span class="nu">1</span>) (<span class="const token" data-verso-hover="295">Nat.le_add_left</span> <span class="nu">1</span> _) ht hf hcard ih</span>
+<span id="L132">      (<span class="kw">fun</span> p =&gt; <span class="const token" data-verso-hover="30">viewCnt</span> <span class="kw">fun</span> q =&gt; <span class="kw">if</span> q ∈ sc.<span class="const token" data-verso-hover="43">byz</span> <span class="kw">then</span> sc.<span class="const token" data-verso-hover="45">adv</span> k q p</span>
+<span id="L133">        <span class="kw">else</span> <span class="const token" data-verso-hover="36">some</span> (<span class="const token" data-verso-hover="50">roundOut</span> t (t + <span class="nu">1</span>) r sc k q))</span>
+<span id="L134">      (<span class="kw">fun</span> p _ A =&gt; (<span class="const token" data-verso-hover="157">viewCnt_bounds</span> (<span class="kw">fun</span> q hq =&gt; <span class="kw">by</span></span>
+<span id="L135">          <span class="kw">rw</span> [<span class="const token" data-verso-hover="296">Scenario.mem_honestFinset</span>] <span class="kw">at</span> hq; <span class="kw">simp</span> [hq]) A).<span class="const token" data-verso-hover="71">1</span>)</span>
+<span id="L136">      (<span class="kw">fun</span> p _ A =&gt; (<span class="const token" data-verso-hover="157">viewCnt_bounds</span> (<span class="kw">fun</span> q hq =&gt; <span class="kw">by</span></span>
+<span id="L137">          <span class="kw">rw</span> [<span class="const token" data-verso-hover="296">Scenario.mem_honestFinset</span>] <span class="kw">at</span> hq; <span class="kw">simp</span> [hq]) A).<span class="const token" data-verso-hover="65">2</span>)</span>
+<span id="L138">    <span class="kw">have</span> he : <span class="nu">2</span> * (<span class="nu">2</span> ^ k + <span class="nu">1</span>) - <span class="nu">1</span> = <span class="nu">2</span> ^ (k + <span class="nu">1</span>) + <span class="nu">1</span> := <span class="kw">by</span> <span class="kw">rw</span> [<span class="const token" data-verso-hover="297">pow_succ</span>]; <span class="kw">omega</span></span>
+<span id="L139">    <span class="kw">rw</span> [he] <span class="kw">at</span> hstep</span>
+<span id="L140">    <span class="kw">refine</span> ⟨<span class="kw">fun</span> p hp =&gt; ?_, <span class="kw">fun</span> v hv p hp =&gt; ?_, <span class="kw">fun</span> p hp q hq =&gt; ?_⟩</span>
+<span id="L141">    · <span class="kw">rw</span> [<span class="const token" data-verso-hover="54">roundOut_succ</span> t (t + <span class="nu">1</span>) r sc hrel k p ((sc.<span class="const token" data-verso-hover="296">mem_honestFinset</span>).<span class="const token" data-verso-hover="104">1</span> hp)]</span>
+<span id="L142">      <span class="kw">exact</span> hstep.<span class="const token" data-verso-hover="152">grade_le</span> p hp</span>
+<span id="L143">    · <span class="kw">rw</span> [<span class="const token" data-verso-hover="54">roundOut_succ</span> t (t + <span class="nu">1</span>) r sc hrel k p ((sc.<span class="const token" data-verso-hover="296">mem_honestFinset</span>).<span class="const token" data-verso-hover="104">1</span> hp)]</span>
+<span id="L144">      <span class="kw">exact</span> hstep.<span class="const token" data-verso-hover="153">validity</span> v hv p hp</span>
+<span id="L145">    · <span class="kw">rw</span> [<span class="const token" data-verso-hover="54">roundOut_succ</span> t (t + <span class="nu">1</span>) r sc hrel k p ((sc.<span class="const token" data-verso-hover="296">mem_honestFinset</span>).<span class="const token" data-verso-hover="104">1</span> hp),</span>
+<span id="L146">        <span class="const token" data-verso-hover="54">roundOut_succ</span> t (t + <span class="nu">1</span>) r sc hrel k q ((sc.<span class="const token" data-verso-hover="296">mem_honestFinset</span>).<span class="const token" data-verso-hover="104">1</span> hq)]</span>
+<span id="L147">      <span class="kw">exact</span> hstep.<span class="const token" data-verso-hover="69">consistency</span> p hp q hq</span>
+<span id="L148"></span>
+<span id="L149"><span class="dc">/-- The status of `p` after `k` rounds. -/</span></span>
+<span id="L150"><span class="kw">lemma</span> <span class="const token" data-verso-hover="298">status_proxProtocol</span> (k : <span class="const token" data-verso-hover="32">ℕ</span>) (p : P) :</span>
+<span id="L151">    <span class="const token" data-verso-hover="299">status</span> ⊤ (<span class="const token" data-verso-hover="64">proxProtocol</span> t θ r) sc k p =</span>
+<span id="L152">      <span class="kw">if</span> k = r <span class="kw">then</span> <span class="const token" data-verso-hover="36">some</span> (<span class="const token" data-verso-hover="50">roundOut</span> t θ r sc k p) <span class="kw">else</span> <span class="const token" data-verso-hover="39">none</span> := <span class="kw">by</span></span>
+<span id="L153">  <span class="kw">simp</span> [<span class="const token" data-verso-hover="299">status</span>, <span class="const token" data-verso-hover="64">proxProtocol</span>, <span class="const token" data-verso-hover="50">roundOut</span>]</span>
+<span id="L154"></span>
+<span id="L155"><span class="kw">lemma</span> <span class="const token" data-verso-hover="66">decides_proxProtocol_iff</span> (p : P) (o : D × <span class="const token" data-verso-hover="32">ℕ</span>) :</span>
+<span id="L156">    <span class="const token" data-verso-hover="63">Decides</span> ⊤ (<span class="const token" data-verso-hover="64">proxProtocol</span> t θ r) sc p o ↔ o = <span class="const token" data-verso-hover="50">roundOut</span> t θ r sc r p := <span class="kw">by</span></span>
+<span id="L157">  <span class="kw">constructor</span></span>
+<span id="L158">  · <span class="kw">rintro</span> ⟨k, hk, -⟩</span>
+<span id="L159">    <span class="kw">rw</span> [<span class="const token" data-verso-hover="298">status_proxProtocol</span>] <span class="kw">at</span> hk</span>
+<span id="L160">    <span class="kw">split_ifs</span> <span class="kw">at</span> hk <span class="kw">with</span> h</span>
+<span id="L161">    · <span class="kw">subst</span> h; <span class="kw">exact</span> (<span class="const token" data-verso-hover="300">Option.some_injective</span> _ hk).<span class="const token" data-verso-hover="131">symm</span></span>
+<span id="L162">  · <span class="kw">rintro</span> <span class="kw">rfl</span></span>
+<span id="L163">    <span class="kw">refine</span> ⟨r, <span class="kw">by</span> <span class="kw">rw</span> [<span class="const token" data-verso-hover="298">status_proxProtocol</span>, <span class="const token" data-verso-hover="144">if_pos</span> <span class="const token" data-verso-hover="68">rfl</span>], <span class="kw">fun</span> k hk =&gt; ?_⟩</span>
+<span id="L164">    <span class="kw">rw</span> [<span class="const token" data-verso-hover="298">status_proxProtocol</span>, <span class="const token" data-verso-hover="57">if_neg</span> (<span class="kw">by</span> <span class="kw">omega</span>)]</span>
+<span id="L165"></span>
+<span id="L166"><span class="dc">/-- The Proxcensus specification as a lock-step `Spec`: every honest party decides, and the</span></span>
+<span id="L167"><span class="dc">honest decisions satisfy `s`-slot Proxcensus. -/</span></span>
+<span id="L168"><span class="kw">def</span> <span class="const token" data-verso-hover="27">ProxSpec</span> (s : <span class="const token" data-verso-hover="32">ℕ</span>) : <span class="const token" data-verso-hover="301">Spec</span> P D (D × <span class="const token" data-verso-hover="32">ℕ</span>) := <span class="const token" data-verso-hover="28">Cslib.Byzantine.Problem.ofOut</span> (<span class="const token" data-verso-hover="9">IsProx</span> s)</span>
+<span id="L169"></span>
+<span id="L170"><span class="dc">/-- **Corollary 3.3 (corrected threshold).** Let `n &gt; 3t`. For every `r ≥ 0`, `proxProtocol t (t+1) r`</span></span>
+<span id="L171"><span class="dc">achieves `(2^r + 1)`-slot Proxcensus against any (static, deterministic) adversary corrupting at</span></span>
+<span id="L172"><span class="dc">most `t` parties, with perfect security, and all honest parties decide in round `r`. -/</span></span>
+<span id="L173"><span class="kw">theorem</span> <span class="const token" data-verso-hover="6">proxProtocol_spec</span> (ht : <span class="nu">3</span> * t &lt; <span class="const token" data-verso-hover="61">Fintype.card</span> P) (hB : sc.<span class="const token" data-verso-hover="43">byz</span>.<span class="const token" data-verso-hover="59">ncard</span> ≤ t)</span>
+<span id="L174">    (hrel : sc.<span class="const token" data-verso-hover="60">Reliable</span>) :</span>
+<span id="L175">    <span class="const token" data-verso-hover="27">ProxSpec</span> (<span class="nu">2</span> ^ r + <span class="nu">1</span>) sc.<span class="const token" data-verso-hover="44">input</span> sc.<span class="const token" data-verso-hover="62">honest</span> (<span class="const token" data-verso-hover="63">Decides</span> ⊤ (<span class="const token" data-verso-hover="64">proxProtocol</span> t (t + <span class="nu">1</span>) r) sc) ∧</span>
+<span id="L176">      <span class="const token" data-verso-hover="302">TerminatesBy</span> ⊤ (<span class="const token" data-verso-hover="64">proxProtocol</span> t (t + <span class="nu">1</span>) r) sc r := <span class="kw">by</span></span>
+<span id="L177">  <span class="kw">have</span> hP := <span class="const token" data-verso-hover="286">roundOut_isProx</span> t r sc ht hB hrel r</span>
+<span id="L178">  <span class="kw">refine</span> ⟨⟨<span class="kw">fun</span> p _ =&gt; ⟨_, (<span class="const token" data-verso-hover="66">decides_proxProtocol_iff</span> _ _ _ _ p _).<span class="const token" data-verso-hover="67">2</span> <span class="const token" data-verso-hover="68">rfl</span>⟩, <span class="kw">fun</span> out hout =&gt; ?_⟩,</span>
+<span id="L179">    <span class="kw">fun</span> p _ =&gt; ⟨r, <span class="const token" data-verso-hover="206">le_rfl</span>, _, <span class="kw">by</span> <span class="kw">rw</span> [<span class="const token" data-verso-hover="298">status_proxProtocol</span>, <span class="const token" data-verso-hover="144">if_pos</span> <span class="const token" data-verso-hover="68">rfl</span>]⟩⟩</span>
+<span id="L180">  <span class="kw">have</span> : ∀ p ∈ sc.<span class="const token" data-verso-hover="62">honest</span>, out p = <span class="const token" data-verso-hover="50">roundOut</span> t (t + <span class="nu">1</span>) r sc r p :=</span>
+<span id="L181">    <span class="kw">fun</span> p hp =&gt; (<span class="const token" data-verso-hover="66">decides_proxProtocol_iff</span> _ _ _ _ p _).<span class="const token" data-verso-hover="104">1</span> (hout p hp)</span>
+<span id="L182">  <span class="kw">refine</span> ⟨<span class="kw">fun</span> p hp =&gt; ?_, <span class="kw">fun</span> v hv p hp =&gt; ?_, <span class="kw">fun</span> p hp q hq =&gt; ?_⟩</span>
+<span id="L183">  · <span class="kw">rw</span> [this p hp]; <span class="kw">exact</span> hP.<span class="const token" data-verso-hover="152">grade_le</span> p hp</span>
+<span id="L184">  · <span class="kw">rw</span> [this p hp]; <span class="kw">exact</span> hP.<span class="const token" data-verso-hover="153">validity</span> v hv p hp</span>
+<span id="L185">  · <span class="kw">rw</span> [this p hp, this q hq]; <span class="kw">exact</span> hP.<span class="const token" data-verso-hover="69">consistency</span> p hp q hq</span>
+<span id="L186"></span>
+<span id="L187"><span class="dc">/-- **Corollary 3.3 as stated, for `n = 3t + 1`**: the paper's threshold `n - 2t` equals `t + 1`. -/</span></span>
+<span id="L188"><span class="kw">theorem</span> <span class="const token" data-verso-hover="15">proxProtocol_spec_paper</span> (hn : <span class="const token" data-verso-hover="61">Fintype.card</span> P = <span class="nu">3</span> * t + <span class="nu">1</span>) (hB : sc.<span class="const token" data-verso-hover="43">byz</span>.<span class="const token" data-verso-hover="59">ncard</span> ≤ t)</span>
+<span id="L189">    (hrel : sc.<span class="const token" data-verso-hover="60">Reliable</span>) :</span>
+<span id="L190">    <span class="const token" data-verso-hover="27">ProxSpec</span> (<span class="nu">2</span> ^ r + <span class="nu">1</span>) sc.<span class="const token" data-verso-hover="44">input</span> sc.<span class="const token" data-verso-hover="62">honest</span></span>
+<span id="L191">        (<span class="const token" data-verso-hover="63">Decides</span> ⊤ (<span class="const token" data-verso-hover="64">proxProtocol</span> t (<span class="const token" data-verso-hover="61">Fintype.card</span> P - <span class="nu">2</span> * t) r) sc) ∧</span>
+<span id="L192">      <span class="const token" data-verso-hover="302">TerminatesBy</span> ⊤ (<span class="const token" data-verso-hover="64">proxProtocol</span> t (<span class="const token" data-verso-hover="61">Fintype.card</span> P - <span class="nu">2</span> * t) r) sc r := <span class="kw">by</span></span>
+<span id="L193">  <span class="kw">have</span> : <span class="const token" data-verso-hover="61">Fintype.card</span> P - <span class="nu">2</span> * t = t + <span class="nu">1</span> := <span class="kw">by</span> <span class="kw">omega</span></span>
+<span id="L194">  <span class="kw">rw</span> [this]</span>
+<span id="L195">  <span class="kw">exact</span> <span class="const token" data-verso-hover="6">proxProtocol_spec</span> t r sc (<span class="kw">by</span> <span class="kw">omega</span>) hB hrel</span>
+<span id="L196"></span>
+<span id="L197"><span class="kw">end</span> RoundEfficientBA</span>
+<span id="L198"></span>
+<span id="L199"><span class="dc">/-! ### Corollary 3.8, `t &lt; n/3` -/</span></span>
+<span id="L200"></span>
+<span id="L201"><span class="kw">namespace</span> RoundEfficientBA</span>
+<span id="L202"></span>
+<span id="L203"><span class="kw">open</span> Cslib.Byzantine.LockStep</span>
+<span id="L204"></span>
+<span id="L205"><span class="kw">variable</span> {P : <span class="kw">Type</span>*} [<span class="const token" data-verso-hover="89">Fintype</span> P] [<span class="const token" data-verso-hover="79">DecidableEq</span> P]</span>
+<span id="L206"></span>
+<span id="L207"><span class="dc">/-- **Corollary 3.8 (`t &lt; n/3`), with the corrected threshold.** Binary BA from `κ` rounds of</span></span>
+<span id="L208"><span class="dc">`proxProtocol` (yielding `Prox_{2^κ+1}`) followed by one ideal coin uniform in `[1, 2^κ]` and the</span></span>
+<span id="L209"><span class="dc">extraction function, `κ + 1` rounds in total:</span></span>
+<span id="L210"><span class="dc">* validity: if all honest inputs are `b`, every honest party outputs `b` for every coin value;</span></span>
+<span id="L211"><span class="dc">* agreement except with probability `≤ 2^{-κ}` over the coin, even if the adversary corrupts</span></span>
+<span id="L212"><span class="dc">  further parties after seeing the coin (honest set `Hc i ⊆ honest` for coin `i + 1`). -/</span></span>
+<span id="L213"><span class="kw">theorem</span> <span class="const token" data-verso-hover="7">ba_third</span> (t κ : <span class="const token" data-verso-hover="32">ℕ</span>) (sc : <span class="const token" data-verso-hover="42">Scenario</span> P <span class="const token" data-verso-hover="35">Bool</span> (<span class="const token" data-verso-hover="35">Bool</span> × <span class="const token" data-verso-hover="32">ℕ</span>)) (ht : <span class="nu">3</span> * t &lt; <span class="const token" data-verso-hover="61">Fintype.card</span> P)</span>
+<span id="L214">    (hB : sc.<span class="const token" data-verso-hover="43">byz</span>.<span class="const token" data-verso-hover="59">ncard</span> ≤ t) (hrel : sc.<span class="const token" data-verso-hover="60">Reliable</span>) :</span>
+<span id="L215">    (∀ b, (∀ p ∈ sc.<span class="const token" data-verso-hover="62">honest</span>, sc.<span class="const token" data-verso-hover="44">input</span> p = b) → ∀ c, <span class="nu">1</span> ≤ c → c ≤ <span class="nu">2</span> ^ κ →</span>
+<span id="L216">        ∀ p ∈ sc.<span class="const token" data-verso-hover="62">honest</span>, <span class="const token" data-verso-hover="10">extract</span> (<span class="nu">2</span> ^ κ + <span class="nu">1</span>) (<span class="const token" data-verso-hover="50">roundOut</span> t (t + <span class="nu">1</span>) κ sc κ p) c = b) ∧</span>
+<span id="L217">      ∀ Hc : <span class="const token" data-verso-hover="33">Fin</span> (<span class="nu">2</span> ^ κ) → <span class="const token" data-verso-hover="151">Set</span> P, (∀ i, Hc i ⊆ sc.<span class="const token" data-verso-hover="62">honest</span>) →</span>
+<span id="L218">        (<span class="const token" data-verso-hover="8">PMF.uniformOfFintype</span> (<span class="const token" data-verso-hover="33">Fin</span> (<span class="nu">2</span> ^ κ))).<span class="const token" data-verso-hover="76">toOuterMeasure</span></span>
+<span id="L219">            {i | ∃ p ∈ Hc i, ∃ q ∈ Hc i,</span>
+<span id="L220">              <span class="const token" data-verso-hover="10">extract</span> (<span class="nu">2</span> ^ κ + <span class="nu">1</span>) (<span class="const token" data-verso-hover="50">roundOut</span> t (t + <span class="nu">1</span>) κ sc κ p) (i + <span class="nu">1</span>) ≠</span>
+<span id="L221">                <span class="const token" data-verso-hover="10">extract</span> (<span class="nu">2</span> ^ κ + <span class="nu">1</span>) (<span class="const token" data-verso-hover="50">roundOut</span> t (t + <span class="nu">1</span>) κ sc κ q) (i + <span class="nu">1</span>)}</span>
+<span id="L222">          ≤ <span class="nu">1</span> / (<span class="nu">2</span> ^ κ : <span class="const token" data-verso-hover="32">ℕ</span>) := <span class="kw">by</span></span>
+<span id="L223">  <span class="kw">have</span> hP := <span class="const token" data-verso-hover="286">roundOut_isProx</span> t κ sc ht hB hrel κ</span>
+<span id="L224">  <span class="kw">refine</span> ⟨<span class="kw">fun</span> b hb c hc1 hc2 =&gt; <span class="const token" data-verso-hover="12">iter_validity</span> hP b hb c hc1 (<span class="kw">by</span> <span class="kw">omega</span>), <span class="kw">fun</span> Hc hHc =&gt; ?_⟩</span>
+<span id="L225">  <span class="kw">have</span> : <span class="const token" data-verso-hover="249">NeZero</span> (<span class="nu">2</span> ^ κ) := ⟨<span class="kw">by</span> <span class="kw">positivity</span>⟩</span>
+<span id="L226">  <span class="kw">exact</span> <span class="const token" data-verso-hover="13">iter_error_le</span> (<span class="const token" data-verso-hover="303">Nat.add_sub_cancel</span> _ _).<span class="const token" data-verso-hover="131">symm</span> hP.<span class="const token" data-verso-hover="152">grade_le</span> hP.<span class="const token" data-verso-hover="69">consistency</span> Hc hHc</span>
+<span id="L227"></span>
+<span id="L228"><span class="kw">end</span> RoundEfficientBA</span>
+<span id="L229"></span>
+<span id="L230"><span class="kw">namespace</span> RoundEfficientBA</span>
+<span id="L231"></span>
+<span id="L232"><span class="kw">open</span> Cslib.Byzantine.LockStep</span>
+<span id="L233"></span>
+<span id="L234"><span class="kw">variable</span> {P : <span class="kw">Type</span>*} [<span class="const token" data-verso-hover="89">Fintype</span> P] [<span class="const token" data-verso-hover="79">DecidableEq</span> P]</span>
+<span id="L235"></span>
+<span id="L236"><span class="dc">/-- **Corollary 3.8 (`t &lt; n/3`) as stated, for `n = 3t + 1`** (paper's threshold `n - 2t`). -/</span></span>
+<span id="L237"><span class="kw">theorem</span> <span class="const token" data-verso-hover="16">ba_third_paper</span> (t κ : <span class="const token" data-verso-hover="32">ℕ</span>) (sc : <span class="const token" data-verso-hover="42">Scenario</span> P <span class="const token" data-verso-hover="35">Bool</span> (<span class="const token" data-verso-hover="35">Bool</span> × <span class="const token" data-verso-hover="32">ℕ</span>))</span>
+<span id="L238">    (hn : <span class="const token" data-verso-hover="61">Fintype.card</span> P = <span class="nu">3</span> * t + <span class="nu">1</span>) (hB : sc.<span class="const token" data-verso-hover="43">byz</span>.<span class="const token" data-verso-hover="59">ncard</span> ≤ t) (hrel : sc.<span class="const token" data-verso-hover="60">Reliable</span>) :</span>
+<span id="L239">    (∀ b, (∀ p ∈ sc.<span class="const token" data-verso-hover="62">honest</span>, sc.<span class="const token" data-verso-hover="44">input</span> p = b) → ∀ c, <span class="nu">1</span> ≤ c → c ≤ <span class="nu">2</span> ^ κ →</span>
+<span id="L240">        ∀ p ∈ sc.<span class="const token" data-verso-hover="62">honest</span>,</span>
+<span id="L241">          <span class="const token" data-verso-hover="10">extract</span> (<span class="nu">2</span> ^ κ + <span class="nu">1</span>) (<span class="const token" data-verso-hover="50">roundOut</span> t (<span class="const token" data-verso-hover="61">Fintype.card</span> P - <span class="nu">2</span> * t) κ sc κ p) c = b) ∧</span>
+<span id="L242">      ∀ Hc : <span class="const token" data-verso-hover="33">Fin</span> (<span class="nu">2</span> ^ κ) → <span class="const token" data-verso-hover="151">Set</span> P, (∀ i, Hc i ⊆ sc.<span class="const token" data-verso-hover="62">honest</span>) →</span>
+<span id="L243">        (<span class="const token" data-verso-hover="8">PMF.uniformOfFintype</span> (<span class="const token" data-verso-hover="33">Fin</span> (<span class="nu">2</span> ^ κ))).<span class="const token" data-verso-hover="76">toOuterMeasure</span></span>
+<span id="L244">            {i | ∃ p ∈ Hc i, ∃ q ∈ Hc i,</span>
+<span id="L245">              <span class="const token" data-verso-hover="10">extract</span> (<span class="nu">2</span> ^ κ + <span class="nu">1</span>) (<span class="const token" data-verso-hover="50">roundOut</span> t (<span class="const token" data-verso-hover="61">Fintype.card</span> P - <span class="nu">2</span> * t) κ sc κ p) (i + <span class="nu">1</span>) ≠</span>
+<span id="L246">                <span class="const token" data-verso-hover="10">extract</span> (<span class="nu">2</span> ^ κ + <span class="nu">1</span>) (<span class="const token" data-verso-hover="50">roundOut</span> t (<span class="const token" data-verso-hover="61">Fintype.card</span> P - <span class="nu">2</span> * t) κ sc κ q) (i + <span class="nu">1</span>)}</span>
+<span id="L247">          ≤ <span class="nu">1</span> / (<span class="nu">2</span> ^ κ : <span class="const token" data-verso-hover="32">ℕ</span>) := <span class="kw">by</span></span>
+<span id="L248">  <span class="kw">rw</span> [<span class="kw">show</span> <span class="const token" data-verso-hover="61">Fintype.card</span> P - <span class="nu">2</span> * t = t + <span class="nu">1</span> <span class="kw">by</span> <span class="kw">omega</span>]</span>
+<span id="L249">  <span class="kw">exact</span> <span class="const token" data-verso-hover="7">ba_third</span> t κ sc (<span class="kw">by</span> <span class="kw">omega</span>) hB hrel</span>
+<span id="L250"></span>
+<span id="L251"><span class="kw">end</span> RoundEfficientBA</span>
+<span id="L252"></span>
+</code></div>
+        <script>
+          window.versoHoversUrl = "PODC2021/RoundEfficientBA/-hovers.json";</script>
+        <script src="static/lean/popper.js"></script>
+        <script src="static/lean/tippy.js"></script>
+        <script src="static/lean/marked.js"></script>
+        <script src="static/lean/highlighting.js"></script>
+        <script src="static/lean/lean.js"></script>
+        </article></main><footer class="site-footer"><div class="wrap">
+        Machine-checked formalizations of PODC papers in Lean 4. Generated with <a href="https://github.com/leanprover/verso">Verso</a> from the README files of <a href="https://github.com/vasnesterov/formal_podc">vasnesterov/formal_podc</a>.</div>
+      </footer></body>
+  </html>
+

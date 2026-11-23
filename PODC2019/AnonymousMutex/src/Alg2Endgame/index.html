@@ -1,0 +1,795 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="light dark">
+    <link rel="icon" href="data:,">
+    <title>AnonymousMutex: Alg2Endgame.lean · Formal PODC</title><base href="../../../.././"><link rel="stylesheet" href="static/lean/verso-vars.css">
+    <link rel="stylesheet" href="static/lean/highlighting.css">
+    <link rel="stylesheet" href="static/lean/tippy-border.css">
+    <link rel="stylesheet" href="static/style.css">
+    <script defer="defer" src="static/site.js"></script>
+    </head>
+  <body>
+    <header class="site-header">
+      <div class="wrap">
+        <a class="brand" href=".">Formal PODC</a><nav class="top">
+          <a href=".">Search</a><a href="about/">About</a><a href="https://github.com/vasnesterov/formal_podc">GitHub</a></nav>
+        </div>
+      </header>
+    <main class="wrap"><article><nav class="breadcrumbs" aria-label="Breadcrumb">
+          <a href=".">Search</a><span class="sep">›</span><a href="PODC2019/">PODC 2019</a><span class="sep">›</span><a href="PODC2019/AnonymousMutex/">AnonymousMutex</a><span class="sep">›</span><a href="PODC2019/AnonymousMutex/src/">Lean source</a><span class="sep">›</span><span aria-current="page">Alg2Endgame</span></nav>
+        <h1>
+          <code>Alg2Endgame.lean</code></h1>
+        <div class="paper-links">
+          <p>
+            Source of <a href="PODC2019/AnonymousMutex/">Memory-Anonymous Symmetric Mutual Exclusion — PODC 2019</a> · <a href="https://github.com/vasnesterov/formal_podc/blob/main/Papers/PODC2019/AnonymousMutex/Alg2Endgame.lean">GitHub</a> · hover over a name for its type and documentation</p>
+          </div>
+        <div class="lean-code lean-src">
+          <code class="hl lean block" data-lean-context="Alg2Endgame"><span id="L1"><span class="kw">import</span> Papers.PODC2019.AnonymousMutex.Alg2Resign</span>
+<span id="L2"><span class="kw">import</span> Cslib.Foundations.Data.Nat.Descent</span>
+<span id="L3"></span>
+<span id="L4"><span class="dc">/-!</span></span>
+<span id="L5"><span class="dc"># Algorithm 2: the endgame of the deadlock-freedom proof</span></span>
+<span id="L6"></span>
+<span id="L7"><span class="dc">Two final steps of the proof of Theorem 4 (deadlock-freedom).</span></span>
+<span id="L8"></span>
+<span id="L9"><span class="dc">* `endgame`: if some process `q` stays forever in the first two loops of `lock()` (lines 2–3)</span></span>
+<span id="L10"><span class="dc">  and keeps a register `y₀`, then the execution cannot continue without a completion. Indeed,</span></span>
+<span id="L11"><span class="dc">  every scan of lines 8–10 started later reads `y₀ ≠ ⊥` and fails, so every process eventually</span></span>
+<span id="L12"><span class="dc">  either owns nothing forever or stays in the first two loops forever; the memory then</span></span>
+<span id="L13"><span class="dc">  stabilizes, is full (otherwise `q` would fill a `⊥` register), and every owner decides</span></span>
+<span id="L14"><span class="dc">  (line 6) on the same full view. Since nobody withdraws nor enters, all owners own the same</span></span>
+<span id="L15"><span class="dc">  number `c ≤ m/2` of registers, so the number `k ≥ 2` of owners divides `m`, contradicting</span></span>
+<span id="L16"><span class="dc">  `m ∈ M(n)`.</span></span>
+<span id="L17"><span class="dc">* `zero_case`: if after some time nobody owns any register, the memory is all `⊥` and a pending</span></span>
+<span id="L18"><span class="dc">  process eventually performs a successful `compare&amp;swap`, a contradiction.</span></span>
+<span id="L19"><span class="dc">-/</span></span>
+<span id="L20"></span>
+<span id="L21"><span class="kw">set_option</span> <span class="const token" data-verso-hover="13">linter.unusedSectionVars</span> false</span>
+<span id="L22"></span>
+<span id="L23"><span class="kw">open</span> Cslib.SharedMemory</span>
+<span id="L24"></span>
+<span id="L25"><span class="kw">namespace</span> AnonymousMutex.Alg2</span>
+<span id="L26"></span>
+<span id="L27"><span class="kw">variable</span> {Id : <span class="kw">Type</span>} [<span class="const token" data-verso-hover="26">DecidableEq</span> Id] {m : <span class="const token" data-verso-hover="15">ℕ</span>} {P : <span class="kw">Type</span>} [<span class="const token" data-verso-hover="26">DecidableEq</span> P]</span>
+<span id="L28">  {ids : P → Id} {π : P → <span class="const token" data-verso-hover="66">Equiv.Perm</span> (<span class="const token" data-verso-hover="19">Fin</span> m)}</span>
+<span id="L29"></span>
+<span id="L30"><span class="kw">namespace</span> Endgame</span>
+<span id="L31"></span>
+<span id="L32"><span class="dc">/-- Program counters of the first two loops of `lock()` (lines 2–3). -/</span></span>
+<span id="L33"><span class="kw">def</span> <span class="const token" data-verso-hover="347">CasRead</span> (c : <span class="const token" data-verso-hover="319">PC</span>) : <span class="kw">Prop</span> := (∃ i, c = <span class="const token" data-verso-hover="321">.</span>cas i) ∨ (∃ i, c = <span class="const token" data-verso-hover="322">.</span>read i)</span>
+<span id="L34"></span>
+<span id="L35"><span class="kw">lemma</span> <span class="const token" data-verso-hover="348">busy_of_casRead</span> {c : <span class="const token" data-verso-hover="319">PC</span>} (h : <span class="const token" data-verso-hover="347">CasRead</span> c) : <span class="const token" data-verso-hover="349">Busy</span> c := <span class="kw">by</span></span>
+<span id="L36">  <span class="kw">rcases</span> h <span class="kw">with</span> ⟨i, <span class="kw">rfl</span>⟩ | ⟨i, <span class="kw">rfl</span>⟩ &lt;;&gt; <span class="kw">trivial</span></span>
+<span id="L37"></span>
+<span id="L38"><span class="kw">lemma</span> <span class="const token" data-verso-hover="350">cas0_of_afterRead</span> {s : <span class="const token" data-verso-hover="329">St</span> Id m} {w : <span class="const token" data-verso-hover="19">Fin</span> m → <span class="const token" data-verso-hover="31">Option</span> Id} (h : <span class="const token" data-verso-hover="347">CasRead</span> (<span class="const token" data-verso-hover="338">afterRead</span> s w).<span class="const token" data-verso-hover="331">pc</span>) :</span>
+<span id="L39">    (<span class="const token" data-verso-hover="338">afterRead</span> s w).<span class="const token" data-verso-hover="331">pc</span> = <span class="const token" data-verso-hover="321">.</span>cas <span class="nu">0</span> := <span class="kw">by</span></span>
+<span id="L40">  <span class="kw">rcases</span> <span class="const token" data-verso-hover="351">afterRead_pc</span> s w <span class="kw">with</span> ⟨j, h'⟩ | h' | h' | h'</span>
+<span id="L41">  · <span class="kw">rw</span> [h'] <span class="kw">at</span> h; <span class="kw">simp</span> [<span class="const token" data-verso-hover="347">CasRead</span>] <span class="kw">at</span> h</span>
+<span id="L42">  · <span class="kw">rw</span> [h'] <span class="kw">at</span> h; <span class="kw">simp</span> [<span class="const token" data-verso-hover="347">CasRead</span>] <span class="kw">at</span> h</span>
+<span id="L43">  · <span class="kw">rw</span> [h'] <span class="kw">at</span> h; <span class="kw">simp</span> [<span class="const token" data-verso-hover="347">CasRead</span>] <span class="kw">at</span> h</span>
+<span id="L44">  · <span class="kw">exact</span> h'</span>
+<span id="L45"></span>
+<span id="L46"><span class="kw">lemma</span> <span class="const token" data-verso-hover="352">afterRead_casRead</span> {s : <span class="const token" data-verso-hover="329">St</span> Id m} {w : <span class="const token" data-verso-hover="19">Fin</span> m → <span class="const token" data-verso-hover="31">Option</span> Id} (h : <span class="const token" data-verso-hover="347">CasRead</span> (<span class="const token" data-verso-hover="338">afterRead</span> s w).<span class="const token" data-verso-hover="331">pc</span>) :</span>
+<span id="L47">    ¬ <span class="const token" data-verso-hover="334">owned</span> w s.<span class="const token" data-verso-hover="330">me</span> &lt; <span class="const token" data-verso-hover="335">mostPresent</span> w ∧ ¬ m &lt; <span class="nu">2</span> * <span class="const token" data-verso-hover="334">owned</span> w s.<span class="const token" data-verso-hover="330">me</span> := <span class="kw">by</span></span>
+<span id="L48">  <span class="kw">unfold</span> <span class="const token" data-verso-hover="338">afterRead</span> <span class="kw">at</span> h</span>
+<span id="L49">  <span class="kw">split_ifs</span> <span class="kw">at</span> h <span class="kw">with</span> h1 h2</span>
+<span id="L50">  · <span class="kw">unfold</span> <span class="const token" data-verso-hover="337">wrFrom</span> <span class="kw">at</span> h; <span class="kw">split_ifs</span> <span class="kw">at</span> h &lt;;&gt; <span class="kw">simp</span> [<span class="const token" data-verso-hover="347">CasRead</span>] <span class="kw">at</span> h</span>
+<span id="L51">  · <span class="kw">simp</span> [<span class="const token" data-verso-hover="347">CasRead</span>] <span class="kw">at</span> h</span>
+<span id="L52">  · <span class="kw">exact</span> ⟨h1, h2⟩</span>
+<span id="L53"></span>
+<span id="L54"><span class="dc">/-- Distance measures used with `Hyp.eventually_loc`. -/</span></span>
+<span id="L55"><span class="kw">def</span> <span class="const token" data-verso-hover="353">wrDist</span> (m : <span class="const token" data-verso-hover="15">ℕ</span>) : <span class="const token" data-verso-hover="319">PC</span> → <span class="const token" data-verso-hover="15">ℕ</span></span>
+<span id="L56">  | <span class="const token" data-verso-hover="323">.</span>wr j =&gt; m - j</span>
+<span id="L57">  | _ =&gt; <span class="nu">0</span></span>
+<span id="L58"></span>
+<span id="L59"><span class="kw">def</span> <span class="const token" data-verso-hover="354">waitDist</span> (m : <span class="const token" data-verso-hover="15">ℕ</span>) : <span class="const token" data-verso-hover="319">PC</span> → <span class="const token" data-verso-hover="15">ℕ</span></span>
+<span id="L60">  | <span class="const token" data-verso-hover="324">.</span>wait j _ =&gt; m - j</span>
+<span id="L61">  | _ =&gt; <span class="nu">0</span></span>
+<span id="L62"></span>
+<span id="L63"><span class="kw">def</span> <span class="const token" data-verso-hover="355">readDist</span> (m : <span class="const token" data-verso-hover="15">ℕ</span>) : <span class="const token" data-verso-hover="319">PC</span> → <span class="const token" data-verso-hover="15">ℕ</span></span>
+<span id="L64">  | <span class="const token" data-verso-hover="322">.</span>read j =&gt; m - j</span>
+<span id="L65">  | _ =&gt; <span class="nu">0</span></span>
+<span id="L66"></span>
+<span id="L67"><span class="kw">def</span> <span class="const token" data-verso-hover="356">scanDist</span> (m : <span class="const token" data-verso-hover="15">ℕ</span>) : <span class="const token" data-verso-hover="319">PC</span> → <span class="const token" data-verso-hover="15">ℕ</span></span>
+<span id="L68">  | <span class="const token" data-verso-hover="321">.</span>cas i =&gt; <span class="nu">2</span> * m - i</span>
+<span id="L69">  | <span class="const token" data-verso-hover="322">.</span>read i =&gt; m - i</span>
+<span id="L70">  | _ =&gt; <span class="nu">0</span></span>
+<span id="L71"></span>
+<span id="L72"><span class="kw">def</span> <span class="const token" data-verso-hover="357">casDist</span> (m k : <span class="const token" data-verso-hover="15">ℕ</span>) : <span class="const token" data-verso-hover="319">PC</span> → <span class="const token" data-verso-hover="15">ℕ</span></span>
+<span id="L73">  | <span class="const token" data-verso-hover="321">.</span>cas i =&gt; <span class="kw">if</span> i ≤ k <span class="kw">then</span> k - i <span class="kw">else</span> (m - i) + m + k + <span class="nu">1</span></span>
+<span id="L74">  | <span class="const token" data-verso-hover="322">.</span>read i =&gt; (m - i) + k + <span class="nu">1</span></span>
+<span id="L75">  | _ =&gt; <span class="nu">0</span></span>
+<span id="L76"></span>
+<span id="L77"><span class="kw">def</span> <span class="const token" data-verso-hover="358">zDist</span> (m : <span class="const token" data-verso-hover="15">ℕ</span>) : <span class="const token" data-verso-hover="319">PC</span> → <span class="const token" data-verso-hover="15">ℕ</span></span>
+<span id="L78">  | <span class="const token" data-verso-hover="322">.</span>read i =&gt; <span class="nu">3</span> * m - i</span>
+<span id="L79">  | <span class="const token" data-verso-hover="324">.</span>wait i ab =&gt; <span class="kw">if</span> ab <span class="kw">then</span> m - i <span class="kw">else</span> <span class="nu">2</span> * m - i</span>
+<span id="L80">  | _ =&gt; <span class="nu">0</span></span>
+<span id="L81"></span>
+<span id="L82"><span class="dc">/-! ### Finite combinatorics -/</span></span>
+<span id="L83"></span>
+<span id="L84"><span class="kw">lemma</span> <span class="const token" data-verso-hover="359">card_comp_perm</span> (σ : <span class="const token" data-verso-hover="66">Equiv.Perm</span> (<span class="const token" data-verso-hover="19">Fin</span> m)) (g : <span class="const token" data-verso-hover="19">Fin</span> m → <span class="const token" data-verso-hover="31">Option</span> Id) (a : <span class="const token" data-verso-hover="31">Option</span> Id) :</span>
+<span id="L85">    (<span class="const token" data-verso-hover="42">Finset.univ</span>.<span class="const token" data-verso-hover="43">filter</span> (<span class="kw">fun</span> x =&gt; g (σ x) = a)).<span class="const token" data-verso-hover="44">card</span> =</span>
+<span id="L86">      (<span class="const token" data-verso-hover="42">Finset.univ</span>.<span class="const token" data-verso-hover="43">filter</span> (<span class="kw">fun</span> y =&gt; g y = a)).<span class="const token" data-verso-hover="44">card</span> := <span class="kw">by</span></span>
+<span id="L87">  <span class="kw">refine</span> <span class="const token" data-verso-hover="360">Finset.card_bij</span> (<span class="kw">fun</span> x _ =&gt; σ x) ?_ ?_ ?_</span>
+<span id="L88">  · <span class="kw">intro</span> x hx; <span class="kw">simpa</span> <span class="kw">using</span> hx</span>
+<span id="L89">  · <span class="kw">intro</span> x _ y _ h; <span class="kw">exact</span> σ.<span class="const token" data-verso-hover="301">injective</span> h</span>
+<span id="L90">  · <span class="kw">intro</span> y hy</span>
+<span id="L91">    <span class="kw">refine</span> ⟨σ.<span class="const token" data-verso-hover="256">symm</span> y, ?_, <span class="kw">by</span> <span class="kw">simp</span>⟩</span>
+<span id="L92">    <span class="kw">simpa</span> <span class="kw">using</span> hy</span>
+<span id="L93"></span>
+<span id="L94"><span class="dc">/-- The counting argument: a full memory in which every owner sees (through its permutation)</span></span>
+<span id="L95"><span class="dc">`owned ≥ most_present` and `owned ≤ m/2` contradicts `m ∈ M(n)`. -/</span></span>
+<span id="L96"><span class="kw">lemma</span> <span class="const token" data-verso-hover="361">final_contra</span> [<span class="const token" data-verso-hover="228">Fintype</span> P] (hid : <span class="const token" data-verso-hover="86">Function.Injective</span> ids) (hm : <span class="nu">0</span> &lt; m)</span>
+<span id="L97">    (hM : m ∈ <span class="const token" data-verso-hover="160">M</span> (<span class="const token" data-verso-hover="161">Fintype.card</span> P)) (M₀ : <span class="const token" data-verso-hover="19">Fin</span> m → <span class="const token" data-verso-hover="31">Option</span> Id) (hval : ∀ y, ∃ r, M₀ y = <span class="const token" data-verso-hover="37">some</span> (ids r))</span>
+<span id="L98">    (hdec : ∀ r, (∃ y, M₀ y = <span class="const token" data-verso-hover="37">some</span> (ids r)) →</span>
+<span id="L99">      ¬ <span class="const token" data-verso-hover="334">owned</span> (<span class="kw">fun</span> x =&gt; M₀ (π r x)) (ids r) &lt; <span class="const token" data-verso-hover="335">mostPresent</span> (<span class="kw">fun</span> x =&gt; M₀ (π r x)) ∧</span>
+<span id="L100">      ¬ m &lt; <span class="nu">2</span> * <span class="const token" data-verso-hover="334">owned</span> (<span class="kw">fun</span> x =&gt; M₀ (π r x)) (ids r)) : <span class="const token" data-verso-hover="187">False</span> := <span class="kw">by</span></span>
+<span id="L101">  <span class="kw">set</span> cnt : P → <span class="const token" data-verso-hover="15">ℕ</span> := <span class="kw">fun</span> r =&gt; (<span class="const token" data-verso-hover="42">Finset.univ</span>.<span class="const token" data-verso-hover="43">filter</span> (<span class="kw">fun</span> y =&gt; M₀ y = <span class="const token" data-verso-hover="37">some</span> (ids r))).<span class="const token" data-verso-hover="44">card</span> <span class="kw">with</span> hcnt</span>
+<span id="L102">  <span class="kw">have</span> howned : ∀ r a, <span class="const token" data-verso-hover="334">owned</span> (<span class="kw">fun</span> x =&gt; M₀ (π r x)) a =</span>
+<span id="L103">      (<span class="const token" data-verso-hover="42">Finset.univ</span>.<span class="const token" data-verso-hover="43">filter</span> (<span class="kw">fun</span> y =&gt; M₀ y = <span class="const token" data-verso-hover="37">some</span> a)).<span class="const token" data-verso-hover="44">card</span> :=</span>
+<span id="L104">    <span class="kw">fun</span> r a =&gt; <span class="const token" data-verso-hover="359">card_comp_perm</span> (π r) M₀ (<span class="const token" data-verso-hover="37">some</span> a)</span>
+<span id="L105">  <span class="kw">have</span> hmp : ∀ r r', (∃ y, M₀ y = <span class="const token" data-verso-hover="37">some</span> (ids r')) → cnt r' ≤ <span class="const token" data-verso-hover="335">mostPresent</span> (<span class="kw">fun</span> x =&gt; M₀ (π r x)) := <span class="kw">by</span></span>
+<span id="L106">    <span class="kw">rintro</span> r r' ⟨y, hy⟩</span>
+<span id="L107">    <span class="kw">unfold</span> <span class="const token" data-verso-hover="335">mostPresent</span></span>
+<span id="L108">    <span class="kw">have</span> := <span class="const token" data-verso-hover="362">Finset.le_sup</span> (f := <span class="kw">fun</span> x =&gt; <span class="kw">if</span> M₀ (π r x) = <span class="const token" data-verso-hover="48">none</span> <span class="kw">then</span> <span class="nu">0</span> <span class="kw">else</span></span>
+<span id="L109">      (<span class="const token" data-verso-hover="42">Finset.univ</span>.<span class="const token" data-verso-hover="43">filter</span> (<span class="kw">fun</span> y' =&gt; M₀ (π r y') = M₀ (π r x))).<span class="const token" data-verso-hover="44">card</span>)</span>
+<span id="L110">      (<span class="const token" data-verso-hover="180">Finset.mem_univ</span> ((π r).<span class="const token" data-verso-hover="256">symm</span> y))</span>
+<span id="L111">    <span class="kw">simp</span> only [<span class="const token" data-verso-hover="257">Equiv.apply_symm_apply</span>, hy, <span class="const token" data-verso-hover="272">reduceCtorEq</span>, <span class="const token" data-verso-hover="363">ite_false</span>] <span class="kw">at</span> this</span>
+<span id="L112">    <span class="kw">refine</span> <span class="const token" data-verso-hover="261">le_trans</span> ?_ this</span>
+<span id="L113">    <span class="kw">exact</span> (<span class="const token" data-verso-hover="359">card_comp_perm</span> (π r) M₀ (<span class="const token" data-verso-hover="37">some</span> (ids r'))).<span class="const token" data-verso-hover="364">ge</span></span>
+<span id="L114">  <span class="kw">have</span> hle : ∀ r r', (∃ y, M₀ y = <span class="const token" data-verso-hover="37">some</span> (ids r)) → (∃ y, M₀ y = <span class="const token" data-verso-hover="37">some</span> (ids r')) →</span>
+<span id="L115">      cnt r' ≤ cnt r := <span class="kw">by</span></span>
+<span id="L116">    <span class="kw">intro</span> r r' hr hr'</span>
+<span id="L117">    <span class="kw">have</span> h1 := (hdec r hr).<span class="const token" data-verso-hover="152">1</span></span>
+<span id="L118">    <span class="kw">rw</span> [<span class="const token" data-verso-hover="365">not_lt</span>, howned] <span class="kw">at</span> h1</span>
+<span id="L119">    <span class="kw">exact</span> (hmp r r' hr').<span class="const token" data-verso-hover="366">trans</span> h1</span>
+<span id="L120">  <span class="kw">set</span> A := <span class="const token" data-verso-hover="42">Finset.univ</span>.<span class="const token" data-verso-hover="43">filter</span> (<span class="kw">fun</span> r : P =&gt; ∃ y, M₀ y = <span class="const token" data-verso-hover="37">some</span> (ids r)) <span class="kw">with</span> hA</span>
+<span id="L121">  <span class="kw">obtain</span> ⟨r₀, hr₀⟩ := hval ⟨<span class="nu">0</span>, hm⟩</span>
+<span id="L122">  <span class="kw">have</span> hconst : ∀ r ∈ A, cnt r = cnt r₀ := <span class="kw">by</span></span>
+<span id="L123">    <span class="kw">intro</span> r hr</span>
+<span id="L124">    <span class="kw">simp</span> only [hA, <span class="const token" data-verso-hover="367">Finset.mem_filter</span>, <span class="const token" data-verso-hover="180">Finset.mem_univ</span>, <span class="const token" data-verso-hover="315">true_and</span>] <span class="kw">at</span> hr</span>
+<span id="L125">    <span class="kw">exact</span> <span class="const token" data-verso-hover="368">le_antisymm</span> (hle r₀ r ⟨_, hr₀⟩ hr) (hle r r₀ hr ⟨_, hr₀⟩)</span>
+<span id="L126">  <span class="kw">have</span> hcover : (<span class="const token" data-verso-hover="42">Finset.univ</span> : <span class="const token" data-verso-hover="176">Finset</span> (<span class="const token" data-verso-hover="19">Fin</span> m)) =</span>
+<span id="L127">      A.<span class="const token" data-verso-hover="369">biUnion</span> (<span class="kw">fun</span> r =&gt; <span class="const token" data-verso-hover="42">Finset.univ</span>.<span class="const token" data-verso-hover="43">filter</span> (<span class="kw">fun</span> y =&gt; M₀ y = <span class="const token" data-verso-hover="37">some</span> (ids r))) := <span class="kw">by</span></span>
+<span id="L128">    <span class="kw">ext</span> y</span>
+<span id="L129">    <span class="kw">simp</span> only [<span class="const token" data-verso-hover="180">Finset.mem_univ</span>, <span class="const token" data-verso-hover="370">Finset.mem_biUnion</span>, <span class="const token" data-verso-hover="367">Finset.mem_filter</span>, <span class="const token" data-verso-hover="315">true_and</span>, <span class="const token" data-verso-hover="371">true_iff</span>, hA]</span>
+<span id="L130">    <span class="kw">obtain</span> ⟨r, hr⟩ := hval y</span>
+<span id="L131">    <span class="kw">exact</span> ⟨r, ⟨y, hr⟩, hr⟩</span>
+<span id="L132">  <span class="kw">have</span> hdisj : (A : <span class="const token" data-verso-hover="372">Set</span> P).<span class="const token" data-verso-hover="373">PairwiseDisjoint</span></span>
+<span id="L133">      (<span class="kw">fun</span> r =&gt; <span class="const token" data-verso-hover="42">Finset.univ</span>.<span class="const token" data-verso-hover="43">filter</span> (<span class="kw">fun</span> y =&gt; M₀ y = <span class="const token" data-verso-hover="37">some</span> (ids r))) := <span class="kw">by</span></span>
+<span id="L134">    <span class="kw">intro</span> r _ r' _ hne</span>
+<span id="L135">    <span class="kw">simp</span> only [<span class="const token" data-verso-hover="374">Function.onFun</span>]</span>
+<span id="L136">    <span class="kw">rw</span> [<span class="const token" data-verso-hover="375">Finset.disjoint_left</span>]</span>
+<span id="L137">    <span class="kw">intro</span> y h1 h2</span>
+<span id="L138">    <span class="kw">simp</span> only [<span class="const token" data-verso-hover="367">Finset.mem_filter</span>, <span class="const token" data-verso-hover="180">Finset.mem_univ</span>, <span class="const token" data-verso-hover="315">true_and</span>] <span class="kw">at</span> h1 h2</span>
+<span id="L139">    <span class="kw">rw</span> [h1] <span class="kw">at</span> h2</span>
+<span id="L140">    <span class="kw">exact</span> hne (hid (<span class="const token" data-verso-hover="157">Option.some.inj</span> h2))</span>
+<span id="L141">  <span class="kw">have</span> hsum : m = A.<span class="const token" data-verso-hover="44">card</span> * cnt r₀ := <span class="kw">by</span></span>
+<span id="L142">    <span class="kw">have</span> := <span class="const token" data-verso-hover="376">Finset.card_biUnion</span> hdisj</span>
+<span id="L143">    <span class="kw">rw</span> [← hcover, <span class="const token" data-verso-hover="177">Finset.card_univ</span>, <span class="const token" data-verso-hover="178">Fintype.card_fin</span>] <span class="kw">at</span> this</span>
+<span id="L144">    <span class="kw">rw</span> [this, <span class="const token" data-verso-hover="377">Finset.sum_const_nat</span> hconst]</span>
+<span id="L145">  <span class="kw">have</span> hpos : <span class="nu">1</span> ≤ cnt r₀ := <span class="const token" data-verso-hover="248">Finset.card_pos</span>.<span class="const token" data-verso-hover="249">2</span> ⟨⟨<span class="nu">0</span>, hm⟩, <span class="kw">by</span> <span class="kw">simp</span> [hr₀]⟩</span>
+<span id="L146">  <span class="kw">have</span> h2 := (hdec r₀ ⟨_, hr₀⟩).<span class="const token" data-verso-hover="199">2</span></span>
+<span id="L147">  <span class="kw">rw</span> [<span class="const token" data-verso-hover="365">not_lt</span>, howned] <span class="kw">at</span> h2</span>
+<span id="L148">  <span class="kw">have</span> hA2 : <span class="nu">2</span> ≤ A.<span class="const token" data-verso-hover="44">card</span> := <span class="kw">by</span></span>
+<span id="L149">    <span class="kw">by_contra</span> hc</span>
+<span id="L150">    <span class="kw">have</span> h1 : A.<span class="const token" data-verso-hover="44">card</span> ≤ <span class="nu">1</span> := <span class="kw">by</span> <span class="kw">omega</span></span>
+<span id="L151">    <span class="kw">have</span> : m ≤ cnt r₀ := <span class="kw">by</span></span>
+<span id="L152">      <span class="kw">rw</span> [hsum]; <span class="kw">simpa</span> <span class="kw">using</span> <span class="const token" data-verso-hover="378">Nat.mul_le_mul_right</span> (cnt r₀) h1</span>
+<span id="L153">    <span class="kw">have</span> : <span class="nu">2</span> * cnt r₀ ≤ m := h2</span>
+<span id="L154">    <span class="kw">omega</span></span>
+<span id="L155">  <span class="kw">have</span> hAP : A.<span class="const token" data-verso-hover="44">card</span> ≤ <span class="const token" data-verso-hover="161">Fintype.card</span> P := <span class="const token" data-verso-hover="379">Finset.card_le_univ</span> A</span>
+<span id="L156">  <span class="kw">have</span> hcop : <span class="const token" data-verso-hover="380">Nat.Coprime</span> A.<span class="const token" data-verso-hover="44">card</span> m := hM A.<span class="const token" data-verso-hover="44">card</span> (<span class="kw">by</span> <span class="kw">omega</span>) hAP</span>
+<span id="L157">  <span class="kw">have</span> := <span class="const token" data-verso-hover="381">Nat.Coprime.eq_one_of_dvd</span> hcop ⟨cnt r₀, hsum⟩</span>
+<span id="L158">  <span class="kw">omega</span></span>
+<span id="L159"></span>
+<span id="L160"><span class="dc">/-! ### Execution lemmas -/</span></span>
+<span id="L161"></span>
+<span id="L162"><span class="kw">section</span> Exec</span>
+<span id="L163"></span>
+<span id="L164"><span class="kw">variable</span> {e : ((<span class="const token" data-verso-hover="339">alg2</span> Id m).<span class="const token" data-verso-hover="69">impl</span> ids π).<span class="const token" data-verso-hover="382">InfExec</span>} {t₀ : <span class="const token" data-verso-hover="15">ℕ</span>}</span>
+<span id="L165"></span>
+<span id="L166"><span class="kw">lemma</span> <span class="const token" data-verso-hover="383">not_step_of_ne</span> (H : <span class="const token" data-verso-hover="341">Hyp</span> e t₀) {t : <span class="const token" data-verso-hover="15">ℕ</span>} (ht : t₀ ≤ t) {p : P} (hl : e.<span class="const token" data-verso-hover="144">lbl</span> t ≠ <span class="const token" data-verso-hover="76">.</span>tau p) :</span>
+<span id="L167">    ¬ ((e.<span class="const token" data-verso-hover="144">lbl</span> t).<span class="const token" data-verso-hover="223">proc</span> = p ∧ (e.<span class="const token" data-verso-hover="144">lbl</span> t).<span class="const token" data-verso-hover="384">IsStep</span>) := <span class="kw">by</span></span>
+<span id="L168">  <span class="kw">rintro</span> ⟨hproc, hst⟩</span>
+<span id="L169">  <span class="kw">cases</span> h : e.<span class="const token" data-verso-hover="144">lbl</span> t <span class="kw">with</span></span>
+<span id="L170">  | <span class="const token" data-verso-hover="78">inv</span> r o =&gt; <span class="kw">rw</span> [h] <span class="kw">at</span> hst; <span class="kw">exact</span> hst</span>
+<span id="L171">  | <span class="const token" data-verso-hover="218">ret</span> r o =&gt; <span class="kw">exact</span> H.<span class="const token" data-verso-hover="385">noret</span> t ht r o h</span>
+<span id="L172">  | <span class="const token" data-verso-hover="76">tau</span> r =&gt; <span class="kw">rw</span> [h] <span class="kw">at</span> hproc; <span class="kw">simp</span> only [<span class="const token" data-verso-hover="223">Label.proc</span>] <span class="kw">at</span> hproc; <span class="kw">rw</span> [hproc] <span class="kw">at</span> h; <span class="kw">exact</span> hl h</span>
+<span id="L173"></span>
+<span id="L174"><span class="dc">/-- A property of the local state of a pending process preserved by its own steps holds</span></span>
+<span id="L175"><span class="dc">forever. -/</span></span>
+<span id="L176"><span class="kw">lemma</span> <span class="const token" data-verso-hover="386">loc_forever</span> (H : <span class="const token" data-verso-hover="341">Hyp</span> e t₀) {t : <span class="const token" data-verso-hover="15">ℕ</span>} (ht : t₀ ≤ t) {p : P} (hpend : (e.<span class="const token" data-verso-hover="155">cfg</span> t).<span class="const token" data-verso-hover="83">pend</span> p ≠ <span class="const token" data-verso-hover="48">none</span>)</span>
+<span id="L177">    (Q : <span class="const token" data-verso-hover="329">St</span> Id m → <span class="kw">Prop</span>) (h0 : Q ((e.<span class="const token" data-verso-hover="155">cfg</span> t).<span class="const token" data-verso-hover="82">loc</span> p))</span>
+<span id="L178">    (hstep : ∀ t' ≥ t, Q ((e.<span class="const token" data-verso-hover="155">cfg</span> t').<span class="const token" data-verso-hover="82">loc</span> p) → e.<span class="const token" data-verso-hover="144">lbl</span> t' = <span class="const token" data-verso-hover="76">.</span>tau p → Q ((e.<span class="const token" data-verso-hover="155">cfg</span> (t' + <span class="nu">1</span>)).<span class="const token" data-verso-hover="82">loc</span> p)) :</span>
+<span id="L179">    ∀ t' ≥ t, Q ((e.<span class="const token" data-verso-hover="155">cfg</span> t').<span class="const token" data-verso-hover="82">loc</span> p) := <span class="kw">by</span></span>
+<span id="L180">  <span class="kw">intro</span> t' ht'</span>
+<span id="L181">  <span class="kw">induction</span> t', ht' <span class="kw">using</span> <span class="const token" data-verso-hover="387">Nat.le_induction</span> <span class="kw">with</span></span>
+<span id="L182">  | base =&gt; <span class="kw">exact</span> h0</span>
+<span id="L183">  | <span class="const token" data-verso-hover="132">succ</span> t' ht' ih =&gt;</span>
+<span id="L184">    <span class="kw">by_cases</span> hl : e.<span class="const token" data-verso-hover="144">lbl</span> t' = <span class="const token" data-verso-hover="76">.</span>tau p</span>
+<span id="L185">    · <span class="kw">exact</span> hstep t' ht' ih hl</span>
+<span id="L186">    · <span class="kw">have</span> hp' : (e.<span class="const token" data-verso-hover="155">cfg</span> t').<span class="const token" data-verso-hover="83">pend</span> p ≠ <span class="const token" data-verso-hover="48">none</span> := <span class="kw">by</span></span>
+<span id="L187">        <span class="kw">rw</span> [<span class="const token" data-verso-hover="388">pend_persist</span> e t₀ H.<span class="const token" data-verso-hover="385">noret</span> ht hpend t' ht']; <span class="kw">exact</span> hpend</span>
+<span id="L188">      <span class="kw">rw</span> [<span class="const token" data-verso-hover="389">loc_of_not_step</span> e hp' (<span class="const token" data-verso-hover="383">not_step_of_ne</span> H (<span class="kw">by</span> <span class="kw">omega</span>) hl)]</span>
+<span id="L189">      <span class="kw">exact</span> ih</span>
+<span id="L190"></span>
+<span id="L191"><span class="dc">/-- The next internal step of a pending process starts from its current local state. -/</span></span>
+<span id="L192"><span class="kw">lemma</span> <span class="const token" data-verso-hover="390">next_tau</span> (H : <span class="const token" data-verso-hover="341">Hyp</span> e t₀) {t : <span class="const token" data-verso-hover="15">ℕ</span>} (ht : t₀ ≤ t) {p : P} (hpend : (e.<span class="const token" data-verso-hover="155">cfg</span> t).<span class="const token" data-verso-hover="83">pend</span> p ≠ <span class="const token" data-verso-hover="48">none</span>) :</span>
+<span id="L193">    ∃ t₂ ≥ t, e.<span class="const token" data-verso-hover="144">lbl</span> t₂ = <span class="const token" data-verso-hover="76">.</span>tau p ∧ (e.<span class="const token" data-verso-hover="155">cfg</span> t₂).<span class="const token" data-verso-hover="82">loc</span> p = (e.<span class="const token" data-verso-hover="155">cfg</span> t).<span class="const token" data-verso-hover="82">loc</span> p := <span class="kw">by</span></span>
+<span id="L194">  <span class="kw">classical</span></span>
+<span id="L195">  <span class="kw">have</span> hex : ∃ t₂, t ≤ t₂ ∧ e.<span class="const token" data-verso-hover="144">lbl</span> t₂ = <span class="const token" data-verso-hover="76">.</span>tau p := <span class="kw">by</span></span>
+<span id="L196">    <span class="kw">obtain</span> ⟨t₂, h1, h2⟩ := H.<span class="const token" data-verso-hover="391">tau</span> ht hpend t <span class="const token" data-verso-hover="392">le_rfl</span></span>
+<span id="L197">    <span class="kw">exact</span> ⟨t₂, h1, h2⟩</span>
+<span id="L198">  <span class="kw">obtain</span> ⟨h1, h2⟩ := <span class="const token" data-verso-hover="393">Nat.find_spec</span> hex</span>
+<span id="L199">  <span class="kw">refine</span> ⟨<span class="const token" data-verso-hover="394">Nat.find</span> hex, h1, h2, ?_⟩</span>
+<span id="L200">  <span class="kw">have</span> key : ∀ s, t ≤ s → s ≤ <span class="const token" data-verso-hover="394">Nat.find</span> hex → (e.<span class="const token" data-verso-hover="155">cfg</span> s).<span class="const token" data-verso-hover="82">loc</span> p = (e.<span class="const token" data-verso-hover="155">cfg</span> t).<span class="const token" data-verso-hover="82">loc</span> p := <span class="kw">by</span></span>
+<span id="L201">    <span class="kw">intro</span> s hs1</span>
+<span id="L202">    <span class="kw">induction</span> s, hs1 <span class="kw">using</span> <span class="const token" data-verso-hover="387">Nat.le_induction</span> <span class="kw">with</span></span>
+<span id="L203">    | base =&gt; <span class="kw">intro</span> _; <span class="kw">rfl</span></span>
+<span id="L204">    | <span class="const token" data-verso-hover="132">succ</span> s hs ih =&gt;</span>
+<span id="L205">      <span class="kw">intro</span> hs2</span>
+<span id="L206">      <span class="kw">have</span> hne : e.<span class="const token" data-verso-hover="144">lbl</span> s ≠ <span class="const token" data-verso-hover="76">.</span>tau p := <span class="kw">fun</span> h =&gt; <span class="const token" data-verso-hover="395">Nat.find_min</span> hex (<span class="kw">show</span> s &lt; <span class="const token" data-verso-hover="394">Nat.find</span> hex <span class="kw">by</span> <span class="kw">omega</span>) ⟨hs, h⟩</span>
+<span id="L207">      <span class="kw">have</span> hp' : (e.<span class="const token" data-verso-hover="155">cfg</span> s).<span class="const token" data-verso-hover="83">pend</span> p ≠ <span class="const token" data-verso-hover="48">none</span> := <span class="kw">by</span></span>
+<span id="L208">        <span class="kw">rw</span> [<span class="const token" data-verso-hover="388">pend_persist</span> e t₀ H.<span class="const token" data-verso-hover="385">noret</span> ht hpend s hs]; <span class="kw">exact</span> hpend</span>
+<span id="L209">      <span class="kw">rw</span> [<span class="const token" data-verso-hover="389">loc_of_not_step</span> e hp' (<span class="const token" data-verso-hover="383">not_step_of_ne</span> H (<span class="kw">by</span> <span class="kw">omega</span>) hne)]</span>
+<span id="L210">      <span class="kw">exact</span> ih (<span class="kw">by</span> <span class="kw">omega</span>)</span>
+<span id="L211">  <span class="kw">exact</span> key _ h1 <span class="const token" data-verso-hover="392">le_rfl</span></span>
+<span id="L212"></span>
+<span id="L213"><span class="kw">variable</span> (hid : <span class="const token" data-verso-hover="86">Function.Injective</span> ids) (hm : <span class="nu">0</span> &lt; m)</span>
+<span id="L214"><span class="kw">include</span> hid hm</span>
+<span id="L215"></span>
+<span id="L216"><span class="kw">lemma</span> <span class="const token" data-verso-hover="396">step_cas</span> (H : <span class="const token" data-verso-hover="341">Hyp</span> e t₀) {t : <span class="const token" data-verso-hover="15">ℕ</span>} {p : P} {i : <span class="const token" data-verso-hover="15">ℕ</span>} (hl : e.<span class="const token" data-verso-hover="144">lbl</span> t = <span class="const token" data-verso-hover="76">.</span>tau p)</span>
+<span id="L217">    (hpc : ((e.<span class="const token" data-verso-hover="155">cfg</span> t).<span class="const token" data-verso-hover="82">loc</span> p).<span class="const token" data-verso-hover="331">pc</span> = <span class="const token" data-verso-hover="321">.</span>cas i) :</span>
+<span id="L218">    ∃ hi : i &lt; m, (e.<span class="const token" data-verso-hover="155">cfg</span> (t + <span class="nu">1</span>)).<span class="const token" data-verso-hover="82">loc</span> p =</span>
+<span id="L219">      (<span class="kw">if</span> i + <span class="nu">1</span> &lt; m <span class="kw">then</span> { (e.<span class="const token" data-verso-hover="155">cfg</span> t).<span class="const token" data-verso-hover="82">loc</span> p <span class="kw">with</span> <span class="const token" data-verso-hover="331">pc</span> := <span class="const token" data-verso-hover="321">.</span>cas (i + <span class="nu">1</span>) }</span>
+<span id="L220">       <span class="kw">else</span> { (e.<span class="const token" data-verso-hover="155">cfg</span> t).<span class="const token" data-verso-hover="82">loc</span> p <span class="kw">with</span> <span class="const token" data-verso-hover="331">pc</span> := <span class="const token" data-verso-hover="322">.</span>read <span class="nu">0</span> }) ∧</span>
+<span id="L221">      (e.<span class="const token" data-verso-hover="155">cfg</span> (t + <span class="nu">1</span>)).<span class="const token" data-verso-hover="84">mem</span> <span class="const token" data-verso-hover="64">(</span>) = <span class="const token" data-verso-hover="210">Function.update</span> ((e.<span class="const token" data-verso-hover="155">cfg</span> t).<span class="const token" data-verso-hover="84">mem</span> <span class="const token" data-verso-hover="64">(</span>)) (π p ⟨i, hi⟩)</span>
+<span id="L222">        (<span class="kw">if</span> (e.<span class="const token" data-verso-hover="155">cfg</span> t).<span class="const token" data-verso-hover="84">mem</span> <span class="const token" data-verso-hover="64">(</span>) (π p ⟨i, hi⟩) = <span class="const token" data-verso-hover="48">none</span> <span class="kw">then</span> <span class="const token" data-verso-hover="37">some</span> (ids p)</span>
+<span id="L223">         <span class="kw">else</span> (e.<span class="const token" data-verso-hover="155">cfg</span> t).<span class="const token" data-verso-hover="84">mem</span> <span class="const token" data-verso-hover="64">(</span>) (π p ⟨i, hi⟩)) := <span class="kw">by</span></span>
+<span id="L224">  <span class="kw">obtain</span> ⟨-, x, f, k, hact, hloc, hmem, -⟩ := <span class="const token" data-verso-hover="397">tau_step</span> e hl</span>
+<span id="L225">  <span class="kw">have</span> hL := H.<span class="const token" data-verso-hover="398">locInv</span> hid hm t p</span>
+<span id="L226">  <span class="kw">have</span> hi : i &lt; m := <span class="kw">by</span> <span class="kw">have</span> := hL.<span class="const token" data-verso-hover="199">2</span>; <span class="kw">rw</span> [hpc] <span class="kw">at</span> this; <span class="kw">exact</span> this</span>
+<span id="L227">  <span class="kw">rw</span> [<span class="const token" data-verso-hover="399">act_cas</span> hpc hi] <span class="kw">at</span> hact</span>
+<span id="L228">  <span class="kw">simp</span> only [<span class="const token" data-verso-hover="314">SymAction.rmw.injEq</span>] <span class="kw">at</span> hact</span>
+<span id="L229">  <span class="kw">obtain</span> ⟨<span class="kw">rfl</span>, <span class="kw">rfl</span>, <span class="kw">rfl</span>⟩ := hact</span>
+<span id="L230">  <span class="kw">refine</span> ⟨hi, hloc, ?_⟩</span>
+<span id="L231">  <span class="kw">rw</span> [hmem]; <span class="kw">simp</span> only [hL.<span class="const token" data-verso-hover="152">1</span>]</span>
+<span id="L232"></span>
+<span id="L233"><span class="kw">lemma</span> <span class="const token" data-verso-hover="400">step_read</span> (H : <span class="const token" data-verso-hover="341">Hyp</span> e t₀) {t : <span class="const token" data-verso-hover="15">ℕ</span>} {p : P} {i : <span class="const token" data-verso-hover="15">ℕ</span>} (hl : e.<span class="const token" data-verso-hover="144">lbl</span> t = <span class="const token" data-verso-hover="76">.</span>tau p)</span>
+<span id="L234">    (hpc : ((e.<span class="const token" data-verso-hover="155">cfg</span> t).<span class="const token" data-verso-hover="82">loc</span> p).<span class="const token" data-verso-hover="331">pc</span> = <span class="const token" data-verso-hover="322">.</span>read i) :</span>
+<span id="L235">    ∃ hi : i &lt; m, (e.<span class="const token" data-verso-hover="155">cfg</span> (t + <span class="nu">1</span>)).<span class="const token" data-verso-hover="84">mem</span> <span class="const token" data-verso-hover="64">(</span>) = (e.<span class="const token" data-verso-hover="155">cfg</span> t).<span class="const token" data-verso-hover="84">mem</span> <span class="const token" data-verso-hover="64">(</span>) ∧</span>
+<span id="L236">      (e.<span class="const token" data-verso-hover="155">cfg</span> (t + <span class="nu">1</span>)).<span class="const token" data-verso-hover="82">loc</span> p =</span>
+<span id="L237">        (<span class="kw">if</span> i + <span class="nu">1</span> &lt; m <span class="kw">then</span> { (e.<span class="const token" data-verso-hover="155">cfg</span> t).<span class="const token" data-verso-hover="82">loc</span> p <span class="kw">with</span></span>
+<span id="L238">            <span class="const token" data-verso-hover="332">view</span> := <span class="const token" data-verso-hover="210">Function.update</span> ((e.<span class="const token" data-verso-hover="155">cfg</span> t).<span class="const token" data-verso-hover="82">loc</span> p).<span class="const token" data-verso-hover="332">view</span> ⟨i, hi⟩ ((e.<span class="const token" data-verso-hover="155">cfg</span> t).<span class="const token" data-verso-hover="84">mem</span> <span class="const token" data-verso-hover="64">(</span>) (π p ⟨i, hi⟩)),</span>
+<span id="L239">            <span class="const token" data-verso-hover="331">pc</span> := <span class="const token" data-verso-hover="322">.</span>read (i + <span class="nu">1</span>) }</span>
+<span id="L240">         <span class="kw">else</span> <span class="const token" data-verso-hover="338">afterRead</span> ((e.<span class="const token" data-verso-hover="155">cfg</span> t).<span class="const token" data-verso-hover="82">loc</span> p)</span>
+<span id="L241">          (<span class="const token" data-verso-hover="210">Function.update</span> ((e.<span class="const token" data-verso-hover="155">cfg</span> t).<span class="const token" data-verso-hover="82">loc</span> p).<span class="const token" data-verso-hover="332">view</span> ⟨i, hi⟩ ((e.<span class="const token" data-verso-hover="155">cfg</span> t).<span class="const token" data-verso-hover="84">mem</span> <span class="const token" data-verso-hover="64">(</span>) (π p ⟨i, hi⟩)))) := <span class="kw">by</span></span>
+<span id="L242">  <span class="kw">obtain</span> ⟨-, x, f, k, hact, hloc, hmem, -⟩ := <span class="const token" data-verso-hover="397">tau_step</span> e hl</span>
+<span id="L243">  <span class="kw">have</span> hi : i &lt; m := <span class="kw">by</span> <span class="kw">have</span> := (H.<span class="const token" data-verso-hover="398">locInv</span> hid hm t p).<span class="const token" data-verso-hover="199">2</span>; <span class="kw">rw</span> [hpc] <span class="kw">at</span> this; <span class="kw">exact</span> this.<span class="const token" data-verso-hover="152">1</span></span>
+<span id="L244">  <span class="kw">rw</span> [<span class="const token" data-verso-hover="401">act_read</span> hpc hi] <span class="kw">at</span> hact</span>
+<span id="L245">  <span class="kw">simp</span> only [<span class="const token" data-verso-hover="314">SymAction.rmw.injEq</span>] <span class="kw">at</span> hact</span>
+<span id="L246">  <span class="kw">obtain</span> ⟨<span class="kw">rfl</span>, <span class="kw">rfl</span>, <span class="kw">rfl</span>⟩ := hact</span>
+<span id="L247">  <span class="kw">exact</span> ⟨hi, <span class="kw">by</span> <span class="kw">rw</span> [hmem]; <span class="kw">simp</span>, hloc⟩</span>
+<span id="L248"></span>
+<span id="L249"><span class="kw">lemma</span> <span class="const token" data-verso-hover="402">step_wait</span> (H : <span class="const token" data-verso-hover="341">Hyp</span> e t₀) {t : <span class="const token" data-verso-hover="15">ℕ</span>} {p : P} {i : <span class="const token" data-verso-hover="15">ℕ</span>} {ab : <span class="const token" data-verso-hover="21">Bool</span>} (hl : e.<span class="const token" data-verso-hover="144">lbl</span> t = <span class="const token" data-verso-hover="76">.</span>tau p)</span>
+<span id="L250">    (hpc : ((e.<span class="const token" data-verso-hover="155">cfg</span> t).<span class="const token" data-verso-hover="82">loc</span> p).<span class="const token" data-verso-hover="331">pc</span> = <span class="const token" data-verso-hover="324">.</span>wait i ab) :</span>
+<span id="L251">    ∃ hi : i &lt; m, (e.<span class="const token" data-verso-hover="155">cfg</span> (t + <span class="nu">1</span>)).<span class="const token" data-verso-hover="84">mem</span> <span class="const token" data-verso-hover="64">(</span>) = (e.<span class="const token" data-verso-hover="155">cfg</span> t).<span class="const token" data-verso-hover="84">mem</span> <span class="const token" data-verso-hover="64">(</span>) ∧</span>
+<span id="L252">      (e.<span class="const token" data-verso-hover="155">cfg</span> (t + <span class="nu">1</span>)).<span class="const token" data-verso-hover="82">loc</span> p =</span>
+<span id="L253">        (<span class="kw">if</span> i + <span class="nu">1</span> &lt; m <span class="kw">then</span></span>
+<span id="L254">          { (e.<span class="const token" data-verso-hover="155">cfg</span> t).<span class="const token" data-verso-hover="82">loc</span> p <span class="kw">with</span> <span class="const token" data-verso-hover="331">pc</span> := <span class="const token" data-verso-hover="324">.</span>wait (i + <span class="nu">1</span>) (ab &amp;&amp; (e.<span class="const token" data-verso-hover="155">cfg</span> t).<span class="const token" data-verso-hover="84">mem</span> <span class="const token" data-verso-hover="64">(</span>) (π p ⟨i, hi⟩) == <span class="const token" data-verso-hover="48">none</span>) }</span>
+<span id="L255">        <span class="kw">else</span> <span class="kw">if</span> ab &amp;&amp; (e.<span class="const token" data-verso-hover="155">cfg</span> t).<span class="const token" data-verso-hover="84">mem</span> <span class="const token" data-verso-hover="64">(</span>) (π p ⟨i, hi⟩) == <span class="const token" data-verso-hover="48">none</span> <span class="kw">then</span> { (e.<span class="const token" data-verso-hover="155">cfg</span> t).<span class="const token" data-verso-hover="82">loc</span> p <span class="kw">with</span> <span class="const token" data-verso-hover="331">pc</span> := <span class="const token" data-verso-hover="321">.</span>cas <span class="nu">0</span> }</span>
+<span id="L256">        <span class="kw">else</span> { (e.<span class="const token" data-verso-hover="155">cfg</span> t).<span class="const token" data-verso-hover="82">loc</span> p <span class="kw">with</span> <span class="const token" data-verso-hover="331">pc</span> := <span class="const token" data-verso-hover="324">.</span>wait <span class="nu">0</span> <span class="const token" data-verso-hover="59">true</span> }) := <span class="kw">by</span></span>
+<span id="L257">  <span class="kw">obtain</span> ⟨-, x, f, k, hact, hloc, hmem, -⟩ := <span class="const token" data-verso-hover="397">tau_step</span> e hl</span>
+<span id="L258">  <span class="kw">have</span> hi : i &lt; m := <span class="kw">by</span> <span class="kw">have</span> := (H.<span class="const token" data-verso-hover="398">locInv</span> hid hm t p).<span class="const token" data-verso-hover="199">2</span>; <span class="kw">rw</span> [hpc] <span class="kw">at</span> this; <span class="kw">exact</span> this.<span class="const token" data-verso-hover="152">1</span></span>
+<span id="L259">  <span class="kw">rw</span> [<span class="const token" data-verso-hover="403">act_wait</span> hpc hi] <span class="kw">at</span> hact</span>
+<span id="L260">  <span class="kw">simp</span> only [<span class="const token" data-verso-hover="314">SymAction.rmw.injEq</span>] <span class="kw">at</span> hact</span>
+<span id="L261">  <span class="kw">obtain</span> ⟨<span class="kw">rfl</span>, <span class="kw">rfl</span>, <span class="kw">rfl</span>⟩ := hact</span>
+<span id="L262">  <span class="kw">exact</span> ⟨hi, <span class="kw">by</span> <span class="kw">rw</span> [hmem]; <span class="kw">simp</span>, hloc⟩</span>
+<span id="L263"></span>
+<span id="L264"><span class="kw">lemma</span> <span class="const token" data-verso-hover="404">step_wr</span> (H : <span class="const token" data-verso-hover="341">Hyp</span> e t₀) {t : <span class="const token" data-verso-hover="15">ℕ</span>} {p : P} {i : <span class="const token" data-verso-hover="15">ℕ</span>} (hl : e.<span class="const token" data-verso-hover="144">lbl</span> t = <span class="const token" data-verso-hover="76">.</span>tau p)</span>
+<span id="L265">    (hpc : ((e.<span class="const token" data-verso-hover="155">cfg</span> t).<span class="const token" data-verso-hover="82">loc</span> p).<span class="const token" data-verso-hover="331">pc</span> = <span class="const token" data-verso-hover="323">.</span>wr i) :</span>
+<span id="L266">    i &lt; m ∧ (e.<span class="const token" data-verso-hover="155">cfg</span> (t + <span class="nu">1</span>)).<span class="const token" data-verso-hover="82">loc</span> p = <span class="const token" data-verso-hover="337">wrFrom</span> ((e.<span class="const token" data-verso-hover="155">cfg</span> t).<span class="const token" data-verso-hover="82">loc</span> p) (i + <span class="nu">1</span>) := <span class="kw">by</span></span>
+<span id="L267">  <span class="kw">obtain</span> ⟨-, x, f, k, hact, hloc, -, -⟩ := <span class="const token" data-verso-hover="397">tau_step</span> e hl</span>
+<span id="L268">  <span class="kw">have</span> hL := (H.<span class="const token" data-verso-hover="398">locInv</span> hid hm t p).<span class="const token" data-verso-hover="199">2</span></span>
+<span id="L269">  <span class="kw">rw</span> [hpc] <span class="kw">at</span> hL</span>
+<span id="L270">  <span class="kw">obtain</span> ⟨hi, -⟩ := hL</span>
+<span id="L271">  <span class="kw">rw</span> [<span class="const token" data-verso-hover="405">act_wr</span> hpc hi] <span class="kw">at</span> hact</span>
+<span id="L272">  <span class="kw">simp</span> only [<span class="const token" data-verso-hover="314">SymAction.rmw.injEq</span>] <span class="kw">at</span> hact</span>
+<span id="L273">  <span class="kw">obtain</span> ⟨<span class="kw">rfl</span>, <span class="kw">rfl</span>, <span class="kw">rfl</span>⟩ := hact</span>
+<span id="L274">  <span class="kw">exact</span> ⟨hi, hloc⟩</span>
+<span id="L275"></span>
+<span id="L276"><span class="kw">lemma</span> <span class="const token" data-verso-hover="406">own_nonempty_of_wr</span> (H : <span class="const token" data-verso-hover="341">Hyp</span> e t₀) {t : <span class="const token" data-verso-hover="15">ℕ</span>} {p : P} {j : <span class="const token" data-verso-hover="15">ℕ</span>}</span>
+<span id="L277">    (hpc : ((e.<span class="const token" data-verso-hover="155">cfg</span> t).<span class="const token" data-verso-hover="82">loc</span> p).<span class="const token" data-verso-hover="331">pc</span> = <span class="const token" data-verso-hover="323">.</span>wr j) : (<span class="const token" data-verso-hover="407">own</span> ids (e.<span class="const token" data-verso-hover="155">cfg</span> t) p).<span class="const token" data-verso-hover="408">Nonempty</span> := <span class="kw">by</span></span>
+<span id="L278">  <span class="kw">have</span> hL := (H.<span class="const token" data-verso-hover="398">locInv</span> hid hm t p).<span class="const token" data-verso-hover="199">2</span></span>
+<span id="L279">  <span class="kw">rw</span> [hpc] <span class="kw">at</span> hL</span>
+<span id="L280">  <span class="kw">obtain</span> ⟨hj, hv, hown⟩ := hL</span>
+<span id="L281">  <span class="kw">refine</span> ⟨π p ⟨j, hj⟩, ?_⟩</span>
+<span id="L282">  <span class="kw">simp</span> only [<span class="const token" data-verso-hover="407">own</span>, <span class="const token" data-verso-hover="367">Finset.mem_filter</span>, <span class="const token" data-verso-hover="180">Finset.mem_univ</span>, <span class="const token" data-verso-hover="315">true_and</span>]</span>
+<span id="L283">  <span class="kw">exact</span> (hown _).<span class="const token" data-verso-hover="249">2</span> ⟨⟨j, hj⟩, <span class="const token" data-verso-hover="392">le_rfl</span>, hv, <span class="const token" data-verso-hover="108">rfl</span>⟩</span>
+<span id="L284"></span>
+<span id="L285"><span class="dc">/-- If nobody erases, non-`⊥` registers keep their values. -/</span></span>
+<span id="L286"><span class="kw">lemma</span> <span class="const token" data-verso-hover="409">mem_step_nonbot</span> (H : <span class="const token" data-verso-hover="341">Hyp</span> e t₀) {t : <span class="const token" data-verso-hover="15">ℕ</span>} (ht : t₀ ≤ t)</span>
+<span id="L287">    (hnwr : ∀ p j, e.<span class="const token" data-verso-hover="144">lbl</span> t = <span class="const token" data-verso-hover="76">.</span>tau p → ((e.<span class="const token" data-verso-hover="155">cfg</span> t).<span class="const token" data-verso-hover="82">loc</span> p).<span class="const token" data-verso-hover="331">pc</span> ≠ <span class="const token" data-verso-hover="323">.</span>wr j) (y : <span class="const token" data-verso-hover="19">Fin</span> m)</span>
+<span id="L288">    (hy : (e.<span class="const token" data-verso-hover="155">cfg</span> t).<span class="const token" data-verso-hover="84">mem</span> <span class="const token" data-verso-hover="64">(</span>) y ≠ <span class="const token" data-verso-hover="48">none</span>) : (e.<span class="const token" data-verso-hover="155">cfg</span> (t + <span class="nu">1</span>)).<span class="const token" data-verso-hover="84">mem</span> <span class="const token" data-verso-hover="64">(</span>) y = (e.<span class="const token" data-verso-hover="155">cfg</span> t).<span class="const token" data-verso-hover="84">mem</span> <span class="const token" data-verso-hover="64">(</span>) y := <span class="kw">by</span></span>
+<span id="L289">  <span class="kw">have</span> hstep := e.<span class="const token" data-verso-hover="410">step_eq</span> t</span>
+<span id="L290">  <span class="kw">cases</span> hl : e.<span class="const token" data-verso-hover="144">lbl</span> t <span class="kw">with</span></span>
+<span id="L291">  | <span class="const token" data-verso-hover="78">inv</span> r o =&gt;</span>
+<span id="L292">    <span class="kw">rw</span> [hl] <span class="kw">at</span> hstep</span>
+<span id="L293">    <span class="kw">obtain</span> ⟨-, hC⟩ := <span class="const token" data-verso-hover="411">SymAlg.impl_step_inv_cases</span> hstep</span>
+<span id="L294">    <span class="kw">rw</span> [hC]</span>
+<span id="L295">  | <span class="const token" data-verso-hover="218">ret</span> r o =&gt; <span class="kw">exact</span> <span class="const token" data-verso-hover="184">absurd</span> hl (H.<span class="const token" data-verso-hover="385">noret</span> t ht r o)</span>
+<span id="L296">  | <span class="const token" data-verso-hover="76">tau</span> p =&gt;</span>
+<span id="L297">    <span class="kw">have</span> hb := H.<span class="const token" data-verso-hover="412">busy_of_tau</span> hid hm ht hl</span>
+<span id="L298">    <span class="kw">cases</span> hpc : ((e.<span class="const token" data-verso-hover="155">cfg</span> t).<span class="const token" data-verso-hover="82">loc</span> p).<span class="const token" data-verso-hover="331">pc</span> <span class="kw">with</span></span>
+<span id="L299">    | <span class="const token" data-verso-hover="321">cas</span> i =&gt;</span>
+<span id="L300">      <span class="kw">obtain</span> ⟨hi, -, hmem⟩ := <span class="const token" data-verso-hover="396">step_cas</span> hid hm H hl hpc</span>
+<span id="L301">      <span class="kw">rw</span> [hmem, <span class="const token" data-verso-hover="413">Function.update_apply</span>]</span>
+<span id="L302">      <span class="kw">split_ifs</span> <span class="kw">with</span> h1 h2</span>
+<span id="L303">      · <span class="kw">subst</span> h1; <span class="kw">exact</span> <span class="const token" data-verso-hover="184">absurd</span> h2 hy</span>
+<span id="L304">      · <span class="kw">subst</span> h1; <span class="kw">rfl</span></span>
+<span id="L305">      · <span class="kw">rfl</span></span>
+<span id="L306">    | <span class="const token" data-verso-hover="322">read</span> i =&gt; <span class="kw">obtain</span> ⟨hi, hmem, -⟩ := <span class="const token" data-verso-hover="400">step_read</span> hid hm H hl hpc; <span class="kw">rw</span> [hmem]</span>
+<span id="L307">    | <span class="const token" data-verso-hover="324">wait</span> i ab =&gt; <span class="kw">obtain</span> ⟨hi, hmem, -⟩ := <span class="const token" data-verso-hover="402">step_wait</span> hid hm H hl hpc; <span class="kw">rw</span> [hmem]</span>
+<span id="L308">    | <span class="const token" data-verso-hover="323">wr</span> j =&gt; <span class="kw">exact</span> <span class="const token" data-verso-hover="184">absurd</span> hpc (hnwr p j hl)</span>
+<span id="L309">    | <span class="const token" data-verso-hover="325">_</span> =&gt; <span class="kw">rw</span> [hpc] <span class="kw">at</span> hb; <span class="kw">exact</span> <span class="const token" data-verso-hover="184">absurd</span> hb <span class="const token" data-verso-hover="70">id</span></span>
+<span id="L310"></span>
+<span id="L311"><span class="dc">/-! ### Stuck waiting processes -/</span></span>
+<span id="L312"></span>
+<span id="L313"><span class="dc">/-- `r` waits and cannot pass the register `y₀` in its current scan. -/</span></span>
+<span id="L314"><span class="kw">def</span> <span class="const token" data-verso-hover="414">WaitInv</span> (π : P → <span class="const token" data-verso-hover="66">Equiv.Perm</span> (<span class="const token" data-verso-hover="19">Fin</span> m)) (y₀ : <span class="const token" data-verso-hover="19">Fin</span> m) (r : P) (s : <span class="const token" data-verso-hover="329">St</span> Id m) : <span class="kw">Prop</span> :=</span>
+<span id="L315">  ∃ j ab, s.<span class="const token" data-verso-hover="331">pc</span> = <span class="const token" data-verso-hover="324">.</span>wait j ab ∧ (ab = <span class="const token" data-verso-hover="50">false</span> ∨ j ≤ ((π r).<span class="const token" data-verso-hover="256">symm</span> y₀).<span class="const token" data-verso-hover="36">val</span>)</span>
+<span id="L316"></span>
+<span id="L317"><span class="dc">/-- `r` erases (line 7) or waits without being able to pass `y₀`. -/</span></span>
+<span id="L318"><span class="kw">def</span> <span class="const token" data-verso-hover="415">StuckInv</span> (π : P → <span class="const token" data-verso-hover="66">Equiv.Perm</span> (<span class="const token" data-verso-hover="19">Fin</span> m)) (y₀ : <span class="const token" data-verso-hover="19">Fin</span> m) (r : P) (s : <span class="const token" data-verso-hover="329">St</span> Id m) : <span class="kw">Prop</span> :=</span>
+<span id="L319">  (∃ j, s.<span class="const token" data-verso-hover="331">pc</span> = <span class="const token" data-verso-hover="323">.</span>wr j) ∨ <span class="const token" data-verso-hover="414">WaitInv</span> π y₀ r s</span>
+<span id="L320"></span>
+<span id="L321"><span class="kw">omit</span> hid hm <span class="kw">in</span></span>
+<span id="L322"><span class="kw">lemma</span> <span class="const token" data-verso-hover="416">busy_of_stuck</span> {y₀ : <span class="const token" data-verso-hover="19">Fin</span> m} {r : P} {s : <span class="const token" data-verso-hover="329">St</span> Id m} (h : <span class="const token" data-verso-hover="415">StuckInv</span> π y₀ r s) : <span class="const token" data-verso-hover="349">Busy</span> s.<span class="const token" data-verso-hover="331">pc</span> := <span class="kw">by</span></span>
+<span id="L323">  <span class="kw">rcases</span> h <span class="kw">with</span> ⟨j, hpc⟩ | ⟨j, ab, hpc, -⟩ &lt;;&gt; <span class="kw">rw</span> [hpc] &lt;;&gt; <span class="kw">trivial</span></span>
+<span id="L324"></span>
+<span id="L325"><span class="kw">variable</span> (H : <span class="const token" data-verso-hover="341">Hyp</span> e t₀) {q : P} {y₀ : <span class="const token" data-verso-hover="19">Fin</span> m} {t : <span class="const token" data-verso-hover="15">ℕ</span>}</span>
+<span id="L326">  (hyq : ∀ t' ≥ t, (e.<span class="const token" data-verso-hover="155">cfg</span> t').<span class="const token" data-verso-hover="84">mem</span> <span class="const token" data-verso-hover="64">(</span>) y₀ = <span class="const token" data-verso-hover="37">some</span> (ids q))</span>
+<span id="L327"><span class="kw">include</span> hid hm H hyq</span>
+<span id="L328"></span>
+<span id="L329"><span class="kw">lemma</span> <span class="const token" data-verso-hover="417">waitInv_step</span> {r : P} {t' : <span class="const token" data-verso-hover="15">ℕ</span>} (ht' : t ≤ t') (hl : e.<span class="const token" data-verso-hover="144">lbl</span> t' = <span class="const token" data-verso-hover="76">.</span>tau r)</span>
+<span id="L330">    (hW : <span class="const token" data-verso-hover="414">WaitInv</span> π y₀ r ((e.<span class="const token" data-verso-hover="155">cfg</span> t').<span class="const token" data-verso-hover="82">loc</span> r)) : <span class="const token" data-verso-hover="414">WaitInv</span> π y₀ r ((e.<span class="const token" data-verso-hover="155">cfg</span> (t' + <span class="nu">1</span>)).<span class="const token" data-verso-hover="82">loc</span> r) := <span class="kw">by</span></span>
+<span id="L331">  <span class="kw">obtain</span> ⟨j, ab, hpc, hab⟩ := hW</span>
+<span id="L332">  <span class="kw">obtain</span> ⟨hj, -, hloc⟩ := <span class="const token" data-verso-hover="402">step_wait</span> hid hm H hl hpc</span>
+<span id="L333">  <span class="kw">set</span> v := (e.<span class="const token" data-verso-hover="155">cfg</span> t').<span class="const token" data-verso-hover="84">mem</span> <span class="const token" data-verso-hover="64">(</span>) (π r ⟨j, hj⟩) <span class="kw">with</span> hv</span>
+<span id="L334">  <span class="kw">set</span> idx := ((π r).<span class="const token" data-verso-hover="256">symm</span> y₀).<span class="const token" data-verso-hover="36">val</span> <span class="kw">with</span> hidx</span>
+<span id="L335">  <span class="kw">have</span> hidx_lt : idx &lt; m := ((π r).<span class="const token" data-verso-hover="256">symm</span> y₀).<span class="const token" data-verso-hover="134">isLt</span></span>
+<span id="L336">  <span class="kw">have</span> hy0 : j = idx → v ≠ <span class="const token" data-verso-hover="48">none</span> := <span class="kw">by</span></span>
+<span id="L337">    <span class="kw">intro</span> hji</span>
+<span id="L338">    <span class="kw">have</span> : (⟨j, hj⟩ : <span class="const token" data-verso-hover="19">Fin</span> m) = (π r).<span class="const token" data-verso-hover="256">symm</span> y₀ := <span class="const token" data-verso-hover="418">Fin.ext</span> hji</span>
+<span id="L339">    <span class="kw">rw</span> [hv, this, <span class="const token" data-verso-hover="257">Equiv.apply_symm_apply</span>, hyq t' ht']; <span class="kw">simp</span></span>
+<span id="L340">  <span class="kw">rw</span> [hloc]</span>
+<span id="L341">  <span class="kw">split_ifs</span> <span class="kw">with</span> hj1 hab2</span>
+<span id="L342">  · <span class="kw">refine</span> ⟨_, _, <span class="const token" data-verso-hover="108">rfl</span>, ?_⟩</span>
+<span id="L343">    <span class="kw">by_cases</span> hji : j = idx</span>
+<span id="L344">    · <span class="kw">left</span></span>
+<span id="L345">      <span class="kw">rcases</span> <span class="const token" data-verso-hover="419">Option.ne_none_iff_exists</span>.<span class="const token" data-verso-hover="128">1</span> (hy0 hji) <span class="kw">with</span> ⟨a, ha⟩</span>
+<span id="L346">      <span class="kw">rw</span> [← ha]; <span class="kw">simp</span></span>
+<span id="L347">    · <span class="kw">rcases</span> hab <span class="kw">with</span> hab | hab</span>
+<span id="L348">      · <span class="kw">left</span>; <span class="kw">simp</span> [hab]</span>
+<span id="L349">      · <span class="kw">right</span>; <span class="kw">omega</span></span>
+<span id="L350">  · <span class="kw">exfalso</span></span>
+<span id="L351">    <span class="kw">simp</span> only [<span class="const token" data-verso-hover="93">Bool.and_eq_true</span>, <span class="const token" data-verso-hover="420">beq_iff_eq</span>] <span class="kw">at</span> hab2</span>
+<span id="L352">    <span class="kw">obtain</span> ⟨<span class="kw">rfl</span>, hvn⟩ := hab2</span>
+<span id="L353">    <span class="kw">rcases</span> hab <span class="kw">with</span> hab | hab</span>
+<span id="L354">    · <span class="kw">cases</span> hab</span>
+<span id="L355">    · <span class="kw">exact</span> hy0 (<span class="kw">by</span> <span class="kw">omega</span>) hvn</span>
+<span id="L356">  · <span class="kw">exact</span> ⟨<span class="nu">0</span>, <span class="const token" data-verso-hover="59">true</span>, <span class="const token" data-verso-hover="108">rfl</span>, <span class="const token" data-verso-hover="170">Or.inr</span> (<span class="const token" data-verso-hover="421">Nat.zero_le</span> _)⟩</span>
+<span id="L357"></span>
+<span id="L358"><span class="kw">lemma</span> <span class="const token" data-verso-hover="422">stuckInv_step</span> {r : P} {t' : <span class="const token" data-verso-hover="15">ℕ</span>} (ht' : t ≤ t') (hl : e.<span class="const token" data-verso-hover="144">lbl</span> t' = <span class="const token" data-verso-hover="76">.</span>tau r)</span>
+<span id="L359">    (hS : <span class="const token" data-verso-hover="415">StuckInv</span> π y₀ r ((e.<span class="const token" data-verso-hover="155">cfg</span> t').<span class="const token" data-verso-hover="82">loc</span> r)) : <span class="const token" data-verso-hover="415">StuckInv</span> π y₀ r ((e.<span class="const token" data-verso-hover="155">cfg</span> (t' + <span class="nu">1</span>)).<span class="const token" data-verso-hover="82">loc</span> r) := <span class="kw">by</span></span>
+<span id="L360">  <span class="kw">rcases</span> hS <span class="kw">with</span> ⟨j, hpc⟩ | hW</span>
+<span id="L361">  · <span class="kw">obtain</span> ⟨-, hloc⟩ := <span class="const token" data-verso-hover="404">step_wr</span> hid hm H hl hpc</span>
+<span id="L362">    <span class="kw">rw</span> [hloc]; <span class="kw">unfold</span> <span class="const token" data-verso-hover="337">wrFrom</span>; <span class="kw">split_ifs</span></span>
+<span id="L363">    · <span class="kw">exact</span> <span class="const token" data-verso-hover="168">Or.inl</span> ⟨_, <span class="const token" data-verso-hover="108">rfl</span>⟩</span>
+<span id="L364">    · <span class="kw">exact</span> <span class="const token" data-verso-hover="170">Or.inr</span> ⟨<span class="nu">0</span>, <span class="const token" data-verso-hover="59">true</span>, <span class="const token" data-verso-hover="108">rfl</span>, <span class="const token" data-verso-hover="170">Or.inr</span> (<span class="const token" data-verso-hover="421">Nat.zero_le</span> _)⟩</span>
+<span id="L365">  · <span class="kw">exact</span> <span class="const token" data-verso-hover="170">Or.inr</span> (<span class="const token" data-verso-hover="417">waitInv_step</span> hid hm H hyq ht' hl hW)</span>
+<span id="L366"></span>
+<span id="L367"><span class="kw">lemma</span> <span class="const token" data-verso-hover="423">wait_forever</span> (ht0 : t₀ ≤ t) {r : P} {s : <span class="const token" data-verso-hover="15">ℕ</span>} (hs : t ≤ s)</span>
+<span id="L368">    (hW : <span class="const token" data-verso-hover="414">WaitInv</span> π y₀ r ((e.<span class="const token" data-verso-hover="155">cfg</span> s).<span class="const token" data-verso-hover="82">loc</span> r)) : ∀ t' ≥ s, <span class="const token" data-verso-hover="414">WaitInv</span> π y₀ r ((e.<span class="const token" data-verso-hover="155">cfg</span> t').<span class="const token" data-verso-hover="82">loc</span> r) := <span class="kw">by</span></span>
+<span id="L369">  <span class="kw">have</span> hpend : (e.<span class="const token" data-verso-hover="155">cfg</span> s).<span class="const token" data-verso-hover="83">pend</span> r ≠ <span class="const token" data-verso-hover="48">none</span> :=</span>
+<span id="L370">    H.<span class="const token" data-verso-hover="424">pend_of_busy</span> hid hm (<span class="kw">by</span> <span class="kw">omega</span>) (<span class="const token" data-verso-hover="416">busy_of_stuck</span> (<span class="const token" data-verso-hover="170">Or.inr</span> hW))</span>
+<span id="L371">  <span class="kw">exact</span> <span class="const token" data-verso-hover="386">loc_forever</span> H (<span class="kw">by</span> <span class="kw">omega</span>) hpend _ hW</span>
+<span id="L372">    (<span class="kw">fun</span> t' ht' hQ hl =&gt; <span class="const token" data-verso-hover="417">waitInv_step</span> hid hm H hyq (<span class="kw">by</span> <span class="kw">omega</span>) hl hQ)</span>
+<span id="L373"></span>
+<span id="L374"><span class="kw">lemma</span> <span class="const token" data-verso-hover="425">stuck_own_empty</span> (ht0 : t₀ ≤ t) {r : P} {s : <span class="const token" data-verso-hover="15">ℕ</span>} (hs : t ≤ s)</span>
+<span id="L375">    (hS : <span class="const token" data-verso-hover="415">StuckInv</span> π y₀ r ((e.<span class="const token" data-verso-hover="155">cfg</span> s).<span class="const token" data-verso-hover="82">loc</span> r)) : ∃ T, ∀ t' ≥ T, <span class="const token" data-verso-hover="407">own</span> ids (e.<span class="const token" data-verso-hover="155">cfg</span> t') r = ∅ := <span class="kw">by</span></span>
+<span id="L376">  <span class="kw">have</span> hpend : (e.<span class="const token" data-verso-hover="155">cfg</span> s).<span class="const token" data-verso-hover="83">pend</span> r ≠ <span class="const token" data-verso-hover="48">none</span> := H.<span class="const token" data-verso-hover="424">pend_of_busy</span> hid hm (<span class="kw">by</span> <span class="kw">omega</span>) (<span class="const token" data-verso-hover="416">busy_of_stuck</span> hS)</span>
+<span id="L377">  <span class="kw">have</span> hall : ∀ t' ≥ s, <span class="const token" data-verso-hover="415">StuckInv</span> π y₀ r ((e.<span class="const token" data-verso-hover="155">cfg</span> t').<span class="const token" data-verso-hover="82">loc</span> r) :=</span>
+<span id="L378">    <span class="const token" data-verso-hover="386">loc_forever</span> H (<span class="kw">by</span> <span class="kw">omega</span>) hpend _ hS</span>
+<span id="L379">      (<span class="kw">fun</span> t' ht' hQ hl =&gt; <span class="const token" data-verso-hover="422">stuckInv_step</span> hid hm H hyq (<span class="kw">by</span> <span class="kw">omega</span>) hl hQ)</span>
+<span id="L380">  <span class="kw">obtain</span> ⟨s', hs', hG⟩ := H.<span class="const token" data-verso-hover="426">eventually_loc</span> (<span class="kw">show</span> t₀ ≤ s <span class="kw">by</span> <span class="kw">omega</span>) hpend</span>
+<span id="L381">    (<span class="kw">fun</span> st =&gt; ∃ j ab, st.<span class="const token" data-verso-hover="331">pc</span> = <span class="const token" data-verso-hover="324">.</span>wait j ab) (<span class="kw">fun</span> st =&gt; <span class="const token" data-verso-hover="353">wrDist</span> m st.<span class="const token" data-verso-hover="331">pc</span>) (<span class="kw">by</span></span>
+<span id="L382">      <span class="kw">intro</span> t' ht' hnG hl</span>
+<span id="L383">      <span class="kw">try</span> <span class="kw">dsimp</span> only <span class="kw">at</span> hnG ⊢</span>
+<span id="L384">      <span class="kw">rcases</span> hall t' ht' <span class="kw">with</span> ⟨j, hpc⟩ | ⟨j, ab, hpc, -⟩</span>
+<span id="L385">      · <span class="kw">obtain</span> ⟨hj, hloc⟩ := <span class="const token" data-verso-hover="404">step_wr</span> hid hm H hl hpc</span>
+<span id="L386">        <span class="kw">rw</span> [hloc, hpc]</span>
+<span id="L387">        <span class="kw">unfold</span> <span class="const token" data-verso-hover="337">wrFrom</span></span>
+<span id="L388">        <span class="kw">split_ifs</span> <span class="kw">with</span> h</span>
+<span id="L389">        · <span class="kw">right</span></span>
+<span id="L390">          <span class="kw">have</span> := (<span class="const token" data-verso-hover="427">nextOwn_found</span> _ _ _ h).<span class="const token" data-verso-hover="152">1</span></span>
+<span id="L391">          <span class="kw">simp</span> only [<span class="const token" data-verso-hover="353">wrDist</span>]; <span class="kw">omega</span></span>
+<span id="L392">        · <span class="kw">left</span>; <span class="kw">exact</span> ⟨<span class="nu">0</span>, <span class="const token" data-verso-hover="59">true</span>, <span class="const token" data-verso-hover="108">rfl</span>⟩</span>
+<span id="L393">      · <span class="kw">exact</span> <span class="const token" data-verso-hover="184">absurd</span> ⟨j, ab, hpc⟩ hnG)</span>
+<span id="L394">  <span class="kw">have</span> hW : <span class="const token" data-verso-hover="414">WaitInv</span> π y₀ r ((e.<span class="const token" data-verso-hover="155">cfg</span> s').<span class="const token" data-verso-hover="82">loc</span> r) := <span class="kw">by</span></span>
+<span id="L395">    <span class="kw">rcases</span> hall s' hs' <span class="kw">with</span> ⟨j, hpc⟩ | hW</span>
+<span id="L396">    · <span class="kw">obtain</span> ⟨j', ab, hpc'⟩ := hG; <span class="kw">rw</span> [hpc] <span class="kw">at</span> hpc'; <span class="kw">cases</span> hpc'</span>
+<span id="L397">    · <span class="kw">exact</span> hW</span>
+<span id="L398">  <span class="kw">refine</span> ⟨s', <span class="kw">fun</span> t' ht' =&gt; ?_⟩</span>
+<span id="L399">  <span class="kw">obtain</span> ⟨j, ab, hpc, -⟩ := <span class="const token" data-verso-hover="423">wait_forever</span> hid hm H hyq ht0 (<span class="kw">by</span> <span class="kw">omega</span>) hW t' ht'</span>
+<span id="L400">  <span class="kw">exact</span> <span class="const token" data-verso-hover="428">own_empty_of_wait</span> hid hm H hpc</span>
+<span id="L401"></span>
+<span id="L402"><span class="dc">/-- **Classification.** Every process eventually owns nothing forever, or stays in the first two</span></span>
+<span id="L403"><span class="dc">loops forever. -/</span></span>
+<span id="L404"><span class="kw">lemma</span> <span class="const token" data-verso-hover="429">classify</span> (ht0 : t₀ ≤ t) (r : P) :</span>
+<span id="L405">    (∃ T, ∀ t' ≥ T, <span class="const token" data-verso-hover="407">own</span> ids (e.<span class="const token" data-verso-hover="155">cfg</span> t') r = ∅) ∨</span>
+<span id="L406">    (∃ T ≥ t, ∀ t' ≥ T, <span class="const token" data-verso-hover="347">CasRead</span> ((e.<span class="const token" data-verso-hover="155">cfg</span> t').<span class="const token" data-verso-hover="82">loc</span> r).<span class="const token" data-verso-hover="331">pc</span>) := <span class="kw">by</span></span>
+<span id="L407">  <span class="kw">by_cases</span> hS : ∃ s ≥ t, <span class="const token" data-verso-hover="415">StuckInv</span> π y₀ r ((e.<span class="const token" data-verso-hover="155">cfg</span> s).<span class="const token" data-verso-hover="82">loc</span> r)</span>
+<span id="L408">  · <span class="kw">obtain</span> ⟨s, hs, hst⟩ := hS</span>
+<span id="L409">    <span class="kw">exact</span> <span class="const token" data-verso-hover="168">Or.inl</span> (<span class="const token" data-verso-hover="425">stuck_own_empty</span> hid hm H hyq ht0 hs hst)</span>
+<span id="L410">  <span class="kw">have</span> hS' : ∀ s ≥ t, ¬ <span class="const token" data-verso-hover="415">StuckInv</span> π y₀ r ((e.<span class="const token" data-verso-hover="155">cfg</span> s).<span class="const token" data-verso-hover="82">loc</span> r) := <span class="kw">fun</span> s hs h =&gt; hS ⟨s, hs, h⟩</span>
+<span id="L411">  <span class="kw">by_cases</span> hB : ∃ s ≥ t, <span class="const token" data-verso-hover="349">Busy</span> ((e.<span class="const token" data-verso-hover="155">cfg</span> s).<span class="const token" data-verso-hover="82">loc</span> r).<span class="const token" data-verso-hover="331">pc</span></span>
+<span id="L412">  swap</span>
+<span id="L413">  · <span class="kw">left</span></span>
+<span id="L414">    <span class="kw">refine</span> ⟨t, <span class="kw">fun</span> t' ht' =&gt; ?_⟩</span>
+<span id="L415">    <span class="kw">rcases</span> H.<span class="const token" data-verso-hover="430">phase</span> hid hm (<span class="kw">show</span> t₀ ≤ t' <span class="kw">by</span> <span class="kw">omega</span>) r <span class="kw">with</span> ⟨h, -⟩ | ⟨-, h⟩</span>
+<span id="L416">    · <span class="kw">exact</span> <span class="const token" data-verso-hover="431">own_empty_of_rem</span> hid hm H h</span>
+<span id="L417">    · <span class="kw">exact</span> <span class="const token" data-verso-hover="184">absurd</span> ⟨t', ht', h⟩ hB</span>
+<span id="L418">  <span class="kw">right</span></span>
+<span id="L419">  <span class="kw">obtain</span> ⟨s, hs, hb⟩ := hB</span>
+<span id="L420">  <span class="kw">have</span> hpend := H.<span class="const token" data-verso-hover="424">pend_of_busy</span> hid hm (<span class="kw">show</span> t₀ ≤ s <span class="kw">by</span> <span class="kw">omega</span>) hb</span>
+<span id="L421">  <span class="kw">obtain</span> ⟨s', hs', hG⟩ := H.<span class="const token" data-verso-hover="426">eventually_loc</span> (<span class="kw">show</span> t₀ ≤ s <span class="kw">by</span> <span class="kw">omega</span>) hpend</span>
+<span id="L422">    (<span class="kw">fun</span> st =&gt; <span class="const token" data-verso-hover="347">CasRead</span> st.<span class="const token" data-verso-hover="331">pc</span>) (<span class="kw">fun</span> st =&gt; <span class="const token" data-verso-hover="354">waitDist</span> m st.<span class="const token" data-verso-hover="331">pc</span>) (<span class="kw">by</span></span>
+<span id="L423">      <span class="kw">intro</span> t' ht' hnG hl</span>
+<span id="L424">      <span class="kw">try</span> <span class="kw">dsimp</span> only <span class="kw">at</span> hnG ⊢</span>
+<span id="L425">      <span class="kw">have</span> hb' := H.<span class="const token" data-verso-hover="412">busy_of_tau</span> hid hm (<span class="kw">show</span> t₀ ≤ t' <span class="kw">by</span> <span class="kw">omega</span>) hl</span>
+<span id="L426">      <span class="kw">cases</span> hpc : ((e.<span class="const token" data-verso-hover="155">cfg</span> t').<span class="const token" data-verso-hover="82">loc</span> r).<span class="const token" data-verso-hover="331">pc</span> <span class="kw">with</span></span>
+<span id="L427">      | <span class="const token" data-verso-hover="321">cas</span> i =&gt; <span class="kw">rw</span> [hpc] <span class="kw">at</span> hnG; <span class="kw">exact</span> <span class="const token" data-verso-hover="184">absurd</span> (<span class="const token" data-verso-hover="168">Or.inl</span> ⟨i, <span class="const token" data-verso-hover="108">rfl</span>⟩) hnG</span>
+<span id="L428">      | <span class="const token" data-verso-hover="322">read</span> i =&gt; <span class="kw">rw</span> [hpc] <span class="kw">at</span> hnG; <span class="kw">exact</span> <span class="const token" data-verso-hover="184">absurd</span> (<span class="const token" data-verso-hover="170">Or.inr</span> ⟨i, <span class="const token" data-verso-hover="108">rfl</span>⟩) hnG</span>
+<span id="L429">      | <span class="const token" data-verso-hover="323">wr</span> j =&gt; <span class="kw">exact</span> <span class="const token" data-verso-hover="184">absurd</span> (<span class="const token" data-verso-hover="168">Or.inl</span> ⟨j, hpc⟩) (hS' t' (<span class="kw">by</span> <span class="kw">omega</span>))</span>
+<span id="L430">      | <span class="const token" data-verso-hover="324">wait</span> j ab =&gt;</span>
+<span id="L431">        <span class="kw">obtain</span> ⟨hj, -, hloc⟩ := <span class="const token" data-verso-hover="402">step_wait</span> hid hm H hl hpc</span>
+<span id="L432">        <span class="kw">by_cases</span> h1 : j + <span class="nu">1</span> &lt; m</span>
+<span id="L433">        · <span class="kw">right</span>; <span class="kw">rw</span> [hloc]; <span class="kw">simp</span> only [h1, ↓<span class="const token" data-verso-hover="123">reduceIte</span>, <span class="const token" data-verso-hover="354">waitDist</span>]; <span class="kw">omega</span></span>
+<span id="L434">        · <span class="kw">by_cases</span> h2 : (ab &amp;&amp; (e.<span class="const token" data-verso-hover="155">cfg</span> t').<span class="const token" data-verso-hover="84">mem</span> <span class="const token" data-verso-hover="64">(</span>) (π r ⟨j, hj⟩) == <span class="const token" data-verso-hover="48">none</span>) = <span class="const token" data-verso-hover="59">true</span></span>
+<span id="L435">          · <span class="kw">left</span>; <span class="kw">rw</span> [hloc]; <span class="kw">simp</span> only [h1, h2, ↓<span class="const token" data-verso-hover="123">reduceIte</span>]; <span class="kw">exact</span> <span class="const token" data-verso-hover="168">Or.inl</span> ⟨<span class="nu">0</span>, <span class="const token" data-verso-hover="108">rfl</span>⟩</span>
+<span id="L436">          · <span class="kw">exfalso</span></span>
+<span id="L437">            <span class="kw">apply</span> hS' (t' + <span class="nu">1</span>) (<span class="kw">by</span> <span class="kw">omega</span>)</span>
+<span id="L438">            <span class="kw">rw</span> [hloc]; <span class="kw">simp</span> only [h1, h2, ↓<span class="const token" data-verso-hover="123">reduceIte</span>]</span>
+<span id="L439">            <span class="kw">exact</span> <span class="const token" data-verso-hover="170">Or.inr</span> ⟨<span class="nu">0</span>, <span class="const token" data-verso-hover="59">true</span>, <span class="const token" data-verso-hover="108">rfl</span>, <span class="const token" data-verso-hover="170">Or.inr</span> (<span class="const token" data-verso-hover="421">Nat.zero_le</span> _)⟩</span>
+<span id="L440">      | <span class="const token" data-verso-hover="326">_</span> =&gt; <span class="kw">rw</span> [hpc] <span class="kw">at</span> hb'; <span class="kw">exact</span> <span class="const token" data-verso-hover="184">absurd</span> hb' <span class="const token" data-verso-hover="70">id</span>)</span>
+<span id="L441">  <span class="kw">have</span> hpend' : (e.<span class="const token" data-verso-hover="155">cfg</span> s').<span class="const token" data-verso-hover="83">pend</span> r ≠ <span class="const token" data-verso-hover="48">none</span> := <span class="kw">by</span></span>
+<span id="L442">    <span class="kw">rw</span> [<span class="const token" data-verso-hover="388">pend_persist</span> e t₀ H.<span class="const token" data-verso-hover="385">noret</span> (<span class="kw">by</span> <span class="kw">omega</span>) hpend s' hs']; <span class="kw">exact</span> hpend</span>
+<span id="L443">  <span class="kw">refine</span> ⟨s', <span class="kw">by</span> <span class="kw">omega</span>, <span class="const token" data-verso-hover="386">loc_forever</span> H (<span class="kw">show</span> t₀ ≤ s' <span class="kw">by</span> <span class="kw">omega</span>) hpend' (<span class="kw">fun</span> st =&gt; <span class="const token" data-verso-hover="347">CasRead</span> st.<span class="const token" data-verso-hover="331">pc</span>) hG ?_⟩</span>
+<span id="L444">  <span class="kw">intro</span> t' ht' hQ hl</span>
+<span id="L445">  <span class="kw">try</span> <span class="kw">dsimp</span> only <span class="kw">at</span> hQ ⊢</span>
+<span id="L446">  <span class="kw">rcases</span> hQ <span class="kw">with</span> ⟨i, hpc⟩ | ⟨i, hpc⟩</span>
+<span id="L447">  · <span class="kw">obtain</span> ⟨hi, hloc, -⟩ := <span class="const token" data-verso-hover="396">step_cas</span> hid hm H hl hpc</span>
+<span id="L448">    <span class="kw">rw</span> [hloc]; <span class="kw">split_ifs</span></span>
+<span id="L449">    · <span class="kw">exact</span> <span class="const token" data-verso-hover="168">Or.inl</span> ⟨_, <span class="const token" data-verso-hover="108">rfl</span>⟩</span>
+<span id="L450">    · <span class="kw">exact</span> <span class="const token" data-verso-hover="170">Or.inr</span> ⟨_, <span class="const token" data-verso-hover="108">rfl</span>⟩</span>
+<span id="L451">  · <span class="kw">obtain</span> ⟨hi, -, hloc⟩ := <span class="const token" data-verso-hover="400">step_read</span> hid hm H hl hpc</span>
+<span id="L452">    <span class="kw">by_cases</span> h1 : i + <span class="nu">1</span> &lt; m</span>
+<span id="L453">    · <span class="kw">rw</span> [hloc]; <span class="kw">simp</span> only [h1, ↓<span class="const token" data-verso-hover="123">reduceIte</span>]; <span class="kw">exact</span> <span class="const token" data-verso-hover="170">Or.inr</span> ⟨_, <span class="const token" data-verso-hover="108">rfl</span>⟩</span>
+<span id="L454">    · <span class="kw">have</span> hph := H.<span class="const token" data-verso-hover="430">phase</span> hid hm (<span class="kw">show</span> t₀ ≤ t' + <span class="nu">1</span> <span class="kw">by</span> <span class="kw">omega</span>) r</span>
+<span id="L455">      <span class="kw">have</span> hS1 := hS' (t' + <span class="nu">1</span>) (<span class="kw">by</span> <span class="kw">omega</span>)</span>
+<span id="L456">      <span class="kw">rw</span> [hloc] <span class="kw">at</span> hph hS1 ⊢</span>
+<span id="L457">      <span class="kw">simp</span> only [h1, ↓<span class="const token" data-verso-hover="123">reduceIte</span>] <span class="kw">at</span> hph hS1 ⊢</span>
+<span id="L458">      <span class="kw">rcases</span> <span class="const token" data-verso-hover="351">afterRead_pc</span> ((e.<span class="const token" data-verso-hover="155">cfg</span> t').<span class="const token" data-verso-hover="82">loc</span> r)</span>
+<span id="L459">        (<span class="const token" data-verso-hover="210">Function.update</span> ((e.<span class="const token" data-verso-hover="155">cfg</span> t').<span class="const token" data-verso-hover="82">loc</span> r).<span class="const token" data-verso-hover="332">view</span> ⟨i, hi⟩ ((e.<span class="const token" data-verso-hover="155">cfg</span> t').<span class="const token" data-verso-hover="84">mem</span> <span class="const token" data-verso-hover="64">(</span>) (π r ⟨i, hi⟩)))</span>
+<span id="L460">        <span class="kw">with</span> ⟨j, h⟩ | h | h | h</span>
+<span id="L461">      · <span class="kw">exact</span> <span class="const token" data-verso-hover="184">absurd</span> (<span class="const token" data-verso-hover="168">Or.inl</span> ⟨j, h⟩) hS1</span>
+<span id="L462">      · <span class="kw">exact</span> <span class="const token" data-verso-hover="184">absurd</span> (<span class="const token" data-verso-hover="170">Or.inr</span> ⟨<span class="nu">0</span>, <span class="const token" data-verso-hover="59">true</span>, h, <span class="const token" data-verso-hover="170">Or.inr</span> (<span class="const token" data-verso-hover="421">Nat.zero_le</span> _)⟩) hS1</span>
+<span id="L463">      · <span class="kw">exfalso</span>; <span class="kw">rw</span> [h] <span class="kw">at</span> hph</span>
+<span id="L464">        <span class="kw">rcases</span> hph <span class="kw">with</span> ⟨h', -⟩ | ⟨-, h'⟩</span>
+<span id="L465">        · <span class="kw">cases</span> h'</span>
+<span id="L466">        · <span class="kw">exact</span> h'</span>
+<span id="L467">      · <span class="kw">exact</span> <span class="const token" data-verso-hover="168">Or.inl</span> ⟨<span class="nu">0</span>, h⟩</span>
+<span id="L468"></span>
+<span id="L469"><span class="kw">end</span> Exec</span>
+<span id="L470"></span>
+<span id="L471"><span class="dc">/-! ### Owners decide on a constant memory -/</span></span>
+<span id="L472"></span>
+<span id="L473"><span class="kw">section</span> Owner</span>
+<span id="L474"></span>
+<span id="L475"><span class="kw">variable</span> {e : ((<span class="const token" data-verso-hover="339">alg2</span> Id m).<span class="const token" data-verso-hover="69">impl</span> ids π).<span class="const token" data-verso-hover="382">InfExec</span>} {t₀ : <span class="const token" data-verso-hover="15">ℕ</span>}</span>
+<span id="L476">  (hid : <span class="const token" data-verso-hover="86">Function.Injective</span> ids) (hm : <span class="nu">0</span> &lt; m) (H : <span class="const token" data-verso-hover="341">Hyp</span> e t₀)</span>
+<span id="L477"><span class="kw">include</span> hid hm H</span>
+<span id="L478"></span>
+<span id="L479"><span class="dc">/-- The scan invariant for a constant memory `M₀`. -/</span></span>
+<span id="L480"><span class="kw">def</span> <span class="const token" data-verso-hover="432">ScanQ</span> (π : P → <span class="const token" data-verso-hover="66">Equiv.Perm</span> (<span class="const token" data-verso-hover="19">Fin</span> m)) (M₀ : <span class="const token" data-verso-hover="19">Fin</span> m → <span class="const token" data-verso-hover="31">Option</span> Id) (r : P) (st : <span class="const token" data-verso-hover="329">St</span> Id m) : <span class="kw">Prop</span> :=</span>
+<span id="L481">  (∃ i, st.<span class="const token" data-verso-hover="331">pc</span> = <span class="const token" data-verso-hover="321">.</span>cas i) ∨ (∃ i, st.<span class="const token" data-verso-hover="331">pc</span> = <span class="const token" data-verso-hover="322">.</span>read i ∧ ∀ x : <span class="const token" data-verso-hover="19">Fin</span> m, x.<span class="const token" data-verso-hover="36">val</span> &lt; i → st.<span class="const token" data-verso-hover="332">view</span> x = M₀ (π r x))</span>
+<span id="L482"></span>
+<span id="L483"><span class="kw">omit</span> hid hm H <span class="kw">in</span></span>
+<span id="L484"><span class="kw">lemma</span> <span class="const token" data-verso-hover="433">scanQ_def</span> {M₀ : <span class="const token" data-verso-hover="19">Fin</span> m → <span class="const token" data-verso-hover="31">Option</span> Id} {r : P} {st : <span class="const token" data-verso-hover="329">St</span> Id m} :</span>
+<span id="L485">    <span class="const token" data-verso-hover="432">ScanQ</span> π M₀ r st ↔ (∃ i, st.<span class="const token" data-verso-hover="331">pc</span> = <span class="const token" data-verso-hover="321">.</span>cas i) ∨</span>
+<span id="L486">      (∃ i, st.<span class="const token" data-verso-hover="331">pc</span> = <span class="const token" data-verso-hover="322">.</span>read i ∧ ∀ x : <span class="const token" data-verso-hover="19">Fin</span> m, x.<span class="const token" data-verso-hover="36">val</span> &lt; i → st.<span class="const token" data-verso-hover="332">view</span> x = M₀ (π r x)) := <span class="const token" data-verso-hover="434">Iff.rfl</span></span>
+<span id="L487"></span>
+<span id="L488"><span class="dc">/-- A process staying in the first two loops forever while the memory is constant completes a</span></span>
+<span id="L489"><span class="dc">scan on the constant memory and decides to restart: `owned ≥ most_present` and `owned ≤ m/2`. -/</span></span>
+<span id="L490"><span class="kw">lemma</span> <span class="const token" data-verso-hover="435">owner_decision</span> {T₆ : <span class="const token" data-verso-hover="15">ℕ</span>} (hT₆ : t₀ ≤ T₆)</span>
+<span id="L491">    (hconst : ∀ t' ≥ T₆, (e.<span class="const token" data-verso-hover="155">cfg</span> t').<span class="const token" data-verso-hover="84">mem</span> <span class="const token" data-verso-hover="64">(</span>) = (e.<span class="const token" data-verso-hover="155">cfg</span> T₆).<span class="const token" data-verso-hover="84">mem</span> <span class="const token" data-verso-hover="64">(</span>)) {r : P}</span>
+<span id="L492">    (hcr : ∀ t' ≥ T₆, <span class="const token" data-verso-hover="347">CasRead</span> ((e.<span class="const token" data-verso-hover="155">cfg</span> t').<span class="const token" data-verso-hover="82">loc</span> r).<span class="const token" data-verso-hover="331">pc</span>) :</span>
+<span id="L493">    ¬ <span class="const token" data-verso-hover="334">owned</span> (<span class="kw">fun</span> x =&gt; (e.<span class="const token" data-verso-hover="155">cfg</span> T₆).<span class="const token" data-verso-hover="84">mem</span> <span class="const token" data-verso-hover="64">(</span>) (π r x)) (ids r) &lt;</span>
+<span id="L494">        <span class="const token" data-verso-hover="335">mostPresent</span> (<span class="kw">fun</span> x =&gt; (e.<span class="const token" data-verso-hover="155">cfg</span> T₆).<span class="const token" data-verso-hover="84">mem</span> <span class="const token" data-verso-hover="64">(</span>) (π r x)) ∧</span>
+<span id="L495">      ¬ m &lt; <span class="nu">2</span> * <span class="const token" data-verso-hover="334">owned</span> (<span class="kw">fun</span> x =&gt; (e.<span class="const token" data-verso-hover="155">cfg</span> T₆).<span class="const token" data-verso-hover="84">mem</span> <span class="const token" data-verso-hover="64">(</span>) (π r x)) (ids r) := <span class="kw">by</span></span>
+<span id="L496">  <span class="kw">set</span> M₀ := (e.<span class="const token" data-verso-hover="155">cfg</span> T₆).<span class="const token" data-verso-hover="84">mem</span> <span class="const token" data-verso-hover="64">(</span>) <span class="kw">with</span> hM₀</span>
+<span id="L497">  <span class="kw">have</span> hpend : ∀ s ≥ T₆, (e.<span class="const token" data-verso-hover="155">cfg</span> s).<span class="const token" data-verso-hover="83">pend</span> r ≠ <span class="const token" data-verso-hover="48">none</span> := <span class="kw">fun</span> s hs =&gt;</span>
+<span id="L498">    H.<span class="const token" data-verso-hover="424">pend_of_busy</span> hid hm (<span class="kw">by</span> <span class="kw">omega</span>) (<span class="const token" data-verso-hover="348">busy_of_casRead</span> (hcr s hs))</span>
+<span id="L499">  <span class="cm">--</span><span class="cm"> reach line 2</span></span>
+<span id="L500">  <span class="kw">obtain</span> ⟨s₁, hs₁, hG₁⟩ := H.<span class="const token" data-verso-hover="426">eventually_loc</span> hT₆ (hpend T₆ <span class="const token" data-verso-hover="392">le_rfl</span>)</span>
+<span id="L501">    (<span class="kw">fun</span> st =&gt; ∃ i, st.<span class="const token" data-verso-hover="331">pc</span> = <span class="const token" data-verso-hover="321">.</span>cas i) (<span class="kw">fun</span> st =&gt; <span class="const token" data-verso-hover="355">readDist</span> m st.<span class="const token" data-verso-hover="331">pc</span>) (<span class="kw">by</span></span>
+<span id="L502">      <span class="kw">intro</span> t' ht' hnG hl</span>
+<span id="L503">      <span class="kw">try</span> <span class="kw">dsimp</span> only <span class="kw">at</span> hnG ⊢</span>
+<span id="L504">      <span class="kw">rcases</span> hcr t' ht' <span class="kw">with</span> ⟨i, hpc⟩ | ⟨i, hpc⟩</span>
+<span id="L505">      · <span class="kw">exact</span> <span class="const token" data-verso-hover="184">absurd</span> ⟨i, hpc⟩ hnG</span>
+<span id="L506">      · <span class="kw">obtain</span> ⟨hi, -, hloc⟩ := <span class="const token" data-verso-hover="400">step_read</span> hid hm H hl hpc</span>
+<span id="L507">        <span class="kw">by_cases</span> h1 : i + <span class="nu">1</span> &lt; m</span>
+<span id="L508">        · <span class="kw">right</span>; <span class="kw">rw</span> [hloc, hpc]; <span class="kw">simp</span> only [h1, ↓<span class="const token" data-verso-hover="123">reduceIte</span>, <span class="const token" data-verso-hover="355">readDist</span>]; <span class="kw">omega</span></span>
+<span id="L509">        · <span class="kw">left</span></span>
+<span id="L510">          <span class="kw">have</span> hc := hcr (t' + <span class="nu">1</span>) (<span class="kw">by</span> <span class="kw">omega</span>)</span>
+<span id="L511">          <span class="kw">rw</span> [hloc] <span class="kw">at</span> hc ⊢; <span class="kw">simp</span> only [h1, ↓<span class="const token" data-verso-hover="123">reduceIte</span>] <span class="kw">at</span> hc ⊢</span>
+<span id="L512">          <span class="kw">exact</span> ⟨<span class="nu">0</span>, <span class="const token" data-verso-hover="350">cas0_of_afterRead</span> hc⟩)</span>
+<span id="L513">  <span class="cm">--</span><span class="cm"> the scan invariant</span></span>
+<span id="L514">  <span class="kw">have</span> hQ : ∀ t' ≥ s₁, <span class="const token" data-verso-hover="432">ScanQ</span> π M₀ r ((e.<span class="const token" data-verso-hover="155">cfg</span> t').<span class="const token" data-verso-hover="82">loc</span> r) :=</span>
+<span id="L515">    <span class="const token" data-verso-hover="386">loc_forever</span> H (<span class="kw">by</span> <span class="kw">omega</span>) (hpend s₁ (<span class="kw">by</span> <span class="kw">omega</span>)) (<span class="const token" data-verso-hover="432">ScanQ</span> π M₀ r) (<span class="const token" data-verso-hover="168">Or.inl</span> hG₁) (<span class="kw">by</span></span>
+<span id="L516">      <span class="kw">intro</span> t' ht' hQt hl</span>
+<span id="L517">      <span class="kw">rcases</span> hQt <span class="kw">with</span> ⟨i, hpc⟩ | ⟨i, hpc, hview⟩</span>
+<span id="L518">      · <span class="kw">obtain</span> ⟨hi, hloc, -⟩ := <span class="const token" data-verso-hover="396">step_cas</span> hid hm H hl hpc</span>
+<span id="L519">        <span class="kw">rw</span> [hloc]; <span class="kw">split_ifs</span></span>
+<span id="L520">        · <span class="kw">exact</span> <span class="const token" data-verso-hover="168">Or.inl</span> ⟨_, <span class="const token" data-verso-hover="108">rfl</span>⟩</span>
+<span id="L521">        · <span class="kw">exact</span> <span class="const token" data-verso-hover="170">Or.inr</span> ⟨<span class="nu">0</span>, <span class="const token" data-verso-hover="108">rfl</span>, <span class="kw">fun</span> x hx =&gt; <span class="const token" data-verso-hover="184">absurd</span> hx (<span class="const token" data-verso-hover="436">Nat.not_lt_zero</span> _)⟩</span>
+<span id="L522">      · <span class="kw">obtain</span> ⟨hi, -, hloc⟩ := <span class="const token" data-verso-hover="400">step_read</span> hid hm H hl hpc</span>
+<span id="L523">        <span class="kw">by_cases</span> h1 : i + <span class="nu">1</span> &lt; m</span>
+<span id="L524">        · <span class="kw">rw</span> [hloc]; <span class="kw">simp</span> only [h1, ↓<span class="const token" data-verso-hover="123">reduceIte</span>]</span>
+<span id="L525">          <span class="kw">refine</span> <span class="const token" data-verso-hover="170">Or.inr</span> ⟨i + <span class="nu">1</span>, <span class="const token" data-verso-hover="108">rfl</span>, <span class="kw">fun</span> x hxi =&gt; ?_⟩</span>
+<span id="L526">          <span class="kw">dsimp</span> only</span>
+<span id="L527">          <span class="kw">by_cases</span> hx : x = ⟨i, hi⟩</span>
+<span id="L528">          · <span class="kw">subst</span> hx; <span class="kw">rw</span> [<span class="const token" data-verso-hover="240">Function.update_self</span>, hconst t' (<span class="kw">by</span> <span class="kw">omega</span>)]</span>
+<span id="L529">          · <span class="kw">rw</span> [<span class="const token" data-verso-hover="241">Function.update_of_ne</span> hx]</span>
+<span id="L530">            <span class="kw">exact</span> hview x (<span class="kw">by</span> <span class="kw">have</span> : x.<span class="const token" data-verso-hover="36">val</span> ≠ i := <span class="kw">fun</span> h =&gt; hx (<span class="const token" data-verso-hover="418">Fin.ext</span> h); <span class="kw">omega</span>)</span>
+<span id="L531">        · <span class="kw">have</span> hc := hcr (t' + <span class="nu">1</span>) (<span class="kw">by</span> <span class="kw">omega</span>)</span>
+<span id="L532">          <span class="kw">rw</span> [hloc] <span class="kw">at</span> hc ⊢; <span class="kw">simp</span> only [h1, ↓<span class="const token" data-verso-hover="123">reduceIte</span>] <span class="kw">at</span> hc ⊢</span>
+<span id="L533">          <span class="kw">exact</span> <span class="const token" data-verso-hover="168">Or.inl</span> ⟨<span class="nu">0</span>, <span class="const token" data-verso-hover="350">cas0_of_afterRead</span> hc⟩)</span>
+<span id="L534">  <span class="cm">--</span><span class="cm"> reach the last read of a scan</span></span>
+<span id="L535">  <span class="kw">obtain</span> ⟨τ, hτ, hGτ⟩ := H.<span class="const token" data-verso-hover="426">eventually_loc</span> (<span class="kw">show</span> t₀ ≤ s₁ <span class="kw">by</span> <span class="kw">omega</span>) (hpend s₁ (<span class="kw">by</span> <span class="kw">omega</span>))</span>
+<span id="L536">    (<span class="kw">fun</span> st =&gt; st.<span class="const token" data-verso-hover="331">pc</span> = <span class="const token" data-verso-hover="322">.</span>read (m - <span class="nu">1</span>)) (<span class="kw">fun</span> st =&gt; <span class="const token" data-verso-hover="356">scanDist</span> m st.<span class="const token" data-verso-hover="331">pc</span>) (<span class="kw">by</span></span>
+<span id="L537">      <span class="kw">intro</span> t' ht' hnG hl</span>
+<span id="L538">      <span class="kw">try</span> <span class="kw">dsimp</span> only <span class="kw">at</span> hnG ⊢</span>
+<span id="L539">      <span class="kw">rcases</span> hcr t' (<span class="kw">by</span> <span class="kw">omega</span>) <span class="kw">with</span> ⟨i, hpc⟩ | ⟨i, hpc⟩</span>
+<span id="L540">      · <span class="kw">obtain</span> ⟨hi, hloc, -⟩ := <span class="const token" data-verso-hover="396">step_cas</span> hid hm H hl hpc</span>
+<span id="L541">        <span class="kw">right</span>; <span class="kw">rw</span> [hloc, hpc]; <span class="kw">split_ifs</span> &lt;;&gt; <span class="kw">simp</span> only [<span class="const token" data-verso-hover="356">scanDist</span>] &lt;;&gt; <span class="kw">omega</span></span>
+<span id="L542">      · <span class="kw">obtain</span> ⟨hi, -, hloc⟩ := <span class="const token" data-verso-hover="400">step_read</span> hid hm H hl hpc</span>
+<span id="L543">        <span class="kw">have</span> h1 : i + <span class="nu">1</span> &lt; m := <span class="kw">by</span></span>
+<span id="L544">          <span class="kw">by_contra</span> h</span>
+<span id="L545">          <span class="kw">exact</span> hnG (<span class="kw">by</span> <span class="kw">rw</span> [hpc, <span class="kw">show</span> i = m - <span class="nu">1</span> <span class="kw">by</span> <span class="kw">omega</span>])</span>
+<span id="L546">        <span class="kw">right</span>; <span class="kw">rw</span> [hloc, hpc]; <span class="kw">simp</span> only [h1, ↓<span class="const token" data-verso-hover="123">reduceIte</span>, <span class="const token" data-verso-hover="356">scanDist</span>]; <span class="kw">omega</span>)</span>
+<span id="L547">  <span class="kw">have</span> hQτ := hQ τ hτ</span>
+<span id="L548">  <span class="kw">try</span> <span class="kw">dsimp</span> only <span class="kw">at</span> hGτ</span>
+<span id="L549">  <span class="kw">rcases</span> hQτ <span class="kw">with</span> ⟨i, hpc⟩ | ⟨i, hpc, hview⟩</span>
+<span id="L550">  · <span class="kw">rw</span> [hGτ] <span class="kw">at</span> hpc; <span class="kw">cases</span> hpc</span>
+<span id="L551">  <span class="kw">rw</span> [hGτ] <span class="kw">at</span> hpc</span>
+<span id="L552">  <span class="kw">simp</span> only [<span class="const token" data-verso-hover="437">PC.read.injEq</span>] <span class="kw">at</span> hpc</span>
+<span id="L553">  <span class="kw">subst</span> hpc</span>
+<span id="L554">  <span class="kw">obtain</span> ⟨τ₂, hτ₂, hl, hlocτ⟩ := <span class="const token" data-verso-hover="390">next_tau</span> H (<span class="kw">show</span> t₀ ≤ τ <span class="kw">by</span> <span class="kw">omega</span>) (hpend τ (<span class="kw">by</span> <span class="kw">omega</span>))</span>
+<span id="L555">  <span class="kw">have</span> hpc2 : ((e.<span class="const token" data-verso-hover="155">cfg</span> τ₂).<span class="const token" data-verso-hover="82">loc</span> r).<span class="const token" data-verso-hover="331">pc</span> = <span class="const token" data-verso-hover="322">.</span>read (m - <span class="nu">1</span>) := <span class="kw">by</span> <span class="kw">rw</span> [hlocτ]; <span class="kw">exact</span> hGτ</span>
+<span id="L556">  <span class="kw">obtain</span> ⟨hi, -, hloc⟩ := <span class="const token" data-verso-hover="400">step_read</span> hid hm H hl hpc2</span>
+<span id="L557">  <span class="kw">have</span> h1 : ¬ (m - <span class="nu">1</span> + <span class="nu">1</span> &lt; m) := <span class="kw">by</span> <span class="kw">omega</span></span>
+<span id="L558">  <span class="kw">have</span> hc := hcr (τ₂ + <span class="nu">1</span>) (<span class="kw">by</span> <span class="kw">omega</span>)</span>
+<span id="L559">  <span class="kw">rw</span> [hloc] <span class="kw">at</span> hc; <span class="kw">simp</span> only [h1, ↓<span class="const token" data-verso-hover="123">reduceIte</span>] <span class="kw">at</span> hc</span>
+<span id="L560">  <span class="kw">have</span> hdec := <span class="const token" data-verso-hover="352">afterRead_casRead</span> hc</span>
+<span id="L561">  <span class="kw">have</span> hme : ((e.<span class="const token" data-verso-hover="155">cfg</span> τ₂).<span class="const token" data-verso-hover="82">loc</span> r).<span class="const token" data-verso-hover="330">me</span> = ids r := (H.<span class="const token" data-verso-hover="398">locInv</span> hid hm τ₂ r).<span class="const token" data-verso-hover="152">1</span></span>
+<span id="L562">  <span class="kw">rw</span> [hme] <span class="kw">at</span> hdec</span>
+<span id="L563">  <span class="kw">have</span> hw : <span class="const token" data-verso-hover="210">Function.update</span> ((e.<span class="const token" data-verso-hover="155">cfg</span> τ₂).<span class="const token" data-verso-hover="82">loc</span> r).<span class="const token" data-verso-hover="332">view</span> ⟨m - <span class="nu">1</span>, hi⟩</span>
+<span id="L564">      ((e.<span class="const token" data-verso-hover="155">cfg</span> τ₂).<span class="const token" data-verso-hover="84">mem</span> <span class="const token" data-verso-hover="64">(</span>) (π r ⟨m - <span class="nu">1</span>, hi⟩)) = <span class="kw">fun</span> x =&gt; M₀ (π r x) := <span class="kw">by</span></span>
+<span id="L565">    <span class="kw">funext</span> x</span>
+<span id="L566">    <span class="kw">by_cases</span> hx : x = ⟨m - <span class="nu">1</span>, hi⟩</span>
+<span id="L567">    · <span class="kw">subst</span> hx; <span class="kw">rw</span> [<span class="const token" data-verso-hover="240">Function.update_self</span>, hconst τ₂ (<span class="kw">by</span> <span class="kw">omega</span>)]</span>
+<span id="L568">    · <span class="kw">rw</span> [<span class="const token" data-verso-hover="241">Function.update_of_ne</span> hx, hlocτ]</span>
+<span id="L569">      <span class="kw">exact</span> hview x (<span class="kw">by</span> <span class="kw">have</span> : x.<span class="const token" data-verso-hover="36">val</span> ≠ m - <span class="nu">1</span> := <span class="kw">fun</span> h =&gt; hx (<span class="const token" data-verso-hover="418">Fin.ext</span> h); <span class="kw">omega</span>)</span>
+<span id="L570">  <span class="kw">rw</span> [hw] <span class="kw">at</span> hdec</span>
+<span id="L571">  <span class="kw">exact</span> hdec</span>
+<span id="L572"></span>
+<span id="L573"><span class="kw">end</span> Owner</span>
+<span id="L574"></span>
+<span id="L575"><span class="kw">end</span> Endgame</span>
+<span id="L576"></span>
+<span id="L577"><span class="kw">open</span> Endgame</span>
+<span id="L578"></span>
+<span id="L579"><span class="kw">variable</span> [<span class="const token" data-verso-hover="228">Fintype</span> P]</span>
+<span id="L580"></span>
+<span id="L581"><span class="dc">/-- Once some process `q` stays forever in the first two loops (cas/read) of `lock()` and keeps a</span></span>
+<span id="L582"><span class="dc">register `y₀`, the execution cannot continue without a completion. -/</span></span>
+<span id="L583"><span class="kw">theorem</span> <span class="const token" data-verso-hover="346">endgame</span> (hid : <span class="const token" data-verso-hover="86">Function.Injective</span> ids) (hm : <span class="nu">0</span> &lt; m) (hM : m ∈ <span class="const token" data-verso-hover="160">M</span> (<span class="const token" data-verso-hover="161">Fintype.card</span> P))</span>
+<span id="L584">    {e : ((<span class="const token" data-verso-hover="339">alg2</span> Id m).<span class="const token" data-verso-hover="69">impl</span> ids π).<span class="const token" data-verso-hover="382">InfExec</span>} {t₀ : <span class="const token" data-verso-hover="15">ℕ</span>} (H : <span class="const token" data-verso-hover="341">Hyp</span> e t₀) {q : P} {t : <span class="const token" data-verso-hover="15">ℕ</span>} (ht : t₀ ≤ t)</span>
+<span id="L585">    (hq : ∀ t' ≥ t, (∃ i, ((e.<span class="const token" data-verso-hover="155">cfg</span> t').<span class="const token" data-verso-hover="82">loc</span> q).<span class="const token" data-verso-hover="331">pc</span> = <span class="const token" data-verso-hover="321">.</span>cas i) ∨ (∃ i, ((e.<span class="const token" data-verso-hover="155">cfg</span> t').<span class="const token" data-verso-hover="82">loc</span> q).<span class="const token" data-verso-hover="331">pc</span> = <span class="const token" data-verso-hover="322">.</span>read i))</span>
+<span id="L586">    (hown : ∀ t' ≥ t, <span class="const token" data-verso-hover="407">own</span> ids (e.<span class="const token" data-verso-hover="155">cfg</span> t) q ⊆ <span class="const token" data-verso-hover="407">own</span> ids (e.<span class="const token" data-verso-hover="155">cfg</span> t') q)</span>
+<span id="L587">    {y₀ : <span class="const token" data-verso-hover="19">Fin</span> m} (hy₀ : y₀ ∈ <span class="const token" data-verso-hover="407">own</span> ids (e.<span class="const token" data-verso-hover="155">cfg</span> t) q) : <span class="const token" data-verso-hover="187">False</span> := <span class="kw">by</span></span>
+<span id="L588">  <span class="kw">have</span> hyq : ∀ t' ≥ t, (e.<span class="const token" data-verso-hover="155">cfg</span> t').<span class="const token" data-verso-hover="84">mem</span> <span class="const token" data-verso-hover="64">(</span>) y₀ = <span class="const token" data-verso-hover="37">some</span> (ids q) := <span class="kw">by</span></span>
+<span id="L589">    <span class="kw">intro</span> t' ht'</span>
+<span id="L590">    <span class="kw">have</span> := hown t' ht' hy₀</span>
+<span id="L591">    <span class="kw">simpa</span> [<span class="const token" data-verso-hover="407">own</span>] <span class="kw">using</span> this</span>
+<span id="L592">  <span class="cm">--</span><span class="cm"> a time after which every process is classified</span></span>
+<span id="L593">  <span class="kw">obtain</span> ⟨T, hT⟩ := <span class="const token" data-verso-hover="438">Finite.exists_forall_of_monotone</span></span>
+<span id="L594">    (p := <span class="kw">fun</span> r T =&gt; t ≤ T ∧ ((∀ t' ≥ T, <span class="const token" data-verso-hover="407">own</span> ids (e.<span class="const token" data-verso-hover="155">cfg</span> t') r = ∅) ∨</span>
+<span id="L595">      (∀ t' ≥ T, <span class="const token" data-verso-hover="347">CasRead</span> ((e.<span class="const token" data-verso-hover="155">cfg</span> t').<span class="const token" data-verso-hover="82">loc</span> r).<span class="const token" data-verso-hover="331">pc</span>)))</span>
+<span id="L596">    (<span class="kw">by</span></span>
+<span id="L597">      <span class="kw">rintro</span> r a b hab ⟨h1, h2⟩</span>
+<span id="L598">      <span class="kw">refine</span> ⟨<span class="kw">by</span> <span class="kw">omega</span>, ?_⟩</span>
+<span id="L599">      <span class="kw">rcases</span> h2 <span class="kw">with</span> h2 | h2</span>
+<span id="L600">      · <span class="kw">exact</span> <span class="const token" data-verso-hover="168">Or.inl</span> <span class="kw">fun</span> t' ht' =&gt; h2 t' (<span class="kw">by</span> <span class="kw">omega</span>)</span>
+<span id="L601">      · <span class="kw">exact</span> <span class="const token" data-verso-hover="170">Or.inr</span> <span class="kw">fun</span> t' ht' =&gt; h2 t' (<span class="kw">by</span> <span class="kw">omega</span>))</span>
+<span id="L602">    (<span class="kw">by</span></span>
+<span id="L603">      <span class="kw">intro</span> r</span>
+<span id="L604">      <span class="kw">rcases</span> <span class="const token" data-verso-hover="429">classify</span> hid hm H hyq ht r <span class="kw">with</span> ⟨T, hT⟩ | ⟨T, -, hT⟩</span>
+<span id="L605">      · <span class="kw">exact</span> ⟨<span class="const token" data-verso-hover="439">max</span> T t, <span class="kw">by</span> <span class="kw">omega</span>, <span class="const token" data-verso-hover="168">Or.inl</span> <span class="kw">fun</span> t' ht' =&gt; hT t' (<span class="kw">by</span> <span class="kw">omega</span>)⟩</span>
+<span id="L606">      · <span class="kw">exact</span> ⟨<span class="const token" data-verso-hover="439">max</span> T t, <span class="kw">by</span> <span class="kw">omega</span>, <span class="const token" data-verso-hover="170">Or.inr</span> <span class="kw">fun</span> t' ht' =&gt; hT t' (<span class="kw">by</span> <span class="kw">omega</span>)⟩)</span>
+<span id="L607">  <span class="kw">have</span> hTt : t ≤ T := (hT q).<span class="const token" data-verso-hover="152">1</span></span>
+<span id="L608">  <span class="cm">--</span><span class="cm"> nobody erases after `T`</span></span>
+<span id="L609">  <span class="kw">have</span> hnwr : ∀ t' ≥ T, ∀ r j, ((e.<span class="const token" data-verso-hover="155">cfg</span> t').<span class="const token" data-verso-hover="82">loc</span> r).<span class="const token" data-verso-hover="331">pc</span> ≠ <span class="const token" data-verso-hover="323">.</span>wr j := <span class="kw">by</span></span>
+<span id="L610">    <span class="kw">intro</span> t' ht' r j hpc</span>
+<span id="L611">    <span class="kw">rcases</span> (hT r).<span class="const token" data-verso-hover="199">2</span> <span class="kw">with</span> h | h</span>
+<span id="L612">    · <span class="kw">have</span> := <span class="const token" data-verso-hover="406">own_nonempty_of_wr</span> hid hm H hpc</span>
+<span id="L613">      <span class="kw">rw</span> [h t' ht'] <span class="kw">at</span> this; <span class="kw">simp</span> <span class="kw">at</span> this</span>
+<span id="L614">    · <span class="kw">rcases</span> h t' ht' <span class="kw">with</span> ⟨i, hi⟩ | ⟨i, hi⟩ &lt;;&gt; <span class="kw">rw</span> [hi] <span class="kw">at</span> hpc &lt;;&gt; <span class="kw">cases</span> hpc</span>
+<span id="L615">  <span class="cm">--</span><span class="cm"> the set of non-`⊥` registers grows and stabilizes</span></span>
+<span id="L616">  <span class="kw">obtain</span> ⟨T₆, hT₆, hstab⟩ := <span class="const token" data-verso-hover="440">Finset.eventually_const_of_subset_succ_of_finite</span></span>
+<span id="L617">    (f := <span class="kw">fun</span> t' =&gt; <span class="const token" data-verso-hover="42">Finset.univ</span>.<span class="const token" data-verso-hover="43">filter</span> (<span class="kw">fun</span> y =&gt; (e.<span class="const token" data-verso-hover="155">cfg</span> t').<span class="const token" data-verso-hover="84">mem</span> <span class="const token" data-verso-hover="64">(</span>) y ≠ <span class="const token" data-verso-hover="48">none</span>)) (N := T) (<span class="kw">by</span></span>
+<span id="L618">      <span class="kw">intro</span> t' ht' y hy</span>
+<span id="L619">      <span class="kw">simp</span> only [<span class="const token" data-verso-hover="367">Finset.mem_filter</span>, <span class="const token" data-verso-hover="180">Finset.mem_univ</span>, <span class="const token" data-verso-hover="315">true_and</span>] <span class="kw">at</span> hy ⊢</span>
+<span id="L620">      <span class="kw">rw</span> [<span class="const token" data-verso-hover="409">mem_step_nonbot</span> hid hm H (<span class="kw">by</span> <span class="kw">omega</span>) (<span class="kw">fun</span> p j _ =&gt; hnwr t' ht' p j) y hy]</span>
+<span id="L621">      <span class="kw">exact</span> hy)</span>
+<span id="L622">  <span class="kw">have</span> hiff : ∀ t' ≥ T₆, ∀ y,</span>
+<span id="L623">      ((e.<span class="const token" data-verso-hover="155">cfg</span> t').<span class="const token" data-verso-hover="84">mem</span> <span class="const token" data-verso-hover="64">(</span>) y ≠ <span class="const token" data-verso-hover="48">none</span> ↔ (e.<span class="const token" data-verso-hover="155">cfg</span> T₆).<span class="const token" data-verso-hover="84">mem</span> <span class="const token" data-verso-hover="64">(</span>) y ≠ <span class="const token" data-verso-hover="48">none</span>) := <span class="kw">by</span></span>
+<span id="L624">    <span class="kw">intro</span> t' ht' y</span>
+<span id="L625">    <span class="kw">have</span> := <span class="const token" data-verso-hover="441">Finset.ext_iff</span>.<span class="const token" data-verso-hover="128">1</span> (hstab t' ht') y</span>
+<span id="L626">    <span class="kw">simp</span> only [<span class="const token" data-verso-hover="367">Finset.mem_filter</span>, <span class="const token" data-verso-hover="180">Finset.mem_univ</span>, <span class="const token" data-verso-hover="315">true_and</span>] <span class="kw">at</span> this</span>
+<span id="L627">    <span class="kw">exact</span> this</span>
+<span id="L628">  <span class="cm">--</span><span class="cm"> the memory is constant after `T₆`</span></span>
+<span id="L629">  <span class="kw">have</span> hconst : ∀ t' ≥ T₆, (e.<span class="const token" data-verso-hover="155">cfg</span> t').<span class="const token" data-verso-hover="84">mem</span> <span class="const token" data-verso-hover="64">(</span>) = (e.<span class="const token" data-verso-hover="155">cfg</span> T₆).<span class="const token" data-verso-hover="84">mem</span> <span class="const token" data-verso-hover="64">(</span>) := <span class="kw">by</span></span>
+<span id="L630">    <span class="kw">intro</span> t' ht'</span>
+<span id="L631">    <span class="kw">induction</span> t', ht' <span class="kw">using</span> <span class="const token" data-verso-hover="387">Nat.le_induction</span> <span class="kw">with</span></span>
+<span id="L632">    | base =&gt; <span class="kw">rfl</span></span>
+<span id="L633">    | <span class="const token" data-verso-hover="132">succ</span> t' ht' ih =&gt;</span>
+<span id="L634">      <span class="kw">funext</span> y</span>
+<span id="L635">      <span class="kw">by_cases</span> hy : (e.<span class="const token" data-verso-hover="155">cfg</span> t').<span class="const token" data-verso-hover="84">mem</span> <span class="const token" data-verso-hover="64">(</span>) y = <span class="const token" data-verso-hover="48">none</span></span>
+<span id="L636">      · <span class="kw">have</span> h1 : (e.<span class="const token" data-verso-hover="155">cfg</span> (t' + <span class="nu">1</span>)).<span class="const token" data-verso-hover="84">mem</span> <span class="const token" data-verso-hover="64">(</span>) y = <span class="const token" data-verso-hover="48">none</span> := <span class="kw">by</span></span>
+<span id="L637">          <span class="kw">by_contra</span> h</span>
+<span id="L638">          <span class="kw">exact</span> (hiff t' ht' y).<span class="const token" data-verso-hover="249">2</span> ((hiff (t' + <span class="nu">1</span>) (<span class="kw">by</span> <span class="kw">omega</span>) y).<span class="const token" data-verso-hover="128">1</span> h) hy</span>
+<span id="L639">        <span class="kw">rw</span> [h1, ← ih, hy]</span>
+<span id="L640">      · <span class="kw">rw</span> [<span class="const token" data-verso-hover="409">mem_step_nonbot</span> hid hm H (<span class="kw">by</span> <span class="kw">omega</span>) (<span class="kw">fun</span> p j _ =&gt; hnwr t' (<span class="kw">by</span> <span class="kw">omega</span>) p j) y hy, ih]</span>
+<span id="L641">  <span class="cm">--</span><span class="cm"> the memory is full</span></span>
+<span id="L642">  <span class="kw">have</span> hfull : ∀ y, (e.<span class="const token" data-verso-hover="155">cfg</span> T₆).<span class="const token" data-verso-hover="84">mem</span> <span class="const token" data-verso-hover="64">(</span>) y ≠ <span class="const token" data-verso-hover="48">none</span> := <span class="kw">by</span></span>
+<span id="L643">    <span class="kw">intro</span> y hy</span>
+<span id="L644">    <span class="kw">set</span> k := (π q).<span class="const token" data-verso-hover="256">symm</span> y <span class="kw">with</span> hk</span>
+<span id="L645">    <span class="kw">have</span> hqcr : ∀ t' ≥ T₆, <span class="const token" data-verso-hover="347">CasRead</span> ((e.<span class="const token" data-verso-hover="155">cfg</span> t').<span class="const token" data-verso-hover="82">loc</span> q).<span class="const token" data-verso-hover="331">pc</span> := <span class="kw">fun</span> t' ht' =&gt; hq t' (<span class="kw">by</span> <span class="kw">omega</span>)</span>
+<span id="L646">    <span class="kw">have</span> hpendq : (e.<span class="const token" data-verso-hover="155">cfg</span> T₆).<span class="const token" data-verso-hover="83">pend</span> q ≠ <span class="const token" data-verso-hover="48">none</span> :=</span>
+<span id="L647">      H.<span class="const token" data-verso-hover="424">pend_of_busy</span> hid hm (<span class="kw">by</span> <span class="kw">omega</span>) (<span class="const token" data-verso-hover="348">busy_of_casRead</span> (hqcr T₆ <span class="const token" data-verso-hover="392">le_rfl</span>))</span>
+<span id="L648">    <span class="kw">have</span> hklt := k.<span class="const token" data-verso-hover="134">isLt</span></span>
+<span id="L649">    <span class="kw">obtain</span> ⟨t₁, ht₁, hG⟩ := H.<span class="const token" data-verso-hover="426">eventually_loc</span> (<span class="kw">show</span> t₀ ≤ T₆ <span class="kw">by</span> <span class="kw">omega</span>) hpendq</span>
+<span id="L650">      (<span class="kw">fun</span> st =&gt; st.<span class="const token" data-verso-hover="331">pc</span> = <span class="const token" data-verso-hover="321">.</span>cas k.<span class="const token" data-verso-hover="36">val</span>) (<span class="kw">fun</span> st =&gt; <span class="const token" data-verso-hover="357">casDist</span> m k.<span class="const token" data-verso-hover="36">val</span> st.<span class="const token" data-verso-hover="331">pc</span>) (<span class="kw">by</span></span>
+<span id="L651">        <span class="kw">intro</span> t' ht' hnG hl</span>
+<span id="L652">        <span class="kw">try</span> <span class="kw">dsimp</span> only <span class="kw">at</span> hnG ⊢</span>
+<span id="L653">        <span class="kw">rcases</span> hqcr t' ht' <span class="kw">with</span> ⟨i, hpc⟩ | ⟨i, hpc⟩</span>
+<span id="L654">        · <span class="kw">obtain</span> ⟨hi, hloc, -⟩ := <span class="const token" data-verso-hover="396">step_cas</span> hid hm H hl hpc</span>
+<span id="L655">          <span class="kw">have</span> hik : i ≠ k.<span class="const token" data-verso-hover="36">val</span> := <span class="kw">fun</span> h =&gt; hnG (<span class="kw">by</span> <span class="kw">rw</span> [hpc, h])</span>
+<span id="L656">          <span class="kw">right</span>; <span class="kw">rw</span> [hloc, hpc]</span>
+<span id="L657">          <span class="kw">split_ifs</span> <span class="kw">with</span> h1 &lt;;&gt; <span class="kw">simp</span> only [<span class="const token" data-verso-hover="357">casDist</span>] &lt;;&gt; <span class="kw">split_ifs</span> &lt;;&gt; <span class="kw">omega</span></span>
+<span id="L658">        · <span class="kw">obtain</span> ⟨hi, -, hloc⟩ := <span class="const token" data-verso-hover="400">step_read</span> hid hm H hl hpc</span>
+<span id="L659">          <span class="kw">by_cases</span> h1 : i + <span class="nu">1</span> &lt; m</span>
+<span id="L660">          · <span class="kw">right</span>; <span class="kw">rw</span> [hloc, hpc]; <span class="kw">simp</span> only [h1, ↓<span class="const token" data-verso-hover="123">reduceIte</span>, <span class="const token" data-verso-hover="357">casDist</span>]; <span class="kw">omega</span></span>
+<span id="L661">          · <span class="kw">have</span> hc := hqcr (t' + <span class="nu">1</span>) (<span class="kw">by</span> <span class="kw">omega</span>)</span>
+<span id="L662">            <span class="kw">rw</span> [hloc] <span class="kw">at</span> hc ⊢; <span class="kw">simp</span> only [h1, ↓<span class="const token" data-verso-hover="123">reduceIte</span>] <span class="kw">at</span> hc ⊢</span>
+<span id="L663">            <span class="kw">right</span>; <span class="kw">rw</span> [<span class="const token" data-verso-hover="350">cas0_of_afterRead</span> hc, hpc]; <span class="kw">simp</span> only [<span class="const token" data-verso-hover="357">casDist</span>]; <span class="kw">split_ifs</span> &lt;;&gt; <span class="kw">omega</span>)</span>
+<span id="L664">    <span class="kw">try</span> <span class="kw">dsimp</span> only <span class="kw">at</span> hG</span>
+<span id="L665">    <span class="kw">obtain</span> ⟨t₂, ht₂, hl, hloc2⟩ := <span class="const token" data-verso-hover="390">next_tau</span> H (<span class="kw">show</span> t₀ ≤ t₁ <span class="kw">by</span> <span class="kw">omega</span>)</span>
+<span id="L666">      (H.<span class="const token" data-verso-hover="424">pend_of_busy</span> hid hm (<span class="kw">by</span> <span class="kw">omega</span>) (<span class="const token" data-verso-hover="348">busy_of_casRead</span> (hqcr t₁ (<span class="kw">by</span> <span class="kw">omega</span>))))</span>
+<span id="L667">    <span class="kw">have</span> hpc2 : ((e.<span class="const token" data-verso-hover="155">cfg</span> t₂).<span class="const token" data-verso-hover="82">loc</span> q).<span class="const token" data-verso-hover="331">pc</span> = <span class="const token" data-verso-hover="321">.</span>cas k.<span class="const token" data-verso-hover="36">val</span> := <span class="kw">by</span> <span class="kw">rw</span> [hloc2]; <span class="kw">exact</span> hG</span>
+<span id="L668">    <span class="kw">obtain</span> ⟨hi, -, hmem⟩ := <span class="const token" data-verso-hover="396">step_cas</span> hid hm H hl hpc2</span>
+<span id="L669">    <span class="kw">have</span> hyk : π q ⟨k.<span class="const token" data-verso-hover="36">val</span>, hi⟩ = y := <span class="kw">by</span> <span class="kw">simp</span> [hk]</span>
+<span id="L670">    <span class="kw">have</span> h1 := <span class="const token" data-verso-hover="442">congrFun</span> (hconst (t₂ + <span class="nu">1</span>) (<span class="kw">by</span> <span class="kw">omega</span>)) y</span>
+<span id="L671">    <span class="kw">have</span> h2 := <span class="const token" data-verso-hover="442">congrFun</span> (hconst t₂ (<span class="kw">by</span> <span class="kw">omega</span>)) y</span>
+<span id="L672">    <span class="kw">rw</span> [hmem, ← hyk, <span class="const token" data-verso-hover="240">Function.update_self</span>, hyk, h2, hy] <span class="kw">at</span> h1</span>
+<span id="L673">    <span class="kw">simp</span> <span class="kw">at</span> h1</span>
+<span id="L674">  <span class="kw">apply</span> <span class="const token" data-verso-hover="361">final_contra</span> hid hm hM ((e.<span class="const token" data-verso-hover="155">cfg</span> T₆).<span class="const token" data-verso-hover="84">mem</span> <span class="const token" data-verso-hover="64">(</span>)) (π := π)</span>
+<span id="L675">  · <span class="kw">intro</span> y</span>
+<span id="L676">    <span class="kw">rcases</span> H.<span class="const token" data-verso-hover="443">valInv</span> hid hm T₆ y <span class="kw">with</span> h | h</span>
+<span id="L677">    · <span class="kw">exact</span> <span class="const token" data-verso-hover="184">absurd</span> h (hfull y)</span>
+<span id="L678">    · <span class="kw">exact</span> h</span>
+<span id="L679">  · <span class="kw">rintro</span> r ⟨y, hy⟩</span>
+<span id="L680">    <span class="kw">have</span> hcr : ∀ t' ≥ T₆, <span class="const token" data-verso-hover="347">CasRead</span> ((e.<span class="const token" data-verso-hover="155">cfg</span> t').<span class="const token" data-verso-hover="82">loc</span> r).<span class="const token" data-verso-hover="331">pc</span> := <span class="kw">by</span></span>
+<span id="L681">      <span class="kw">rcases</span> (hT r).<span class="const token" data-verso-hover="199">2</span> <span class="kw">with</span> h | h</span>
+<span id="L682">      · <span class="kw">exfalso</span></span>
+<span id="L683">        <span class="kw">have</span> hy' : y ∈ <span class="const token" data-verso-hover="407">own</span> ids (e.<span class="const token" data-verso-hover="155">cfg</span> T₆) r := <span class="kw">by</span> <span class="kw">simp</span> [<span class="const token" data-verso-hover="407">own</span>, hy]</span>
+<span id="L684">        <span class="kw">rw</span> [h T₆ hT₆] <span class="kw">at</span> hy'; <span class="kw">simp</span> <span class="kw">at</span> hy'</span>
+<span id="L685">      · <span class="kw">exact</span> <span class="kw">fun</span> t' ht' =&gt; h t' (<span class="kw">by</span> <span class="kw">omega</span>)</span>
+<span id="L686">    <span class="kw">exact</span> <span class="const token" data-verso-hover="435">owner_decision</span> hid hm H (<span class="kw">by</span> <span class="kw">omega</span>) hconst hcr</span>
+<span id="L687"></span>
+<span id="L688"><span class="dc">/-- If after some time nobody owns any register, the execution cannot continue without a</span></span>
+<span id="L689"><span class="dc">completion (a pending process eventually performs a successful compare&amp;swap). -/</span></span>
+<span id="L690"><span class="kw">theorem</span> <span class="const token" data-verso-hover="343">zero_case</span> (hid : <span class="const token" data-verso-hover="86">Function.Injective</span> ids) (hm : <span class="nu">0</span> &lt; m)</span>
+<span id="L691">    {e : ((<span class="const token" data-verso-hover="339">alg2</span> Id m).<span class="const token" data-verso-hover="69">impl</span> ids π).<span class="const token" data-verso-hover="382">InfExec</span>} {t₀ : <span class="const token" data-verso-hover="15">ℕ</span>} (H : <span class="const token" data-verso-hover="341">Hyp</span> e t₀) {p₀ : P}</span>
+<span id="L692">    (hp₀ : (e.<span class="const token" data-verso-hover="155">cfg</span> t₀).<span class="const token" data-verso-hover="83">pend</span> p₀ ≠ <span class="const token" data-verso-hover="48">none</span>) {T : <span class="const token" data-verso-hover="15">ℕ</span>} (hT : t₀ ≤ T)</span>
+<span id="L693">    (hzero : ∀ t ≥ T, ∀ r, <span class="const token" data-verso-hover="407">own</span> ids (e.<span class="const token" data-verso-hover="155">cfg</span> t) r = ∅) : <span class="const token" data-verso-hover="187">False</span> := <span class="kw">by</span></span>
+<span id="L694">  <span class="kw">have</span> hbot : ∀ t ≥ T, ∀ y, (e.<span class="const token" data-verso-hover="155">cfg</span> t).<span class="const token" data-verso-hover="84">mem</span> <span class="const token" data-verso-hover="64">(</span>) y = <span class="const token" data-verso-hover="48">none</span> := <span class="kw">by</span></span>
+<span id="L695">    <span class="kw">intro</span> t ht y</span>
+<span id="L696">    <span class="kw">rcases</span> H.<span class="const token" data-verso-hover="443">valInv</span> hid hm t y <span class="kw">with</span> h | ⟨r, h⟩</span>
+<span id="L697">    · <span class="kw">exact</span> h</span>
+<span id="L698">    · <span class="kw">exfalso</span></span>
+<span id="L699">      <span class="kw">have</span> : y ∈ <span class="const token" data-verso-hover="407">own</span> ids (e.<span class="const token" data-verso-hover="155">cfg</span> t) r := <span class="kw">by</span> <span class="kw">simp</span> [<span class="const token" data-verso-hover="407">own</span>, h]</span>
+<span id="L700">      <span class="kw">rw</span> [hzero t ht r] <span class="kw">at</span> this; <span class="kw">simp</span> <span class="kw">at</span> this</span>
+<span id="L701">  <span class="kw">have</span> hpend : ∀ t ≥ t₀, (e.<span class="const token" data-verso-hover="155">cfg</span> t).<span class="const token" data-verso-hover="83">pend</span> p₀ ≠ <span class="const token" data-verso-hover="48">none</span> := <span class="kw">fun</span> t ht =&gt; <span class="kw">by</span></span>
+<span id="L702">    <span class="kw">rw</span> [<span class="const token" data-verso-hover="388">pend_persist</span> e t₀ H.<span class="const token" data-verso-hover="385">noret</span> <span class="const token" data-verso-hover="392">le_rfl</span> hp₀ t ht]; <span class="kw">exact</span> hp₀</span>
+<span id="L703">  <span class="kw">have</span> hbusy : ∀ t ≥ t₀, <span class="const token" data-verso-hover="349">Busy</span> ((e.<span class="const token" data-verso-hover="155">cfg</span> t).<span class="const token" data-verso-hover="82">loc</span> p₀).<span class="const token" data-verso-hover="331">pc</span> := <span class="kw">fun</span> t ht =&gt; <span class="kw">by</span></span>
+<span id="L704">    <span class="kw">rcases</span> H.<span class="const token" data-verso-hover="430">phase</span> hid hm ht p₀ <span class="kw">with</span> ⟨-, h⟩ | ⟨-, h⟩</span>
+<span id="L705">    · <span class="kw">exact</span> <span class="const token" data-verso-hover="184">absurd</span> h (hpend t ht)</span>
+<span id="L706">    · <span class="kw">exact</span> h</span>
+<span id="L707">  <span class="kw">have</span> hnwr : ∀ t ≥ T, ∀ j, ((e.<span class="const token" data-verso-hover="155">cfg</span> t).<span class="const token" data-verso-hover="82">loc</span> p₀).<span class="const token" data-verso-hover="331">pc</span> ≠ <span class="const token" data-verso-hover="323">.</span>wr j := <span class="kw">fun</span> t ht j h =&gt; <span class="kw">by</span></span>
+<span id="L708">    <span class="kw">have</span> := <span class="const token" data-verso-hover="406">own_nonempty_of_wr</span> hid hm H h</span>
+<span id="L709">    <span class="kw">rw</span> [hzero t ht p₀] <span class="kw">at</span> this; <span class="kw">simp</span> <span class="kw">at</span> this</span>
+<span id="L710">  <span class="kw">obtain</span> ⟨t₁, ht₁, hG⟩ := H.<span class="const token" data-verso-hover="426">eventually_loc</span> hT (hpend T hT)</span>
+<span id="L711">    (<span class="kw">fun</span> st =&gt; ∃ i, st.<span class="const token" data-verso-hover="331">pc</span> = <span class="const token" data-verso-hover="321">.</span>cas i) (<span class="kw">fun</span> st =&gt; <span class="const token" data-verso-hover="358">zDist</span> m st.<span class="const token" data-verso-hover="331">pc</span>) (<span class="kw">by</span></span>
+<span id="L712">      <span class="kw">intro</span> t' ht' hnG hl</span>
+<span id="L713">      <span class="kw">try</span> <span class="kw">dsimp</span> only <span class="kw">at</span> hnG ⊢</span>
+<span id="L714">      <span class="kw">have</span> hb := hbusy t' (<span class="kw">by</span> <span class="kw">omega</span>)</span>
+<span id="L715">      <span class="kw">cases</span> hpc : ((e.<span class="const token" data-verso-hover="155">cfg</span> t').<span class="const token" data-verso-hover="82">loc</span> p₀).<span class="const token" data-verso-hover="331">pc</span> <span class="kw">with</span></span>
+<span id="L716">      | <span class="const token" data-verso-hover="321">cas</span> i =&gt; <span class="kw">rw</span> [hpc] <span class="kw">at</span> hnG; <span class="kw">exact</span> <span class="const token" data-verso-hover="184">absurd</span> ⟨i, <span class="const token" data-verso-hover="108">rfl</span>⟩ hnG</span>
+<span id="L717">      | <span class="const token" data-verso-hover="323">wr</span> j =&gt; <span class="kw">exact</span> <span class="const token" data-verso-hover="184">absurd</span> hpc (hnwr t' ht' j)</span>
+<span id="L718">      | <span class="const token" data-verso-hover="322">read</span> i =&gt;</span>
+<span id="L719">        <span class="kw">obtain</span> ⟨hi, -, hloc⟩ := <span class="const token" data-verso-hover="400">step_read</span> hid hm H hl hpc</span>
+<span id="L720">        <span class="kw">by_cases</span> h1 : i + <span class="nu">1</span> &lt; m</span>
+<span id="L721">        · <span class="kw">right</span>; <span class="kw">rw</span> [hloc]; <span class="kw">simp</span> only [h1, ↓<span class="const token" data-verso-hover="123">reduceIte</span>, <span class="const token" data-verso-hover="358">zDist</span>]; <span class="kw">omega</span></span>
+<span id="L722">        · <span class="kw">have</span> hb1 := hbusy (t' + <span class="nu">1</span>) (<span class="kw">by</span> <span class="kw">omega</span>)</span>
+<span id="L723">          <span class="kw">have</span> hn1 := hnwr (t' + <span class="nu">1</span>) (<span class="kw">by</span> <span class="kw">omega</span>)</span>
+<span id="L724">          <span class="kw">rw</span> [hloc] <span class="kw">at</span> hb1 hn1 ⊢</span>
+<span id="L725">          <span class="kw">simp</span> only [h1, ↓<span class="const token" data-verso-hover="123">reduceIte</span>] <span class="kw">at</span> hb1 hn1 ⊢</span>
+<span id="L726">          <span class="kw">rcases</span> <span class="const token" data-verso-hover="351">afterRead_pc</span> ((e.<span class="const token" data-verso-hover="155">cfg</span> t').<span class="const token" data-verso-hover="82">loc</span> p₀)</span>
+<span id="L727">            (<span class="const token" data-verso-hover="210">Function.update</span> ((e.<span class="const token" data-verso-hover="155">cfg</span> t').<span class="const token" data-verso-hover="82">loc</span> p₀).<span class="const token" data-verso-hover="332">view</span> ⟨i, hi⟩ ((e.<span class="const token" data-verso-hover="155">cfg</span> t').<span class="const token" data-verso-hover="84">mem</span> <span class="const token" data-verso-hover="64">(</span>) (π p₀ ⟨i, hi⟩)))</span>
+<span id="L728">            <span class="kw">with</span> ⟨j, h⟩ | h | h | h</span>
+<span id="L729">          · <span class="kw">exact</span> <span class="const token" data-verso-hover="184">absurd</span> h (hn1 j)</span>
+<span id="L730">          · <span class="kw">right</span>; <span class="kw">rw</span> [h]; <span class="kw">simp</span> only [<span class="const token" data-verso-hover="358">zDist</span>, ↓<span class="const token" data-verso-hover="123">reduceIte</span>]; <span class="kw">omega</span></span>
+<span id="L731">          · <span class="kw">exfalso</span>; <span class="kw">rw</span> [h] <span class="kw">at</span> hb1; <span class="kw">exact</span> hb1</span>
+<span id="L732">          · <span class="kw">left</span>; <span class="kw">exact</span> ⟨<span class="nu">0</span>, h⟩</span>
+<span id="L733">      | <span class="const token" data-verso-hover="324">wait</span> i ab =&gt;</span>
+<span id="L734">        <span class="kw">obtain</span> ⟨hi, -, hloc⟩ := <span class="const token" data-verso-hover="402">step_wait</span> hid hm H hl hpc</span>
+<span id="L735">        <span class="kw">have</span> hv : (e.<span class="const token" data-verso-hover="155">cfg</span> t').<span class="const token" data-verso-hover="84">mem</span> <span class="const token" data-verso-hover="64">(</span>) (π p₀ ⟨i, hi⟩) = <span class="const token" data-verso-hover="48">none</span> := hbot t' ht' _</span>
+<span id="L736">        <span class="kw">rw</span> [hloc, hv]</span>
+<span id="L737">        <span class="kw">by_cases</span> h1 : i + <span class="nu">1</span> &lt; m</span>
+<span id="L738">        · <span class="kw">right</span>; <span class="kw">simp</span> only [h1, ↓<span class="const token" data-verso-hover="123">reduceIte</span>, <span class="const token" data-verso-hover="358">zDist</span>]</span>
+<span id="L739">          <span class="kw">cases</span> ab &lt;;&gt; <span class="kw">simp</span> &lt;;&gt; <span class="kw">omega</span></span>
+<span id="L740">        · <span class="kw">cases</span> ab</span>
+<span id="L741">          · <span class="kw">right</span>; <span class="kw">simp</span> only [h1, ↓<span class="const token" data-verso-hover="123">reduceIte</span>, <span class="const token" data-verso-hover="358">zDist</span>]; <span class="kw">simp</span>; <span class="kw">omega</span></span>
+<span id="L742">          · <span class="kw">left</span>; <span class="kw">simp</span> only [h1, ↓<span class="const token" data-verso-hover="123">reduceIte</span>]; <span class="kw">simp</span></span>
+<span id="L743">      | <span class="const token" data-verso-hover="326">_</span> =&gt; <span class="kw">rw</span> [hpc] <span class="kw">at</span> hb; <span class="kw">exact</span> <span class="const token" data-verso-hover="184">absurd</span> hb <span class="const token" data-verso-hover="70">id</span>)</span>
+<span id="L744">  <span class="kw">obtain</span> ⟨i, hpc⟩ := hG</span>
+<span id="L745">  <span class="kw">obtain</span> ⟨t₂, ht₂, hl, hloc2⟩ := <span class="const token" data-verso-hover="390">next_tau</span> H (<span class="kw">show</span> t₀ ≤ t₁ <span class="kw">by</span> <span class="kw">omega</span>) (hpend t₁ (<span class="kw">by</span> <span class="kw">omega</span>))</span>
+<span id="L746">  <span class="kw">have</span> hpc2 : ((e.<span class="const token" data-verso-hover="155">cfg</span> t₂).<span class="const token" data-verso-hover="82">loc</span> p₀).<span class="const token" data-verso-hover="331">pc</span> = <span class="const token" data-verso-hover="321">.</span>cas i := <span class="kw">by</span> <span class="kw">rw</span> [hloc2]; <span class="kw">exact</span> hpc</span>
+<span id="L747">  <span class="kw">obtain</span> ⟨hi, -, hmem⟩ := <span class="const token" data-verso-hover="396">step_cas</span> hid hm H hl hpc2</span>
+<span id="L748">  <span class="kw">have</span> h1 := hbot (t₂ + <span class="nu">1</span>) (<span class="kw">by</span> <span class="kw">omega</span>) (π p₀ ⟨i, hi⟩)</span>
+<span id="L749">  <span class="kw">rw</span> [hmem, <span class="const token" data-verso-hover="240">Function.update_self</span>, hbot t₂ (<span class="kw">by</span> <span class="kw">omega</span>)] <span class="kw">at</span> h1</span>
+<span id="L750">  <span class="kw">simp</span> <span class="kw">at</span> h1</span>
+<span id="L751"></span>
+<span id="L752"><span class="kw">end</span> AnonymousMutex.Alg2</span>
+<span id="L753"></span>
+</code></div>
+        <script>
+          window.versoHoversUrl = "PODC2019/AnonymousMutex/-hovers.json";</script>
+        <script src="static/lean/popper.js"></script>
+        <script src="static/lean/tippy.js"></script>
+        <script src="static/lean/marked.js"></script>
+        <script src="static/lean/highlighting.js"></script>
+        <script src="static/lean/lean.js"></script>
+        </article></main><footer class="site-footer"><div class="wrap">
+        Machine-checked formalizations of PODC papers in Lean 4. Generated with <a href="https://github.com/leanprover/verso">Verso</a> from the README files of <a href="https://github.com/vasnesterov/formal_podc">vasnesterov/formal_podc</a>.</div>
+      </footer></body>
+  </html>
+

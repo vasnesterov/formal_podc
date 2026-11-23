@@ -1,0 +1,452 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="light dark">
+    <link rel="icon" href="data:,">
+    <title>MBroadcast: CausalModel.lean · Formal PODC</title><base href="../../../.././"><link rel="stylesheet" href="static/lean/verso-vars.css">
+    <link rel="stylesheet" href="static/lean/highlighting.css">
+    <link rel="stylesheet" href="static/lean/tippy-border.css">
+    <link rel="stylesheet" href="static/style.css">
+    <script defer="defer" src="static/site.js"></script>
+    </head>
+  <body>
+    <header class="site-header">
+      <div class="wrap">
+        <a class="brand" href=".">Formal PODC</a><nav class="top">
+          <a href=".">Search</a><a href="about/">About</a><a href="https://github.com/vasnesterov/formal_podc">GitHub</a></nav>
+        </div>
+      </header>
+    <main class="wrap"><article><nav class="breadcrumbs" aria-label="Breadcrumb">
+          <a href=".">Search</a><span class="sep">›</span><a href="PODC2023/">PODC 2023</a><span class="sep">›</span><a href="PODC2023/MBroadcast/">MBroadcast</a><span class="sep">›</span><a href="PODC2023/MBroadcast/src/">Lean source</a><span class="sep">›</span><span aria-current="page">CausalModel</span></nav>
+        <h1>
+          <code>CausalModel.lean</code></h1>
+        <div class="paper-links">
+          <p>
+            Source of <a href="PODC2023/MBroadcast/">The MBroadcast Abstraction — PODC 2023</a> · <a href="https://github.com/vasnesterov/formal_podc/blob/main/Papers/PODC2023/MBroadcast/CausalModel.lean">GitHub</a> · hover over a name for its type and documentation</p>
+          </div>
+        <div class="lean-code lean-src">
+          <code class="hl lean block" data-lean-context="CausalModel"><span id="L1"><span class="kw">import</span> Papers.PODC2023.MBroadcast.Spec</span>
+<span id="L2"><span class="kw">import</span> Mathlib.Data.Fintype.Card</span>
+<span id="L3"></span>
+<span id="L4"><span class="dc">/-!</span></span>
+<span id="L5"><span class="dc"># Algorithm 2 (MBroadcast on top of causal message delivery): the model</span></span>
+<span id="L6"></span>
+<span id="L7"><span class="dc">Model `CAMP_{n,t}[t &lt; n/2]` enriched with causal message delivery, running Algorithm 2 of</span></span>
+<span id="L8"><span class="dc">Déprés, Mostéfaoui, Perrin, Raynal, *Brief Announcement: The MBroadcast Abstraction*, PODC 2023:</span></span>
+<span id="L9"></span>
+<span id="L10"><span class="dc">```</span></span>
+<span id="L11"><span class="dc">operation mbroadcast(m):</span></span>
+<span id="L12"><span class="dc"> (1) causal_broadcast init(m);</span></span>
+<span id="L13"><span class="dc"> (2) wait (ack(m) received from at least n − t − 1 processes);</span></span>
+<span id="L14"><span class="dc"> (3) mdelivery of m from p_i</span></span>
+<span id="L15"><span class="dc">when init(m) is causally-delivered from p_j do</span></span>
+<span id="L16"><span class="dc"> (4) if i ≠ j then (5) causal_send ack(m) to p_j; (6) mdelivery of m from p_j end if</span></span>
+<span id="L17"><span class="dc">```</span></span>
+<span id="L18"></span>
+<span id="L19"><span class="dc">## Model choices</span></span>
+<span id="L20"></span>
+<span id="L21"><span class="dc">* Processes `P` (`[Fintype P]`, `n = Fintype.card P`), protocol parameter `t : ℕ` (the waiting</span></span>
+<span id="L22"><span class="dc">  threshold of line 2 is `n - t - 1`, natural subtraction), messages `M`.</span></span>
+<span id="L23"><span class="dc">* **One global, append-only event log** `Cfg.log : List (GEv P M)`, in real-time order; "before"</span></span>
+<span id="L24"><span class="dc">  is comparison of positions. It contains the events of the MBroadcast abstraction (`GEv.mb`), the</span></span>
+<span id="L25"><span class="dc">  network sends (`GEv.snd`) and the network receptions (`GEv.rcv`). The *id* of a network message</span></span>
+<span id="L26"><span class="dc">  is the log position of its `snd` event. The MBroadcast trace is the projection</span></span>
+<span id="L27"><span class="dc">  `Cfg.trace = log.filterMap mbOf`; all correctness theorems are stated about it, with the</span></span>
+<span id="L28"><span class="dc">  definitions of `Papers.PODC2023.MBroadcast.Spec`.</span></span>
+<span id="L29"><span class="dc">* A network message record (`Rec`) has a sender, a set of destinations (a causal broadcast is one</span></span>
+<span id="L30"><span class="dc">  network message with destinations `univ.erase sender`, a causal send has one destination), a</span></span>
+<span id="L31"><span class="dc">  body (`init m` or `ack m`) and a ghost field `dep`: the ids of all messages that causally precede</span></span>
+<span id="L32"><span class="dc">  this send. `dep` is the sender's causal past `Cfg.past src` at sending time; `past p` contains</span></span>
+<span id="L33"><span class="dc">  the ids of `p`'s own sends, of the messages `p` received, and their `dep`s (this is the</span></span>
+<span id="L34"><span class="dc">  transitive closure of the paper's relations (i) and (ii)).</span></span>
+<span id="L35"><span class="dc">* **Causal delivery** (`CausalReady`): a process `p` may receive message `x` only if it has</span></span>
+<span id="L36"><span class="dc">  already received every message `y ∈ dep x` of which it is a destination. This is exactly the</span></span>
+<span id="L37"><span class="dc">  paper's causal delivery guarantee ("if send(m1) causally precedes send(m2) and both have the</span></span>
+<span id="L38"><span class="dc">  same destination, m1 is delivered there before m2"), for causal broadcasts and causal sends</span></span>
+<span id="L39"><span class="dc">  alike. Channels are otherwise unordered (not FIFO).</span></span>
+<span id="L40"><span class="dc">* **Self-delivery.** The causal broadcast of line 1 does not include the sender in its</span></span>
+<span id="L41"><span class="dc">  destinations: in Algorithm 2 the handler of a self-delivered `init(m)` does nothing (test of</span></span>
+<span id="L42"><span class="dc">  line 4), so this is a no-op; it does not affect causality either, since every own send is in</span></span>
+<span id="L43"><span class="dc">  the sender's causal past anyway.</span></span>
+<span id="L44"><span class="dc">* **Atomicity.** Each step executes a block of code between two `wait`s atomically: an</span></span>
+<span id="L45"><span class="dc">  invocation (line 1: the whole causal broadcast is one step), the end of the wait of line 2</span></span>
+<span id="L46"><span class="dc">  (line 3, `Action.own`), the reception of a message together with its handler (lines 4–6 for</span></span>
+<span id="L47"><span class="dc">  `init`; for `ack(m)`, the receiver records the sender in its set of acknowledgers if it is</span></span>
+<span id="L48"><span class="dc">  currently waiting for acknowledgements of `m`).</span></span>
+<span id="L49"><span class="dc">* **Local state**: `Phase.idle` or `Phase.wait m acks` (inside `mbroadcast(m)`, waiting at</span></span>
+<span id="L50"><span class="dc">  line 2, `acks` = the processes from which `ack(m)` was received); crashed processes `crashed`.</span></span>
+<span id="L51"><span class="dc">* **All mbroadcast messages are different** (the paper's assumption, per sender): `invoke p m`</span></span>
+<span id="L52"><span class="dc">  is enabled only if `p` never invoked `mbroadcast(m)` before. A process invokes a new</span></span>
+<span id="L53"><span class="dc">  `mbroadcast` only when the previous one returned (processes are sequential).</span></span>
+<span id="L54"><span class="dc">* **Crashes and reliability.** A crash is a step (`Action.crash`); crashed processes take no</span></span>
+<span id="L55"><span class="dc">  further steps. Messages are never lost: the messages of a crashed sender stay in transit and</span></span>
+<span id="L56"><span class="dc">  may still be received (reliable channels). Since a whole broadcast is one atomic step, the</span></span>
+<span id="L57"><span class="dc">  paper's possibility "a process crashes in the middle of a broadcast and only some destinations</span></span>
+<span id="L58"><span class="dc">  ever receive the message" is covered for safety: every finite behaviour of that model is a</span></span>
+<span id="L59"><span class="dc">  finite behaviour of ours in which the remaining receptions simply have not happened yet, and</span></span>
+<span id="L60"><span class="dc">  the safety properties are properties of finite traces. For liveness (`Exec.Fair`), a message</span></span>
+<span id="L61"><span class="dc">  to a correct process whose causal predecessors (with the same destination) have been received</span></span>
+<span id="L62"><span class="dc">  is eventually received, also when its sender has crashed. The liveness proofs use this only</span></span>
+<span id="L63"><span class="dc">  for messages of correct senders and for messages in the causal past of a message sent by a</span></span>
+<span id="L64"><span class="dc">  correct process (a process that has delivered or sent them); this is what an implementation</span></span>
+<span id="L65"><span class="dc">  of causal delivery on top of reliable channels provides (by piggybacking the causal past), and</span></span>
+<span id="L66"><span class="dc">  it is needed anyway for causal delivery to be live in the presence of crashes.</span></span>
+<span id="L67"><span class="dc">* `Action.skip` (stuttering) makes infinite executions always possible.</span></span>
+<span id="L68"><span class="dc">-/</span></span>
+<span id="L69"></span>
+<span id="L70"><span class="kw">set_option</span> <span class="const token" data-verso-hover="38">linter.unusedSectionVars</span> false</span>
+<span id="L71"></span>
+<span id="L72"><span class="kw">namespace</span> Podc.MBroadcast.Causal</span>
+<span id="L73"></span>
+<span id="L74"><span class="kw">open</span> Finset</span>
+<span id="L75"></span>
+<span id="L76"><span class="dc">/-- Bodies of the implementation messages. -/</span></span>
+<span id="L77"><span class="kw">inductive</span> <span class="const token" data-verso-hover="236">Body</span> (M : <span class="kw">Type</span>) <span class="kw">where</span></span>
+<span id="L78">  | <span class="const token" data-verso-hover="53">init</span> (m : M)</span>
+<span id="L79">  | <span class="const token" data-verso-hover="51">ack</span> (m : M)</span>
+<span id="L80">  <span class="kw">deriving</span> <span class="const token" data-verso-hover="40">DecidableEq</span></span>
+<span id="L81"></span>
+<span id="L82"><span class="dc">/-- A network message: sender, destinations, body, and (ghost) the ids of the messages that</span></span>
+<span id="L83"><span class="dc">causally precede it. -/</span></span>
+<span id="L84"><span class="kw">structure</span> <span class="const token" data-verso-hover="45">Rec</span> (P M : <span class="kw">Type</span>) <span class="kw">where</span></span>
+<span id="L85">  <span class="const token" data-verso-hover="49">src</span> : P</span>
+<span id="L86">  <span class="const token" data-verso-hover="58">dst</span> : <span class="const token" data-verso-hover="76">Finset</span> P</span>
+<span id="L87">  <span class="const token" data-verso-hover="50">body</span> : <span class="const token" data-verso-hover="236">Body</span> M</span>
+<span id="L88">  <span class="const token" data-verso-hover="59">dep</span> : <span class="const token" data-verso-hover="76">Finset</span> <span class="const token" data-verso-hover="44">ℕ</span></span>
+<span id="L89">  <span class="kw">deriving</span> <span class="const token" data-verso-hover="40">DecidableEq</span></span>
+<span id="L90"></span>
+<span id="L91"><span class="dc">/-- Events of the global log. -/</span></span>
+<span id="L92"><span class="kw">inductive</span> <span class="const token" data-verso-hover="43">GEv</span> (P M : <span class="kw">Type</span>) <span class="kw">where</span></span>
+<span id="L93">  <span class="dc">/-- An event of the MBroadcast abstraction. -/</span></span>
+<span id="L94">  | <span class="const token" data-verso-hover="69">mb</span> (e : <span class="const token" data-verso-hover="237">Ev</span> P M)</span>
+<span id="L95">  <span class="dc">/-- A network message is sent; its id is the log position of this event. -/</span></span>
+<span id="L96">  | <span class="const token" data-verso-hover="48">snd</span> (r : <span class="const token" data-verso-hover="45">Rec</span> P M)</span>
+<span id="L97">  <span class="dc">/-- Process `p` (causally) receives the network message with id `id`. -/</span></span>
+<span id="L98">  | <span class="const token" data-verso-hover="47">rcv</span> (p : P) (id : <span class="const token" data-verso-hover="44">ℕ</span>)</span>
+<span id="L99">  <span class="kw">deriving</span> <span class="const token" data-verso-hover="40">DecidableEq</span></span>
+<span id="L100"></span>
+<span id="L101"><span class="dc">/-- Control state of a process. -/</span></span>
+<span id="L102"><span class="kw">inductive</span> <span class="const token" data-verso-hover="148">Phase</span> (P M : <span class="kw">Type</span>) <span class="kw">where</span></span>
+<span id="L103">  | <span class="const token" data-verso-hover="101">idle</span></span>
+<span id="L104">  <span class="dc">/-- Inside `mbroadcast(m)`, waiting at line 2; `acks` = senders of the received `ack(m)`. -/</span></span>
+<span id="L105">  | <span class="const token" data-verso-hover="6">wait</span> (m : M) (acks : <span class="const token" data-verso-hover="76">Finset</span> P)</span>
+<span id="L106">  <span class="kw">deriving</span> <span class="const token" data-verso-hover="40">DecidableEq</span></span>
+<span id="L107"></span>
+<span id="L108"><span class="dc">/-- Configurations. -/</span></span>
+<span id="L109"><span class="kw">structure</span> <span class="const token" data-verso-hover="55">Cfg</span> (P M : <span class="kw">Type</span>) <span class="kw">where</span></span>
+<span id="L110">  <span class="dc">/-- The global event log (append-only). -/</span></span>
+<span id="L111">  <span class="const token" data-verso-hover="57">log</span> : <span class="const token" data-verso-hover="42">List</span> (<span class="const token" data-verso-hover="43">GEv</span> P M)</span>
+<span id="L112">  <span class="dc">/-- Control states. -/</span></span>
+<span id="L113">  <span class="const token" data-verso-hover="80">phase</span> : P → <span class="const token" data-verso-hover="148">Phase</span> P M</span>
+<span id="L114">  <span class="dc">/-- Ghost: causal past of each process (ids of network messages). -/</span></span>
+<span id="L115">  <span class="const token" data-verso-hover="63">past</span> : P → <span class="const token" data-verso-hover="76">Finset</span> <span class="const token" data-verso-hover="44">ℕ</span></span>
+<span id="L116">  <span class="dc">/-- Crashed processes. -/</span></span>
+<span id="L117">  <span class="const token" data-verso-hover="184">crashed</span> : <span class="const token" data-verso-hover="76">Finset</span> P</span>
+<span id="L118"></span>
+<span id="L119"><span class="dc">/-- Actions (scheduler choices). -/</span></span>
+<span id="L120"><span class="kw">inductive</span> <span class="const token" data-verso-hover="175">Action</span> (P M : <span class="kw">Type</span>) <span class="kw">where</span></span>
+<span id="L121">  <span class="dc">/-- `p` invokes `mbroadcast(m)`. -/</span></span>
+<span id="L122">  | <span class="const token" data-verso-hover="164">invoke</span> (p : P) (m : M)</span>
+<span id="L123">  <span class="dc">/-- `p` receives network message `id` and runs the handler. -/</span></span>
+<span id="L124">  | <span class="const token" data-verso-hover="166">recv</span> (p : P) (id : <span class="const token" data-verso-hover="44">ℕ</span>)</span>
+<span id="L125">  <span class="dc">/-- `p` ends the wait of line 2 and mdelivers its own message (line 3). -/</span></span>
+<span id="L126">  | <span class="const token" data-verso-hover="168">own</span> (p : P)</span>
+<span id="L127">  <span class="dc">/-- `p` crashes. -/</span></span>
+<span id="L128">  | <span class="const token" data-verso-hover="170">crash</span> (p : P)</span>
+<span id="L129">  <span class="dc">/-- Stuttering. -/</span></span>
+<span id="L130">  | <span class="const token" data-verso-hover="172">skip</span></span>
+<span id="L131"></span>
+<span id="L132"><span class="kw">variable</span> {P M : <span class="kw">Type</span>} [<span class="const token" data-verso-hover="39">Fintype</span> P] [<span class="const token" data-verso-hover="40">DecidableEq</span> P] [<span class="const token" data-verso-hover="40">DecidableEq</span> M]</span>
+<span id="L133"></span>
+<span id="L134"><span class="dc">/-- Projection of the global log to MBroadcast events. -/</span></span>
+<span id="L135"><span class="kw">def</span> <span class="const token" data-verso-hover="238">mbOf</span> : <span class="const token" data-verso-hover="43">GEv</span> P M → <span class="const token" data-verso-hover="239">Option</span> (<span class="const token" data-verso-hover="237">Ev</span> P M)</span>
+<span id="L136">  | <span class="const token" data-verso-hover="69">.</span>mb e =&gt; <span class="const token" data-verso-hover="46">some</span> e</span>
+<span id="L137">  | _ =&gt; <span class="const token" data-verso-hover="240">none</span></span>
+<span id="L138"></span>
+<span id="L139"><span class="dc">/-- The MBroadcast trace of a configuration. -/</span></span>
+<span id="L140"><span class="kw">def</span> <span class="const token" data-verso-hover="221">Cfg.trace</span> (C : <span class="const token" data-verso-hover="55">Cfg</span> P M) : <span class="const token" data-verso-hover="42">List</span> (<span class="const token" data-verso-hover="237">Ev</span> P M) := C.<span class="const token" data-verso-hover="57">log</span>.<span class="const token" data-verso-hover="241">filterMap</span> <span class="const token" data-verso-hover="238">mbOf</span></span>
+<span id="L141"></span>
+<span id="L142"><span class="dc">/-- `p` is a destination of the network message with id `y`. -/</span></span>
+<span id="L143"><span class="kw">def</span> <span class="const token" data-verso-hover="213">needs</span> (L : <span class="const token" data-verso-hover="42">List</span> (<span class="const token" data-verso-hover="43">GEv</span> P M)) (p : P) (y : <span class="const token" data-verso-hover="44">ℕ</span>) : <span class="const token" data-verso-hover="242">Bool</span> :=</span>
+<span id="L144">  <span class="kw">match</span> L[y]? <span class="kw">with</span></span>
+<span id="L145">  | <span class="const token" data-verso-hover="46">some</span> (<span class="const token" data-verso-hover="48">.</span>snd r) =&gt; <span class="const token" data-verso-hover="243">decide</span> (p ∈ r.<span class="const token" data-verso-hover="58">dst</span>)</span>
+<span id="L146">  | _ =&gt; <span class="const token" data-verso-hover="244">false</span></span>
+<span id="L147"></span>
+<span id="L148"><span class="dc">/-- Causal delivery guard: `p` has received every message causally preceding `r` of which it is</span></span>
+<span id="L149"><span class="dc">a destination. -/</span></span>
+<span id="L150"><span class="kw">def</span> <span class="const token" data-verso-hover="140">CausalReady</span> (L : <span class="const token" data-verso-hover="42">List</span> (<span class="const token" data-verso-hover="43">GEv</span> P M)) (p : P) (r : <span class="const token" data-verso-hover="45">Rec</span> P M) : <span class="kw">Prop</span> :=</span>
+<span id="L151">  ∀ y ∈ r.<span class="const token" data-verso-hover="59">dep</span>, <span class="const token" data-verso-hover="213">needs</span> L p y = <span class="const token" data-verso-hover="214">true</span> → <span class="const token" data-verso-hover="47">GEv.rcv</span> p y ∈ L</span>
+<span id="L152"></span>
+<span id="L153"><span class="const token" data-verso-hover="245">instance</span> (L : <span class="const token" data-verso-hover="42">List</span> (<span class="const token" data-verso-hover="43">GEv</span> P M)) (p : P) (r : <span class="const token" data-verso-hover="45">Rec</span> P M) : <span class="const token" data-verso-hover="246">Decidable</span> (<span class="const token" data-verso-hover="140">CausalReady</span> L p r) := <span class="kw">by</span></span>
+<span id="L154">  <span class="kw">unfold</span> <span class="const token" data-verso-hover="140">CausalReady</span>; <span class="kw">infer_instance</span></span>
+<span id="L155"></span>
+<span id="L156"><span class="dc">/-- The initial configuration. -/</span></span>
+<span id="L157"><span class="kw">def</span> <span class="const token" data-verso-hover="87">initCfg</span> : <span class="const token" data-verso-hover="55">Cfg</span> P M := ⟨[], <span class="kw">fun</span> _ =&gt; <span class="const token" data-verso-hover="101">.</span>idle, <span class="kw">fun</span> _ =&gt; ∅, ∅⟩</span>
+<span id="L158"></span>
+<span id="L159"><span class="dc">/-- Effect of the reception by `p` of the network message `x` (record `r`), with its handler. -/</span></span>
+<span id="L160"><span class="kw">def</span> <span class="const token" data-verso-hover="155">deliver</span> (C : <span class="const token" data-verso-hover="55">Cfg</span> P M) (p : P) (x : <span class="const token" data-verso-hover="44">ℕ</span>) (r : <span class="const token" data-verso-hover="45">Rec</span> P M) : <span class="const token" data-verso-hover="55">Cfg</span> P M :=</span>
+<span id="L161">  <span class="kw">let</span> past' := C.<span class="const token" data-verso-hover="63">past</span> p ∪ r.<span class="const token" data-verso-hover="59">dep</span> ∪ {x}</span>
+<span id="L162">  <span class="kw">match</span> r.<span class="const token" data-verso-hover="50">body</span> <span class="kw">with</span></span>
+<span id="L163">  | <span class="const token" data-verso-hover="53">.</span>init m =&gt;</span>
+<span id="L164">    <span class="kw">if</span> r.<span class="const token" data-verso-hover="49">src</span> ≠ p <span class="kw">then</span></span>
+<span id="L165">      <span class="cm">--</span><span class="cm"> lines 5–6: causal_send ack(m) to the sender, then mdeliver m from the sender</span></span>
+<span id="L166">      { C <span class="kw">with</span></span>
+<span id="L167">        <span class="const token" data-verso-hover="57">log</span> := C.<span class="const token" data-verso-hover="57">log</span> ++ [<span class="const token" data-verso-hover="47">.</span>rcv p x, <span class="const token" data-verso-hover="48">.</span>snd ⟨p, {r.<span class="const token" data-verso-hover="49">src</span>}, <span class="const token" data-verso-hover="51">.</span>ack m, past'⟩, <span class="const token" data-verso-hover="69">.</span>mb (<span class="const token" data-verso-hover="73">.</span>dl p r.<span class="const token" data-verso-hover="49">src</span> m)]</span>
+<span id="L168">        <span class="const token" data-verso-hover="63">past</span> := <span class="const token" data-verso-hover="102">Function.update</span> C.<span class="const token" data-verso-hover="63">past</span> p (<span class="const token" data-verso-hover="103">insert</span> (C.<span class="const token" data-verso-hover="57">log</span>.<span class="const token" data-verso-hover="65">length</span> + <span class="nu">1</span>) past') }</span>
+<span id="L169">    <span class="kw">else</span></span>
+<span id="L170">      { C <span class="kw">with</span> <span class="const token" data-verso-hover="57">log</span> := C.<span class="const token" data-verso-hover="57">log</span> ++ [<span class="const token" data-verso-hover="47">.</span>rcv p x], <span class="const token" data-verso-hover="63">past</span> := <span class="const token" data-verso-hover="102">Function.update</span> C.<span class="const token" data-verso-hover="63">past</span> p past' }</span>
+<span id="L171">  | <span class="const token" data-verso-hover="51">.</span>ack m =&gt;</span>
+<span id="L172">    { C <span class="kw">with</span></span>
+<span id="L173">      <span class="const token" data-verso-hover="57">log</span> := C.<span class="const token" data-verso-hover="57">log</span> ++ [<span class="const token" data-verso-hover="47">.</span>rcv p x]</span>
+<span id="L174">      <span class="const token" data-verso-hover="63">past</span> := <span class="const token" data-verso-hover="102">Function.update</span> C.<span class="const token" data-verso-hover="63">past</span> p past'</span>
+<span id="L175">      <span class="const token" data-verso-hover="80">phase</span> := <span class="kw">match</span> C.<span class="const token" data-verso-hover="80">phase</span> p <span class="kw">with</span></span>
+<span id="L176">        | <span class="const token" data-verso-hover="6">.</span>wait m' A =&gt; <span class="kw">if</span> m' = m <span class="kw">then</span> <span class="const token" data-verso-hover="102">Function.update</span> C.<span class="const token" data-verso-hover="80">phase</span> p (<span class="const token" data-verso-hover="6">.</span>wait m (<span class="const token" data-verso-hover="103">insert</span> r.<span class="const token" data-verso-hover="49">src</span> A))</span>
+<span id="L177">            <span class="kw">else</span> C.<span class="const token" data-verso-hover="80">phase</span></span>
+<span id="L178">        | <span class="const token" data-verso-hover="101">.</span>idle =&gt; C.<span class="const token" data-verso-hover="80">phase</span> }</span>
+<span id="L179"></span>
+<span id="L180"><span class="dc">/-- The transition function (`none` = action not enabled). `t` is the protocol parameter. -/</span></span>
+<span id="L181"><span class="kw">def</span> <span class="const token" data-verso-hover="182">step</span> (t : <span class="const token" data-verso-hover="44">ℕ</span>) (C : <span class="const token" data-verso-hover="55">Cfg</span> P M) : <span class="const token" data-verso-hover="175">Action</span> P M → <span class="const token" data-verso-hover="239">Option</span> (<span class="const token" data-verso-hover="55">Cfg</span> P M)</span>
+<span id="L182">  | <span class="const token" data-verso-hover="164">.</span>invoke p m =&gt;</span>
+<span id="L183">    <span class="kw">if</span> p ∉ C.<span class="const token" data-verso-hover="184">crashed</span> ∧ C.<span class="const token" data-verso-hover="80">phase</span> p = <span class="const token" data-verso-hover="101">.</span>idle ∧ <span class="const token" data-verso-hover="69">GEv.mb</span> (<span class="const token" data-verso-hover="70">.</span>bc p m) ∉ C.<span class="const token" data-verso-hover="57">log</span> <span class="kw">then</span></span>
+<span id="L184">      <span class="const token" data-verso-hover="46">some</span> { C <span class="kw">with</span></span>
+<span id="L185">        <span class="const token" data-verso-hover="57">log</span> := C.<span class="const token" data-verso-hover="57">log</span> ++ [<span class="const token" data-verso-hover="69">.</span>mb (<span class="const token" data-verso-hover="70">.</span>bc p m), <span class="const token" data-verso-hover="48">.</span>snd ⟨p, <span class="const token" data-verso-hover="67">univ</span>.<span class="const token" data-verso-hover="68">erase</span> p, <span class="const token" data-verso-hover="53">.</span>init m, C.<span class="const token" data-verso-hover="63">past</span> p⟩]</span>
+<span id="L186">        <span class="const token" data-verso-hover="63">past</span> := <span class="const token" data-verso-hover="102">Function.update</span> C.<span class="const token" data-verso-hover="63">past</span> p (<span class="const token" data-verso-hover="103">insert</span> (C.<span class="const token" data-verso-hover="57">log</span>.<span class="const token" data-verso-hover="65">length</span> + <span class="nu">1</span>) (C.<span class="const token" data-verso-hover="63">past</span> p))</span>
+<span id="L187">        <span class="const token" data-verso-hover="80">phase</span> := <span class="const token" data-verso-hover="102">Function.update</span> C.<span class="const token" data-verso-hover="80">phase</span> p (<span class="const token" data-verso-hover="6">.</span>wait m ∅) }</span>
+<span id="L188">    <span class="kw">else</span> <span class="const token" data-verso-hover="240">none</span></span>
+<span id="L189">  | <span class="const token" data-verso-hover="166">.</span>recv p x =&gt;</span>
+<span id="L190">    <span class="kw">match</span> C.<span class="const token" data-verso-hover="57">log</span>[x]? <span class="kw">with</span></span>
+<span id="L191">    | <span class="const token" data-verso-hover="46">some</span> (<span class="const token" data-verso-hover="48">.</span>snd r) =&gt;</span>
+<span id="L192">      <span class="kw">if</span> p ∉ C.<span class="const token" data-verso-hover="184">crashed</span> ∧ p ∈ r.<span class="const token" data-verso-hover="58">dst</span> ∧ <span class="const token" data-verso-hover="47">GEv.rcv</span> p x ∉ C.<span class="const token" data-verso-hover="57">log</span> ∧ <span class="const token" data-verso-hover="140">CausalReady</span> C.<span class="const token" data-verso-hover="57">log</span> p r <span class="kw">then</span></span>
+<span id="L193">        <span class="const token" data-verso-hover="46">some</span> (<span class="const token" data-verso-hover="155">deliver</span> C p x r)</span>
+<span id="L194">      <span class="kw">else</span> <span class="const token" data-verso-hover="240">none</span></span>
+<span id="L195">    | _ =&gt; <span class="const token" data-verso-hover="240">none</span></span>
+<span id="L196">  | <span class="const token" data-verso-hover="168">.</span>own p =&gt;</span>
+<span id="L197">    <span class="kw">match</span> C.<span class="const token" data-verso-hover="80">phase</span> p <span class="kw">with</span></span>
+<span id="L198">    | <span class="const token" data-verso-hover="6">.</span>wait m A =&gt;</span>
+<span id="L199">      <span class="kw">if</span> p ∉ C.<span class="const token" data-verso-hover="184">crashed</span> ∧ <span class="const token" data-verso-hover="77">Fintype.card</span> P - t - <span class="nu">1</span> ≤ A.<span class="const token" data-verso-hover="78">card</span> <span class="kw">then</span></span>
+<span id="L200">        <span class="const token" data-verso-hover="46">some</span> { C <span class="kw">with</span></span>
+<span id="L201">          <span class="const token" data-verso-hover="57">log</span> := C.<span class="const token" data-verso-hover="57">log</span> ++ [<span class="const token" data-verso-hover="69">.</span>mb (<span class="const token" data-verso-hover="73">.</span>dl p p m)]</span>
+<span id="L202">          <span class="const token" data-verso-hover="80">phase</span> := <span class="const token" data-verso-hover="102">Function.update</span> C.<span class="const token" data-verso-hover="80">phase</span> p <span class="const token" data-verso-hover="101">.</span>idle }</span>
+<span id="L203">      <span class="kw">else</span> <span class="const token" data-verso-hover="240">none</span></span>
+<span id="L204">    | <span class="const token" data-verso-hover="101">.</span>idle =&gt; <span class="const token" data-verso-hover="240">none</span></span>
+<span id="L205">  | <span class="const token" data-verso-hover="170">.</span>crash p =&gt; <span class="const token" data-verso-hover="46">some</span> { C <span class="kw">with</span> <span class="const token" data-verso-hover="184">crashed</span> := <span class="const token" data-verso-hover="103">insert</span> p C.<span class="const token" data-verso-hover="184">crashed</span> }</span>
+<span id="L206">  | <span class="const token" data-verso-hover="172">.</span>skip =&gt; <span class="const token" data-verso-hover="46">some</span> C</span>
+<span id="L207"></span>
+<span id="L208"><span class="dc">/-- Reachable configurations. -/</span></span>
+<span id="L209"><span class="kw">inductive</span> <span class="const token" data-verso-hover="161">Reachable</span> (t : <span class="const token" data-verso-hover="44">ℕ</span>) : <span class="const token" data-verso-hover="55">Cfg</span> P M → <span class="kw">Prop</span></span>
+<span id="L210">  | <span class="const token" data-verso-hover="162">init</span> : <span class="const token" data-verso-hover="161">Reachable</span> t <span class="const token" data-verso-hover="87">initCfg</span></span>
+<span id="L211">  | <span class="const token" data-verso-hover="163">step</span> {C C' : <span class="const token" data-verso-hover="55">Cfg</span> P M} (a : <span class="const token" data-verso-hover="175">Action</span> P M) : <span class="const token" data-verso-hover="161">Reachable</span> t C → <span class="const token" data-verso-hover="182">step</span> t C a = <span class="const token" data-verso-hover="46">some</span> C' →</span>
+<span id="L212">      <span class="const token" data-verso-hover="161">Reachable</span> t C'</span>
+<span id="L213"></span>
+<span id="L214"><span class="dc">/-! ## Step inversion lemmas -/</span></span>
+<span id="L215"></span>
+<span id="L216"><span class="kw">section</span> Inversion</span>
+<span id="L217"></span>
+<span id="L218"><span class="kw">variable</span> {t : <span class="const token" data-verso-hover="44">ℕ</span>} {C C' : <span class="const token" data-verso-hover="55">Cfg</span> P M}</span>
+<span id="L219"></span>
+<span id="L220"><span class="kw">lemma</span> <span class="const token" data-verso-hover="165">step_invoke</span> {p : P} {m : M} (h : <span class="const token" data-verso-hover="182">step</span> t C (<span class="const token" data-verso-hover="164">.</span>invoke p m) = <span class="const token" data-verso-hover="46">some</span> C') :</span>
+<span id="L221">    p ∉ C.<span class="const token" data-verso-hover="184">crashed</span> ∧ C.<span class="const token" data-verso-hover="80">phase</span> p = <span class="const token" data-verso-hover="101">.</span>idle ∧ <span class="const token" data-verso-hover="69">GEv.mb</span> (<span class="const token" data-verso-hover="70">.</span>bc p m) ∉ C.<span class="const token" data-verso-hover="57">log</span> ∧</span>
+<span id="L222">    C' = { C <span class="kw">with</span></span>
+<span id="L223">        <span class="const token" data-verso-hover="57">log</span> := C.<span class="const token" data-verso-hover="57">log</span> ++ [<span class="const token" data-verso-hover="69">.</span>mb (<span class="const token" data-verso-hover="70">.</span>bc p m), <span class="const token" data-verso-hover="48">.</span>snd ⟨p, <span class="const token" data-verso-hover="67">univ</span>.<span class="const token" data-verso-hover="68">erase</span> p, <span class="const token" data-verso-hover="53">.</span>init m, C.<span class="const token" data-verso-hover="63">past</span> p⟩]</span>
+<span id="L224">        <span class="const token" data-verso-hover="63">past</span> := <span class="const token" data-verso-hover="102">Function.update</span> C.<span class="const token" data-verso-hover="63">past</span> p (<span class="const token" data-verso-hover="103">insert</span> (C.<span class="const token" data-verso-hover="57">log</span>.<span class="const token" data-verso-hover="65">length</span> + <span class="nu">1</span>) (C.<span class="const token" data-verso-hover="63">past</span> p))</span>
+<span id="L225">        <span class="const token" data-verso-hover="80">phase</span> := <span class="const token" data-verso-hover="102">Function.update</span> C.<span class="const token" data-verso-hover="80">phase</span> p (<span class="const token" data-verso-hover="6">.</span>wait m ∅) } := <span class="kw">by</span></span>
+<span id="L226">  <span class="kw">simp</span> only [<span class="const token" data-verso-hover="182">step</span>] <span class="kw">at</span> h</span>
+<span id="L227">  <span class="kw">split_ifs</span> <span class="kw">at</span> h <span class="kw">with</span> hg</span>
+<span id="L228">  <span class="kw">exact</span> ⟨hg.<span class="const token" data-verso-hover="106">1</span>, hg.<span class="const token" data-verso-hover="107">2</span><span class="nu">.</span><span class="const token" data-verso-hover="106">1</span>, hg.<span class="const token" data-verso-hover="107">2</span><span class="nu">.</span><span class="const token" data-verso-hover="107">2</span>, (<span class="const token" data-verso-hover="247">Option.some.inj</span> h).<span class="const token" data-verso-hover="117">symm</span>⟩</span>
+<span id="L229"></span>
+<span id="L230"><span class="kw">lemma</span> <span class="const token" data-verso-hover="167">step_recv</span> {p : P} {x : <span class="const token" data-verso-hover="44">ℕ</span>} (h : <span class="const token" data-verso-hover="182">step</span> t C (<span class="const token" data-verso-hover="166">.</span>recv p x) = <span class="const token" data-verso-hover="46">some</span> C') :</span>
+<span id="L231">    ∃ r, C.<span class="const token" data-verso-hover="57">log</span>[x]? = <span class="const token" data-verso-hover="46">some</span> (<span class="const token" data-verso-hover="48">.</span>snd r) ∧ p ∉ C.<span class="const token" data-verso-hover="184">crashed</span> ∧ p ∈ r.<span class="const token" data-verso-hover="58">dst</span> ∧ <span class="const token" data-verso-hover="47">GEv.rcv</span> p x ∉ C.<span class="const token" data-verso-hover="57">log</span> ∧</span>
+<span id="L232">      <span class="const token" data-verso-hover="140">CausalReady</span> C.<span class="const token" data-verso-hover="57">log</span> p r ∧ C' = <span class="const token" data-verso-hover="155">deliver</span> C p x r := <span class="kw">by</span></span>
+<span id="L233">  <span class="kw">simp</span> only [<span class="const token" data-verso-hover="182">step</span>] <span class="kw">at</span> h</span>
+<span id="L234">  <span class="kw">split</span> <span class="kw">at</span> h</span>
+<span id="L235">  · <span class="kw">rename_i</span> r hr</span>
+<span id="L236">    <span class="kw">split_ifs</span> <span class="kw">at</span> h <span class="kw">with</span> hg</span>
+<span id="L237">    <span class="kw">exact</span> ⟨r, hr, hg.<span class="const token" data-verso-hover="106">1</span>, hg.<span class="const token" data-verso-hover="107">2</span><span class="nu">.</span><span class="const token" data-verso-hover="106">1</span>, hg.<span class="const token" data-verso-hover="107">2</span><span class="nu">.</span><span class="const token" data-verso-hover="107">2</span><span class="nu">.</span><span class="const token" data-verso-hover="106">1</span>, hg.<span class="const token" data-verso-hover="107">2</span><span class="nu">.</span><span class="const token" data-verso-hover="107">2</span><span class="nu">.</span><span class="const token" data-verso-hover="107">2</span>, (<span class="const token" data-verso-hover="247">Option.some.inj</span> h).<span class="const token" data-verso-hover="117">symm</span>⟩</span>
+<span id="L238">  · <span class="kw">cases</span> h</span>
+<span id="L239"></span>
+<span id="L240"><span class="kw">lemma</span> <span class="const token" data-verso-hover="169">step_own</span> {p : P} (h : <span class="const token" data-verso-hover="182">step</span> t C (<span class="const token" data-verso-hover="168">.</span>own p) = <span class="const token" data-verso-hover="46">some</span> C') :</span>
+<span id="L241">    ∃ m A, C.<span class="const token" data-verso-hover="80">phase</span> p = <span class="const token" data-verso-hover="6">.</span>wait m A ∧ p ∉ C.<span class="const token" data-verso-hover="184">crashed</span> ∧ <span class="const token" data-verso-hover="77">Fintype.card</span> P - t - <span class="nu">1</span> ≤ A.<span class="const token" data-verso-hover="78">card</span> ∧</span>
+<span id="L242">      C' = { C <span class="kw">with</span></span>
+<span id="L243">          <span class="const token" data-verso-hover="57">log</span> := C.<span class="const token" data-verso-hover="57">log</span> ++ [<span class="const token" data-verso-hover="69">.</span>mb (<span class="const token" data-verso-hover="73">.</span>dl p p m)]</span>
+<span id="L244">          <span class="const token" data-verso-hover="80">phase</span> := <span class="const token" data-verso-hover="102">Function.update</span> C.<span class="const token" data-verso-hover="80">phase</span> p <span class="const token" data-verso-hover="101">.</span>idle } := <span class="kw">by</span></span>
+<span id="L245">  <span class="kw">simp</span> only [<span class="const token" data-verso-hover="182">step</span>] <span class="kw">at</span> h</span>
+<span id="L246">  <span class="kw">split</span> <span class="kw">at</span> h</span>
+<span id="L247">  · <span class="kw">rename_i</span> m A hph</span>
+<span id="L248">    <span class="kw">split_ifs</span> <span class="kw">at</span> h <span class="kw">with</span> hg</span>
+<span id="L249">    <span class="kw">exact</span> ⟨m, A, hph, hg.<span class="const token" data-verso-hover="106">1</span>, hg.<span class="const token" data-verso-hover="107">2</span>, (<span class="const token" data-verso-hover="247">Option.some.inj</span> h).<span class="const token" data-verso-hover="117">symm</span>⟩</span>
+<span id="L250">  · <span class="kw">cases</span> h</span>
+<span id="L251"></span>
+<span id="L252"><span class="kw">lemma</span> <span class="const token" data-verso-hover="171">step_crash</span> {p : P} (h : <span class="const token" data-verso-hover="182">step</span> t C (<span class="const token" data-verso-hover="170">.</span>crash p) = <span class="const token" data-verso-hover="46">some</span> C') :</span>
+<span id="L253">    C' = { C <span class="kw">with</span> <span class="const token" data-verso-hover="184">crashed</span> := <span class="const token" data-verso-hover="103">insert</span> p C.<span class="const token" data-verso-hover="184">crashed</span> } := <span class="kw">by</span></span>
+<span id="L254">  <span class="kw">simp</span> only [<span class="const token" data-verso-hover="182">step</span>, <span class="const token" data-verso-hover="248">Option.some.injEq</span>] <span class="kw">at</span> h; <span class="kw">exact</span> h.<span class="const token" data-verso-hover="117">symm</span></span>
+<span id="L255"></span>
+<span id="L256"><span class="kw">lemma</span> <span class="const token" data-verso-hover="173">step_skip</span> (h : <span class="const token" data-verso-hover="182">step</span> t C <span class="const token" data-verso-hover="172">.</span>skip = <span class="const token" data-verso-hover="46">some</span> C') : C' = C := <span class="kw">by</span></span>
+<span id="L257">  <span class="kw">simp</span> only [<span class="const token" data-verso-hover="182">step</span>, <span class="const token" data-verso-hover="248">Option.some.injEq</span>] <span class="kw">at</span> h; <span class="kw">exact</span> h.<span class="const token" data-verso-hover="117">symm</span></span>
+<span id="L258"></span>
+<span id="L259"><span class="dc">/-- Every step appends to the log. -/</span></span>
+<span id="L260"><span class="kw">lemma</span> <span class="const token" data-verso-hover="193">step_log_prefix</span> {a : <span class="const token" data-verso-hover="175">Action</span> P M} (h : <span class="const token" data-verso-hover="182">step</span> t C a = <span class="const token" data-verso-hover="46">some</span> C') : ∃ l, C'.<span class="const token" data-verso-hover="57">log</span> = C.<span class="const token" data-verso-hover="57">log</span> ++ l := <span class="kw">by</span></span>
+<span id="L261">  <span class="kw">cases</span> a <span class="kw">with</span></span>
+<span id="L262">  | <span class="const token" data-verso-hover="164">invoke</span> p m =&gt; <span class="kw">obtain</span> ⟨-, -, -, <span class="kw">rfl</span>⟩ := <span class="const token" data-verso-hover="165">step_invoke</span> h; <span class="kw">exact</span> ⟨_, <span class="const token" data-verso-hover="115">rfl</span>⟩</span>
+<span id="L263">  | <span class="const token" data-verso-hover="166">recv</span> p x =&gt;</span>
+<span id="L264">    <span class="kw">obtain</span> ⟨r, -, -, -, -, -, <span class="kw">rfl</span>⟩ := <span class="const token" data-verso-hover="167">step_recv</span> h</span>
+<span id="L265">    <span class="kw">unfold</span> <span class="const token" data-verso-hover="155">deliver</span></span>
+<span id="L266">    <span class="kw">split</span></span>
+<span id="L267">    · <span class="kw">split_ifs</span></span>
+<span id="L268">      · <span class="kw">exact</span> ⟨_, <span class="const token" data-verso-hover="115">rfl</span>⟩</span>
+<span id="L269">      · <span class="kw">exact</span> ⟨_, <span class="const token" data-verso-hover="115">rfl</span>⟩</span>
+<span id="L270">    · <span class="kw">exact</span> ⟨_, <span class="const token" data-verso-hover="115">rfl</span>⟩</span>
+<span id="L271">  | <span class="const token" data-verso-hover="168">own</span> p =&gt; <span class="kw">obtain</span> ⟨m, A, -, -, -, <span class="kw">rfl</span>⟩ := <span class="const token" data-verso-hover="169">step_own</span> h; <span class="kw">exact</span> ⟨_, <span class="const token" data-verso-hover="115">rfl</span>⟩</span>
+<span id="L272">  | <span class="const token" data-verso-hover="170">crash</span> p =&gt; <span class="kw">rw</span> [<span class="const token" data-verso-hover="171">step_crash</span> h]; <span class="kw">exact</span> ⟨[], <span class="kw">by</span> <span class="kw">simp</span>⟩</span>
+<span id="L273">  | <span class="const token" data-verso-hover="172">skip</span> =&gt; <span class="kw">rw</span> [<span class="const token" data-verso-hover="173">step_skip</span> h]; <span class="kw">exact</span> ⟨[], <span class="kw">by</span> <span class="kw">simp</span>⟩</span>
+<span id="L274"></span>
+<span id="L275"><span class="dc">/-- Crashed processes stay crashed. -/</span></span>
+<span id="L276"><span class="kw">lemma</span> <span class="const token" data-verso-hover="200">step_crashed_mono</span> {a : <span class="const token" data-verso-hover="175">Action</span> P M} (h : <span class="const token" data-verso-hover="182">step</span> t C a = <span class="const token" data-verso-hover="46">some</span> C') : C.<span class="const token" data-verso-hover="184">crashed</span> ⊆ C'.<span class="const token" data-verso-hover="184">crashed</span> := <span class="kw">by</span></span>
+<span id="L277">  <span class="kw">cases</span> a <span class="kw">with</span></span>
+<span id="L278">  | <span class="const token" data-verso-hover="164">invoke</span> p m =&gt; <span class="kw">obtain</span> ⟨-, -, -, <span class="kw">rfl</span>⟩ := <span class="const token" data-verso-hover="165">step_invoke</span> h; <span class="kw">exact</span> <span class="const token" data-verso-hover="198">subset_rfl</span></span>
+<span id="L279">  | <span class="const token" data-verso-hover="166">recv</span> p x =&gt;</span>
+<span id="L280">    <span class="kw">obtain</span> ⟨r, -, -, -, -, -, <span class="kw">rfl</span>⟩ := <span class="const token" data-verso-hover="167">step_recv</span> h</span>
+<span id="L281">    <span class="kw">unfold</span> <span class="const token" data-verso-hover="155">deliver</span></span>
+<span id="L282">    <span class="kw">split</span></span>
+<span id="L283">    · <span class="kw">split_ifs</span></span>
+<span id="L284">      · <span class="kw">exact</span> <span class="const token" data-verso-hover="198">subset_rfl</span></span>
+<span id="L285">      · <span class="kw">exact</span> <span class="const token" data-verso-hover="198">subset_rfl</span></span>
+<span id="L286">    · <span class="kw">exact</span> <span class="const token" data-verso-hover="198">subset_rfl</span></span>
+<span id="L287">  | <span class="const token" data-verso-hover="168">own</span> p =&gt; <span class="kw">obtain</span> ⟨m, A, -, -, -, <span class="kw">rfl</span>⟩ := <span class="const token" data-verso-hover="169">step_own</span> h; <span class="kw">exact</span> <span class="const token" data-verso-hover="198">subset_rfl</span></span>
+<span id="L288">  | <span class="const token" data-verso-hover="170">crash</span> p =&gt; <span class="kw">rw</span> [<span class="const token" data-verso-hover="171">step_crash</span> h]; <span class="kw">exact</span> <span class="const token" data-verso-hover="249">subset_insert</span> _ _</span>
+<span id="L289">  | <span class="const token" data-verso-hover="172">skip</span> =&gt; <span class="kw">rw</span> [<span class="const token" data-verso-hover="173">step_skip</span> h]</span>
+<span id="L290"></span>
+<span id="L291"><span class="kw">end</span> Inversion</span>
+<span id="L292"></span>
+<span id="L293"><span class="dc">/-! ## List lemmas -/</span></span>
+<span id="L294"></span>
+<span id="L295"><span class="kw">section</span> ListLemmas</span>
+<span id="L296"></span>
+<span id="L297"><span class="kw">variable</span> {α : <span class="kw">Type</span>}</span>
+<span id="L298"></span>
+<span id="L299"><span class="kw">lemma</span> <span class="const token" data-verso-hover="105">lt_of_getElem?_eq_some</span> {L : <span class="const token" data-verso-hover="42">List</span> α} {i : <span class="const token" data-verso-hover="44">ℕ</span>} {a : α} (h : L[i]? = <span class="const token" data-verso-hover="46">some</span> a) : i &lt; L.<span class="const token" data-verso-hover="65">length</span> := <span class="kw">by</span></span>
+<span id="L300">  <span class="kw">by_contra</span> hc; <span class="kw">rw</span> [<span class="const token" data-verso-hover="250">List.getElem?_eq_none</span> (<span class="kw">by</span> <span class="kw">omega</span>)] <span class="kw">at</span> h; <span class="kw">cases</span> h</span>
+<span id="L301"></span>
+<span id="L302"><span class="kw">lemma</span> <span class="const token" data-verso-hover="96">getElem?_append_of_some</span> {L l : <span class="const token" data-verso-hover="42">List</span> α} {i : <span class="const token" data-verso-hover="44">ℕ</span>} {a : α} (h : L[i]? = <span class="const token" data-verso-hover="46">some</span> a) :</span>
+<span id="L303">    (L ++ l)[i]? = <span class="const token" data-verso-hover="46">some</span> a := <span class="kw">by</span></span>
+<span id="L304">  <span class="kw">rw</span> [<span class="const token" data-verso-hover="99">List.getElem?_append_left</span> (<span class="const token" data-verso-hover="105">lt_of_getElem?_eq_some</span> h)]; <span class="kw">exact</span> h</span>
+<span id="L305"></span>
+<span id="L306"><span class="kw">lemma</span> <span class="const token" data-verso-hover="251">getElem?_append_cases</span> {L l : <span class="const token" data-verso-hover="42">List</span> α} {i : <span class="const token" data-verso-hover="44">ℕ</span>} {a : α} (h : (L ++ l)[i]? = <span class="const token" data-verso-hover="46">some</span> a) :</span>
+<span id="L307">    L[i]? = <span class="const token" data-verso-hover="46">some</span> a ∨ (L.<span class="const token" data-verso-hover="65">length</span> ≤ i ∧ l[i - L.<span class="const token" data-verso-hover="65">length</span>]? = <span class="const token" data-verso-hover="46">some</span> a) := <span class="kw">by</span></span>
+<span id="L308">  <span class="kw">by_cases</span> hi : i &lt; L.<span class="const token" data-verso-hover="65">length</span></span>
+<span id="L309">  · <span class="kw">left</span>; <span class="kw">rwa</span> [<span class="const token" data-verso-hover="99">List.getElem?_append_left</span> hi] <span class="kw">at</span> h</span>
+<span id="L310">  · <span class="kw">right</span>; <span class="kw">rw</span> [<span class="const token" data-verso-hover="252">List.getElem?_append_right</span> (<span class="kw">by</span> <span class="kw">omega</span>)] <span class="kw">at</span> h; <span class="kw">exact</span> ⟨<span class="kw">by</span> <span class="kw">omega</span>, h⟩</span>
+<span id="L311"></span>
+<span id="L312"><span class="kw">lemma</span> <span class="const token" data-verso-hover="137">getElem?_append_one</span> {L : <span class="const token" data-verso-hover="42">List</span> α} {b : α} {i : <span class="const token" data-verso-hover="44">ℕ</span>} {a : α} (h : (L ++ [b])[i]? = <span class="const token" data-verso-hover="46">some</span> a) :</span>
+<span id="L313">    L[i]? = <span class="const token" data-verso-hover="46">some</span> a ∨ (i = L.<span class="const token" data-verso-hover="65">length</span> ∧ b = a) := <span class="kw">by</span></span>
+<span id="L314">  <span class="kw">rcases</span> <span class="const token" data-verso-hover="251">getElem?_append_cases</span> h <span class="kw">with</span> h | ⟨h1, h2⟩</span>
+<span id="L315">  · <span class="kw">exact</span> <span class="const token" data-verso-hover="118">Or.inl</span> h</span>
+<span id="L316">  · <span class="kw">right</span></span>
+<span id="L317">    <span class="kw">obtain</span> ⟨k, hk⟩ : ∃ k, i = L.<span class="const token" data-verso-hover="65">length</span> + k := ⟨i - L.<span class="const token" data-verso-hover="65">length</span>, <span class="kw">by</span> <span class="kw">omega</span>⟩</span>
+<span id="L318">    <span class="kw">subst</span> hk</span>
+<span id="L319">    <span class="kw">rcases</span> k <span class="kw">with</span> _ | k &lt;;&gt; <span class="kw">simp</span> <span class="kw">at</span> h2 ⊢; <span class="kw">exact</span> h2</span>
+<span id="L320"></span>
+<span id="L321"><span class="kw">lemma</span> <span class="const token" data-verso-hover="104">getElem?_append_two</span> {L : <span class="const token" data-verso-hover="42">List</span> α} {b c : α} {i : <span class="const token" data-verso-hover="44">ℕ</span>} {a : α}</span>
+<span id="L322">    (h : (L ++ [b, c])[i]? = <span class="const token" data-verso-hover="46">some</span> a) :</span>
+<span id="L323">    L[i]? = <span class="const token" data-verso-hover="46">some</span> a ∨ (i = L.<span class="const token" data-verso-hover="65">length</span> ∧ b = a) ∨ (i = L.<span class="const token" data-verso-hover="65">length</span> + <span class="nu">1</span> ∧ c = a) := <span class="kw">by</span></span>
+<span id="L324">  <span class="kw">rcases</span> <span class="const token" data-verso-hover="251">getElem?_append_cases</span> h <span class="kw">with</span> h | ⟨h1, h2⟩</span>
+<span id="L325">  · <span class="kw">exact</span> <span class="const token" data-verso-hover="118">Or.inl</span> h</span>
+<span id="L326">  · <span class="kw">right</span></span>
+<span id="L327">    <span class="kw">obtain</span> ⟨k, hk⟩ : ∃ k, i = L.<span class="const token" data-verso-hover="65">length</span> + k := ⟨i - L.<span class="const token" data-verso-hover="65">length</span>, <span class="kw">by</span> <span class="kw">omega</span>⟩</span>
+<span id="L328">    <span class="kw">subst</span> hk</span>
+<span id="L329">    <span class="kw">rcases</span> k <span class="kw">with</span> _ | _ | k &lt;;&gt; <span class="kw">simp</span> <span class="kw">at</span> h2 ⊢</span>
+<span id="L330">    · <span class="kw">exact</span> h2</span>
+<span id="L331">    · <span class="kw">exact</span> h2</span>
+<span id="L332"></span>
+<span id="L333"><span class="kw">lemma</span> <span class="const token" data-verso-hover="144">getElem?_append_three</span> {L : <span class="const token" data-verso-hover="42">List</span> α} {b c d : α} {i : <span class="const token" data-verso-hover="44">ℕ</span>} {a : α}</span>
+<span id="L334">    (h : (L ++ [b, c, d])[i]? = <span class="const token" data-verso-hover="46">some</span> a) :</span>
+<span id="L335">    L[i]? = <span class="const token" data-verso-hover="46">some</span> a ∨ (i = L.<span class="const token" data-verso-hover="65">length</span> ∧ b = a) ∨ (i = L.<span class="const token" data-verso-hover="65">length</span> + <span class="nu">1</span> ∧ c = a) ∨</span>
+<span id="L336">      (i = L.<span class="const token" data-verso-hover="65">length</span> + <span class="nu">2</span> ∧ d = a) := <span class="kw">by</span></span>
+<span id="L337">  <span class="kw">rcases</span> <span class="const token" data-verso-hover="251">getElem?_append_cases</span> h <span class="kw">with</span> h | ⟨h1, h2⟩</span>
+<span id="L338">  · <span class="kw">exact</span> <span class="const token" data-verso-hover="118">Or.inl</span> h</span>
+<span id="L339">  · <span class="kw">right</span></span>
+<span id="L340">    <span class="kw">obtain</span> ⟨k, hk⟩ : ∃ k, i = L.<span class="const token" data-verso-hover="65">length</span> + k := ⟨i - L.<span class="const token" data-verso-hover="65">length</span>, <span class="kw">by</span> <span class="kw">omega</span>⟩</span>
+<span id="L341">    <span class="kw">subst</span> hk</span>
+<span id="L342">    <span class="kw">rcases</span> k <span class="kw">with</span> _ | _ | _ | k &lt;;&gt; <span class="kw">simp</span> <span class="kw">at</span> h2 ⊢</span>
+<span id="L343">    · <span class="kw">exact</span> h2</span>
+<span id="L344">    · <span class="kw">exact</span> h2</span>
+<span id="L345">    · <span class="kw">exact</span> h2</span>
+<span id="L346"></span>
+<span id="L347"><span class="kw">lemma</span> <span class="const token" data-verso-hover="90">mem_iff_getElem?'</span> {L : <span class="const token" data-verso-hover="42">List</span> α} {a : α} : a ∈ L ↔ ∃ i : <span class="const token" data-verso-hover="44">ℕ</span>, L[i]? = <span class="const token" data-verso-hover="46">some</span> a := <span class="kw">by</span></span>
+<span id="L348">  <span class="kw">constructor</span></span>
+<span id="L349">  · <span class="kw">intro</span> h; <span class="kw">obtain</span> ⟨i, hi, he⟩ := <span class="const token" data-verso-hover="253">List.getElem_of_mem</span> h; <span class="kw">exact</span> ⟨i, <span class="kw">by</span> <span class="kw">simp</span> [hi, he]⟩</span>
+<span id="L350">  · <span class="kw">rintro</span> ⟨i, hi⟩; <span class="kw">exact</span> <span class="const token" data-verso-hover="92">List.mem_of_getElem?</span> hi</span>
+<span id="L351"></span>
+<span id="L352"><span class="cm">--</span><span class="cm"> CSLib candidate</span></span>
+<span id="L353"><span class="dc">/-- A position in a `filterMap` comes from a position of the original list, with the same</span></span>
+<span id="L354"><span class="dc">prefix. -/</span></span>
+<span id="L355"><span class="kw">lemma</span> <span class="const token" data-verso-hover="34">exists_of_getElem?_filterMap</span> {β : <span class="kw">Type</span>} (f : α → <span class="const token" data-verso-hover="239">Option</span> β) :</span>
+<span id="L356">    ∀ (l : <span class="const token" data-verso-hover="42">List</span> α) (i : <span class="const token" data-verso-hover="44">ℕ</span>) (b : β), (l.<span class="const token" data-verso-hover="241">filterMap</span> f)[i]? = <span class="const token" data-verso-hover="46">some</span> b →</span>
+<span id="L357">      ∃ j a, l[j]? = <span class="const token" data-verso-hover="46">some</span> a ∧ f a = <span class="const token" data-verso-hover="46">some</span> b ∧ (l.<span class="const token" data-verso-hover="254">take</span> j).<span class="const token" data-verso-hover="241">filterMap</span> f = (l.<span class="const token" data-verso-hover="241">filterMap</span> f).<span class="const token" data-verso-hover="254">take</span> i</span>
+<span id="L358">  | [], i, b, h =&gt; <span class="kw">by</span> <span class="kw">simp</span> <span class="kw">at</span> h</span>
+<span id="L359">  | a :: l, i, b, h =&gt; <span class="kw">by</span></span>
+<span id="L360">    <span class="kw">cases</span> hfa : f a <span class="kw">with</span></span>
+<span id="L361">    | <span class="const token" data-verso-hover="240">none</span> =&gt;</span>
+<span id="L362">      <span class="kw">rw</span> [<span class="const token" data-verso-hover="255">List.filterMap_cons_none</span> hfa] <span class="kw">at</span> h</span>
+<span id="L363">      <span class="kw">obtain</span> ⟨j, a', h1, h2, h3⟩ := <span class="const token" data-verso-hover="34">exists_of_getElem?_filterMap</span> f l i b h</span>
+<span id="L364">      <span class="kw">refine</span> ⟨j + <span class="nu">1</span>, a', <span class="kw">by</span> <span class="kw">simpa</span> <span class="kw">using</span> h1, h2, ?_⟩</span>
+<span id="L365">      <span class="kw">rw</span> [<span class="const token" data-verso-hover="256">List.take_succ_cons</span>, <span class="const token" data-verso-hover="255">List.filterMap_cons_none</span> hfa, <span class="const token" data-verso-hover="255">List.filterMap_cons_none</span> hfa, h3]</span>
+<span id="L366">    | <span class="const token" data-verso-hover="46">some</span> b' =&gt;</span>
+<span id="L367">      <span class="kw">rw</span> [<span class="const token" data-verso-hover="257">List.filterMap_cons_some</span> hfa] <span class="kw">at</span> h</span>
+<span id="L368">      <span class="kw">cases</span> i <span class="kw">with</span></span>
+<span id="L369">      | <span class="const token" data-verso-hover="189">zero</span> =&gt;</span>
+<span id="L370">        <span class="kw">simp</span> <span class="kw">at</span> h; <span class="kw">subst</span> h</span>
+<span id="L371">        <span class="kw">exact</span> ⟨<span class="nu">0</span>, a, <span class="const token" data-verso-hover="115">rfl</span>, hfa, <span class="kw">by</span> <span class="kw">simp</span>⟩</span>
+<span id="L372">      | <span class="const token" data-verso-hover="190">succ</span> i =&gt;</span>
+<span id="L373">        <span class="kw">simp</span> only [<span class="const token" data-verso-hover="258">List.getElem?_cons_succ</span>] <span class="kw">at</span> h</span>
+<span id="L374">        <span class="kw">obtain</span> ⟨j, a', h1, h2, h3⟩ := <span class="const token" data-verso-hover="34">exists_of_getElem?_filterMap</span> f l i b h</span>
+<span id="L375">        <span class="kw">refine</span> ⟨j + <span class="nu">1</span>, a', <span class="kw">by</span> <span class="kw">simpa</span> <span class="kw">using</span> h1, h2, ?_⟩</span>
+<span id="L376">        <span class="kw">rw</span> [<span class="const token" data-verso-hover="256">List.take_succ_cons</span>, <span class="const token" data-verso-hover="257">List.filterMap_cons_some</span> hfa, <span class="const token" data-verso-hover="257">List.filterMap_cons_some</span> hfa,</span>
+<span id="L377">          <span class="const token" data-verso-hover="256">List.take_succ_cons</span>, h3]</span>
+<span id="L378"></span>
+<span id="L379"><span class="kw">end</span> ListLemmas</span>
+<span id="L380"></span>
+<span id="L381"><span class="kw">lemma</span> <span class="const token" data-verso-hover="259">mbOf_eq_some</span> {a : <span class="const token" data-verso-hover="43">GEv</span> P M} {e : <span class="const token" data-verso-hover="237">Ev</span> P M} : <span class="const token" data-verso-hover="238">mbOf</span> a = <span class="const token" data-verso-hover="46">some</span> e ↔ a = <span class="const token" data-verso-hover="69">.</span>mb e := <span class="kw">by</span></span>
+<span id="L382">  <span class="kw">cases</span> a &lt;;&gt; <span class="kw">simp</span> [<span class="const token" data-verso-hover="238">mbOf</span>]</span>
+<span id="L383"></span>
+<span id="L384"><span class="kw">lemma</span> <span class="const token" data-verso-hover="222">mem_filterMap_mbOf</span> {L : <span class="const token" data-verso-hover="42">List</span> (<span class="const token" data-verso-hover="43">GEv</span> P M)} {e : <span class="const token" data-verso-hover="237">Ev</span> P M} :</span>
+<span id="L385">    e ∈ L.<span class="const token" data-verso-hover="241">filterMap</span> <span class="const token" data-verso-hover="238">mbOf</span> ↔ <span class="const token" data-verso-hover="69">GEv.mb</span> e ∈ L := <span class="kw">by</span></span>
+<span id="L386">  <span class="kw">simp</span> [<span class="const token" data-verso-hover="260">List.mem_filterMap</span>, <span class="const token" data-verso-hover="259">mbOf_eq_some</span>]</span>
+<span id="L387"></span>
+<span id="L388"><span class="kw">lemma</span> <span class="const token" data-verso-hover="261">count_filterMap_mbOf</span> (L : <span class="const token" data-verso-hover="42">List</span> (<span class="const token" data-verso-hover="43">GEv</span> P M)) (e : <span class="const token" data-verso-hover="237">Ev</span> P M) :</span>
+<span id="L389">    (L.<span class="const token" data-verso-hover="241">filterMap</span> <span class="const token" data-verso-hover="238">mbOf</span>).<span class="const token" data-verso-hover="84">count</span> e = L.<span class="const token" data-verso-hover="84">count</span> (<span class="const token" data-verso-hover="69">.</span>mb e) := <span class="kw">by</span></span>
+<span id="L390">  <span class="kw">induction</span> L <span class="kw">with</span></span>
+<span id="L391">  | <span class="const token" data-verso-hover="262">nil</span> =&gt; <span class="kw">simp</span></span>
+<span id="L392">  | <span class="const token" data-verso-hover="263">cons</span> a L ih =&gt;</span>
+<span id="L393">    <span class="kw">cases</span> a <span class="kw">with</span></span>
+<span id="L394">    | <span class="const token" data-verso-hover="69">mb</span> e' =&gt;</span>
+<span id="L395">      <span class="kw">rw</span> [<span class="const token" data-verso-hover="257">List.filterMap_cons_some</span> (<span class="kw">by</span> <span class="kw">rfl</span>), <span class="const token" data-verso-hover="132">List.count_cons</span>, <span class="const token" data-verso-hover="132">List.count_cons</span>, ih]</span>
+<span id="L396">      <span class="kw">simp</span></span>
+<span id="L397">    | <span class="const token" data-verso-hover="48">snd</span> r =&gt; <span class="kw">rw</span> [<span class="const token" data-verso-hover="255">List.filterMap_cons_none</span> (<span class="kw">by</span> <span class="kw">rfl</span>), <span class="const token" data-verso-hover="132">List.count_cons</span>, ih]; <span class="kw">simp</span></span>
+<span id="L398">    | <span class="const token" data-verso-hover="47">rcv</span> p y =&gt; <span class="kw">rw</span> [<span class="const token" data-verso-hover="255">List.filterMap_cons_none</span> (<span class="kw">by</span> <span class="kw">rfl</span>), <span class="const token" data-verso-hover="132">List.count_cons</span>, ih]; <span class="kw">simp</span></span>
+<span id="L399"></span>
+<span id="L400"><span class="kw">lemma</span> <span class="const token" data-verso-hover="141">needs_iff</span> {L : <span class="const token" data-verso-hover="42">List</span> (<span class="const token" data-verso-hover="43">GEv</span> P M)} {p : P} {y : <span class="const token" data-verso-hover="44">ℕ</span>} :</span>
+<span id="L401">    <span class="const token" data-verso-hover="213">needs</span> L p y = <span class="const token" data-verso-hover="214">true</span> ↔ ∃ r, L[y]? = <span class="const token" data-verso-hover="46">some</span> (<span class="const token" data-verso-hover="48">.</span>snd r) ∧ p ∈ r.<span class="const token" data-verso-hover="58">dst</span> := <span class="kw">by</span></span>
+<span id="L402">  <span class="kw">unfold</span> <span class="const token" data-verso-hover="213">needs</span></span>
+<span id="L403">  <span class="kw">split</span></span>
+<span id="L404">  · <span class="kw">rename_i</span> r hr; <span class="kw">simp</span> [hr]</span>
+<span id="L405">  · <span class="kw">rename_i</span> hr</span>
+<span id="L406">    <span class="kw">simp</span> only [<span class="const token" data-verso-hover="264">Bool.false_eq_true</span>, <span class="const token" data-verso-hover="265">false_iff</span>, <span class="const token" data-verso-hover="266">not_exists</span>, <span class="const token" data-verso-hover="267">not_and</span>]</span>
+<span id="L407">    <span class="kw">intro</span> r h; <span class="kw">exact</span> <span class="const token" data-verso-hover="152">absurd</span> h (hr r)</span>
+<span id="L408"></span>
+<span id="L409"><span class="kw">end</span> Podc.MBroadcast.Causal</span>
+<span id="L410"></span>
+</code></div>
+        <script>
+          window.versoHoversUrl = "PODC2023/MBroadcast/-hovers.json";</script>
+        <script src="static/lean/popper.js"></script>
+        <script src="static/lean/tippy.js"></script>
+        <script src="static/lean/marked.js"></script>
+        <script src="static/lean/highlighting.js"></script>
+        <script src="static/lean/lean.js"></script>
+        </article></main><footer class="site-footer"><div class="wrap">
+        Machine-checked formalizations of PODC papers in Lean 4. Generated with <a href="https://github.com/leanprover/verso">Verso</a> from the README files of <a href="https://github.com/vasnesterov/formal_podc">vasnesterov/formal_podc</a>.</div>
+      </footer></body>
+  </html>
+

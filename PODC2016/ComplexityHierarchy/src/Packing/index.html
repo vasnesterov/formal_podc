@@ -1,0 +1,404 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="light dark">
+    <link rel="icon" href="data:,">
+    <title>ComplexityHierarchy: Packing.lean · Formal PODC</title><base href="../../../.././"><link rel="stylesheet" href="static/lean/verso-vars.css">
+    <link rel="stylesheet" href="static/lean/highlighting.css">
+    <link rel="stylesheet" href="static/lean/tippy-border.css">
+    <link rel="stylesheet" href="static/style.css">
+    <script defer="defer" src="static/site.js"></script>
+    </head>
+  <body>
+    <header class="site-header">
+      <div class="wrap">
+        <a class="brand" href=".">Formal PODC</a><nav class="top">
+          <a href=".">Search</a><a href="about/">About</a><a href="https://github.com/vasnesterov/formal_podc">GitHub</a></nav>
+        </div>
+      </header>
+    <main class="wrap"><article><nav class="breadcrumbs" aria-label="Breadcrumb">
+          <a href=".">Search</a><span class="sep">›</span><a href="PODC2016/">PODC 2016</a><span class="sep">›</span><a href="PODC2016/ComplexityHierarchy/">ComplexityHierarchy</a><span class="sep">›</span><a href="PODC2016/ComplexityHierarchy/src/">Lean source</a><span class="sep">›</span><span aria-current="page">Packing</span></nav>
+        <h1>
+          <code>Packing.lean</code></h1>
+        <div class="paper-links">
+          <p>
+            Source of <a href="PODC2016/ComplexityHierarchy/">A Complexity-Based Hierarchy for Multiprocessor Synchronization — PODC 2016</a> · <a href="https://github.com/vasnesterov/formal_podc/blob/main/Papers/PODC2016/ComplexityHierarchy/Packing.lean">GitHub</a> · hover over a name for its type and documentation</p>
+          </div>
+        <div class="lean-code lean-src">
+          <code class="hl lean block" data-lean-context="Packing"><span id="L1"><span class="kw">import</span> Mathlib</span>
+<span id="L2"><span class="kw">import</span> Cslib.Foundations.Combinatorics.Digraph.Walk</span>
+<span id="L3"></span>
+<span id="L4"><span class="dc">/-!</span></span>
+<span id="L5"><span class="dc"># `k`-packings</span></span>
+<span id="L6"></span>
+<span id="L7"><span class="dc">Pure combinatorics of `k`-packings from Section 7 of</span></span>
+<span id="L8"><span class="dc">F. Ellen, R. Gelashvili, N. Shavit, L. Zhu,</span></span>
+<span id="L9"><span class="dc">*A Complexity-Based Hierarchy for Multiprocessor Synchronization*, PODC 2016.</span></span>
+<span id="L10"></span>
+<span id="L11"><span class="dc">-- CSLib candidate</span></span>
+<span id="L12"></span>
+<span id="L13"><span class="dc">Processes `P` cover locations `Loc` according to a relation `cov : P → Loc → Prop` (a process may</span></span>
+<span id="L14"><span class="dc">cover several locations). A `k`-packing of a finite set `S` of processes assigns to each process of</span></span>
+<span id="L15"><span class="dc">`S` a location it covers, with at most `k` processes per location. A location `r` is *fully</span></span>
+<span id="L16"><span class="dc">`k`-packed* by `S` if every `k`-packing of `S` packs exactly `k` processes into `r`.</span></span>
+<span id="L17"></span>
+<span id="L18"><span class="dc">## Main results</span></span>
+<span id="L19"></span>
+<span id="L20"><span class="dc">* `fullyPacked_of_cov` (Lemma 7.2): a process packed (by some packing) into a fully packed location</span></span>
+<span id="L21"><span class="dc">  only covers fully packed locations.</span></span>
+<span id="L22"><span class="dc">* `isPacking_insert`, `card_le_of_isPacking`, `card_lt_of_not_fullyPacked`, `exists_blocks`,</span></span>
+<span id="L23"><span class="dc">  `isPacking_congr`, `fullyPacked_congr`: auxiliary facts used in the paper's Section 7.</span></span>
+<span id="L24"><span class="dc">* `lemma71_trail_counterexample`: the re-packing step of the paper's proof of Lemma 7.1 (along a</span></span>
+<span id="L25"><span class="dc">  maximal trail) does not always decrease the number of processes packed in the start location of</span></span>
+<span id="L26"><span class="dc">  the re-packed suffix when the trail revisits a location.</span></span>
+<span id="L27"></span>
+<span id="L28"><span class="dc">## Implementation notes</span></span>
+<span id="L29"></span>
+<span id="L30"><span class="dc">Instead of the paper's Eulerian-trail argument (Lemma 7.1) we use an augmenting-path argument on</span></span>
+<span id="L31"><span class="dc">the *residual relation* `resid cov S π x y` ("some process packed into `x` by `π` covers `y`"):</span></span>
+<span id="L32"><span class="dc">* if every location reachable from `r` is full, all of them are fully packed (counting);</span></span>
+<span id="L33"><span class="dc">* if `x` reaches an under-full location, then re-packing along a shortest path gives a packing in</span></span>
+<span id="L34"><span class="dc">  which `x` is under-full.</span></span>
+<span id="L35"><span class="dc">-/</span></span>
+<span id="L36"></span>
+<span id="L37"><span class="kw">namespace</span> Cslib.SharedMemory.ComplexityHierarchy</span>
+<span id="L38"></span>
+<span id="L39"><span class="kw">open</span> Finset Relation</span>
+<span id="L40"></span>
+<span id="L41"><span class="kw">variable</span> {P Loc : <span class="kw">Type</span>*} [<span class="const token" data-verso-hover="80">DecidableEq</span> Loc]</span>
+<span id="L42"></span>
+<span id="L43"><span class="dc">/-- Number of processes of `S` packed into `r` by `π`. -/</span></span>
+<span id="L44"><span class="kw">def</span> <span class="const token" data-verso-hover="804">packCount</span> (S : <span class="const token" data-verso-hover="138">Finset</span> P) (π : P → Loc) (r : Loc) : <span class="const token" data-verso-hover="44">ℕ</span> := (S.<span class="const token" data-verso-hover="300">filter</span> (<span class="kw">fun</span> p =&gt; π p = r)).<span class="const token" data-verso-hover="157">card</span></span>
+<span id="L45"></span>
+<span id="L46"><span class="dc">/-- `π` is a `k`-packing of `S`: every process of `S` is packed into a location it covers, at most</span></span>
+<span id="L47"><span class="dc">`k` per location (Section 7 of the paper). -/</span></span>
+<span id="L48"><span class="kw">def</span> <span class="const token" data-verso-hover="805">IsPacking</span> (cov : P → Loc → <span class="kw">Prop</span>) (k : <span class="const token" data-verso-hover="44">ℕ</span>) (S : <span class="const token" data-verso-hover="138">Finset</span> P) (π : P → Loc) : <span class="kw">Prop</span> :=</span>
+<span id="L49">  (∀ p ∈ S, cov p (π p)) ∧ ∀ r, <span class="const token" data-verso-hover="804">packCount</span> S π r ≤ k</span>
+<span id="L50"></span>
+<span id="L51"><span class="dc">/-- `r` is fully `k`-packed by `S`: every `k`-packing of `S` packs exactly `k` processes into `r`</span></span>
+<span id="L52"><span class="dc">(Section 7 of the paper). -/</span></span>
+<span id="L53"><span class="kw">def</span> <span class="const token" data-verso-hover="502">FullyPacked</span> (cov : P → Loc → <span class="kw">Prop</span>) (k : <span class="const token" data-verso-hover="44">ℕ</span>) (S : <span class="const token" data-verso-hover="138">Finset</span> P) (r : Loc) : <span class="kw">Prop</span> :=</span>
+<span id="L54">  ∀ π, <span class="const token" data-verso-hover="805">IsPacking</span> cov k S π → <span class="const token" data-verso-hover="804">packCount</span> S π r = k</span>
+<span id="L55"></span>
+<span id="L56"><span class="dc">/-! ### Residual relation and augmenting paths -/</span></span>
+<span id="L57"></span>
+<span id="L58"><span class="dc">/-- Residual relation of a packing: some process of `S` packed into `x` by `π` covers `y`. -/</span></span>
+<span id="L59"><span class="kw">def</span> <span class="const token" data-verso-hover="806">resid</span> (cov : P → Loc → <span class="kw">Prop</span>) (S : <span class="const token" data-verso-hover="138">Finset</span> P) (π : P → Loc) (x y : Loc) : <span class="kw">Prop</span> :=</span>
+<span id="L60">  ∃ q ∈ S, π q = x ∧ cov q y</span>
+<span id="L61"></span>
+<span id="L62"><span class="kw">variable</span> {cov : P → Loc → <span class="kw">Prop</span>} {k : <span class="const token" data-verso-hover="44">ℕ</span>} {S : <span class="const token" data-verso-hover="138">Finset</span> P}</span>
+<span id="L63"></span>
+<span id="L64"><span class="kw">theorem</span> <span class="const token" data-verso-hover="807">packCount_update</span> [<span class="const token" data-verso-hover="80">DecidableEq</span> P] {π : P → Loc} {q : P} (hq : q ∈ S) (y r : Loc) :</span>
+<span id="L65">    <span class="const token" data-verso-hover="804">packCount</span> S (<span class="const token" data-verso-hover="106">Function.update</span> π q y) r + (<span class="kw">if</span> π q = r <span class="kw">then</span> <span class="nu">1</span> <span class="kw">else</span> <span class="nu">0</span>) =</span>
+<span id="L66">      <span class="const token" data-verso-hover="804">packCount</span> S π r + (<span class="kw">if</span> y = r <span class="kw">then</span> <span class="nu">1</span> <span class="kw">else</span> <span class="nu">0</span>) := <span class="kw">by</span></span>
+<span id="L67">  <span class="kw">unfold</span> <span class="const token" data-verso-hover="804">packCount</span></span>
+<span id="L68">  <span class="kw">rw</span> [← <span class="const token" data-verso-hover="808">Finset.insert_erase</span> hq]</span>
+<span id="L69">  <span class="kw">have</span> hne : q ∉ S.<span class="const token" data-verso-hover="310">erase</span> q := <span class="const token" data-verso-hover="809">Finset.notMem_erase</span> q S</span>
+<span id="L70">  <span class="kw">have</span> hcongr : (S.<span class="const token" data-verso-hover="310">erase</span> q).<span class="const token" data-verso-hover="300">filter</span> (<span class="kw">fun</span> p =&gt; <span class="const token" data-verso-hover="106">Function.update</span> π q y p = r) =</span>
+<span id="L71">      (S.<span class="const token" data-verso-hover="310">erase</span> q).<span class="const token" data-verso-hover="300">filter</span> (<span class="kw">fun</span> p =&gt; π p = r) := <span class="kw">by</span></span>
+<span id="L72">    <span class="kw">apply</span> <span class="const token" data-verso-hover="810">Finset.filter_congr</span></span>
+<span id="L73">    <span class="kw">intro</span> p hp</span>
+<span id="L74">    <span class="kw">rw</span> [<span class="const token" data-verso-hover="258">Function.update_of_ne</span> (<span class="const token" data-verso-hover="811">Finset.ne_of_mem_erase</span> hp)]</span>
+<span id="L75">  <span class="kw">rw</span> [<span class="const token" data-verso-hover="812">Finset.filter_insert</span>, <span class="const token" data-verso-hover="812">Finset.filter_insert</span>, <span class="const token" data-verso-hover="257">Function.update_self</span>, hcongr]</span>
+<span id="L76">  <span class="kw">by_cases</span> h1 : y = r &lt;;&gt; <span class="kw">by_cases</span> h2 : π q = r &lt;;&gt;</span>
+<span id="L77">    <span class="kw">simp</span> [h1, h2, <span class="const token" data-verso-hover="813">Finset.card_insert_of_notMem</span>, hne]</span>
+<span id="L78"></span>
+<span id="L79"><span class="dc">/-- Augmenting paths: if `x` reaches an under-full location in the residual relation of a</span></span>
+<span id="L80"><span class="dc">packing `π`, then some packing packs fewer than `k` processes into `x`. -/</span></span>
+<span id="L81"><span class="kw">theorem</span> <span class="const token" data-verso-hover="814">exists_packing_lt_of_walk</span> :</span>
+<span id="L82">    ∀ (n : <span class="const token" data-verso-hover="44">ℕ</span>) (π : P → Loc) (x y : Loc), <span class="const token" data-verso-hover="805">IsPacking</span> cov k S π →</span>
+<span id="L83">      <span class="const token" data-verso-hover="36">RelatesInSteps</span> (<span class="const token" data-verso-hover="806">resid</span> cov S π) x y n → <span class="const token" data-verso-hover="804">packCount</span> S π y &lt; k →</span>
+<span id="L84">        ∃ σ, <span class="const token" data-verso-hover="805">IsPacking</span> cov k S σ ∧ <span class="const token" data-verso-hover="804">packCount</span> S σ x &lt; k := <span class="kw">by</span></span>
+<span id="L85">  <span class="kw">classical</span></span>
+<span id="L86">  <span class="kw">intro</span> n</span>
+<span id="L87">  <span class="kw">induction</span> n <span class="kw">using</span> <span class="const token" data-verso-hover="676">Nat.strong_induction_on</span> <span class="kw">with</span></span>
+<span id="L88">  | _ n ih =&gt;</span>
+<span id="L89">  <span class="kw">intro</span> π x y hπ w hy</span>
+<span id="L90">  <span class="kw">cases</span> w <span class="kw">with</span></span>
+<span id="L91">  | <span class="const token" data-verso-hover="815">refl</span> =&gt; <span class="kw">exact</span> ⟨π, hπ, hy⟩</span>
+<span id="L92">  | <span class="const token" data-verso-hover="816">tail</span> z _ m w hzy =&gt;</span>
+<span id="L93">    <span class="kw">obtain</span> ⟨q, hqS, hqz, hqy⟩ := hzy</span>
+<span id="L94">    <span class="kw">have</span> hcount := <span class="kw">fun</span> r =&gt; <span class="const token" data-verso-hover="807">packCount_update</span> (π := π) hqS y r</span>
+<span id="L95">    <span class="kw">set</span> σ := <span class="const token" data-verso-hover="106">Function.update</span> π q y <span class="kw">with</span> hσdef</span>
+<span id="L96">    <span class="kw">have</span> hσ : <span class="const token" data-verso-hover="805">IsPacking</span> cov k S σ := <span class="kw">by</span></span>
+<span id="L97">      <span class="kw">refine</span> ⟨<span class="kw">fun</span> p hp =&gt; ?_, <span class="kw">fun</span> r =&gt; ?_⟩</span>
+<span id="L98">      · <span class="kw">by_cases</span> hpq : p = q</span>
+<span id="L99">        · <span class="kw">subst</span> hpq; <span class="kw">simp</span> [σ, hqy]</span>
+<span id="L100">        · <span class="kw">simp</span> [σ, <span class="const token" data-verso-hover="258">Function.update_of_ne</span> hpq, hπ.<span class="const token" data-verso-hover="278">1</span> p hp]</span>
+<span id="L101">      · <span class="kw">have</span> h1 := hcount r</span>
+<span id="L102">        <span class="kw">have</span> h2 := hπ.<span class="const token" data-verso-hover="279">2</span> r</span>
+<span id="L103">        <span class="kw">by_cases</span> hyr : y = r</span>
+<span id="L104">        · <span class="kw">subst</span> hyr; <span class="kw">split_ifs</span> <span class="kw">at</span> h1 &lt;;&gt; <span class="kw">omega</span></span>
+<span id="L105">        · <span class="kw">split_ifs</span> <span class="kw">at</span> h1 &lt;;&gt; <span class="kw">omega</span></span>
+<span id="L106">    <span class="kw">have</span> hσz : <span class="const token" data-verso-hover="804">packCount</span> S σ z &lt; k := <span class="kw">by</span></span>
+<span id="L107">      <span class="kw">have</span> h1 := hcount z</span>
+<span id="L108">      <span class="kw">have</span> h2 := hπ.<span class="const token" data-verso-hover="279">2</span> z</span>
+<span id="L109">      <span class="kw">by_cases</span> hyz : y = z</span>
+<span id="L110">      · <span class="kw">subst</span> hyz; <span class="kw">simp</span> only [hqz, <span class="const token" data-verso-hover="817">ite_true</span>] <span class="kw">at</span> h1; <span class="kw">omega</span></span>
+<span id="L111">      · <span class="kw">simp</span> only [hqz, hyz, <span class="const token" data-verso-hover="817">ite_true</span>, <span class="const token" data-verso-hover="818">ite_false</span>] <span class="kw">at</span> h1; <span class="kw">omega</span></span>
+<span id="L112">    <span class="kw">obtain</span> ⟨m', hm', w'⟩ := w.<span class="const token" data-verso-hover="37">exists_le_first_visit</span></span>
+<span id="L113">    <span class="kw">have</span> w'' : <span class="const token" data-verso-hover="36">RelatesInSteps</span> (<span class="const token" data-verso-hover="806">resid</span> cov S σ) x z m' := <span class="kw">by</span></span>
+<span id="L114">      <span class="kw">refine</span> w'.<span class="const token" data-verso-hover="819">map</span> <span class="const token" data-verso-hover="620">id</span> (<span class="kw">fun</span> a b hab =&gt; ?_)</span>
+<span id="L115">      <span class="kw">obtain</span> ⟨⟨q', hq'S, hq'a, hq'b⟩, ha⟩ := hab</span>
+<span id="L116">      <span class="kw">have</span> hq' : q' ≠ q := <span class="kw">by</span></span>
+<span id="L117">        <span class="kw">rintro</span> <span class="kw">rfl</span></span>
+<span id="L118">        <span class="kw">exact</span> ha (hq'a.<span class="const token" data-verso-hover="100">symm</span>.<span class="const token" data-verso-hover="625">trans</span> hqz)</span>
+<span id="L119">      <span class="kw">exact</span> ⟨q', hq'S, <span class="kw">by</span> <span class="kw">simp</span> [σ, <span class="const token" data-verso-hover="258">Function.update_of_ne</span> hq', hq'a], hq'b⟩</span>
+<span id="L120">    <span class="kw">exact</span> ih m' (<span class="kw">by</span> <span class="kw">omega</span>) σ x z hσ w'' hσz</span>
+<span id="L121"></span>
+<span id="L122"><span class="dc">/-- Counting: if a set `Z` of locations is closed under the residual relation of `π` and every</span></span>
+<span id="L123"><span class="dc">location of `Z` holds exactly `k` processes under `π`, then every packing packs exactly `k`</span></span>
+<span id="L124"><span class="dc">processes into each location of `Z`. -/</span></span>
+<span id="L125"><span class="kw">theorem</span> <span class="const token" data-verso-hover="820">packCount_eq_of_closed</span> {π σ : P → Loc} {Z : <span class="const token" data-verso-hover="138">Finset</span> Loc}</span>
+<span id="L126">    (hclosed : ∀ q ∈ S, π q ∈ Z → ∀ y, cov q y → y ∈ Z)</span>
+<span id="L127">    (hfull : ∀ z ∈ Z, <span class="const token" data-verso-hover="804">packCount</span> S π z = k) (hσ : <span class="const token" data-verso-hover="805">IsPacking</span> cov k S σ) :</span>
+<span id="L128">    ∀ z ∈ Z, <span class="const token" data-verso-hover="804">packCount</span> S σ z = k := <span class="kw">by</span></span>
+<span id="L129">  <span class="kw">classical</span></span>
+<span id="L130">  <span class="kw">set</span> A := S.<span class="const token" data-verso-hover="300">filter</span> (<span class="kw">fun</span> q =&gt; π q ∈ Z) <span class="kw">with</span> hAdef</span>
+<span id="L131">  <span class="kw">have</span> hA1 : A.<span class="const token" data-verso-hover="157">card</span> = ∑ z ∈ Z, <span class="const token" data-verso-hover="804">packCount</span> S π z := <span class="kw">by</span></span>
+<span id="L132">    <span class="kw">rw</span> [<span class="const token" data-verso-hover="821">card_eq_sum_card_fiberwise</span> (s := A) (f := π) (t := Z) (<span class="kw">fun</span> q hq =&gt; (<span class="const token" data-verso-hover="311">mem_filter</span>.<span class="const token" data-verso-hover="132">1</span> hq).<span class="const token" data-verso-hover="279">2</span>)]</span>
+<span id="L133">    <span class="kw">refine</span> <span class="const token" data-verso-hover="822">sum_congr</span> <span class="const token" data-verso-hover="67">rfl</span> (<span class="kw">fun</span> z hz =&gt; ?_)</span>
+<span id="L134">    <span class="kw">unfold</span> <span class="const token" data-verso-hover="804">packCount</span></span>
+<span id="L135">    <span class="kw">congr</span> <span class="nu">1</span></span>
+<span id="L136">    <span class="kw">ext</span> q</span>
+<span id="L137">    <span class="kw">simp</span> only [A, <span class="const token" data-verso-hover="311">mem_filter</span>]</span>
+<span id="L138">    <span class="kw">constructor</span></span>
+<span id="L139">    · <span class="kw">rintro</span> ⟨⟨h1, _⟩, h3⟩; <span class="kw">exact</span> ⟨h1, h3⟩</span>
+<span id="L140">    · <span class="kw">rintro</span> ⟨h1, h3⟩; <span class="kw">exact</span> ⟨⟨h1, h3 ▸ hz⟩, h3⟩</span>
+<span id="L141">  <span class="kw">have</span> hA2 : A.<span class="const token" data-verso-hover="157">card</span> ≤ ∑ z ∈ Z, <span class="const token" data-verso-hover="804">packCount</span> S σ z := <span class="kw">by</span></span>
+<span id="L142">    <span class="kw">rw</span> [<span class="const token" data-verso-hover="821">card_eq_sum_card_fiberwise</span> (s := A) (f := σ) (t := Z) (<span class="kw">fun</span> q hq =&gt;</span>
+<span id="L143">      hclosed q (<span class="const token" data-verso-hover="311">mem_filter</span>.<span class="const token" data-verso-hover="132">1</span> hq).<span class="const token" data-verso-hover="278">1</span> (<span class="const token" data-verso-hover="311">mem_filter</span>.<span class="const token" data-verso-hover="132">1</span> hq).<span class="const token" data-verso-hover="279">2</span> _ (hσ.<span class="const token" data-verso-hover="278">1</span> q (<span class="const token" data-verso-hover="311">mem_filter</span>.<span class="const token" data-verso-hover="132">1</span> hq).<span class="const token" data-verso-hover="278">1</span>))]</span>
+<span id="L144">    <span class="kw">refine</span> <span class="const token" data-verso-hover="823">sum_le_sum</span> (<span class="kw">fun</span> z _ =&gt; <span class="const token" data-verso-hover="306">card_le_card</span> ?_)</span>
+<span id="L145">    <span class="kw">intro</span> q</span>
+<span id="L146">    <span class="kw">simp</span> only [A, <span class="const token" data-verso-hover="311">mem_filter</span>]</span>
+<span id="L147">    <span class="kw">rintro</span> ⟨⟨h1, _⟩, h3⟩</span>
+<span id="L148">    <span class="kw">exact</span> ⟨h1, h3⟩</span>
+<span id="L149">  <span class="kw">have</span> hle : ∀ z ∈ Z, <span class="const token" data-verso-hover="804">packCount</span> S σ z ≤ k := <span class="kw">fun</span> z _ =&gt; hσ.<span class="const token" data-verso-hover="279">2</span> z</span>
+<span id="L150">  <span class="kw">rw</span> [<span class="const token" data-verso-hover="822">sum_congr</span> <span class="const token" data-verso-hover="67">rfl</span> hfull] <span class="kw">at</span> hA1</span>
+<span id="L151">  <span class="kw">have</span> hsum : ∑ z ∈ Z, <span class="const token" data-verso-hover="804">packCount</span> S σ z = ∑ z ∈ Z, k :=</span>
+<span id="L152">    <span class="const token" data-verso-hover="688">le_antisymm</span> (<span class="const token" data-verso-hover="823">sum_le_sum</span> hle) (hA1 ▸ hA2)</span>
+<span id="L153">  <span class="kw">exact</span> (<span class="const token" data-verso-hover="824">sum_eq_sum_iff_of_le</span> hle).<span class="const token" data-verso-hover="132">1</span> hsum</span>
+<span id="L154"></span>
+<span id="L155"><span class="dc">/-- **Lemma 7.2** of the paper (core statement): if `π` is a `k`-packing of `S` packing a process</span></span>
+<span id="L156"><span class="dc">`p ∈ S` into a fully `k`-packed location, then every location covered by `p` is fully `k`-packed.</span></span>
+<span id="L157"></span>
+<span id="L158"><span class="dc">The paper derives this from Lemma 7.1 (re-packing along a maximal trail); we use an</span></span>
+<span id="L159"><span class="dc">augmenting-path argument instead. -/</span></span>
+<span id="L160"><span class="kw">theorem</span> <span class="const token" data-verso-hover="4">fullyPacked_of_cov</span> [<span class="const token" data-verso-hover="294">Fintype</span> Loc] {π : P → Loc} {p : P} {r : Loc}</span>
+<span id="L161">    (hπ : <span class="const token" data-verso-hover="805">IsPacking</span> cov k S π) (hp : p ∈ S) (ha : <span class="const token" data-verso-hover="502">FullyPacked</span> cov k S (π p)) (hr : cov p r) :</span>
+<span id="L162">    <span class="const token" data-verso-hover="502">FullyPacked</span> cov k S r := <span class="kw">by</span></span>
+<span id="L163">  <span class="kw">classical</span></span>
+<span id="L164">  <span class="kw">set</span> Z := <span class="const token" data-verso-hover="299">univ</span>.<span class="const token" data-verso-hover="300">filter</span> (<span class="kw">fun</span> z =&gt; ∃ n, <span class="const token" data-verso-hover="36">RelatesInSteps</span> (<span class="const token" data-verso-hover="806">resid</span> cov S π) (π p) z n) <span class="kw">with</span> hZ</span>
+<span id="L165">  <span class="kw">by_cases</span> hall : ∀ z ∈ Z, <span class="const token" data-verso-hover="804">packCount</span> S π z = k</span>
+<span id="L166">  · <span class="kw">intro</span> σ hσ</span>
+<span id="L167">    <span class="kw">refine</span> <span class="const token" data-verso-hover="820">packCount_eq_of_closed</span> (π := π) (Z := Z) ?_ hall hσ r ?_</span>
+<span id="L168">    · <span class="kw">intro</span> q hq hqZ y hy</span>
+<span id="L169">      <span class="kw">obtain</span> ⟨n, w⟩ := (<span class="const token" data-verso-hover="311">mem_filter</span>.<span class="const token" data-verso-hover="132">1</span> hqZ).<span class="const token" data-verso-hover="279">2</span></span>
+<span id="L170">      <span class="kw">exact</span> <span class="const token" data-verso-hover="311">mem_filter</span>.<span class="const token" data-verso-hover="167">2</span> ⟨<span class="const token" data-verso-hover="312">mem_univ</span> _, n + <span class="nu">1</span>, <span class="const token" data-verso-hover="816">.</span>tail _ _ _ _ w ⟨q, hq, <span class="const token" data-verso-hover="67">rfl</span>, hy⟩⟩</span>
+<span id="L171">    · <span class="kw">exact</span> <span class="const token" data-verso-hover="311">mem_filter</span>.<span class="const token" data-verso-hover="167">2</span> ⟨<span class="const token" data-verso-hover="312">mem_univ</span> _, <span class="nu">1</span>, <span class="const token" data-verso-hover="825">.</span>single ⟨p, hp, <span class="const token" data-verso-hover="67">rfl</span>, hr⟩⟩</span>
+<span id="L172">  · push <span class="const token" data-verso-hover="177">Not</span> <span class="kw">at</span> hall</span>
+<span id="L173">    <span class="kw">obtain</span> ⟨z, hz, hne⟩ := hall</span>
+<span id="L174">    <span class="kw">obtain</span> ⟨n, w⟩ := (<span class="const token" data-verso-hover="311">mem_filter</span>.<span class="const token" data-verso-hover="132">1</span> hz).<span class="const token" data-verso-hover="279">2</span></span>
+<span id="L175">    <span class="kw">have</span> hlt : <span class="const token" data-verso-hover="804">packCount</span> S π z &lt; k := <span class="const token" data-verso-hover="826">lt_of_le_of_ne</span> (hπ.<span class="const token" data-verso-hover="279">2</span> z) hne</span>
+<span id="L176">    <span class="kw">obtain</span> ⟨σ, hσ, hlt'⟩ := <span class="const token" data-verso-hover="814">exists_packing_lt_of_walk</span> n π _ z hπ w hlt</span>
+<span id="L177">    <span class="kw">have</span> := ha σ hσ</span>
+<span id="L178">    <span class="kw">omega</span></span>
+<span id="L179"></span>
+<span id="L180"><span class="dc">/-! ### Auxiliary facts -/</span></span>
+<span id="L181"></span>
+<span id="L182"><span class="dc">/-- Adding a new process `z` to `S` and packing it into a location `r` that it covers and that is</span></span>
+<span id="L183"><span class="dc">under-full in `σ` gives a packing of `insert z S`. -/</span></span>
+<span id="L184"><span class="kw">theorem</span> <span class="const token" data-verso-hover="827">isPacking_insert</span> [<span class="const token" data-verso-hover="80">DecidableEq</span> P] {σ : P → Loc} {r : Loc} {z : P}</span>
+<span id="L185">    (hσ : <span class="const token" data-verso-hover="805">IsPacking</span> cov k S σ) (hr : <span class="const token" data-verso-hover="804">packCount</span> S σ r &lt; k) (hz : z ∉ S) (hcov : cov z r) :</span>
+<span id="L186">    <span class="const token" data-verso-hover="805">IsPacking</span> cov k (<span class="const token" data-verso-hover="744">insert</span> z S) (<span class="const token" data-verso-hover="106">Function.update</span> σ z r) := <span class="kw">by</span></span>
+<span id="L187">  <span class="kw">have</span> hcongr : ∀ r', S.<span class="const token" data-verso-hover="300">filter</span> (<span class="kw">fun</span> p =&gt; <span class="const token" data-verso-hover="106">Function.update</span> σ z r p = r') =</span>
+<span id="L188">      S.<span class="const token" data-verso-hover="300">filter</span> (<span class="kw">fun</span> p =&gt; σ p = r') := <span class="kw">by</span></span>
+<span id="L189">    <span class="kw">intro</span> r'</span>
+<span id="L190">    <span class="kw">apply</span> <span class="const token" data-verso-hover="810">Finset.filter_congr</span></span>
+<span id="L191">    <span class="kw">intro</span> p hp</span>
+<span id="L192">    <span class="kw">rw</span> [<span class="const token" data-verso-hover="258">Function.update_of_ne</span> (<span class="kw">by</span> <span class="kw">rintro</span> <span class="kw">rfl</span>; <span class="kw">exact</span> hz hp)]</span>
+<span id="L193">  <span class="kw">refine</span> ⟨<span class="kw">fun</span> p hp =&gt; ?_, <span class="kw">fun</span> r' =&gt; ?_⟩</span>
+<span id="L194">  · <span class="kw">rcases</span> <span class="const token" data-verso-hover="828">Finset.mem_insert</span>.<span class="const token" data-verso-hover="132">1</span> hp <span class="kw">with</span> <span class="kw">rfl</span> | hpS</span>
+<span id="L195">    · <span class="kw">simpa</span> <span class="kw">using</span> hcov</span>
+<span id="L196">    · <span class="kw">have</span> hpz : p ≠ z := <span class="kw">by</span> <span class="kw">rintro</span> <span class="kw">rfl</span>; <span class="kw">exact</span> hz hpS</span>
+<span id="L197">      <span class="kw">rw</span> [<span class="const token" data-verso-hover="258">Function.update_of_ne</span> hpz]</span>
+<span id="L198">      <span class="kw">exact</span> hσ.<span class="const token" data-verso-hover="278">1</span> p hpS</span>
+<span id="L199">  · <span class="kw">unfold</span> <span class="const token" data-verso-hover="804">packCount</span></span>
+<span id="L200">    <span class="kw">rw</span> [<span class="const token" data-verso-hover="812">Finset.filter_insert</span>, <span class="const token" data-verso-hover="257">Function.update_self</span>, hcongr]</span>
+<span id="L201">    <span class="kw">have</span> hnot : z ∉ S.<span class="const token" data-verso-hover="300">filter</span> (<span class="kw">fun</span> p =&gt; σ p = r') := <span class="kw">fun</span> h =&gt; hz (<span class="const token" data-verso-hover="311">Finset.mem_filter</span>.<span class="const token" data-verso-hover="132">1</span> h).<span class="const token" data-verso-hover="278">1</span></span>
+<span id="L202">    <span class="kw">by_cases</span> h : r = r'</span>
+<span id="L203">    · <span class="kw">subst</span> h</span>
+<span id="L204">      <span class="kw">simp</span> only [<span class="const token" data-verso-hover="817">ite_true</span>]</span>
+<span id="L205">      <span class="kw">rw</span> [<span class="const token" data-verso-hover="813">Finset.card_insert_of_notMem</span> hnot]</span>
+<span id="L206">      <span class="kw">exact</span> hr</span>
+<span id="L207">    · <span class="kw">simp</span> only [h, <span class="const token" data-verso-hover="818">ite_false</span>]</span>
+<span id="L208">      <span class="kw">exact</span> hσ.<span class="const token" data-verso-hover="279">2</span> r'</span>
+<span id="L209"></span>
+<span id="L210"><span class="dc">/-- The number of processes equals the sum of the numbers of processes packed per location. -/</span></span>
+<span id="L211"><span class="kw">theorem</span> <span class="const token" data-verso-hover="829">card_eq_sum_packCount</span> [<span class="const token" data-verso-hover="294">Fintype</span> Loc] (S : <span class="const token" data-verso-hover="138">Finset</span> P) (π : P → Loc) :</span>
+<span id="L212">    S.<span class="const token" data-verso-hover="157">card</span> = ∑ r, <span class="const token" data-verso-hover="804">packCount</span> S π r :=</span>
+<span id="L213">  <span class="const token" data-verso-hover="821">card_eq_sum_card_fiberwise</span> (<span class="kw">fun</span> _ _ =&gt; <span class="const token" data-verso-hover="312">mem_univ</span> _)</span>
+<span id="L214"></span>
+<span id="L215"><span class="dc">/-- A `k`-packing packs at most `k * |Loc|` processes. -/</span></span>
+<span id="L216"><span class="kw">theorem</span> <span class="const token" data-verso-hover="830">card_le_of_isPacking</span> [<span class="const token" data-verso-hover="294">Fintype</span> Loc] {π : P → Loc} (hπ : <span class="const token" data-verso-hover="805">IsPacking</span> cov k S π) :</span>
+<span id="L217">    S.<span class="const token" data-verso-hover="157">card</span> ≤ k * <span class="const token" data-verso-hover="322">Fintype.card</span> Loc := <span class="kw">by</span></span>
+<span id="L218">  <span class="kw">rw</span> [<span class="const token" data-verso-hover="829">card_eq_sum_packCount</span> S π]</span>
+<span id="L219">  <span class="kw">calc</span> ∑ r, <span class="const token" data-verso-hover="804">packCount</span> S π r ≤ ∑ _r : Loc, k := <span class="const token" data-verso-hover="823">sum_le_sum</span> (<span class="kw">fun</span> r _ =&gt; hπ.<span class="const token" data-verso-hover="279">2</span> r)</span>
+<span id="L220">    _ = k * <span class="const token" data-verso-hover="322">Fintype.card</span> Loc := <span class="kw">by</span> <span class="kw">simp</span> [<span class="const token" data-verso-hover="478">mul_comm</span>]</span>
+<span id="L221"></span>
+<span id="L222"><span class="dc">/-- If some location is not fully `k`-packed by `S` (in particular some `k`-packing of `S`</span></span>
+<span id="L223"><span class="dc">exists), then `S` has fewer than `k * |Loc|` processes. -/</span></span>
+<span id="L224"><span class="kw">theorem</span> <span class="const token" data-verso-hover="501">card_lt_of_not_fullyPacked</span> [<span class="const token" data-verso-hover="294">Fintype</span> Loc] {r : Loc} (h : ¬ <span class="const token" data-verso-hover="502">FullyPacked</span> cov k S r) :</span>
+<span id="L225">    S.<span class="const token" data-verso-hover="157">card</span> + <span class="nu">1</span> ≤ k * <span class="const token" data-verso-hover="322">Fintype.card</span> Loc := <span class="kw">by</span></span>
+<span id="L226">  <span class="kw">simp</span> only [<span class="const token" data-verso-hover="502">FullyPacked</span>, <span class="const token" data-verso-hover="831">not_forall</span>] <span class="kw">at</span> h</span>
+<span id="L227">  <span class="kw">obtain</span> ⟨σ, hσ, hne⟩ := h</span>
+<span id="L228">  <span class="kw">have</span> hlt : <span class="const token" data-verso-hover="804">packCount</span> S σ r &lt; k := <span class="const token" data-verso-hover="826">lt_of_le_of_ne</span> (hσ.<span class="const token" data-verso-hover="279">2</span> r) hne</span>
+<span id="L229">  <span class="kw">rw</span> [<span class="const token" data-verso-hover="829">card_eq_sum_packCount</span> S σ, <span class="const token" data-verso-hover="832">Nat.add_one_le_iff</span>]</span>
+<span id="L230">  <span class="kw">calc</span> ∑ r, <span class="const token" data-verso-hover="804">packCount</span> S σ r &lt; ∑ _r : Loc, k :=</span>
+<span id="L231">        <span class="const token" data-verso-hover="833">sum_lt_sum</span> (<span class="kw">fun</span> r _ =&gt; hσ.<span class="const token" data-verso-hover="279">2</span> r) ⟨r, <span class="const token" data-verso-hover="312">mem_univ</span> _, hlt⟩</span>
+<span id="L232">    _ = k * <span class="const token" data-verso-hover="322">Fintype.card</span> Loc := <span class="kw">by</span> <span class="kw">simp</span> [<span class="const token" data-verso-hover="478">mul_comm</span>]</span>
+<span id="L233"></span>
+<span id="L234"><span class="dc">/-- Splitting the processes packed into fully packed locations into two disjoint blocks with</span></span>
+<span id="L235"><span class="dc">`ℓ` and `k - ℓ` processes in each fully packed location. -/</span></span>
+<span id="L236"><span class="kw">theorem</span> <span class="const token" data-verso-hover="834">exists_blocks</span> [<span class="const token" data-verso-hover="294">Fintype</span> Loc] {π : P → Loc} {ℓ : <span class="const token" data-verso-hover="44">ℕ</span>} (hπ : <span class="const token" data-verso-hover="805">IsPacking</span> cov k S π)</span>
+<span id="L237">    (hℓ : ℓ ≤ k) :</span>
+<span id="L238">    ∃ T1 T2 : <span class="const token" data-verso-hover="138">Finset</span> P, T1 ⊆ S ∧ T2 ⊆ S ∧ <span class="const token" data-verso-hover="540">Disjoint</span> T1 T2 ∧</span>
+<span id="L239">      (∀ p ∈ T1, <span class="const token" data-verso-hover="502">FullyPacked</span> cov k S (π p)) ∧ (∀ p ∈ T2, <span class="const token" data-verso-hover="502">FullyPacked</span> cov k S (π p)) ∧</span>
+<span id="L240">      ∀ r, <span class="const token" data-verso-hover="502">FullyPacked</span> cov k S r →</span>
+<span id="L241">        (T1.<span class="const token" data-verso-hover="300">filter</span> (<span class="kw">fun</span> p =&gt; π p = r)).<span class="const token" data-verso-hover="157">card</span> = ℓ ∧ (T2.<span class="const token" data-verso-hover="300">filter</span> (<span class="kw">fun</span> p =&gt; π p = r)).<span class="const token" data-verso-hover="157">card</span> = k - ℓ := <span class="kw">by</span></span>
+<span id="L242">  <span class="kw">classical</span></span>
+<span id="L243">  <span class="kw">set</span> F := <span class="const token" data-verso-hover="299">univ</span>.<span class="const token" data-verso-hover="300">filter</span> (<span class="kw">fun</span> r =&gt; <span class="const token" data-verso-hover="502">FullyPacked</span> cov k S r) <span class="kw">with</span> hF</span>
+<span id="L244">  <span class="kw">have</span> hex : ∀ r, ∃ t ⊆ S.<span class="const token" data-verso-hover="300">filter</span> (<span class="kw">fun</span> p =&gt; π p = r), r ∈ F → t.<span class="const token" data-verso-hover="157">card</span> = ℓ := <span class="kw">by</span></span>
+<span id="L245">    <span class="kw">intro</span> r</span>
+<span id="L246">    <span class="kw">by_cases</span> hr : r ∈ F</span>
+<span id="L247">    · <span class="kw">have</span> hk : <span class="const token" data-verso-hover="804">packCount</span> S π r = k := (<span class="const token" data-verso-hover="311">mem_filter</span>.<span class="const token" data-verso-hover="132">1</span> hr).<span class="const token" data-verso-hover="279">2</span> π hπ</span>
+<span id="L248">      <span class="kw">obtain</span> ⟨t, ht, htc⟩ := <span class="const token" data-verso-hover="835">exists_subset_card_eq</span> (s := S.<span class="const token" data-verso-hover="300">filter</span> (<span class="kw">fun</span> p =&gt; π p = r)) (n := ℓ)</span>
+<span id="L249">        (<span class="kw">by</span> <span class="kw">unfold</span> <span class="const token" data-verso-hover="804">packCount</span> <span class="kw">at</span> hk; <span class="kw">omega</span>)</span>
+<span id="L250">      <span class="kw">exact</span> ⟨t, ht, <span class="kw">fun</span> _ =&gt; htc⟩</span>
+<span id="L251">    · <span class="kw">exact</span> ⟨∅, <span class="const token" data-verso-hover="836">empty_subset</span> _, <span class="kw">fun</span> h =&gt; <span class="const token" data-verso-hover="66">absurd</span> h hr⟩</span>
+<span id="L252">  <span class="kw">choose</span> c hcsub hccard <span class="kw">using</span> hex</span>
+<span id="L253">  <span class="kw">set</span> T1 := F.<span class="const token" data-verso-hover="837">biUnion</span> c <span class="kw">with</span> hT1</span>
+<span id="L254">  <span class="kw">set</span> T2 := (S.<span class="const token" data-verso-hover="300">filter</span> (<span class="kw">fun</span> p =&gt; π p ∈ F)) \ T1 <span class="kw">with</span> hT2</span>
+<span id="L255">  <span class="kw">have</span> hT1mem : ∀ p, p ∈ T1 ↔ π p ∈ F ∧ p ∈ c (π p) := <span class="kw">by</span></span>
+<span id="L256">    <span class="kw">intro</span> p</span>
+<span id="L257">    <span class="kw">simp</span> only [T1, <span class="const token" data-verso-hover="838">mem_biUnion</span>]</span>
+<span id="L258">    <span class="kw">constructor</span></span>
+<span id="L259">    · <span class="kw">rintro</span> ⟨r, hr, hp⟩</span>
+<span id="L260">      <span class="kw">have</span> := <span class="const token" data-verso-hover="311">mem_filter</span>.<span class="const token" data-verso-hover="132">1</span> (hcsub r hp)</span>
+<span id="L261">      <span class="kw">rw</span> [this.<span class="const token" data-verso-hover="279">2</span>]</span>
+<span id="L262">      <span class="kw">exact</span> ⟨hr, hp⟩</span>
+<span id="L263">    · <span class="kw">rintro</span> ⟨h1, h2⟩</span>
+<span id="L264">      <span class="kw">exact</span> ⟨π p, h1, h2⟩</span>
+<span id="L265">  <span class="kw">have</span> hT1S : T1 ⊆ S := <span class="kw">fun</span> p hp =&gt; (<span class="const token" data-verso-hover="311">mem_filter</span>.<span class="const token" data-verso-hover="132">1</span> (hcsub _ ((hT1mem p).<span class="const token" data-verso-hover="132">1</span> hp).<span class="const token" data-verso-hover="279">2</span>)).<span class="const token" data-verso-hover="278">1</span></span>
+<span id="L266">  <span class="kw">have</span> hfib1 : ∀ r ∈ F, T1.<span class="const token" data-verso-hover="300">filter</span> (<span class="kw">fun</span> p =&gt; π p = r) = c r := <span class="kw">by</span></span>
+<span id="L267">    <span class="kw">intro</span> r hr</span>
+<span id="L268">    <span class="kw">ext</span> p</span>
+<span id="L269">    <span class="kw">rw</span> [<span class="const token" data-verso-hover="311">mem_filter</span>, hT1mem]</span>
+<span id="L270">    <span class="kw">constructor</span></span>
+<span id="L271">    · <span class="kw">rintro</span> ⟨⟨_, h⟩, <span class="kw">rfl</span>⟩</span>
+<span id="L272">      <span class="kw">exact</span> h</span>
+<span id="L273">    · <span class="kw">intro</span> hp</span>
+<span id="L274">      <span class="kw">have</span> := (<span class="const token" data-verso-hover="311">mem_filter</span>.<span class="const token" data-verso-hover="132">1</span> (hcsub r hp)).<span class="const token" data-verso-hover="279">2</span></span>
+<span id="L275">      <span class="kw">subst</span> this</span>
+<span id="L276">      <span class="kw">exact</span> ⟨⟨hr, hp⟩, <span class="const token" data-verso-hover="67">rfl</span>⟩</span>
+<span id="L277">  <span class="kw">refine</span> ⟨T1, T2, hT1S, <span class="kw">fun</span> p hp =&gt; (<span class="const token" data-verso-hover="311">mem_filter</span>.<span class="const token" data-verso-hover="132">1</span> (<span class="const token" data-verso-hover="839">mem_sdiff</span>.<span class="const token" data-verso-hover="132">1</span> hp).<span class="const token" data-verso-hover="278">1</span>).<span class="const token" data-verso-hover="278">1</span>,</span>
+<span id="L278">    <span class="const token" data-verso-hover="500">disjoint_sdiff</span>, <span class="kw">fun</span> p hp =&gt; (<span class="const token" data-verso-hover="311">mem_filter</span>.<span class="const token" data-verso-hover="132">1</span> ((hT1mem p).<span class="const token" data-verso-hover="132">1</span> hp).<span class="const token" data-verso-hover="278">1</span>).<span class="const token" data-verso-hover="279">2</span>,</span>
+<span id="L279">    <span class="kw">fun</span> p hp =&gt; (<span class="const token" data-verso-hover="311">mem_filter</span>.<span class="const token" data-verso-hover="132">1</span> (<span class="const token" data-verso-hover="311">mem_filter</span>.<span class="const token" data-verso-hover="132">1</span> (<span class="const token" data-verso-hover="839">mem_sdiff</span>.<span class="const token" data-verso-hover="132">1</span> hp).<span class="const token" data-verso-hover="278">1</span>).<span class="const token" data-verso-hover="279">2</span>).<span class="const token" data-verso-hover="279">2</span>, ?_⟩</span>
+<span id="L280">  · <span class="kw">intro</span> r hr</span>
+<span id="L281">    <span class="kw">have</span> hrF : r ∈ F := <span class="const token" data-verso-hover="311">mem_filter</span>.<span class="const token" data-verso-hover="167">2</span> ⟨<span class="const token" data-verso-hover="312">mem_univ</span> _, hr⟩</span>
+<span id="L282">    <span class="kw">have</span> hk : <span class="const token" data-verso-hover="804">packCount</span> S π r = k := hr π hπ</span>
+<span id="L283">    <span class="kw">refine</span> ⟨<span class="kw">by</span> <span class="kw">rw</span> [hfib1 r hrF]; <span class="kw">exact</span> hccard r hrF, ?_⟩</span>
+<span id="L284">    <span class="kw">have</span> hfib2 : T2.<span class="const token" data-verso-hover="300">filter</span> (<span class="kw">fun</span> p =&gt; π p = r) = S.<span class="const token" data-verso-hover="300">filter</span> (<span class="kw">fun</span> p =&gt; π p = r) \ c r := <span class="kw">by</span></span>
+<span id="L285">      <span class="kw">ext</span> p</span>
+<span id="L286">      <span class="kw">simp</span> only [T2, <span class="const token" data-verso-hover="311">mem_filter</span>, <span class="const token" data-verso-hover="839">mem_sdiff</span>, hT1mem]</span>
+<span id="L287">      <span class="kw">constructor</span></span>
+<span id="L288">      · <span class="kw">rintro</span> ⟨⟨⟨h1, _⟩, h3⟩, <span class="kw">rfl</span>⟩</span>
+<span id="L289">        <span class="kw">exact</span> ⟨⟨h1, <span class="const token" data-verso-hover="67">rfl</span>⟩, <span class="kw">fun</span> h =&gt; h3 ⟨hrF, h⟩⟩</span>
+<span id="L290">      · <span class="kw">rintro</span> ⟨⟨h1, <span class="kw">rfl</span>⟩, h2⟩</span>
+<span id="L291">        <span class="kw">exact</span> ⟨⟨⟨h1, hrF⟩, <span class="kw">fun</span> h =&gt; h2 h.<span class="const token" data-verso-hover="279">2</span>⟩, <span class="const token" data-verso-hover="67">rfl</span>⟩</span>
+<span id="L292">    <span class="kw">rw</span> [hfib2, <span class="const token" data-verso-hover="503">card_sdiff_of_subset</span> (hcsub r), hccard r hrF]</span>
+<span id="L293">    <span class="kw">unfold</span> <span class="const token" data-verso-hover="804">packCount</span> <span class="kw">at</span> hk</span>
+<span id="L294">    <span class="kw">rw</span> [hk]</span>
+<span id="L295"></span>
+<span id="L296"><span class="dc">/-- Packings only depend on the covering relation restricted to the processes of `S`. -/</span></span>
+<span id="L297"><span class="kw">theorem</span> <span class="const token" data-verso-hover="840">isPacking_congr</span> {cov' : P → Loc → <span class="kw">Prop</span>} {π : P → Loc}</span>
+<span id="L298">    (h : ∀ p ∈ S, ∀ r, cov p r ↔ cov' p r) :</span>
+<span id="L299">    <span class="const token" data-verso-hover="805">IsPacking</span> cov k S π ↔ <span class="const token" data-verso-hover="805">IsPacking</span> cov' k S π := <span class="kw">by</span></span>
+<span id="L300">  <span class="kw">unfold</span> <span class="const token" data-verso-hover="805">IsPacking</span></span>
+<span id="L301">  <span class="kw">constructor</span></span>
+<span id="L302">  · <span class="kw">rintro</span> ⟨h1, h2⟩</span>
+<span id="L303">    <span class="kw">exact</span> ⟨<span class="kw">fun</span> p hp =&gt; (h p hp _).<span class="const token" data-verso-hover="132">1</span> (h1 p hp), h2⟩</span>
+<span id="L304">  · <span class="kw">rintro</span> ⟨h1, h2⟩</span>
+<span id="L305">    <span class="kw">exact</span> ⟨<span class="kw">fun</span> p hp =&gt; (h p hp _).<span class="const token" data-verso-hover="167">2</span> (h1 p hp), h2⟩</span>
+<span id="L306"></span>
+<span id="L307"><span class="dc">/-- Full packedness only depends on the covering relation restricted to the processes of `S`. -/</span></span>
+<span id="L308"><span class="kw">theorem</span> <span class="const token" data-verso-hover="841">fullyPacked_congr</span> {cov' : P → Loc → <span class="kw">Prop</span>} {r : Loc}</span>
+<span id="L309">    (h : ∀ p ∈ S, ∀ r, cov p r ↔ cov' p r) :</span>
+<span id="L310">    <span class="const token" data-verso-hover="502">FullyPacked</span> cov k S r ↔ <span class="const token" data-verso-hover="502">FullyPacked</span> cov' k S r := <span class="kw">by</span></span>
+<span id="L311">  <span class="kw">unfold</span> <span class="const token" data-verso-hover="502">FullyPacked</span></span>
+<span id="L312">  <span class="kw">exact</span> <span class="const token" data-verso-hover="842">forall_congr'</span> <span class="kw">fun</span> π =&gt; <span class="const token" data-verso-hover="843">imp_congr_left</span> (<span class="const token" data-verso-hover="840">isPacking_congr</span> h)</span>
+<span id="L313"></span>
+<span id="L314"><span class="dc">/-! ### The re-packing step of the paper's proof of Lemma 7.1</span></span>
+<span id="L315"></span>
+<span id="L316"><span class="dc">The proof of Lemma 7.1 takes a *maximal* trail `r₁ → ⋯ → r_t` in the multigraph with an edge</span></span>
+<span id="L317"><span class="dc">`g p → h p` for every process `p`, and claims that, for every `1 ≤ j &lt; t`, re-packing `pᵢ` from `rᵢ`</span></span>
+<span id="L318"><span class="dc">to `rᵢ₊₁` for `j ≤ i &lt; t` packs one process less than `g` in `r_j` and one more in `r_t`. This</span></span>
+<span id="L319"><span class="dc">fails when the trail revisits `r_t` (i.e. `r_j = r_t` for some `j &lt; t`). Example: locations</span></span>
+<span id="L320"><span class="dc">`A, B, C` (`0, 1, 2`), processes `p₁, p₂, p₃` (`0, 1, 2`), `g = (A, B, C)`, `h = (B, C, B)`, each</span></span>
+<span id="L321"><span class="dc">process covering its `g`- and its `h`-location, `k = 2`. The unique maximal trail from `A` is</span></span>
+<span id="L322"><span class="dc">`A →p₁ B →p₂ C →p₃ B` (`t = 4`), and re-packing from `j = 2` gives `g' = (A, C, B)`, which packs</span></span>
+<span id="L323"><span class="dc">as many processes as `g` into `r₂ = B`. (The statement of Lemma 7.1 itself is still true: a shortest</span></span>
+<span id="L324"><span class="dc">path, which has no repeated locations, works; this is what `exists_packing_lt_of_walk` does.) -/</span></span>
+<span id="L325"></span>
+<span id="L326"><span class="kw">namespace</span> Lemma71Example</span>
+<span id="L327"></span>
+<span id="L328"><span class="dc">/-- The packing `g = (A, B, C)`. -/</span></span>
+<span id="L329"><span class="kw">def</span> <span class="const token" data-verso-hover="844">g</span> : <span class="const token" data-verso-hover="297">Fin</span> <span class="nu">3</span> → <span class="const token" data-verso-hover="297">Fin</span> <span class="nu">3</span> := ![<span class="nu">0</span>, <span class="nu">1</span>, <span class="nu">2</span>]</span>
+<span id="L330"><span class="dc">/-- The packing `h = (B, C, B)`. -/</span></span>
+<span id="L331"><span class="kw">def</span> <span class="const token" data-verso-hover="845">h</span> : <span class="const token" data-verso-hover="297">Fin</span> <span class="nu">3</span> → <span class="const token" data-verso-hover="297">Fin</span> <span class="nu">3</span> := ![<span class="nu">1</span>, <span class="nu">2</span>, <span class="nu">1</span>]</span>
+<span id="L332"><span class="dc">/-- Every process covers its `g`- and its `h`-location. -/</span></span>
+<span id="L333"><span class="kw">def</span> <span class="const token" data-verso-hover="846">exCov</span> (p r : <span class="const token" data-verso-hover="297">Fin</span> <span class="nu">3</span>) : <span class="kw">Prop</span> := r = <span class="const token" data-verso-hover="844">g</span> p ∨ r = <span class="const token" data-verso-hover="845">h</span> p</span>
+<span id="L334"></span>
+<span id="L335"><span class="const token" data-verso-hover="847">instance</span> : <span class="const token" data-verso-hover="848">DecidableRel</span> <span class="const token" data-verso-hover="846">exCov</span> := <span class="kw">fun</span> p r =&gt; inferInstanceAs (<span class="const token" data-verso-hover="849">Decidable</span> (r = <span class="const token" data-verso-hover="844">g</span> p ∨ r = <span class="const token" data-verso-hover="845">h</span> p))</span>
+<span id="L336"></span>
+<span id="L337"><span class="dc">/-- The result of re-packing from `j = 2` along the trail `A → B → C → B`: `g' = (A, C, B)`. -/</span></span>
+<span id="L338"><span class="kw">def</span> <span class="const token" data-verso-hover="850">g'</span> : <span class="const token" data-verso-hover="297">Fin</span> <span class="nu">3</span> → <span class="const token" data-verso-hover="297">Fin</span> <span class="nu">3</span> := ![<span class="nu">0</span>, <span class="nu">2</span>, <span class="nu">1</span>]</span>
+<span id="L339"></span>
+<span id="L340"><span class="kw">end</span> Lemma71Example</span>
+<span id="L341"></span>
+<span id="L342"><span class="kw">open</span> Lemma71Example <span class="kw">in</span></span>
+<span id="L343"><span class="dc">/-- Counterexample to the re-packing claim in the proof of Lemma 7.1 (see the section docstring):</span></span>
+<span id="L344"><span class="dc">`g` and `h` are `2`-packings, `g` packs more processes than `h` into `A`, the trail</span></span>
+<span id="L345"><span class="dc">`A →p₁ B →p₂ C →p₃ B` is maximal (all edges out of `A`, `B`, `C` are used) and ends in `B`, where `h`</span></span>
+<span id="L346"><span class="dc">packs more processes than `g`; re-packing `p₂, p₃` (i.e. from `j = 2`, where `r₂ = B = r₄`) gives</span></span>
+<span id="L347"><span class="dc">the `2`-packing `g'`, which packs as many processes into `r₂ = B` as `g` does. -/</span></span>
+<span id="L348"><span class="kw">theorem</span> <span class="const token" data-verso-hover="3">lemma71_trail_counterexample</span> :</span>
+<span id="L349">    <span class="const token" data-verso-hover="805">IsPacking</span> <span class="const token" data-verso-hover="846">exCov</span> <span class="nu">2</span> <span class="const token" data-verso-hover="299">univ</span> <span class="const token" data-verso-hover="844">g</span> ∧ <span class="const token" data-verso-hover="805">IsPacking</span> <span class="const token" data-verso-hover="846">exCov</span> <span class="nu">2</span> <span class="const token" data-verso-hover="299">univ</span> <span class="const token" data-verso-hover="845">h</span> ∧ <span class="const token" data-verso-hover="805">IsPacking</span> <span class="const token" data-verso-hover="846">exCov</span> <span class="nu">2</span> <span class="const token" data-verso-hover="299">univ</span> <span class="const token" data-verso-hover="850">g'</span> ∧</span>
+<span id="L350">      <span class="const token" data-verso-hover="804">packCount</span> <span class="const token" data-verso-hover="299">univ</span> <span class="const token" data-verso-hover="845">h</span> <span class="nu">0</span> &lt; <span class="const token" data-verso-hover="804">packCount</span> <span class="const token" data-verso-hover="299">univ</span> <span class="const token" data-verso-hover="844">g</span> <span class="nu">0</span> ∧</span>
+<span id="L351">      <span class="cm">--</span><span class="cm"> the trail `A →p₁ B →p₂ C →p₃ B`: `g pᵢ = rᵢ`, `h pᵢ = rᵢ₊₁`; it uses every edge (every</span></span>
+<span id="L352">      <span class="cm">--</span><span class="cm"> process), hence is maximal</span></span>
+<span id="L353">      (<span class="const token" data-verso-hover="844">g</span> <span class="nu">0</span> = <span class="nu">0</span> ∧ <span class="const token" data-verso-hover="845">h</span> <span class="nu">0</span> = <span class="nu">1</span> ∧ <span class="const token" data-verso-hover="844">g</span> <span class="nu">1</span> = <span class="nu">1</span> ∧ <span class="const token" data-verso-hover="845">h</span> <span class="nu">1</span> = <span class="nu">2</span> ∧ <span class="const token" data-verso-hover="844">g</span> <span class="nu">2</span> = <span class="nu">2</span> ∧ <span class="const token" data-verso-hover="845">h</span> <span class="nu">2</span> = <span class="nu">1</span>) ∧</span>
+<span id="L354">      <span class="cm">--</span><span class="cm"> `h` packs more processes than `g` into the end `r₄ = B`</span></span>
+<span id="L355">      <span class="const token" data-verso-hover="804">packCount</span> <span class="const token" data-verso-hover="299">univ</span> <span class="const token" data-verso-hover="844">g</span> <span class="nu">1</span> &lt; <span class="const token" data-verso-hover="804">packCount</span> <span class="const token" data-verso-hover="299">univ</span> <span class="const token" data-verso-hover="845">h</span> <span class="nu">1</span> ∧</span>
+<span id="L356">      <span class="cm">--</span><span class="cm"> re-packing from `j = 2` does not decrease the count in `r₂ = B`</span></span>
+<span id="L357">      <span class="const token" data-verso-hover="804">packCount</span> <span class="const token" data-verso-hover="299">univ</span> <span class="const token" data-verso-hover="850">g'</span> <span class="nu">1</span> = <span class="const token" data-verso-hover="804">packCount</span> <span class="const token" data-verso-hover="299">univ</span> <span class="const token" data-verso-hover="844">g</span> <span class="nu">1</span> := <span class="kw">by</span></span>
+<span id="L358">  <span class="kw">unfold</span> <span class="const token" data-verso-hover="805">IsPacking</span> <span class="const token" data-verso-hover="804">packCount</span></span>
+<span id="L359">  <span class="kw">decide</span></span>
+<span id="L360"></span>
+<span id="L361"><span class="kw">end</span> Cslib.SharedMemory.ComplexityHierarchy</span>
+<span id="L362"></span>
+</code></div>
+        <script>
+          window.versoHoversUrl = "PODC2016/ComplexityHierarchy/-hovers.json";</script>
+        <script src="static/lean/popper.js"></script>
+        <script src="static/lean/tippy.js"></script>
+        <script src="static/lean/marked.js"></script>
+        <script src="static/lean/highlighting.js"></script>
+        <script src="static/lean/lean.js"></script>
+        </article></main><footer class="site-footer"><div class="wrap">
+        Machine-checked formalizations of PODC papers in Lean 4. Generated with <a href="https://github.com/leanprover/verso">Verso</a> from the README files of <a href="https://github.com/vasnesterov/formal_podc">vasnesterov/formal_podc</a>.</div>
+      </footer></body>
+  </html>
+
