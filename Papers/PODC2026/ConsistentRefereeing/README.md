@@ -4,7 +4,6 @@ Hagit Attiya, Armando Castañeda, Constantin Enea. *Impossibility Results for St
 Difficulty of Consistent Refereeing.* PODC 2026. DOI
 [10.1145/3796701.3815906](https://doi.org/10.1145/3796701.3815906). Formalized version: arXiv
 [2506.18401](https://arxiv.org/abs/2506.18401) v3 (same text as the proceedings version); numbering follows it.
-Copy of the paper: [paper.pdf](paper.pdf).
 
 **Verdict: 🛠️ Hard fix.** All theorems we formalized hold: Theorems 1, 3, 4, 5, 25, 30, Proposition 11, Corollary 12, and
 Lemma 14 for counters, max registers and snapshots. The proof of Theorem 30 fails in its test&set case, and closing it

@@ -3,7 +3,7 @@
 Dariusz R. Kowalski, Achour Mostéfaoui. *Synchronous Byzantine Agreement with Nearly a Cubic Number of
 Communication Bits.* PODC 2013. DOI [10.1145/2484239.2484271](https://doi.org/10.1145/2484239.2484271).
 Formalized version: the authors' final version on HAL ([hal-01151136](https://hal.science/hal-01151136v1),
-16 pp.); there is no arXiv version. Copy of the paper: [paper.pdf](paper.pdf).
+16 pp.); there is no arXiv version.
 
 **Verdict: ❌ Intent lost.** The protocol of Section 4, the contribution named in the title and abstract, does not
 solve Byzantine agreement: with `n = 7`, `t = 2` (so `t < n/3`) and binary values, two Byzantine processes make the

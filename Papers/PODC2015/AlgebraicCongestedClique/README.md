@@ -4,7 +4,6 @@ Keren Censor-Hillel, Petteri Kaski, Janne H. Korhonen, Christoph Lenzen, Ami Paz
 *Algebraic Methods in the Congested Clique.* PODC 2015. DOI
 [10.1145/2767386.2767414](https://doi.org/10.1145/2767386.2767414). Formalized version: arXiv
 [1503.04963](https://arxiv.org/abs/1503.04963) v1; numbering follows it.
-Copy of the paper: [paper.pdf](paper.pdf).
 
 **Verdict: 🔧 Easy fix.** The checked results hold after local changes: `O(1)`-round 4-cycle detection (Theorem 4, with
 Lemmas 12 and 13), `O(n^{1/3})`-round semiring matrix multiplication (Theorem 1), and Lemma 14 and the case split of

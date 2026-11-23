@@ -10,7 +10,6 @@ and the lower-bound construction are the same as in the TCS version. Numbering m
 Theorem 1 → 1 (PODC claims only the strong list specification; TCS adds eventual visibility),
 Lemma 3 → Lemma 6, appendix Lemmas 13–16 → Lemmas 3, 4, 5, 7, Theorems 4–5 → Theorems 8–9,
 Claims 6–9 → Claims 10–13.
-Copy of the paper: [paper.pdf](paper.pdf).
 
 **Verdict: 🔧 Easy fix.** Theorem 1 (RGA implements the strong list specification) fails for the protocol as literally
 written, because its insert procedure counts tombstones when it locates the insertion position, but a local index change

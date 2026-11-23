@@ -3,7 +3,7 @@
 Gadi Taubenfeld. *A closer look at fault tolerance.* PODC 2012. DOI
 [10.1145/2332432.2332484](https://doi.org/10.1145/2332432.2332484). Formalized version: the author's full
 version of 22 February 2017 (22 pp., journal version Theory Comput. Syst. 62(5), 2018); numbering follows
-it. Copy of the paper: [paper.pdf](paper.pdf).
+it.
 
 **Verdict: 🛠️ Hard fix.** The headline results hold: the symmetric election algorithm with
 `⌈log n⌉ + 2` registers is safe and almost-wait-free (Theorems 2.1–2.5), and weak resilience is no

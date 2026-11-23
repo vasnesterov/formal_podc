@@ -3,7 +3,6 @@
 Fabian Kuhn, Yoram Moses, Rotem Oshman. *Coordinated Consensus in Dynamic Networks.* PODC 2011.
 DOI [10.1145/1993806.1993808](https://doi.org/10.1145/1993806.1993808). Formalized version: the
 10-page proceedings version (no full version exists); numbering follows it.
-Copy of the paper: [paper.pdf](paper.pdf).
 
 **Verdict: 🛠️ Hard fix.** All the bounds survive, and most hold as printed or after a local change: Lemma 3.1 (the
 knowledge test for "I have heard from everybody"), Theorem 5.1 (nothing non-trivial is common knowledge before time

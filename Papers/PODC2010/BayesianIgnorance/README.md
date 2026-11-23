@@ -2,8 +2,7 @@
 
 Noga Alon, Yuval Emek, Michal Feldman, Moshe Tennenholtz. *Bayesian Ignorance.* PODC 2010. DOI
 [10.1145/1835698.1835785](https://doi.org/10.1145/1835698.1835785). Formalized version: the full version of
-May 9, 2010 (17 pp., with appendix; no arXiv version); numbering follows it. Copy of the paper:
-[paper.pdf](paper.pdf).
+May 9, 2010 (17 pp., with appendix; no arXiv version); numbering follows it.
 
 **Verdict: 🔧 Easy fix.** The numbered results we checked hold: Observations 2.1–2.2, Lemmas 3.1, 3.2, 3.3 ("ignorance is
 bliss"), 3.6, 3.7, 3.8, Proposition 4.1, Lemma 4.2 and the reduction of Lemma 3.5. Rosenthal's potential fails with the

@@ -3,7 +3,6 @@
 Ofer Feinerman, Amos Korman, Zvi Lotker, Jean-Sébastien Sereni. *Collaborative Search on the Plane without
 Communication.* PODC 2012. DOI [10.1145/2332432.2332444](https://doi.org/10.1145/2332432.2332444).
 Formalized version: arXiv [1205.2170](https://arxiv.org/abs/1205.2170) v2 (Jan 2017); numbering follows it.
-Copy of the paper: [paper.pdf](paper.pdf).
 
 **Verdict: 🔧 Easy fix.** Every result of the paper holds: the upper bounds `O(D + D²/k)` (Thm 3.1, Cor 3.2) and
 `O(log^{1+ε} k)` (Thm 3.3), both lower bounds (Thm 4.1: no uniform `O(log k)`-competitive algorithm; Thm 4.2:

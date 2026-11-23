@@ -2,8 +2,7 @@
 
 Stephan Holzer, Roger Wattenhofer. *Optimal Distributed All Pairs Shortest Paths and Applications.* PODC 2012.
 DOI [10.1145/2332432.2332504](https://doi.org/10.1145/2332432.2332504). Formalized version: the authors' "preliminary
-full version" of 22.05.2012 (38 pp., with proofs; no arXiv version); numbering follows it. Copy of the paper:
-[paper.pdf](paper.pdf).
+full version" of 22.05.2012 (38 pp., with proofs; no arXiv version); numbering follows it.
 
 **Verdict: ⚠️ Weakened.** Algorithm 1 computes APSP in `O(n)` CONGEST rounds (Lemma 1, Theorem 1, Lemmas 2–6), and the
 diameter lower bounds (Theorems 4, 8, 9 with Lemmas 8, 9, 15 and the exact parts of Lemmas 10, 11, 16, Theorem 11) are

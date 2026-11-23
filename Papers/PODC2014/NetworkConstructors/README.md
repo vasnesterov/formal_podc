@@ -3,7 +3,6 @@
 Othon Michail, Paul G. Spirakis. *Simple and Efficient Local Codes for Distributed Stable Network Construction.*
 PODC 2014. DOI [10.1145/2611462.2611466](https://doi.org/10.1145/2611462.2611466). Formalized version: arXiv
 [1309.6978](https://arxiv.org/abs/1309.6978) v2 (full version); numbering follows it.
-Copy of the paper: [paper.pdf](paper.pdf).
 
 **Verdict: 🛠️ Hard fix.** **Theorem 10 is false**: Protocol 6 (Global-Ring) does not construct a spanning ring, but
 nothing depends on it and the paper's own 2RC (Theorem 11) gives the spanning ring with fewer states. The other

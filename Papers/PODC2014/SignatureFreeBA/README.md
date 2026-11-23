@@ -5,7 +5,7 @@ with t < n/3 and O(n²) Messages.* PODC 2014. DOI
 [10.1145/2611462.2611468](https://doi.org/10.1145/2611462.2611468). Formalized version: the full
 version, IRISA technical report PI-2016 (February 2014), HAL
 [hal-00944019](https://hal.science/hal-00944019) (file `RR-2016-Consensus-optimal-V5.pdf`, 13 pages;
-same algorithm, lemmas and numbering as the proceedings version). Copy of the paper: [paper.pdf](paper.pdf).
+same algorithm, lemmas and numbering as the proceedings version).
 
 **Verdict: ❌ Intent lost.** The algorithm of Figure 2 does **not** terminate: in the paper's own model, an
 adversary that controls the schedule and the Byzantine process prevents every decision, for every coin sequence.

@@ -4,7 +4,6 @@ Alberto Montresor, Francesco De Pellegrini, Daniele Miorandi. *Distributed k-cor
 PODC 2011 (brief announcement). DOI [10.1145/1993806.1993836](https://doi.org/10.1145/1993806.1993836).
 Formalized version: arXiv [1103.5320](https://arxiv.org/abs/1103.5320) v2 (full version); numbering
 follows it.
-Copy of the paper: [paper.pdf](paper.pdf).
 
 **Verdict: 🛠️ Hard fix.** The algorithm is correct: estimates never increase, never drop below the
 coreness and converge to it, in the one-node-per-host version (synchronous and asynchronous) and in the

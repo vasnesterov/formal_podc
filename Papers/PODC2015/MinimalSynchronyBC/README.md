@@ -4,7 +4,7 @@ Zohir Bouzid, Achour Mostéfaoui, Michel Raynal. *Minimal Synchrony for Byzantin
 DOI [10.1145/2767386.2767418](https://doi.org/10.1145/2767386.2767418). Formalized version: the HAL deposit
 hal-01178651v1 (July 2015). Its numbering is that of the proceedings. There is no arXiv version. The full version
 cited as [6] ("Tech Report 2025, IRISA, 2015"; 2025 is the report number) is not available to us, so the proofs of
-Lemmas 1 and 2 ("Proof in [6]") were reconstructed. Copy of the paper: [paper.pdf](paper.pdf).
+Lemmas 1 and 2 ("Proof in [6]") were reconstructed.
 
 **Verdict: ❌ Intent lost.** The EA object of Figure 3 is not live: **Lemma 2 (EA-Termination) and Theorem 3 are
 false**, so the consensus algorithm of Figure 4 does not terminate and **Theorem 4 is false**, even in a synchronous

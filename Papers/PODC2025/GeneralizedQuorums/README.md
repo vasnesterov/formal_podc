@@ -3,7 +3,7 @@
 Alejandro Naser-Pastoriza, Gregory Chockler, Alexey Gotsman, Fedor Ryabinin. *Tight Bounds on Channel Reliability via
 Generalized Quorum Systems.* PODC 2025. DOI [10.1145/3732772.3733529](https://doi.org/10.1145/3732772.3733529).
 Formalized version: arXiv [2505.02646](https://arxiv.org/abs/2505.02646) v1 (proceedings text plus appendices);
-numbering follows it. Copy of the paper: [paper.pdf](paper.pdf).
+numbering follows it.
 
 **Verdict: 🔧 Easy fix.** The necessity half of the paper's characterization stands after local changes: Lemma 2,
 Theorem 2 (lattice agreement, MWMR registers, SWMR snapshots, and also consensus), Theorem 6 (partial synchrony) and

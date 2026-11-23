@@ -4,7 +4,6 @@ Jérémie Chalopin, Yi-Jun Chang, Giuseppe Antonio Di Luna, Haoran Zhou. *Effici
 Simulation in Content-Oblivious Rings.* PODC 2026. DOI
 [10.1145/3796701.3815917](https://doi.org/10.1145/3796701.3815917). Formalized version: arXiv
 [2603.28260](https://arxiv.org/abs/2603.28260) v1 (full version; numbering follows it).
-Copy of the paper: [paper.pdf](paper.pdf).
 
 **Verdict: ⚠️ Weakened.** Lemma 16 / Theorem 17 (bit sending has the composable ending
 property) is false when the leader is a relay, a case the paper explicitly covers: two rounds run

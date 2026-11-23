@@ -4,7 +4,7 @@ Martin Biely, Peter Robinson, Ulrich Schmid. *Easy Impossibility Proofs for k-Se
 Message Passing Systems.* PODC 2011 (brief announcement). DOI
 [10.1145/1993806.1993846](https://doi.org/10.1145/1993806.1993846). Formalized version: arXiv
 [1103.3671](https://arxiv.org/abs/1103.3671) v2 (full version, latest arXiv version, March 2011);
-numbering follows it. Copy of the paper: [paper.pdf](paper.pdf).
+numbering follows it.
 
 **Verdict: ⚠️ Weakened.** Theorem 1, the paper's main tool, is saved by local repairs and its asynchronous
 consequences hold: k-set agreement is impossible with `f` crashes when `k ≤ (n−1)/(n−f)` (Theorem 2 with

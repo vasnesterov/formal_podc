@@ -4,7 +4,6 @@ Ittai Abraham, Dahlia Malkhi, Alexander Spiegelman. *Asymptotically Optimal Vali
 Byzantine Agreement.* PODC 2019. DOI [10.1145/3293611.3331612](https://doi.org/10.1145/3293611.3331612).
 Formalized version: arXiv [1811.01332](https://arxiv.org/abs/1811.01332) v1, the only arXiv version.
 Numbering follows it.
-Copy of the paper: [paper.pdf](paper.pdf).
 
 **Verdict: ⚠️ Weakened.** Agreement, validity and expected constant views are proved for all `n > 3f`, once the
 hard-coded `2f + 1` thresholds become `n − f` and two pseudocode bugs get local fixes. But the protocol never halts, so

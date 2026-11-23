@@ -4,7 +4,6 @@ Yann Bourreau, Ananth Narayanan, Alexandre Nolin. *Brief Announcement: Optimal D
 Rendezvous in Labeled Lines.* PODC 2025. DOI
 [10.1145/3732772.3733537](https://doi.org/10.1145/3732772.3733537). Formalized version: the full
 version, arXiv [2505.04564](https://arxiv.org/abs/2505.04564) v2 (24 pp.); numbering follows it.
-Copy of the paper: [paper.pdf](paper.pdf).
 
 **Verdict: 🛠️ Hard fix.** The main result, Theorem 1.1, holds: rendezvous within `O(D log* ℓ_min)` rounds of the first
 wake-up, with an explicit constant and no assumption left open (Lemma 2.1, the cited MIS/colouring subroutine, is also

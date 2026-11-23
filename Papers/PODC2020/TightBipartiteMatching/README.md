@@ -3,7 +3,6 @@
 Sebastian Brandt, Dennis Olivetti. *Truly Tight-in-Δ Bounds for Bipartite Maximal Matching and Variants.*
 PODC 2020. DOI [10.1145/3382734.3405745](https://doi.org/10.1145/3382734.3405745). Formalized version: arXiv
 [2002.08216](https://arxiv.org/abs/2002.08216) v1; numbering follows it.
-Copy of the paper: [paper.pdf](paper.pdf).
 
 **Verdict: 🔧 Easy fix.** The main result holds: in the deterministic port-numbering model on 2-coloured `Δ`-regular
 trees, bipartite `x`-maximal `y`-matching (the encoded version `Φ^W_Δ(x, y)`) has white round complexity exactly

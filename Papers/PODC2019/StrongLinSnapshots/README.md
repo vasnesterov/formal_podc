@@ -3,7 +3,6 @@
 Sean Ovens, Philipp Woelfel. *Strongly Linearizable Implementations of Snapshots and Other Types.* PODC 2019.
 DOI [10.1145/3293611.3331632](https://doi.org/10.1145/3293611.3331632). Formalized version: arXiv
 [1908.10826](https://arxiv.org/abs/1908.10826) v1 (full version, 51 pp.); numbering follows it.
-Copy of the paper: [paper.pdf](paper.pdf).
 
 **Verdict: 🔧 Easy fix.** The one mistake of substance is the specification of the first `DRead`, which wrongly
 forces every process's first `DRead` to report "no write"; for the natural specification, one condition away, Theorem 1

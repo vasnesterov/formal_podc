@@ -3,7 +3,6 @@
 Sebastian Brandt. *An Automatic Speedup Theorem for Distributed Problems.* PODC 2019. DOI
 [10.1145/3293611.3331611](https://doi.org/10.1145/3293611.3331611). Formalized version: arXiv
 [1902.09958](https://arxiv.org/abs/1902.09958) v1 (the only version); numbering follows it.
-Copy of the paper: [paper.pdf](paper.pdf).
 
 **Verdict: ⚠️ Weakened.** The forward direction of Theorem 1, Theorem 2, Lemmas 1–4 and the lower bounds (§4.4, Theorem
 4) stand, though Lemma 4 and Theorem 4 were checked only in the port-numbering model with input orientations, not in

@@ -5,7 +5,6 @@ one-shot timestamp implementations.* PODC 2011. DOI
 [10.1145/1993806.1993826](https://doi.org/10.1145/1993806.1993826). Formalized version: arXiv
 [1103.5794](https://arxiv.org/abs/1103.5794) v2 (full version, matches the PODC results; numbering
 follows it).
-Copy of the paper: [paper.pdf](paper.pdf).
 
 **Verdict: 🛠️ Hard fix.** All stated results hold: Theorems 1.1 (`n/6 - 1`, long-lived), 1.2 (`√(2n) - log n - O(1)`,
 one-shot) and 1.3 (`2⌈√n⌉` registers). The proof of Theorem 1.2 does not go through as written (final counting,

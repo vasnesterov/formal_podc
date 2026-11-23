@@ -4,7 +4,7 @@ Vibhor Bhatt, Chien-Chung Huang. *Group Mutual Exclusion in O(log n) RMR.* PODC 
 [10.1145/1835698.1835708](https://doi.org/10.1145/1835698.1835708). Formalized version: the authors' copy of the
 PODC'10 paper (10 pages, https://www.di.ens.fr/~cchuang/work/gmx.pdf); no full version exists (the paper defers the
 proof of P5' "to the full version" and gives its Invariants 1–8 "without their formal proofs"). Numbering follows
-it. Copy of the paper: [paper.pdf](paper.pdf).
+it.
 
 **Verdict: ❌ Intent lost.** The final algorithm (Figure 3) is not a correct GME algorithm in the claimed sense:
 it **deadlocks** — two processes and two sessions suffice for a fair execution in which a process waits at line 8

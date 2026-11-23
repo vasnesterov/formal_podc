@@ -5,7 +5,6 @@ Asynchronous Fallback.* PODC 2022. DOI [10.1145/3519270.3538442](https://doi.org
 Formalized version: the PODC proceedings version (no arXiv version exists). Numbering follows it. The full
 version (IACR ePrint 2022/354, single version of 2022-03-18) has the same protocols and statements; it contains
 the proof of Theorem 4.1 (Section 6.1).
-Copy of the paper: [paper.pdf](paper.pdf).
 
 **Verdict: ❌ Intent lost.** The protocol the paper is about fails: the Reliable Broadcast `Π_rBC` is not consistent
 in a synchronous network when `tₛ ≥ n/3`, the very range it was built for, so `Π_AA` is **not** a `tₛ`-secure AA

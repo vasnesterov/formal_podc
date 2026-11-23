@@ -4,7 +4,6 @@ Alkida Balliu, Sebastian Brandt, Yuval Efron, Juho Hirvonen, Yannic Maus, Dennis
 *Brief Announcement: Classification of Distributed Binary Labeling Problems.* PODC 2020. DOI
 [10.1145/3382734.3405703](https://doi.org/10.1145/3382734.3405703). Formalized version: the full version
 arXiv [1911.13294](https://arxiv.org/abs/1911.13294) v3 (48 pages); numbering follows it.
-Copy of the paper: [paper.pdf](paper.pdf).
 
 **Verdict: 🔧 Easy fix.** Everything we checked holds as stated: Observation 3.2 (the four equivalent problems),
 Theorems 8.1–8.3 (families V and VI have deterministic complexity `Θ(n)`), proved for every number of nodes, Lemma 10.4

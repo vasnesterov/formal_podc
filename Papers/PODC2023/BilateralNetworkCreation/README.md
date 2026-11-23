@@ -4,7 +4,6 @@ Tobias Friedrich, Hans Gawendowicz, Pascal Lenzner, Arthur Zahn. *The Impact of 
 Bilateral Network Creation.* PODC 2023. DOI
 [10.1145/3583668.3594588](https://doi.org/10.1145/3583668.3594588). Formalized version: arXiv
 [2207.03798](https://arxiv.org/abs/2207.03798) v2 (full version with appendix); numbering follows it.
-Copy of the paper: [paper.pdf](paper.pdf).
 
 **Verdict: 🔧 Easy fix.** Every statement we checked is true, and the proofs of Lemmas 2.4 and 3.5 are saved by local
 changes: this covers Lemma 2.4, Lemma B.1, Proposition 3.1, Corollary 3.2, Lemmas 3.3–3.5, Theorem 3.6 (trees in BSwE

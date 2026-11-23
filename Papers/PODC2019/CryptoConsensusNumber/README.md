@@ -4,7 +4,7 @@ Rachid Guerraoui, Petr Kuznetsov, Matteo Monti, Matej Pavlovič, Dragos-Adrian S
 Consensus Number of a Cryptocurrency.* PODC 2019. DOI
 [10.1145/3293611.3331589](https://doi.org/10.1145/3293611.3331589). Formalized version: arXiv
 [1906.05574](https://arxiv.org/abs/1906.05574) v1 (extended version, the only arXiv version; the journal version, Distributed Computing 2022, was not checked);
-numbering follows it. Copy of the paper: [paper.pdf](paper.pdf).
+numbering follows it.
 
 **Verdict: 🛠️ Hard fix.** Theorem 2 (consensus number exactly `k`, `k ≥ 1`), Corollary 1 and Lemma 2 hold, but
 the wait-freedom proof of Lemma 2 is false as stated and we replaced it with a new potential argument. Theorem 1

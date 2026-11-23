@@ -3,7 +3,6 @@
 Robin Vacus, Isabella Ziccardi. *Minimalist Leader Election Under Weak Communication.* PODC 2025.
 DOI [10.1145/3732772.3733559](https://doi.org/10.1145/3732772.3733559). Formalized version: arXiv
 [2502.12697](https://arxiv.org/abs/2502.12697) v2; numbering follows it.
-Copy of the paper: [paper.pdf](paper.pdf).
 
 **Verdict: 🛠️ Hard fix.** All main results hold: Theorem 2 (for every fixed `p ∈ (0,1)`, BFW elects a unique leader
 almost surely, and w.h.p. within `O(D² log n)` rounds), Theorem 3 (`O(D log n)` rounds for `p = 1/(D+1)`) and Section 3

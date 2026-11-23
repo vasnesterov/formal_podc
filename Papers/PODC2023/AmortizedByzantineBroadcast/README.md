@@ -2,8 +2,7 @@
 
 Jun Wan, Zhuolun Xiang, Atsuki Momose, Ling Ren, Elaine Shi. *On the Amortized Communication Complexity of
 Byzantine Broadcast.* PODC 2023. DOI [10.1145/3583668.3594596](https://doi.org/10.1145/3583668.3594596).
-Formalized version: the PODC proceedings version (9 pages; no arXiv version). Copy of the paper:
-[paper.pdf](paper.pdf).
+Formalized version: the PODC proceedings version (9 pages; no arXiv version).
 
 **Verdict: ❌ Intent lost.** The honest-majority protocol (Algorithm 4), which the abstract presents as achieving
 optimal amortized linear communication, is not a correct multi-shot Byzantine broadcast: its **Validity** and

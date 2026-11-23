@@ -3,7 +3,6 @@
 Faith Ellen, Rati Gelashvili, Nir Shavit, Leqi Zhu. *A Complexity-Based Hierarchy for Multiprocessor
 Synchronization.* PODC 2016. DOI [10.1145/2933057.2933113](https://doi.org/10.1145/2933057.2933113).
 Formalized version: arXiv [1607.06139](https://arxiv.org/abs/1607.06139) v2 (2018).
-Copy of the paper: [paper.pdf](paper.pdf).
 
 **Verdict: 🔧 Easy fix.** All formalized theorems hold: the space lower bounds (`⌈(n−1)/ℓ⌉` ℓ-buffers, `⌈(n−1)/2ℓ⌉`
 locations with multiple assignment, one max-register / one read-write-FAI location insufficient, unboundedly many

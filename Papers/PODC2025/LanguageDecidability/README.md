@@ -4,7 +4,6 @@ Armando Castañeda, Gilde Valeria Rodríguez. *Asynchronous Fault-Tolerant Langu
 Runtime Verification of Distributed Systems.* PODC 2025. DOI
 [10.1145/3732772.3733514](https://doi.org/10.1145/3732772.3733514). Formalized version: arXiv
 [2502.00191](https://arxiv.org/abs/2502.00191) v3 (31 May 2025); numbering follows it.
-Copy of the paper: [paper.pdf](paper.pdf).
 
 **Verdict: ⚠️ Weakened.** Theorem 5.2, the paper's main result, and the remaining impossibility results hold as
 stated, and Theorem 4.1 holds once the Figure 4 construction is replaced. But Lemma 5.3, "`WEC_COUNT ∈ WD`" (also

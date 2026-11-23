@@ -2,7 +2,6 @@
 
 Shay Kutten, Peter Robinson, Ming Ming Tan, Xianbin Zhu. *Improved Tradeoffs for Leader Election.* PODC 2023.
 DOI [10.1145/3583668.3594576](https://doi.org/10.1145/3583668.3594576). Formalized version: arXiv 2301.08235v4.
-Copy of the paper: [paper.pdf](paper.pdf).
 
 **Verdict: ⚠️ Weakened.** The tradeoff `Ω(log n/(log f(n)+1))` of the abstract, Theorem 3.11 (`Ω(n log n)` messages
 for time-bounded algorithms, with explicit bound `(n/2) log₂ n`) and the algorithms of Theorems 3.10 and 3.15 (with

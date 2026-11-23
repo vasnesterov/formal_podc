@@ -3,7 +3,6 @@
 Marcos K. Aguilera, Naama Ben-David, Rachid Guerraoui, Virendra Marathe, Igor Zablotchi. *The Impact of RDMA on
 Agreement.* PODC 2019. DOI [10.1145/3293611.3331601](https://doi.org/10.1145/3293611.3331601). Formalized version:
 arXiv [1905.12143](https://arxiv.org/abs/1905.12143) v2 (extended version, Feb 2021); numbering follows it.
-Copy of the paper: [paper.pdf](paper.pdf).
 
 **Verdict: 🔧 Easy fix.** Algorithm 7 (Protected Memory Paxos) violates agreement as printed, with a Lean run in which
 two processes decide different values, but a one-line fix and one condition on the first ballot make it safe (proved).

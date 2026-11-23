@@ -4,7 +4,6 @@ Antonio Cruciani, Avinandan Das, Massimo Equi, Henrik Lievonen, Diep Luong-Le, A
 Jukka Suomela. *Brief Announcement: Is a LOCAL Algorithm Computable?* PODC 2026. DOI
 [10.1145/3796701.3815908](https://doi.org/10.1145/3796701.3815908). Formalized version: the full
 version, arXiv [2602.21022](https://arxiv.org/abs/2602.21022) v2; numbering follows it.
-Copy of the paper: [paper.pdf](paper.pdf).
 
 **Verdict: 🛠️ Hard fix.** **The paper's main result, the separation Theorem 4.1 (an LCL `Π` with complexity `O(log n)` in
 uncomputable-LOCAL but `Ω(√n)` in computable-LOCAL, i.e. classes I < II of Table 1), was *not* checked:** the LCL `Π` of

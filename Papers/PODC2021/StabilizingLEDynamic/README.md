@@ -6,7 +6,6 @@ Stabilizing Leader Election with Weak Assumptions on Network Dynamics.* PODC 202
 journal version on HAL, [hal-03346225](https://hal.science/hal-03346225) (Research Square preprint,
 2023), Theorems 1–7. The PODC numbering (Theorem 2.1, Lemma 3.2, Theorems 3.3–3.11, 4.1) is in the
 docstrings.
-Copy of the paper: [paper.pdf](paper.pdf).
 
 **Verdict: 🔧 Easy fix.** All main results are proved after local changes: the class hierarchy (Theorem 1), all
 impossibility results (Theorems 2–5, Corollaries 1–3) and the correctness of Algorithm `LE` (Corollary 6), with the

@@ -2,8 +2,7 @@
 
 Nirupam Gupta, Nitin H. Vaidya. *Fault-Tolerance in Distributed Optimization: The Case of
 Redundancy.* PODC 2020. DOI [10.1145/3382734.3405748](https://doi.org/10.1145/3382734.3405748).
-Formalized version: the proceedings version (there is no arXiv version). Copy of the paper:
-[paper.pdf](paper.pdf).
+Formalized version: the proceedings version (there is no arXiv version).
 
 **Verdict: ⚠️ Weakened.** Theorem 2 (linear convergence of gradient descent with the CGC filter under
 2f-redundancy) is fully proved; its part (i) `ρ ≥ 0` fails only when `W* = ℝ^d`. Theorem 1 ("2f-redundancy is

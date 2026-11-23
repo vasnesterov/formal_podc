@@ -3,7 +3,6 @@
 Nir Bachrach, Keren Censor-Hillel, Michal Dory, Yuval Efron, Dean Leitersdorf, Ami Paz. *Hardness of
 Distributed Optimization.* PODC 2019. DOI [10.1145/3293611.3331597](https://doi.org/10.1145/3293611.3331597).
 Formalized version: arXiv [1905.10284](https://arxiv.org/abs/1905.10284) v1; numbering follows it.
-Copy of the paper: [paper.pdf](paper.pdf).
 
 **Verdict: 🛠️ Hard fix.** The near-quadratic CONGEST lower bounds of Section 2 hold: we formalize them for minimum
 dominating set (Thm 2.1), directed Hamiltonian path and cycle (Thms 2.2, 2.3), Steiner tree (Thm 2.7) and weighted

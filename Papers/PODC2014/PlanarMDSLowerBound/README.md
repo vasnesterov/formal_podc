@@ -3,7 +3,7 @@
 Miikka Hilke, Christoph Lenzen, Jukka Suomela. *Brief Announcement: Local Approximability of Minimum Dominating
 Set on Planar Graphs.* PODC 2014. DOI [10.1145/2611462.2611504](https://doi.org/10.1145/2611462.2611504).
 Formalized version: arXiv [1402.2549](https://arxiv.org/abs/1402.2549) v1 (3 pages, complete proof); numbering
-follows it. Copy of the paper: [paper.pdf](paper.pdf).
+follows it.
 
 **Verdict: ✏️ Slip.** The main theorem holds as stated: no deterministic `T`-round LOCAL algorithm finds a
 `(7 − ε)`-approximation of a minimum dominating set on planar graphs, and the Ramsey argument of Lemma 1 and the

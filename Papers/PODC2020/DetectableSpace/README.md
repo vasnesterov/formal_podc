@@ -3,7 +3,6 @@
 Ohad Ben-Baruch, Danny Hendler, Matan Rusanovsky. *Upper and Lower Bounds on the Space Complexity of
 Detectable Objects.* PODC 2020. DOI [10.1145/3382734.3405725](https://doi.org/10.1145/3382734.3405725).
 Formalized version: arXiv [2002.11378](https://arxiv.org/abs/2002.11378) v1; numbering follows it.
-Copy of the paper: [paper.pdf](paper.pdf).
 
 **Verdict: 🔧 Easy fix.** All three contributions survive. Algorithm 2, the detectable CAS implementation that the
 abstract presents among the main contributions (Lemma 2), is not linearizable: a crash-free run of two processes each

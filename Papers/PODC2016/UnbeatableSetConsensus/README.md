@@ -3,7 +3,7 @@
 Armando Castañeda, Yannai A. Gonczarowski, Yoram Moses. *Unbeatable Set Consensus via Topological and
 Combinatorial Reasoning.* PODC 2016. DOI [10.1145/2933057.2933120](https://doi.org/10.1145/2933057.2933120).
 Formalized version: arXiv [1605.07354](https://arxiv.org/abs/1605.07354) v1 (full version with appendices);
-numbering follows it. Copy of the paper: [paper.pdf](paper.pdf).
+numbering follows it.
 
 **Verdict: 🔧 Easy fix.** The main results hold: `Optmin[k]` solves nonuniform `k`-set consensus with decisions by
 `⌊f/k⌋ + 1` (Prop. 1), it is unbeatable (Thm. 1) and last-decider unbeatable (Thm. 2), and `u-Pmin[k]` solves uniform

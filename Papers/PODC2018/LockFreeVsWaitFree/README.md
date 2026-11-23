@@ -3,7 +3,6 @@
 Hagit Attiya, Armando Castañeda, Danny Hendler, Matthieu Perrin. *Separating Lock-Freedom from
 Wait-Freedom.* PODC 2018. DOI [10.1145/3212734.3212739](https://doi.org/10.1145/3212734.3212739).
 Formalized version: HAL hal-02053248 v1 (no arXiv version); numbering follows it.
-Copy of the paper: [paper.pdf](paper.pdf).
 
 **Verdict: ✅ Correct.** We found no mistakes. The impossibility half of the separation, Theorem 11, is proved in
 Lean with Lemmas 8 and 10 and Claim 9, in a form stronger than the paper's: no wait-free linearizable `n`-LLAA exists

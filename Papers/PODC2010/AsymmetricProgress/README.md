@@ -3,7 +3,7 @@
 Damien Imbs, Michel Raynal, Gadi Taubenfeld. *On Asymmetric Progress Conditions.* PODC 2010. DOI
 [10.1145/1835698.1835709](https://doi.org/10.1145/1835698.1835709). Formalized version: the extended
 IRISA research report PI-1952 (May 2010, HAL inria-00486977), whose numbering matches the PODC paper and adds
-the proofs of Appendix A. Copy of the paper: [paper.pdf](paper.pdf).
+the proofs of Appendix A.
 
 **Verdict: 🛠️ Hard fix.** All results hold for `n ≥ 2` processes: the impossibility of `(n,1)`-liveness from
 `(n−1)`-port objects (Theorem 1), the `(n,x)`-liveness hierarchy (Theorems 2, 3, Corollary 1), the fault-freedom

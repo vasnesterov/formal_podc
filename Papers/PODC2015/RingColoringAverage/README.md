@@ -3,7 +3,6 @@
 Laurent Feuilloley. *Brief Announcement: Average Complexity for the LOCAL Model.* PODC 2015. DOI
 [10.1145/2767386.2767446](https://doi.org/10.1145/2767386.2767446). Formalized version: arXiv
 [1505.05072](https://arxiv.org/abs/1505.05072) v1 (same text as the brief announcement); numbering follows it.
-Copy of the paper: [paper.pdf](paper.pdf).
 
 **Verdict: 🛠️ Hard fix.** Theorem 1 holds: for every 3-colouring algorithm on rings, the worst-case average radius
 is `Ω(log* n)`, and we prove it with explicit constants. Its proof needs a new argument, because the "w.l.o.g. minimal

@@ -3,7 +3,7 @@
 Shuo Liu, Nirupam Gupta, Nitin H. Vaidya. *Approximate Byzantine Fault-Tolerance in Distributed
 Optimization.* PODC 2021. DOI [10.1145/3465084.3467902](https://doi.org/10.1145/3465084.3467902).
 Formalized version: arXiv [2101.09337](https://arxiv.org/abs/2101.09337) v5 (full version);
-numbering follows it. Copy of the paper: [paper.pdf](paper.pdf). Formalized: Section 3 (Lemma 1,
+numbering follows it. Formalized: Section 3 (Lemma 1,
 Theorems 1 and 2).
 
 **Verdict: 🛠️ Hard fix.** Theorem 2 ("`(2f, ε)`-redundancy ⇒ `(f, 2ε)`-resilience") holds as stated, and a local

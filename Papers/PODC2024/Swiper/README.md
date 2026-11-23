@@ -3,7 +3,6 @@
 Andrei Tonkikh, Luciano Freitas. *Swiper: a new paradigm for efficient weighted distributed protocols.* PODC 2024.
 DOI [10.1145/3662158.3662799](https://doi.org/10.1145/3662158.3662799). Formalized version: arXiv
 [2307.15561](https://arxiv.org/abs/2307.15561) v2 (contains the appendix proofs).
-Copy of the paper: [paper.pdf](paper.pdf).
 
 **Verdict: 🛠️ Hard fix.** The weight restriction and qualification bounds (Theorem 2.1, Theorem 2.2, Corollary 2.3)
 that the protocols rely on hold, but the weight separation bound of Theorem 2.4 and Swiper's construction for it fail,

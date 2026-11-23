@@ -4,7 +4,6 @@ Fabian Frei, Ran Gelles, Ahmed Ghazy, Alexandre Nolin. *Brief Announcement: Cont
 Election on Rings.* PODC 2024. DOI [10.1145/3662158.3662785](https://doi.org/10.1145/3662158.3662785).
 Formalized version: the full paper, arXiv [2405.03646](https://arxiv.org/abs/2405.03646) v1 (the only
 version); numbering follows it (BA Theorems 1 and 3 = full Theorems 1 and 3).
-Copy of the paper: [paper.pdf](paper.pdf).
 
 **Verdict: 🔧 Easy fix.** The algorithms are correct exactly as claimed: Algorithm 2 is a quiescently terminating
 leader election on oriented rings with exactly `n(2·IDmax+1)` pulses, the leader terminating last, and Algorithm 3

@@ -4,7 +4,6 @@ Minh Tung Nguyen, Pierre Sutra. *An Exact Characterization of the Two-shot Deter
 Solving Two-process Consensus.* PODC 2025. DOI
 [10.1145/3732772.3733534](https://doi.org/10.1145/3732772.3733534). Formalized version: the PODC
 proceedings version (no arXiv version found); numbering follows it.
-Copy of the paper: [paper.pdf](paper.pdf).
 
 **Verdict: 🔧 Easy fix.** The main result is fully formalized: a deterministic two-shot type `(T, m)`,
 together with registers, solves wait-free two-process consensus iff it lies in `C₁ ∪ C₁.₅ ∪ C₂`. Both

@@ -3,7 +3,6 @@
 Juho Hirvonen, Jukka Suomela. *Distributed Maximal Matching: Greedy is Optimal.* PODC 2012. DOI
 [10.1145/2332432.2332464](https://doi.org/10.1145/2332432.2332464). Formalized version: arXiv
 [1110.0367](https://arxiv.org/abs/1110.0367) v1 (the only version); numbering follows it.
-Copy of the paper: [paper.pdf](paper.pdf).
 
 **Verdict: 🔧 Easy fix.** On anonymous `k`-edge-coloured graphs, maximal matching needs exactly
 `k - 1` deterministic rounds, so the greedy algorithm is optimal (Lemma 1, Theorem 2), and for `k ≥ 3` the

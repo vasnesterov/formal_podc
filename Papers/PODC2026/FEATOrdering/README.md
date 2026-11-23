@@ -2,7 +2,7 @@
 
 Tien Tuan Anh Dinh, Dakai Kang, Mohammad Sadoghi. *FEAT: Fair and Efficient Adversarial Transaction Ordering.*
 PODC 2026. DOI [10.1145/3796701.3815905](https://doi.org/10.1145/3796701.3815905). Formalized version: the
-11-page PODC version (no arXiv version). Copy of the paper: [paper.pdf](paper.pdf).
+11-page PODC version (no arXiv version).
 
 **Verdict: 🔧 Easy fix.** FEAT as printed does not achieve what Theorem 6.6 claims (comparator-based
 γ-Batch-Order-Fairness), and Theorem 6.4 and Lemma 6.3 fail with it: the paper's score counts only **honest** replicas,

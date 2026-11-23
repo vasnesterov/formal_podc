@@ -4,7 +4,6 @@ Fedor Ryabinin, Alexey Gotsman, Pierre Sutra. *Brief Announcement: Revisiting Lo
 Consensus.* PODC 2025, pp. 58–61. DOI [10.1145/3732772.3733541](https://doi.org/10.1145/3732772.3733541).
 Formalized version: arXiv [2505.03627](https://arxiv.org/abs/2505.03627) v2 (full version with appendices
 A–C; numbering follows it).
-Copy of the paper: [paper.pdf](paper.pdf).
 
 **Verdict: 🛠️ Hard fix.** Both main theorems hold, and we prove them as "iff" statements in one model, given
 `n ≥ 2`, `e ≤ f` and two values: an `f`-resilient `e`-two-step consensus task exists iff `n ≥ max {2e+f, 2f+1}`

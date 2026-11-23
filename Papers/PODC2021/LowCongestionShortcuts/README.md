@@ -3,7 +3,6 @@
 Mohsen Ghaffari, Bernhard Haeupler. *Low-Congestion Shortcuts for Graphs Excluding Dense Minors.* PODC 2021,
 pp. 213–221. DOI [10.1145/3465084.3467935](https://doi.org/10.1145/3465084.3467935). Formalized version: full
 version arXiv:2008.03091v1 (numbering follows it).
-Copy of the paper: [paper.pdf](paper.pdf).
 
 **Verdict: ⚠️ Weakened.** The main upper bound is proved: Theorem 3.1, and hence the existential Theorem 1.2, with
 `8δ + 1` blocks and after local repairs of Observations 2.6 and 2.7 and of case (II). The matching lower bound behind

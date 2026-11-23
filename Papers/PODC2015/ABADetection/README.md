@@ -3,7 +3,6 @@
 Zahra Aghazadeh, Philipp Woelfel. *On the Time and Space Complexity of ABA Prevention and Detection.*
 PODC 2015. DOI [10.1145/2767386.2767403](https://doi.org/10.1145/2767386.2767403). Formalized version:
 arXiv [1507.02722](https://arxiv.org/abs/1507.02722) v1; numbering follows it.
-Copy of the paper: [paper.pdf](paper.pdf).
 
 **Verdict: 🔧 Easy fix.** The lower bounds hold for linearizable implementations: Theorem 1(a) `m ≥ n − 1` for bounded
 registers (checked for deterministic implementations only), Theorem 1(b) `t·m ≥ n − 1`, Theorem 1(c) `2t·m ≥ n − 1`, and

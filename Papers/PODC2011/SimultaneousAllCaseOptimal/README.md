@@ -3,7 +3,7 @@
 Maurice P. Herlihy, Yoram Moses, Mark R. Tuttle. *Transforming worst-case optimal solutions for
 simultaneous tasks into all-case optimal solutions.* PODC 2011. DOI
 [10.1145/1993806.1993849](https://doi.org/10.1145/1993806.1993849). Formalized version: the ACM
-proceedings version (8 pages; there is no arXiv version). Copy of the paper: [paper.pdf](paper.pdf).
+proceedings version (8 pages; there is no arXiv version).
 
 **Verdict: ⚠️ Weakened.** The transformation and its optimality are proved for `t ≤ n − 2`: Lemma 1,
 Theorems 2 and 3, Lemma 4, and Theorems 6 and 8 hold, taking the cited connectivity results (Lemmas 5

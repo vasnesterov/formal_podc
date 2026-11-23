@@ -4,7 +4,6 @@ Pierre Fraigniaud, Patrick Lambein-Monette, Mikaël Rabie. *Brief Announcement: 
 the Asynchronous Cycle.* PODC 2022. DOI [10.1145/3519270.3538456](https://doi.org/10.1145/3519270.3538456).
 Formalized version: arXiv [2207.11198](https://arxiv.org/abs/2207.11198) v1 (the only version, the full
 version of the brief announcement). Numbering follows it.
-Copy of the paper: [paper.pdf](paper.pdf).
 
 **Verdict: ❌ Intent lost.** The paper claims a wait-free 5-colouring of every asynchronous cycle `C_n` in
 `O(log* n)` rounds (Algorithm 3, Theorem 4.4), but neither 5-colouring algorithm is wait-free: Algorithm 2

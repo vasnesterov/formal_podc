@@ -3,7 +3,6 @@
 Yoram Moses, Nitzan Zamir. *Probably Approximately Knowing.* PODC 2020. DOI
 [10.1145/3382734.3405734](https://doi.org/10.1145/3382734.3405734). Formalized version: arXiv
 [2007.02984](https://arxiv.org/abs/2007.02984) v1 (full version with appendix); numbering follows it.
-Copy of the paper: [paper.pdf](paper.pdf).
 
 **Verdict: 🔧 Easy fix.** All numbered results hold: Theorems 4.2, 5.2, 6.2 (the main result), 7.1, Corollary 7.2, Lemmas
 4.3, 5.1, B.1, F.1, and the numbers of Example 1. One concrete claim in §7 about Example 1 is false: that *every* protocol

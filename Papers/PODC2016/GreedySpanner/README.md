@@ -3,7 +3,6 @@
 Arnold Filtser, Shay Solomon. *The Greedy Spanner is Existentially Optimal.* PODC 2016. DOI
 [10.1145/2933057.2933114](https://doi.org/10.1145/2933057.2933114). Formalized version: arXiv
 [1605.06852](https://arxiv.org/abs/1605.06852) v2 (full version, January 2020); numbering follows it.
-Copy of the paper: [paper.pdf](paper.pdf).
 
 **Verdict: ✏️ Slip.** Lemma 3, Observation 2, Theorem 5 (greedy is existentially optimal for size and lightness in any
 family closed under edge removal), Lemmas 5 and 6, Observation 7 and Theorem 6 (near-optimality in doubling metrics)

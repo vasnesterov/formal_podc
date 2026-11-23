@@ -4,7 +4,6 @@ Walter Hussak, Amitabh Trehan. *On Termination of a Flooding Process.* PODC 2019
 DOI [10.1145/3293611.3331586](https://doi.org/10.1145/3293611.3331586). Formalized version: arXiv
 [1907.07078](https://arxiv.org/abs/1907.07078) v1, the full version and the only arXiv version. Numbering
 follows it.
-Copy of the paper: [paper.pdf](paper.pdf).
 
 **Verdict: 🔧 Easy fix.** All results hold for finite connected graphs, as the abstract assumes: termination of
 synchronous amnesiac flooding (Theorem 2.2, Corollary 2.4), termination time exactly `e = ecc(source)` iff the

@@ -5,7 +5,6 @@ Applications to Consensus and Approximate Agreement.* PODC 2022. DOI
 [10.1145/3519270.3538422](https://doi.org/10.1145/3519270.3538422). Formalized version: arXiv
 [2206.05356](https://arxiv.org/abs/2206.05356) v2 (full version with the proofs of Claims 3, 4 and of
 Section 5.3); numbering follows it.
-Copy of the paper: [paper.pdf](paper.pdf).
 
 **Verdict: ⚠️ Weakened.** All the paper's numbered results are proved, for any number of processes: the speedup
 theorem (Theorems 1 and 2), Lemma 1, Corollaries 1–3, Theorems 3 and 4, and Claims 1–6. But the claim that binary

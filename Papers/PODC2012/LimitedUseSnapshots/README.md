@@ -4,8 +4,7 @@ James Aspnes, Hagit Attiya, Keren Censor-Hillel, Faith Ellen. *Faster than Optim
 PODC 2012. DOI [10.1145/2332432.2332507](https://doi.org/10.1145/2332432.2332507). Formalized version: the
 journal version *Limited-Use Atomic Snapshots with Polylogarithmic Step Complexity*, J. ACM 62(1):3, 2015
 (author copy), together with the authors' erratum to it; numbering follows the journal version. The
-proceedings version has the same Algorithm 2 (its Lemmas 1–3 and Theorem 4). Copy of the paper:
-[paper.pdf](paper.pdf).
+proceedings version has the same Algorithm 2 (its Lemmas 1–3 and Theorem 4).
 
 **Verdict: 🛠️ Hard fix.** The 2-component max array of Algorithm 2, the paper's key tool, is not linearizable as published
 in either version, an error the authors found and published in their erratum, which we confirm in Lean for `k = 3`; with

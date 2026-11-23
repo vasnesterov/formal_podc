@@ -3,7 +3,6 @@
 Christoph Lenzen, Joel Rybicki, Jukka Suomela. *Towards Optimal Synchronous Counting.* PODC 2015. DOI
 [10.1145/2767386.2767423](https://doi.org/10.1145/2767386.2767423). Formalized version: arXiv
 [1503.06702](https://arxiv.org/abs/1503.06702) v1; numbering follows it.
-Copy of the paper: [paper.pdf](paper.pdf).
 
 **Verdict: 🔧 Easy fix.** The resilience-boosting construction (Theorem 1) and the main result Theorem 3 are verified:
 `f = n^{1−o(1)}`, `O(f)` stabilisation time, `O(log² f / log log f + log c)` state bits, with only constants corrected

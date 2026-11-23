@@ -3,7 +3,7 @@
 Reuven Bar-Yehuda, Keren Censor-Hillel, Yannic Maus, Shreyas Pai, Sriram V. Pemmaraju. *Distributed
 Approximation on Power Graphs.* PODC 2020. DOI
 [10.1145/3382734.3405750](https://doi.org/10.1145/3382734.3405750). Formalized version: arXiv
-[2006.03746](https://arxiv.org/abs/2006.03746) v1; numbering follows it. Copy of the paper: [paper.pdf](paper.pdf).
+[2006.03746](https://arxiv.org/abs/2006.03746) v1; numbering follows it.
 
 **Verdict: 🔧 Easy fix.** Every checked statement is true: the centralized 5/3-approximation for
 `G²`-MVC (Theorem 12, Lemmas 13–16), Lemma 6, the combinatorial core of the `(1+ε)`-approximation (Theorem 1,

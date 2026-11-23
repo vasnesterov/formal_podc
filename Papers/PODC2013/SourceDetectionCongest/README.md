@@ -5,7 +5,6 @@ DOI [10.1145/2484239.2484262](https://doi.org/10.1145/2484239.2484262). Formaliz
 and Definition 1.1) of the open-access journal version that merges it with two other papers: Lenzen, Patt-Shamir,
 Peleg, *Distributed distance computation and routing with small messages*, Distributed Computing 32:133–157 (2019),
 DOI [10.1007/s00446-018-0326-6](https://doi.org/10.1007/s00446-018-0326-6). Numbering follows the journal version.
-Copy of the paper: [paper.pdf](paper.pdf).
 
 **Verdict: ✏️ Slip.** The main result holds: the pipelined Bellman–Ford algorithm (Algorithm 1) solves unweighted
 `(S, h, σ)`-detection in `σ + h − 1` rounds with one `(distance, source)` pair per message. Lemmas 4.3, 4.5 and 4.6,

@@ -3,7 +3,7 @@
 Sotirios Kentros, Aggelos Kiayias. *Solving the At-Most-Once Problem with Nearly Optimal Effectiveness.*
 PODC 2011. DOI [10.1145/1993806.1993847](https://doi.org/10.1145/1993806.1993847). Formalized version: arXiv
 [1107.2990](https://arxiv.org/abs/1107.2990) v2 (Dec 2013, the full TCS version with all proofs); numbering
-follows it. Copy of the paper: [paper.pdf](paper.pdf).
+follows it.
 
 **Verdict: 🔧 Easy fix.** `KK_β` never performs a job twice (Lemma 4.1), is wait-free for `β ≥ m` (Lemma 4.3), and
 with up to `m − 1` crashes has effectiveness exactly `n − (β + m − 2)` (Theorem 4.4 for `f = m − 1`), which for

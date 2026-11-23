@@ -5,7 +5,6 @@ Election in Directed Networks.* PODC 2024. DOI
 [10.1145/3662158.3662778](https://doi.org/10.1145/3662158.3662778). Formalized version: the full
 version on HAL, [hal-04434345v4](https://hal.science/hal-04434345v4) (4 March 2024); numbering
 follows it (v1 has the same statements and algorithms).
-Copy of the paper: [paper.pdf](paper.pdf).
 
 **Verdict: 🔧 Easy fix.** Both characterizations hold, for leader election (Corollary 3) and synchronous unison
 (Corollary 5), but the unison algorithm `U(K)` of Theorem 5 is not self-stabilizing as printed: the bug is in the

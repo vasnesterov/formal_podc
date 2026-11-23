@@ -3,7 +3,6 @@
 Avery Miller, Boaz Patt-Shamir, Will Rosenbaum. *With Great Speed Come Small Buffers: Space-Bandwidth Tradeoffs for
 Routing.* PODC 2019. DOI [10.1145/3293611.3331614](https://doi.org/10.1145/3293611.3331614). Formalized version:
 arXiv [1902.08069](https://arxiv.org/abs/1902.08069) v1 (the only version, with the appendix); numbering follows it.
-Copy of the paper: [paper.pdf](paper.pdf).
 
 **Verdict: ⚠️ Weakened.** The space-bandwidth tradeoff survives, but only in the number `n` of nodes: we prove
 Theorem 4.1 (space `ℓ n^{1/ℓ} + σ + 1` when `ρℓ ≤ 1`) for **HPTS with the levels of each phase in decreasing order**,

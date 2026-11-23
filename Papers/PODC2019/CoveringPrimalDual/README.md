@@ -3,7 +3,7 @@
 Ran Ben-Basat, Guy Even, Ken-ichi Kawarabayashi, Gregory Schwartzman. *Optimal Distributed Covering
 Algorithms.* PODC 2019. DOI [10.1145/3293611.3331577](https://doi.org/10.1145/3293611.3331577).
 Formalized version: arXiv [1902.09377](https://arxiv.org/abs/1902.09377) v2 (same text and numbering
-as the PODC version). Copy of the paper: [paper.pdf](paper.pdf).
+as the PODC version).
 
 **Verdict: ⚠️ Weakened.** The core of the paper stands: algorithm MWHVC is an `(f+ε)`-approximation for
 minimum-weight hypergraph vertex cover (Corollary 4.3), it terminates within `O(log_α Δ + f·z·α)` iterations

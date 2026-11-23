@@ -4,7 +4,6 @@ Michal Dory, Mohsen Ghaffari, Saeed Ilchi. *Near-Optimal Distributed Dominating 
 Arboricity Graphs.* PODC 2022. DOI [10.1145/3519270.3538437](https://doi.org/10.1145/3519270.3538437).
 Formalized version: arXiv [2206.05174](https://arxiv.org/abs/2206.05174) v1 (full version with the
 appendix); numbering follows it.
-Copy of the paper: [paper.pdf](paper.pdf).
 
 **Verdict: 🔧 Easy fix.** The main results hold: the deterministic `(2α+1)(1+ε)`-approximation for weighted MDS
 (Theorem 1.1; Theorem 3.1 for unit weights), the randomized `α + O(α/t)` approximation (Theorem 1.2), the

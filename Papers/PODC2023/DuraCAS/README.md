@@ -4,7 +4,7 @@ Prasad Jayanti, Siddhartha Jayanti, Sucharita Jayanti. *Brief Announcement: Effi
 Writable-CAS.* PODC 2023. DOI [10.1145/3583668.3594592](https://doi.org/10.1145/3583668.3594592).
 Formalized version: the brief announcement (statements, Algorithms 1–2, line numbers) with the proofs of
 the full version *Durable Algorithms for Writable LL/SC and CAS with Dynamic Joining*, arXiv
-[2302.00135](https://arxiv.org/abs/2302.00135) v1 (Appendix A.1, A.3). Copy of the paper: [paper.pdf](paper.pdf).
+[2302.00135](https://arxiv.org/abs/2302.00135) v1 (Appendix A.1, A.3).
 
 **Verdict: 🛠️ Hard fix.** Under the usual per-process recovery rule (recover before invoking anything else)
 Theorem 4.1(1) (DuraCAS is durably linearizable) holds, with detectability, and so does Theorem 4.1(2) (wait-free, at

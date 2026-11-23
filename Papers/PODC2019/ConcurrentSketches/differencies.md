@@ -65,7 +65,7 @@ Invariants 1–3) and Section 7 (Claims 1–6, Lemmas 9–10).
 ## Versions
 
 The PODC 2019 publication (DOI 10.1145/3293611.3331567, pp. 207–208) is a two-page brief
-announcement. The file `papers/2019/3293611.3331567_…pdf` and our `paper.pdf` are arXiv
+announcement. The open copy we used is arXiv
 1902.10995**v2** (Dec. 2019), which is the PPoPP 2020 text (it even cites the PODC brief
 announcement as "the full paper [24]"). Differences that matter for the checked claims:
 * Lemma 1 (`Nb`) and Theorem 1 (`2Nb`) and Algorithm 2 (including `hint_i`, `prop_i` init `1`) are

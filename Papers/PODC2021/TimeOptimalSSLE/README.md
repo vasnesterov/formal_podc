@@ -4,7 +4,6 @@ Janna Burman, Ho-Lin Chen, Hsueh-Ping Chen, David Doty, Thomas Nowak, Eric Sever
 *Time-Optimal Self-Stabilizing Leader Election in Population Protocols.* PODC 2021. DOI
 [10.1145/3465084.3467898](https://doi.org/10.1145/3465084.3467898). Formalized version: arXiv
 [1907.06068](https://arxiv.org/abs/1907.06068) v5 (29 Nov 2021); numbering follows it.
-Copy of the paper: [paper.pdf](paper.pdf).
 
 **Verdict: 🔧 Easy fix.** The paper's time bounds, its main point, and Section 5 (`Sublinear-Time-SSR`) were not
 checked. What was checked holds apart from one typo and a by-product: SSLE needs `≥ n` states and exact knowledge of `n`

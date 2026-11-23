@@ -3,7 +3,6 @@
 Maurice Herlihy. *Atomic Cross-Chain Swaps.* PODC 2018. DOI
 [10.1145/3212734.3212736](https://doi.org/10.1145/3212734.3212736). Formalized version: arXiv
 [1801.09515](https://arxiv.org/abs/1801.09515) v4 (the latest); numbering follows it.
-Copy of the paper: [paper.pdf](paper.pdf).
 
 **Verdict: 🔧 Easy fix.** As printed, the protocol of §4.5 violates its safety theorem (Theorem 4.9: on the paper's
 own three-party example a 2-party coalition leaves a conforming leader Underwater) and its liveness theorem

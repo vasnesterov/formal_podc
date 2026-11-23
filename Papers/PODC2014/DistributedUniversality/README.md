@@ -4,7 +4,7 @@ Michel Raynal, Julien Stainer, Gadi Taubenfeld. *Brief Announcement: Distributed
 Contention-Awareness; Wait-Freedom; Object Progress, and Other Properties.* PODC 2014. DOI
 [10.1145/2611462.2611503](https://doi.org/10.1145/2611462.2611503). Formalized version: the full
 version, IRISA research report PI-2014 (HAL hal-00947657v2, May 2014), with all proofs in the
-appendices; numbering follows it. Copy of the paper: [paper.pdf](paper.pdf).
+appendices; numbering follows it.
 
 **Verdict: ⚠️ Weakened.** The construction is **not contention-aware**, contrary to the title, Theorem 2 and
 property (4) of the abstract: a process that runs alone, after the other processes have completed their operations

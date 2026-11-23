@@ -3,7 +3,6 @@
 Alexandre Nolin. *Brief Announcement: Sinkless Orientation Made Trivial.* PODC 2026. DOI
 [10.1145/3796701.3815953](https://doi.org/10.1145/3796701.3815953). Formalized version: the 4-page brief
 announcement (HAL `hal-05678283`); no full version was found.
-Copy of the paper: [paper.pdf](paper.pdf).
 
 **Verdict: ✏️ Slip.** Only slips were found: filled in, the paper's proof sketches hold, covering the min-ID orientation
 (Theorem 2.1), Lemmas 2.2 and 2.3, and the deterministic `O(log_δ n)` sinkless orientation of Theorem 1.1, counted in

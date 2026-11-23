@@ -3,8 +3,7 @@
 Mirza Ahad Baig, Danny Hendler, Alessia Milani, Corentin Travers. *Long-Lived Snapshots with
 Polylogarithmic Amortized Step Complexity.* PODC 2020. DOI
 [10.1145/3382734.3406005](https://doi.org/10.1145/3382734.3406005). Formalized version: the full
-version, HAL preprint hal-02860087v1 (June 2020, 19 pp., all proofs); numbering follows it. Copy of
-the paper: [paper.pdf](paper.pdf).
+version, HAL preprint hal-02860087v1 (June 2020, 19 pp., all proofs); numbering follows it.
 
 **Verdict: 🛠️ Hard fix.** Lemma 3.3 (the linearization given by rules 1–3 respects the max-array semantics) and Lemma 3.4
 (counting the `MaxUpdate`s that start during a scan) are false, so the linearizability proof of the new max array

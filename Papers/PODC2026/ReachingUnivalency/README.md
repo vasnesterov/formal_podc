@@ -3,7 +3,6 @@
 Andrew Lewis-Pye. *Reaching Univalency with Subquadratic Communication.* PODC 2026. DOI
 [10.1145/3796701.3815918](https://doi.org/10.1145/3796701.3815918). Formalized version: arXiv
 [2602.05356](https://arxiv.org/abs/2602.05356) v1 (the same text as the proceedings version); numbering follows it.
-Copy of the paper: [paper.pdf](paper.pdf).
 
 **Verdict: 🔧 Easy fix.** Lemma 6 and the claim that the §5 protocol (Fig. 3) solves ε-BA are false, but one raised
 threshold and a stronger sampler condition save Theorem 1 with the same bounds. The only loss is Proposition 4 for

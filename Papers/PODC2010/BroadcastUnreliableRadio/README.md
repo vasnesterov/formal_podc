@@ -3,7 +3,6 @@
 Fabian Kuhn, Nancy Lynch, Calvin Newport, Rotem Oshman, Andrea Richa. *Broadcasting in Unreliable
 Radio Networks.* PODC 2010. DOI [10.1145/1835698.1835779](https://doi.org/10.1145/1835698.1835779).
 Formalized version: the full version, MIT-CSAIL-TR-2010-029 (June 2010); numbering follows it.
-Copy of the paper: [paper.pdf](paper.pdf).
 
 **Verdict: 🔧 Easy fix.** Theorems 2 and 4 (bounds for 2-broadcastable networks), Theorem 12 (the `Ω(n log n)`
 deterministic lower bound for undirected networks) and Theorem 10 (strong select broadcasts in `O(n^{3/2} √log n)`

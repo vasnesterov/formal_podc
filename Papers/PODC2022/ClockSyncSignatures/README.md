@@ -2,7 +2,7 @@
 
 Christoph Lenzen, Julian Loss. *Optimal Clock Synchronization with Signatures.* PODC 2022. DOI
 [10.1145/3519270.3538444](https://doi.org/10.1145/3519270.3538444). Formalized version: arXiv
-[2203.02553](https://arxiv.org/abs/2203.02553) v2; numbering follows it. Copy of the paper: [paper.pdf](paper.pdf).
+[2203.02553](https://arxiv.org/abs/2203.02553) v2; numbering follows it.
 
 **Verdict: 🔧 Easy fix.** We checked only Section 2.1, the synchronous approximate-agreement algorithm APA built on
 signature-based crusader broadcast; the clock-synchronization results (Sections 3 and 4), the paper's main point, are

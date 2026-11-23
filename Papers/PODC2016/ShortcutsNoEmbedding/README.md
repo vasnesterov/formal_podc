@@ -3,7 +3,6 @@
 Bernhard Haeupler, Taisuke Izumi, Goran Zuzic. *Low-Congestion Shortcuts without Embedding.* PODC 2016.
 DOI [10.1145/2933057.2933112](https://doi.org/10.1145/2933057.2933112). Formalized version: the journal
 (Distributed Computing) version, arXiv:1607.07553v3; numbering follows it.
-Copy of the paper: [paper.pdf](paper.pdf).
 
 **Verdict: 🔧 Easy fix.** The deterministic core of the paper is proved: Lemma 1 (for distances between vertices of the
 part, or after discarding the irrelevant edges that make it false as literally stated), Lemma 2 (pipelined

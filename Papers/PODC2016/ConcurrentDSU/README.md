@@ -4,7 +4,6 @@ Siddhartha V. Jayanti, Robert E. Tarjan. *A Randomized Concurrent Algorithm for 
 PODC 2016. DOI [10.1145/2933057.2933108](https://doi.org/10.1145/2933057.2933108). Formalized version:
 arXiv [1612.01514](https://arxiv.org/abs/1612.01514) v1 (the only version; a revised version of the
 conference paper). Numbering follows it.
-Copy of the paper: [paper.pdf](paper.pdf).
 
 **Verdict: ⚠️ Weakened.** Linearizability and wait-freedom (Theorem 3.4 and the early-termination variants of
 Section 6) are proved for all three versions of `Find` and every fixed order of the ids, after easy repairs of the

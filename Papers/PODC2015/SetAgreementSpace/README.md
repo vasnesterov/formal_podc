@@ -3,7 +3,7 @@
 Carole Delporte-Gallet, Hugues Fauconnier, Petr Kuznetsov, Eric Ruppert. *On the Space Complexity of Set
 Agreement.* PODC 2015. DOI [10.1145/2767386.2767406](https://doi.org/10.1145/2767386.2767406). Formalized
 version: arXiv [1505.02690](https://arxiv.org/abs/1505.02690) v2 (full version with appendices); numbering
-follows it. Copy of the paper: [paper.pdf](paper.pdf).
+follows it.
 
 **Verdict: ⚠️ Weakened.** The repeated lower bound, Theorem 2 (`n + m − k` registers), is correct; we prove it from the
 wait-free set-agreement impossibility, which is a hypothesis. The algorithms of Figure 3 (one-shot) and Figure 4

@@ -5,7 +5,6 @@ Synchronization Primitives.* PODC 2023. DOI
 [10.1145/3583668.3594601](https://doi.org/10.1145/3583668.3594601). Formalized version: the
 45-page full version with appendices (University of Calgary report). There is no arXiv version.
 Numbering follows the full version.
-Copy of the paper: [paper.pdf](paper.pdf).
 
 **Verdict: ❌ Intent lost.** The algorithm of Figures 1–2 is **not linearizable**: Lean checks a sequential
 execution with 3 processes in which `isEarlier(1, 0)` gives the wrong answer, so Lemmas 6, 8 and 9 and Corollary 10

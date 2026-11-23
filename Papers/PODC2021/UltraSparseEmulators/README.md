@@ -2,8 +2,7 @@
 
 Michael Elkin, Shaked Matar. *Ultra-Sparse Near-Additive Emulators.* PODC 2021. DOI
 [10.1145/3465084.3467926](https://doi.org/10.1145/3465084.3467926). Formalized version: arXiv
-[2106.01036](https://arxiv.org/abs/2106.01036) v1; numbering follows it. Copy of the paper:
-[paper.pdf](paper.pdf).
+[2106.01036](https://arxiv.org/abs/2106.01036) v1; numbering follows it.
 
 **Verdict: 🔧 Easy fix.** The centralized result of Section 2 holds: for every `ε ∈ (0,1)` and integer `κ ≥ 2`,
 Algorithm 1, with the wrong variable of line 18 corrected, builds a `(1+ε, 30(34 log κ/ε)^{log κ − 1})`-emulator with

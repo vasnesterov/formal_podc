@@ -2,7 +2,7 @@
 
 Gadi Taubenfeld. *Coordination Without Prior Agreement.* PODC 2017. DOI
 [10.1145/3087801.3087807](https://doi.org/10.1145/3087801.3087807). Formalized version: the author's
-copy (10 pages, proofs included; no arXiv version). Copy of the paper: [paper.pdf](paper.pdf).
+copy (10 pages, proofs included; no arXiv version).
 
 **Verdict: 🛠️ Hard fix.** All checked results hold: the impossibility results of Section 6 (Theorems 6.2, 6.3, 6.5),
 and correctness of the three algorithms (Figure 1 mutex, Theorems 3.2–3.3; Figure 2 consensus, Theorems 4.1–4.2;

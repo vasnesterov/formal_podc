@@ -5,7 +5,6 @@ For Information-Theoretic BFT.* PODC 2026. DOI
 [10.1145/3796701.3815965](https://doi.org/10.1145/3796701.3815965). Formalized version: the
 proceedings version (11 pages). The full version [3] (Cryptology ePrint) was not available, so
 the proofs were rebuilt from the proof sketch of §4.2.
-Copy of the paper: [paper.pdf](paper.pdf).
 
 **Verdict: ⚠️ Weakened.** The title's good-case latency of 3δ holds, and so do non-triviality and agreement (Theorem 2),
 even in a fully asynchronous model with crash–recovery. The stronger robust good-case latency (Theorem 3, first item,

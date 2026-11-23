@@ -6,7 +6,6 @@ version: the 3-page proceedings brief announcement; numbering follows it. A jour
 exists (Goren, Moses, *Optimistically tuning synchronous Byzantine consensus: another win for null
 messages*, Distributed Computing 34(5), 2021, DOI 10.1007/s00446-021-00393-8); it is not open
 access and was not consulted.
-Copy of the paper: [paper.pdf](paper.pdf).
 
 **Verdict: ✅ Correct.** Theorem 1.2 (silent validation rounds give knowledge of a global
 milestone) and Theorem 2.1 (SmallCouncil + any binary BA protocol is binary BA; failure-free runs

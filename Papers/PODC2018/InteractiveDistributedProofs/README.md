@@ -2,7 +2,7 @@
 
 Gillat Kol, Rotem Oshman, Raghuvansh R. Saxena. *Interactive Distributed Proofs.* PODC 2018. DOI
 [10.1145/3212734.3212771](https://doi.org/10.1145/3212734.3212771). Formalized version: the 10-page author
-copy (full proofs; there is no arXiv version). Copy of the paper: [paper.pdf](paper.pdf).
+copy (full proofs; there is no arXiv version).
 
 **Verdict: ⚠️ Weakened.** The upper bounds `Sym ∈ dMAM[O(log n)]` (Theorem 1.1) and `Sym ∈ dAM[O(n log n)]` (Theorem 1.3)
 are proved, after repairing a missing case in the protocols' pseudocode (as written, Lemma 3.3 is false and Protocol 1

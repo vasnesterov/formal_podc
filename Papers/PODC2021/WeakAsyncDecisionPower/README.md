@@ -4,7 +4,6 @@ Philipp Czerner, Roland Guttenberg, Martin Helfrich, Javier Esparza. *Decision P
 Models of Distributed Computing.* PODC 2021. DOI
 [10.1145/3465084.3467918](https://doi.org/10.1145/3465084.3467918). Formalized version: arXiv
 [2102.11630](https://arxiv.org/abs/2102.11630) v2 (full version with appendix); numbering follows it.
-Copy of the paper: [paper.pdf](paper.pdf).
 
 **Verdict: 🔧 Easy fix.** Only Section 3 was checked, not the paper's main point, the characterizations of Sections 4–6.
 In Section 3 all the impossibility results hold: Lemmas 3.1, 3.2, 3.4 and 3.5 and Corollaries 3.3 and 3.6, which we

@@ -3,7 +3,7 @@
 Allen Clement, Flavio Junqueira, Aniket Kate, Rodrigo Rodrigues. *On the (Limited) Power of
 Non-Equivocation.* PODC 2012. DOI [10.1145/2332432.2332490](https://doi.org/10.1145/2332432.2332490).
 Formalized version: the 8-page author copy (A. Kate's Purdue page; no arXiv version), which includes
-the appendices. Copy of the paper: [paper.pdf](paper.pdf).
+the appendices.
 
 **Verdict: ⚠️ Weakened.** The two lower bounds hold for `n ≥ 3`: Claim 3.1 says non-equivocation without transferable
 authentication does not beat `n > 3f`, and Claim 3.2 says signatures without non-equivocation do not beat it either.

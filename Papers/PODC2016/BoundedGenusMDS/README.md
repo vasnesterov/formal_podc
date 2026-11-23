@@ -3,7 +3,7 @@
 Saeed Akhoondian Amiri, Stefan Schmid, Sebastian Siebertz. *A Local Constant Factor MDS Approximation
 for Bounded Genus Graphs.* PODC 2016. DOI [10.1145/2933057.2933084](https://doi.org/10.1145/2933057.2933084).
 Formalized version: arXiv [1602.02991](https://arxiv.org/abs/1602.02991) v2 (the latest arXiv version); numbering
-follows it. Copy of the paper: [paper.pdf](paper.pdf).
+follows it.
 
 **Verdict: ⚠️ Weakened.** The local constant factor on bounded genus graphs stands: on graphs whose depth-1 minors
 have edge density `≤ c` and which exclude `K_{t,3}` as a depth-1 minor, the modified Lenzen–Pignolet–Wattenhofer

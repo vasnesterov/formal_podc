@@ -4,7 +4,6 @@ Michel Raynal, Julien Stainer. *Brief Announcement: Increasing the Power of the 
 Snapshot Model with Failure Detectors.* PODC 2012. DOI
 [10.1145/2332432.2332498](https://doi.org/10.1145/2332432.2332498). Formalized version: the full
 version, IRISA research report PI 1991, February 2012 (hal-00670154v1); numbering follows it.
-Copy of the paper: [paper.pdf](paper.pdf).
 
 **Verdict: ⚠️ Weakened.** The generic simulation of Figure 3 does **not** work for `Σ`, contrary to
 Section 4.4 and Theorem 4: with two simulators it produces runs whose simulated failure detector is not in `Σ*`,

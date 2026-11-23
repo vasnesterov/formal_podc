@@ -4,7 +4,7 @@ Othon Michail, George Skretas, Paul G. Spirakis. *Distributed Computation and Re
 Actively Dynamic Networks.* PODC 2020. DOI
 [10.1145/3382734.3405744](https://doi.org/10.1145/3382734.3405744). Formalized version: arXiv
 [2003.03355](https://arxiv.org/abs/2003.03355) v1 (full version with Appendices A–D); numbering
-follows it. Copy of the paper: [paper.pdf](paper.pdf).
+follows it.
 
 **Verdict: ⚠️ Weakened.** **Lemma 3.1 is false for GraphToStar as printed**: on the 4-node
 line with increasing IDs a pulling committee jumps onto a committee that is merging away in the

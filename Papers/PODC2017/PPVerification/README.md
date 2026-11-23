@@ -3,7 +3,7 @@
 Michael Blondin, Javier Esparza, Stefan Jaax, Philipp J. Meyer. *Towards Efficient Verification of
 Population Protocols.* PODC 2017. DOI [10.1145/3087801.3087816](https://doi.org/10.1145/3087801.3087816).
 Formalized version: arXiv [1703.04367](https://arxiv.org/abs/1703.04367) v3 (full version with appendix);
-numbering follows it. Copy of the paper: [paper.pdf](paper.pdf).
+numbering follows it.
 
 **Verdict: 🔧 Easy fix.** The soundness of the new class (WS³ ⊆ WS² ⊆ WS, Propositions 19 and 20, StrongConsensus ⇒
 Consensus via traps and siphons), Lemmas 21 and 22, and the membership of `P_thr` in WS³ (Propositions 17 and 18, so

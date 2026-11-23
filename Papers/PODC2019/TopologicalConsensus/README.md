@@ -3,8 +3,8 @@
 Thomas Nowak, Ulrich Schmid, Kyrill Winkler. *Topological Characterization of Consensus under General
 Message Adversaries.* PODC 2019. DOI [10.1145/3293611.3331624](https://doi.org/10.1145/3293611.3331624).
 Formalized version: the PODC'19 paper is arXiv [1905.09590](https://arxiv.org/abs/1905.09590) **v1**
-(23 May 2019); numbering below follows v1. Copy of the paper: [paper.pdf](paper.pdf); note that this
-copy is arXiv v3 (2024), *Topological Characterization of Consensus in Distributed Systems*. v3 extends
+(23 May 2019); numbering below follows v1. The current arXiv
+version is v3 (2024), *Topological Characterization of Consensus in Distributed Systems*. v3 extends
 the paper to models with benign faults, and we formalized it as well (see the last section and the
 v1 ↔ v3 table).
 

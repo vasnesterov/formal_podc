@@ -4,7 +4,6 @@ Silvia Bonomi, Shlomi Dolev, Maria Potop-Butucaru, Michel Raynal. *Stabilizing S
 Byzantine Asynchronous Message-Passing Systems.* PODC 2015. DOI
 [10.1145/2767386.2767441](https://doi.org/10.1145/2767386.2767441). Formalized version: arXiv
 [1503.00140](https://arxiv.org/abs/1503.00140) v1 (full version with Figs. 2–5 and the proofs); numbering follows it.
-Copy of the paper: [paper.pdf](paper.pdf).
 
 **Verdict: ❌ Intent lost.** The paper's noteworthy claim, the first *atomic* storage on top of asynchronous
 servers with transient failures and Byzantine servers, fails: the practically stabilizing SWSR atomic register

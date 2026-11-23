@@ -3,7 +3,6 @@
 Alexander Jaffe, Thomas Moscibroda, Siddhartha Sen. *On the Price of Equivocation in Byzantine Agreement.*
 PODC 2012. DOI [10.1145/2332432.2332491](https://doi.org/10.1145/2332432.2332491). Formalized version: the
 10-page proceedings version (no arXiv version; the "full version" with the deferred proofs was not available).
-Copy of the paper: [paper.pdf](paper.pdf).
 
 **Verdict: 🛠️ Hard fix.** The equivalence of `f`-tolerance and `(n−2f)`-disjointness (Theorem 2), the reduction
 behind co-NP-hardness (Theorem 1) and the tight bounds `Tₙ(h) = Θ(n³/h²)` (Theorems 3, 5, 7) all hold. The proof

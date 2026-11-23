@@ -3,7 +3,6 @@
 Ittai Abraham, Kartik Nayak, Ling Ren, Zhuolun Xiang. *Good-case Latency of Byzantine Broadcast: a Complete
 Categorization.* PODC 2021, pp. 331–341. DOI [10.1145/3465084.3467899](https://doi.org/10.1145/3465084.3467899).
 Formalized version: arXiv:2102.07240v3 (numbering follows it).
-Copy of the paper: [paper.pdf](paper.pdf).
 
 **Verdict: 🔧 Easy fix.** All the lower bounds of Table 1 hold after local repairs, and we formalized every one of them:
 2 rounds (asynchrony and partial synchrony), 3 rounds for `n ≤ 5f − 2`, `2δ`, `Δ + δ`, `Δ + 1.5δ` with unsynchronized

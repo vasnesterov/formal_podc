@@ -3,7 +3,6 @@
 Michael Dinitz, Robert Krauthgamer. *Fault-Tolerant Spanners: Better and Simpler.* PODC 2011. DOI
 [10.1145/1993806.1993830](https://doi.org/10.1145/1993806.1993830). Formalized version: arXiv
 [1101.5753](https://arxiv.org/abs/1101.5753) v1; numbering follows it.
-Copy of the paper: [paper.pdf](paper.pdf).
 
 **Verdict: 🔧 Easy fix.** The generic conversion (Theorem 2.1) and its greedy instance (Corollary 2.2), Lemma 3.1, the
 LP relaxation with knapsack-cover inequalities (validity, LP ≤ OPT, the integrality gap example) and the `O(log n)`

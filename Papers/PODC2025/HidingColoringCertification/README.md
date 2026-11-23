@@ -6,7 +6,7 @@ Distributed Certification of k-Coloring.* PODC 2025. DOI
 the BA cites, arXiv [2502.13854](https://arxiv.org/abs/2502.13854) **v1** (Feb 2025). We formalize the BA's
 statements, using the v1 definitions and proofs. Numbering: BA Theorems 4.1–4.4 = v1 Theorems 1.1–1.4.
 We also checked the corrected statements of v3 (Feb 2026, retitled "…of Bipartiteness", co-author
-B. Jauregui). Copy of the paper: [paper.pdf](paper.pdf).
+B. Jauregui).
 
 **Verdict: ❌ Intent lost.** The paper's main result, **Theorem 4.2** ("no strong and hiding `r`-round LCP for 2-colouring
 on classes containing an `r`-forgetful graph that is neither an even cycle nor of minimum degree 1, no matter the

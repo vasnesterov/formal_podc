@@ -2,7 +2,7 @@
 
 Vassos Hadzilacos, Xing Hu, Sam Toueg. *On Register Linearizability and Termination.* PODC 2021. DOI
 [10.1145/3465084.3467925](https://doi.org/10.1145/3465084.3467925). Formalized version: arXiv
-[2102.13242](https://arxiv.org/abs/2102.13242) v1; numbering follows it. Copy of the paper: [paper.pdf](paper.pdf).
+[2102.13242](https://arxiv.org/abs/2102.13242) v1; numbering follows it.
 
 **Verdict: 🛠️ Hard fix.** Every theorem we formalized holds: Theorem 14 (linearizable SWMR ⇒ write
 strongly-linearizable), Theorems 10/12/13 and Corollary 11 (Algorithm 2 is write strongly-linearizable but not

@@ -3,7 +3,7 @@
 Valerie King, Shay Kutten, Mikkel Thorup. *Construction and impromptu repair of an MST in a distributed
 network with o(m) communication.* PODC 2015. DOI
 [10.1145/2767386.2767405](https://doi.org/10.1145/2767386.2767405). Formalized version: arXiv
-[1502.03320](https://arxiv.org/abs/1502.03320) v1; numbering follows it. Copy of the paper: [paper.pdf](paper.pdf).
+[1502.03320](https://arxiv.org/abs/1502.03320) v1; numbering follows it.
 
 **Verdict: 🔧 Easy fix.** `HP-TestOut`, `FindMin` and `FindAny` are each wrong as printed and saved by a local
 change proved in Lean, and the one step we did not repair, the Markov bound for `FindMin-C`, changes only a

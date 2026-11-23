@@ -6,7 +6,6 @@ Participants and Failures.* PODC 2020. DOI
 the proofs and Algorithm 3 of the full version, arXiv
 [2102.10442](https://arxiv.org/abs/2102.10442) v1. BA Lemmas 1–4 / Theorem 1 are full-version
 Lemmas 2, 4, 6, 7 / Theorem 2.
-Copy of the paper: [paper.pdf](paper.pdf).
 
 **Verdict: 🛠️ Hard fix.** Both algorithms keep `n > 3f` and their round bounds, but the rotor-coordinator's
 Lemma 4 and Theorem 1 are false as written, and saving them took a changed stopping rule and a new good-round

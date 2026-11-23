@@ -4,7 +4,6 @@ Hagit Attiya, Armando Castañeda, Constantin Enea. *Strong Linearizability using
 Number 2.* PODC 2024. DOI [10.1145/3662158.3662790](https://doi.org/10.1145/3662158.3662790). Formalized
 version: arXiv [2402.13618](https://arxiv.org/abs/2402.13618) v1, whose text and numbering are the same
 as the proceedings version.
-Copy of the paper: [paper.pdf](paper.pdf).
 
 **Verdict: ⚠️ Weakened.** All positive constructions we checked hold: the max register and snapshot
 from fetch&add (Theorems 1, 2), readable test&set (Theorem 5), multi-shot test&set (Theorem 6) and

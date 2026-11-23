@@ -2,8 +2,7 @@
 
 Marco Serafini, Dan Dobre, Matthias Majuntke, Péter Bokor, Neeraj Suri. *Eventually Linearizable Shared
 Objects.* PODC 2010. DOI [10.1145/1835698.1835723](https://doi.org/10.1145/1835698.1835723). Formalized
-version: the authors' copy with the appendix (full proofs of Theorems 1–3); no arXiv version. Copy of the
-paper: [paper.pdf](paper.pdf).
+version: the authors' copy with the appendix (full proofs of Theorems 1–3); no arXiv version.
 
 **Verdict: ❌ Intent lost.** Eventual Consensus is not shown to suffice for Eventual Linearizability:
 Algorithm 1 is not even weakly consistent over an Eventual Consensus layer, and with Eventual Stability

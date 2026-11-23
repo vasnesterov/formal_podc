@@ -4,7 +4,6 @@ Ittai Abraham, T-H. Hubert Chan, Danny Dolev, Kartik Nayak, Rafael Pass, Ling Re
 *Communication Complexity of Byzantine Agreement, Revisited.* PODC 2019. DOI
 [10.1145/3293611.3331629](https://doi.org/10.1145/3293611.3331629). Formalized version: arXiv
 [1805.03391](https://arxiv.org/abs/1805.03391) v4 (15 Feb 2020); numbering follows it.
-Copy of the paper: [paper.pdf](paper.pdf).
 
 **Verdict: ⚠️ Weakened.** Both lower bounds hold with new arguments for their central steps: **Theorem 4 / Theorem 1**
 (strongly adaptive adversary ⇒ Ω(f²) expected messages), with a *better* constant `εf²/2` instead of `(εf)²`, and

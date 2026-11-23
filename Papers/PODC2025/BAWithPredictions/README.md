@@ -3,7 +3,6 @@
 Naama Ben-David, Muhammad Ayaz Dzulfikar, Faith Ellen, Seth Gilbert. *Byzantine Agreement with Predictions.*
 PODC 2025. DOI [10.1145/3732772.3733518](https://doi.org/10.1145/3732772.3733518). Formalized version: arXiv
 [2505.01793](https://arxiv.org/abs/2505.01793) v1; numbering follows it (Theorems 13/14 are the lower bounds).
-Copy of the paper: [paper.pdf](paper.pdf).
 
 **Verdict: ⚠️ Weakened.** The `Ω(n + t²)` message bound even with fully correct predictions (Theorem 14), the conditional algorithms (Theorems 5 and 6) and the classification lemmas hold, and the wrapper is verified against the specifications of the cited sub-protocols. The proof of the round bound `min{f+2, t+1, ⌊B/(n−f)⌋+2, ⌊B/(n−t)⌋+1}` (Theorem 13) cites a crash-fault bound that holds for halting times but not for decision times; we prove the decision-time version by switching to Byzantine faults and proving the cited bound there, but only for unauthenticated algorithms. So the tightness of the time bound with signatures stands only in the halting-time reading of the paper's proof.
 

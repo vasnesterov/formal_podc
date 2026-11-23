@@ -4,7 +4,6 @@ Arnold Filtser, Orr Fischer. *Near-Resolution of the Tradeoff Conjecture in Dist
 Labeling Schemes.* PODC 2026. DOI
 [10.1145/3796701.3815966](https://doi.org/10.1145/3796701.3815966). Formalized version: arXiv
 [2605.19078](https://arxiv.org/abs/2605.19078) v1; numbering follows it.
-Copy of the paper: [paper.pdf](paper.pdf).
 
 **Verdict: 🔧 Easy fix.** The two tradeoff theorems hold with explicit constants: for connected graphs, a 1-PLS of
 cost `p` gives an `O(t log n)`-PLS of cost `O(⌈p/t⌉)` (Theorem 1.2), for every graph the warm-up gives an

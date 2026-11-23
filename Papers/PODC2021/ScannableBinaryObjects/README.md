@@ -3,7 +3,6 @@
 Sean Ovens. *The Space Complexity of Scannable Binary Objects.* PODC 2021. DOI
 [10.1145/3465084.3467916](https://doi.org/10.1145/3465084.3467916). Formalized version: the proceedings
 version (no arXiv full version exists); numbering follows it.
-Copy of the paper: [paper.pdf](paper.pdf).
 
 **Verdict: 🔧 Easy fix.** The lower bounds proved in the body (Lemmas 5–6, Theorem 8, Corollary 9) and the Section 4.1
 upper bound hold, and the proofs of Lemmas 6 and 7 need only local changes. The bound "`n + k − 2` for

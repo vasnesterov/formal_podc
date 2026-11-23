@@ -3,7 +3,6 @@
 Marc Fuchs, Diana Ghinea, Zahra Parsaeian, Joel Rybicki. *Round and Resilience-Optimal Approximate Agreement
 on Trees and Block Graphs.* PODC 2026. DOI [10.1145/3796701.3815967](https://doi.org/10.1145/3796701.3815967).
 Formalized version: arXiv [2502.05591](https://arxiv.org/abs/2502.05591) v5; numbering follows it.
-Copy of the paper: [paper.pdf](paper.pdf).
 
 **Verdict: ⚠️ Weakened.** The reductions are correct: AA on trees reduces to real-valued AA plus gradecast (Theorems 3
 and 5), and AA on block graphs reduces to AA on trees (Theorem 8); we proved them in the synchronous lock-step model

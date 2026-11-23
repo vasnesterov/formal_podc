@@ -3,7 +3,6 @@
 Rafail Ostrovsky, Mor Perry, Will Rosenbaum. *Space-Time Tradeoffs for Distributed Verification.*
 PODC 2016 brief announcement by Mor Baruch, Rafail Ostrovsky, Will Rosenbaum. Formalized version: arXiv
 [1605.06814](https://arxiv.org/abs/1605.06814) v2 (full version); numbering follows it.
-Copy of the paper: [paper.pdf](paper.pdf).
 
 **Verdict: ⚠️ Weakened.** The universal `t`-PLS (Theorem 1) and the acyclicity results hold: every `t`-round
 scheme needs labels of `Ω(log n / t)` bits (Theorem 7), and `O(log n / t)` bits suffice for every `t ≥ 2`

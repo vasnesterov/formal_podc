@@ -4,7 +4,6 @@ Prasad Jayanti, Siddhartha Jayanti, Sucharita Jayanti. *MemSnap: A Fast Adaptive
 for RMWable Shared-Memory.* PODC 2024. DOI
 [10.1145/3662158.3662820](https://doi.org/10.1145/3662158.3662820). Formalized version: the
 proceedings version (no arXiv version); numbering follows it.
-Copy of the paper: [paper.pdf](paper.pdf).
 
 **Verdict: 🔧 Easy fix.** The main result, Theorem 7.3, holds: MemSnap (Algorithm 1) is a linearizable, wait-free
 checkpointable object, with at most 9 shared-memory steps per operation, for every set of updaters and every family of

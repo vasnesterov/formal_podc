@@ -3,7 +3,6 @@
 Victor Bushkov, Rachid Guerraoui. *Safety-Liveness Exclusion in Distributed Computing.* PODC 2015.
 DOI [10.1145/2767386.2767401](https://doi.org/10.1145/2767386.2767401). Formalized version: the authors'
 full version with proofs (EPFL Infoscience record 207929, 19 pages); numbering follows it.
-Copy of the paper: [paper.pdf](paper.pdf).
 
 **Verdict: 🔧 Easy fix.** Theorem 4.4 (when a weakest excluded liveness property exists) and Lemma 4.8 are
 correct, and Theorem 4.9 ("a strongest non-excluded liveness property must be `Lmax`") holds, with a locally

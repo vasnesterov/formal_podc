@@ -2,8 +2,7 @@
 
 Xing Hu, Sam Toueg. *You can lie but not deny: SWMR registers with signature properties in systems with Byzantine
 processes.* PODC 2025. DOI [10.1145/3732772.3733550](https://doi.org/10.1145/3732772.3733550). Formalized version:
-arXiv [2504.09805](https://arxiv.org/abs/2504.09805) v2; numbering follows it. Copy of the paper:
-[paper.pdf](paper.pdf).
+arXiv [2504.09805](https://arxiv.org/abs/2504.09805) v2; numbering follows it.
 
 **Verdict: ✅ Correct.** We found no mistake in what we checked, the optimality result of Section 10. For
 `3 ≤ n ≤ 3f` there is no correct implementation from SWMR registers of the one-shot test-or-set object

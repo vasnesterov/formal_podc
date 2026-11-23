@@ -4,7 +4,6 @@ Michael Anoprenko, Petr Kuznetsov, Vitaly Aksenov. *Brief Announcement: Optimal 
 Unique Identifiers from Bounded Registers.* PODC 2025. DOI
 [10.1145/3732772.3733539](https://doi.org/10.1145/3732772.3733539). Formalized version: the
 4-page brief announcement (no arXiv or full version found).
-Copy of the paper: [paper.pdf](paper.pdf).
 
 **Verdict: 🔧 Easy fix.** The main claims hold: Algorithms 1 and 2 generate `(k−1)·2^w` distinct identifiers from `k`
 `w`-bit read/write/FAI registers, and no anonymous obstruction-free implementation supports more than

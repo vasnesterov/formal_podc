@@ -4,7 +4,6 @@ Reuven Bar-Yehuda, Keren Censor-Hillel, Gregory Schwartzman. *A Distributed (2+�
 Vertex Cover in O(log Δ/ε log log Δ) Rounds.* PODC 2016. DOI
 [10.1145/2933057.2933086](https://doi.org/10.1145/2933057.2933086). Formalized version: arXiv
 [1602.03713](https://arxiv.org/abs/1602.03713) v2; numbering follows it.
-Copy of the paper: [paper.pdf](paper.pdf).
 
 **Verdict: ✅ Correct.** The local-ratio template (Theorem 2.1) and Theorem 3.1 hold as stated: Algorithm 1
 is a deterministic `(2+ε)`-approximation for minimum-weight vertex cover, and a vertex of degree `d`

@@ -3,7 +3,7 @@
 Maciej Pacut, Mahmoud Parham, Stefan Schmid. *Brief Announcement: Deterministic Lower Bound for
 Dynamic Balanced Graph Partitioning.* PODC 2020. DOI
 [10.1145/3382734.3405696](https://doi.org/10.1145/3382734.3405696). Formalized version: the 3-page
-brief announcement (no arXiv version). Copy of the paper: [paper.pdf](paper.pdf).
+brief announcement (no arXiv version).
 
 **Verdict: 🔧 Easy fix.** Theorem 2.1 (every deterministic online algorithm for the learning model is
 `Ω(kℓ)`-competitive, `k ≥ 3`, `ℓ ≥ 2`) holds, even with a slightly better constant: `((k-2)(ℓ-1)-2)/2` instead of

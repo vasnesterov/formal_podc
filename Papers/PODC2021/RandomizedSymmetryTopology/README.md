@@ -3,7 +3,7 @@
 Pierre Fraigniaud, Ran Gelles, Zvi Lotker. *The Topology of Randomized Symmetry-Breaking Distributed Computing.*
 PODC 2021. DOI [10.1145/3465084.3467936](https://doi.org/10.1145/3465084.3467936). Formalized version: the
 conference version (numbering follows it). For the proofs it defers we used the full version
-[arXiv:2105.11713](https://arxiv.org/abs/2105.11713) v1. Copy of the paper: [paper.pdf](paper.pdf).
+[arXiv:2105.11713](https://arxiv.org/abs/2105.11713) v1.
 
 **Verdict: 🔧 Easy fix.** Eq. (2), the paper's formal knowledge equation for message passing, mis-models the model
 described in words (Section 2.1: every node may send a message to each other node; port numbers "may assist in breaking

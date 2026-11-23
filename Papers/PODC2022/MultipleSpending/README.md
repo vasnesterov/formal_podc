@@ -4,7 +4,6 @@ João Paulo Bezerra, Petr Kuznetsov. *Brief Announcement: How to Tame Multiple S
 Decentralized Cryptocurrencies.* PODC 2022. DOI
 [10.1145/3519270.3538465](https://doi.org/10.1145/3519270.3538465). Formalized version: the full
 version, arXiv [2205.14076](https://arxiv.org/abs/2205.14076) v1; numbering follows it.
-Copy of the paper: [paper.pdf](paper.pdf).
 
 **Verdict: ⚠️ Weakened.** The lower bound (Theorem 5.1: no `k`-Consistent Broadcast for `k` below the
 inconsistency number `k_max`), and with it the advertised "the optimal spending number is precisely the

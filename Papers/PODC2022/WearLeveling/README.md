@@ -2,7 +2,7 @@
 
 Xialin Liu, Wojciech Golab. *Brief Announcement: Towards a Theory of Wear Leveling in Persistent Data Structures.*
 PODC 2022. DOI [10.1145/3519270.3538457](https://doi.org/10.1145/3519270.3538457). Formalized version: the
-4-page proceedings version (no arXiv version). Copy of the paper: [paper.pdf](paper.pdf).
+4-page proceedings version (no arXiv version).
 
 **Verdict: 🔧 Easy fix.** The round-robin counter of Figure 1 is correct: it is strictly linearizable
 (Theorem 4.1, for unbounded words) and lock-free (Theorem 4.2), and with `k` words of endurance `T` it survives

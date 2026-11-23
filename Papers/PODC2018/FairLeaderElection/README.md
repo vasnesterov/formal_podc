@@ -3,7 +3,6 @@
 Assaf Yifrach, Yishay Mansour. *Fair Leader Election for Rational Agents in Asynchronous Rings and
 Networks.* PODC 2018. DOI [10.1145/3212734.3212767](https://doi.org/10.1145/3212734.3212767).
 Formalized version: arXiv [1805.04778](https://arxiv.org/abs/1805.04778) v2; numbering follows it.
-Copy of the paper: [paper.pdf](paper.pdf).
 
 **Verdict: ⚠️ Weakened.** The attacks on `A-LEADuni`, the paper's main focus, hold: Lemma 2.4, the success
 characterization (Lemmas 3.3–3.5), Lemma 4.1 (honest origin), Theorem 4.2 (`k ≥ √n`), the Cubic

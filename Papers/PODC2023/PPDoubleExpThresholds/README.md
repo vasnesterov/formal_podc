@@ -3,7 +3,6 @@
 Philipp Czerner. *Brief Announcement: Population Protocols Decide Double-exponential Thresholds.* PODC 2023.
 DOI [10.1145/3583668.3594571](https://doi.org/10.1145/3583668.3594571). Formalized version: arXiv
 [2204.02115](https://arxiv.org/abs/2204.02115) v2 (full version with appendices); numbering follows it.
-Copy of the paper: [paper.pdf](paper.pdf).
 
 **Verdict: 🔧 Easy fix.** The main results hold: Theorem 1 says there are population protocols with
 `O(n)` states deciding `x ≥ k` for some `k ≥ 2^(2^n)`, Theorem 2 says they are almost self-stabilising, and

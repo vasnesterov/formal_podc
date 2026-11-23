@@ -4,7 +4,6 @@ Armando Castañeda, Gilde Valeria Rodríguez. *Asynchronous Wait-Free Runtime Ve
 Enforcement of Linearizability.* PODC 2023. DOI
 [10.1145/3583668.3594563](https://doi.org/10.1145/3583668.3594563). Formalized version: arXiv
 [2301.02638](https://arxiv.org/abs/2301.02638) v3 (Nov 2025, full version); numbering follows it.
-Copy of the paper: [paper.pdf](paper.pdf).
 
 **Verdict: 🔧 Easy fix.** All main results hold: the impossibility of runtime verification (Theorem 5.1), the
 impossibility of predictive runtime verification (Theorem A.1, under the black-box reading of the model), the

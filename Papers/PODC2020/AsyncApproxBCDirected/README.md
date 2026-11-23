@@ -3,7 +3,7 @@
 Dimitris Sakavalas, Lewis Tseng, Nitin H. Vaidya. *Asynchronous Byzantine Approximate Consensus in
 Directed Networks.* PODC 2020. DOI [10.1145/3382734.3405724](https://doi.org/10.1145/3382734.3405724).
 Formalized version: arXiv [2004.09054](https://arxiv.org/abs/2004.09054) v1 (the only version);
-numbering follows it. Copy of the paper: [paper.pdf](paper.pdf).
+numbering follows it.
 
 **Verdict: 🔧 Easy fix.** The main result (Theorem 4) holds: asynchronous approximate Byzantine consensus on a directed
 graph is solvable iff the graph satisfies 3-reach, and the paper's Algorithm BW + Filter-and-Average, implemented

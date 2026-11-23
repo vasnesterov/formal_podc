@@ -3,7 +3,6 @@
 Nitin H. Vaidya, Vijay K. Garg. *Byzantine Vector Consensus in Complete Graphs.* PODC 2013. DOI
 [10.1145/2484239.2484256](https://doi.org/10.1145/2484239.2484256). Formalized version: arXiv
 [1302.2543](https://arxiv.org/abs/1302.2543) v1 (full version with appendices); numbering follows it.
-Copy of the paper: [paper.pdf](paper.pdf).
 
 **Verdict: ⚠️ Weakened.** The main contribution stands: Theorems 1–5 and Lemma 1 hold, so exact BVC in
 synchrony is solvable iff `n ≥ max(3f+1, (d+1)f+1)`, and approximate asynchronous BVC needs `n ≥ (d+2)f+1` and

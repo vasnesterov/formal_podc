@@ -3,7 +3,6 @@
 Hsueh-Ping Chen, Ho-Lin Chen. *Self-Stabilizing Leader Election in Regular Graphs.* PODC 2020. DOI
 [10.1145/3382734.3405733](https://doi.org/10.1145/3382734.3405733). Formalized version: the
 proceedings version (no arXiv version exists); numbering follows it.
-Copy of the paper: [paper.pdf](paper.pdf).
 
 **Verdict: ⚠️ Weakened.** SS-EulerCycle (Theorem 3.3), which answers the open question, fails as printed because no
 configuration is output-stable, but a natural one-line repair saves it: we prove Theorem 3.3 on every connected

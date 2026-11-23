@@ -3,7 +3,6 @@
 Jan Skrzypczak, Florian Schintke, Thorsten Schütt. *Linearizable State Machine Replication of State-Based CRDTs
 without Logs.* PODC 2019 (brief announcement). DOI [10.1145/3293611.3331568](https://doi.org/10.1145/3293611.3331568).
 Formalized version: the full version, arXiv [1905.08733](https://arxiv.org/abs/1905.08733) v2; numbering follows it.
-Copy of the paper: [paper.pdf](paper.pdf).
 
 **Verdict: 🔧 Easy fix.** Algorithm 2 is **not linearizable** as printed, and Theorem 3 (Consistency), Lemma 3 and
 Theorem 4 (Update Stability) are false: a five-process execution with majority quorums lets two queries learn the

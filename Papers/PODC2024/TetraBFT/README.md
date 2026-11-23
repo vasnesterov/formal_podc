@@ -4,7 +4,6 @@ Qianyu Yu, Giuliano Losa, Xuechao Wang. *TetraBFT: Reducing Latency of Unauthent
 BFT Consensus.* PODC 2024. DOI [10.1145/3662158.3662783](https://doi.org/10.1145/3662158.3662783).
 Formalized version: arXiv [2405.02615](https://arxiv.org/abs/2405.02615) v2 (April 2026); its
 numbering is the same as v1's.
-Copy of the paper: [paper.pdf](paper.pdf).
 
 **Verdict: ⚠️ Weakened.** Termination (liveness after GST) in Theorem 1 is false for the protocol as specified: after
 GST the view change can deadlock forever, both with reliable channels (`n = 7`, `f = 2`) and in the paper's lossy

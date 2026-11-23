@@ -3,7 +3,7 @@
 Danny Hendler. *On the Complexity of Reader-Writer Locks.* PODC 2016. DOI
 [10.1145/2933057.2933099](https://doi.org/10.1145/2933057.2933099). Formalized version: the author's
 copy "ReadersWritersLock-CR" (Extended Abstract, 11 pp., with the proofs of Sections 3 and 5; no arXiv
-version); numbering follows it. Copy of the paper: [paper.pdf](paper.pdf).
+version); numbering follows it.
 
 **Verdict: 🛠️ Hard fix.** The lower bound holds: Theorem 5 (`n ≤ Wb · 3^Rb`, i.e. writer entry `O(f(n))`
 forces reader exit `Ω(log(n/f(n)))`) and Corollary 6 are proved, but **Lemma 1 is false** (an expanding step

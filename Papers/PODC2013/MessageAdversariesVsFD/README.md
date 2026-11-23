@@ -4,7 +4,7 @@ Michel Raynal, Julien Stainer. *Synchrony Weakened by Message Adversaries vs Asy
 Failure Detectors.* PODC 2013. DOI [10.1145/2484239.2484249](https://doi.org/10.1145/2484239.2484249).
 Formalized version: the full version, IRISA research report PI 2002 (*Round-based Synchrony Weakened by
 Message Adversaries vs Asynchrony Enriched with Failure Detectors*, hal-00787978v2, Feb. 2013); numbering
-follows it. Copy of the paper: [paper.pdf](paper.pdf).
+follows it.
 
 **Verdict: ❌ Intent lost.** With the paper's own definition of solving a task in the synchronous
 model (every process outputs), the QUORUM characterization of Σ is false: a three-process task is solvable

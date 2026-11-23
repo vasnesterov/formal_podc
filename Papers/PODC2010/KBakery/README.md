@@ -4,7 +4,7 @@ Robert Danek. *The k-Bakery: Local-Spin k-Exclusion Using Non-atomic Reads and W
 DOI [10.1145/1835698.1835707](https://doi.org/10.1145/1835698.1835707). Formalized version: the author's
 9-page copy (no arXiv version); the proofs the paper omits (Theorem 9, the CC part of Lemma 7, Theorem 10)
 are taken from Danek's PhD thesis (Toronto, 2010, Chapter 5: Figures 5.3, 5.5, 5.6, Theorems 5.9, 5.20,
-5.33). Copy of the paper: [paper.pdf](paper.pdf).
+5.33).
 
 **Verdict: ❌ Intent lost.** The non-atomic algorithm of Figure 3 — the variant named in the
 title — violates k-exclusion: with safe registers, 3 processes and `k = 1`, two processes end up in the

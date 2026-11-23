@@ -4,7 +4,6 @@ Jukka Suomela. *Distributed Algorithms for Edge Dominating Sets.* PODC 2010. DOI
 [10.1145/1835698.1835783](https://doi.org/10.1145/1835698.1835783). Formalized version: the author's version
 (http://users.ics.aalto.fi/suomela/doc/eds.pdf, 10 pages, same numbering as the proceedings; there is no arXiv
 version).
-Copy of the paper: [paper.pdf](paper.pdf).
 
 **Verdict: ✏️ Slip.** All results are formalized and hold as stated: the lower bounds `4 - 2/d` (even `d`) and
 `4 - 6/(d+1)` (odd `d`) for `d`-regular graphs (Theorems 1, 2), their bounded-degree consequence `4 - 1/k`

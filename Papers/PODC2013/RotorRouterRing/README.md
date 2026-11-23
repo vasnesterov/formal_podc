@@ -3,7 +3,7 @@
 Ralf Klasing, Adrian Kosowski, Dominik Pająk, Thomas Sauerwald. *The Multi-Agent Rotor-Router on the Ring: A
 Deterministic Alternative to Parallel Random Walks.* PODC 2013. DOI
 [10.1145/2484239.2484260](https://doi.org/10.1145/2484239.2484260). Formalized version: the full version
-HAL hal-00735113v2 (September 2014, 28 pp.); numbering follows it. Copy of the paper: [paper.pdf](paper.pdf).
+HAL hal-00735113v2 (September 2014, 28 pp.); numbering follows it.
 
 **Verdict: ❌ Intent lost.** The proofs of Theorem 3.2 (worst case `Θ(n²/log k)`) and Theorem 3.5 (best-case upper
 bound `O((n/k)²)`) are broken and nothing we proved repairs them; neither statement is refuted, but neither is

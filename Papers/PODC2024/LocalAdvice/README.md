@@ -4,7 +4,7 @@ Alkida Balliu, Sebastian Brandt, Fabian Kuhn, Krzysztof Nowicki, Dennis Olivetti
 Jukka Suomela. *Brief Announcement: Local Advice and Local Decompression.* PODC 2024. DOI
 [10.1145/3662158.3662805](https://doi.org/10.1145/3662158.3662805). Formalized version: the full version
 *Distributed Computation with Local Advice*, arXiv [2405.04519](https://arxiv.org/abs/2405.04519) v2
-(22 Aug 2025); numbering follows it. Copy of the paper: [paper.pdf](paper.pdf).
+(22 Aug 2025); numbering follows it.
 
 **Verdict: 🛠️ Hard fix.** The 3-colouring result holds: every 3-colourable graph of maximum degree `Δ` can be 3-coloured
 in `O(Δ⁹)` rounds with 1 bit of advice per node (Theorem 30), and Lemmas 31–34 hold, including the

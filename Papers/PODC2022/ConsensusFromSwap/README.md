@@ -3,7 +3,6 @@
 Sean Ovens. *The Space Complexity of Consensus from Swap.* PODC 2022. DOI
 [10.1145/3519270.3538420](https://doi.org/10.1145/3519270.3538420). Formalized version: arXiv
 [2305.06507](https://arxiv.org/abs/2305.06507) v2 (Aug 2023), which also covers k-set agreement.
-Copy of the paper: [paper.pdf](paper.pdf).
 
 **Verdict: 🔧 Easy fix.** Every formalized result holds as stated, for obstruction-free algorithms: Algorithm 1 is
 an obstruction-free k-set agreement algorithm from `n − k` swap objects, `⌈n/k⌉ − 1` swap objects are needed (so

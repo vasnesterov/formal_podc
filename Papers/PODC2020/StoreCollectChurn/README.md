@@ -5,7 +5,6 @@ Presence of Continuous Churn with Application to Snapshots and Lattice Agreement
 [10.1145/3382734.3405709](https://doi.org/10.1145/3382734.3405709). Formalized version: the full
 version *Store-Collect in the Presence of Continuous Churn with Application to Snapshots and
 Lattice Agreement*, arXiv [2003.07787](https://arxiv.org/abs/2003.07787) v3; numbering follows it.
-Copy of the paper: [paper.pdf](paper.pdf).
 
 **Verdict: ❌ Intent lost.** The churn-tolerant store-collect algorithm CCC (Algorithms 1–3)
 is **not regular** as written: a collect returns its node's current local view, which may contain a

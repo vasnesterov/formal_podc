@@ -3,8 +3,7 @@
 Hagit Attiya, Ohad Ben-Baruch, Danny Hendler. *Nesting-Safe Recoverable Linearizability: Modular
 Constructions for Non-Volatile Memory.* PODC 2018. DOI
 [10.1145/3212734.3212753](https://doi.org/10.1145/3212734.3212753). Formalized version: the authors'
-copy of the conference paper (10 pages, proofs included; no arXiv version). Copy of the paper:
-[paper.pdf](paper.pdf).
+copy of the conference paper (10 pages, proofs included; no arXiv version).
 
 **Verdict: ⚠️ Weakened.** Lemma 1 holds, the recoverable read/write object (Lemma 2) and the recoverable
 compare&swap object (Lemma 3) satisfy NRL, and Theorem 4 (no wait-free recoverable test&set from

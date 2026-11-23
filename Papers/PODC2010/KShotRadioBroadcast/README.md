@@ -4,7 +4,7 @@ Paraschos Koutris, Aris Pagourtzis. *Brief Announcement: k-Shot Distributed Broa
 Networks.* PODC 2010. DOI [10.1145/1835698.1835717](https://doi.org/10.1145/1835698.1835717).
 Formalized version: the full version, Karmakar, Koutris, Pagourtzis, Sakavalas, *k-shot Broadcasting
 in Ad Hoc Radio Networks*, arXiv [1603.08393](https://arxiv.org/abs/1603.08393) v1; numbering follows
-it. We found no open copy of the 2-page brief announcement. Copy of the paper: [paper.pdf](paper.pdf).
+it. We found no open copy of the 2-page brief announcement.
 
 **Version caveat.** All mistakes below are those of the 2016 arXiv text. The brief announcement
 (2 pages, no public abstract) presumably states the oblivious bounds (`Θ(n²/k)` for `k ≤ √n`,

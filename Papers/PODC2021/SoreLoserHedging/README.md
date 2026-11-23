@@ -3,7 +3,7 @@
 Yingjie Xue, Maurice Herlihy. *Hedging Against Sore Loser Attacks in Cross-Chain Transactions.* PODC 2021. DOI
 [10.1145/3465084.3467904](https://doi.org/10.1145/3465084.3467904). Formalized version: arXiv
 [2105.06322](https://arxiv.org/abs/2105.06322) v2. It has the same text as the proceedings version, and the
-numbering follows it. Copy of the paper: [paper.pdf](paper.pdf).
+numbering follows it.
 
 **Verdict: 🔧 Easy fix.** Once the protocols' unspecified details are filled in consistently, the hedged two-party swap
 is safe, live and hedged, the multi-party swap protocol is hedged (Lemma 6: a conforming party gains at least `p` for

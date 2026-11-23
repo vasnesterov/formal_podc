@@ -3,7 +3,7 @@
 Matthias Bentert, Chen Avin, Stefan Schmid. *A Separation Between Optimal Demand-Oblivious and
 Demand-Aware Network Throughput.* PODC 2026. DOI
 [10.1145/3796701.3815941](https://doi.org/10.1145/3796701.3815941). Formalized version: arXiv
-2605.04699 v1; numbering follows it. Copy of the paper: [paper.pdf](paper.pdf).
+2605.04699 v1; numbering follows it.
 
 **Verdict: 🔧 Easy fix.** All the main results hold, and we prove them without assumptions: the separation theorem
 (Theorem 5: throughput `5/8 − ε` is achievable for large `n`), the two results from the literature it uses, dependent

@@ -3,7 +3,6 @@
 Swan Dubois, Rachid Guerraoui. *Introducing speculation in self-stabilization: an application to mutual
 exclusion.* PODC 2013. DOI [10.1145/2484239.2484246](https://doi.org/10.1145/2484239.2484246). Formalized
 version: arXiv [1302.2217](https://arxiv.org/abs/1302.2217) v1; numbering follows it.
-Copy of the paper: [paper.pdf](paper.pdf).
 
 **Verdict: ⚠️ Weakened.** The protocol results stand: SSME is self-stabilizing for mutual exclusion under the
 unfair distributed daemon (Theorem 1), and under the synchronous daemon it stabilizes within `⌈diam/2⌉` steps

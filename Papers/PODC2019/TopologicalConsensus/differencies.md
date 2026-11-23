@@ -3,7 +3,7 @@
 Paper: T. Nowak, U. Schmid, K. Winkler, *Topological Characterization of Consensus under General
 Message Adversaries*, PODC 2019. **The PODC'19 paper is arXiv:1905.09590 v1** (23 May 2019). Its
 setting is synchronous, fault-free dynamic networks under an arbitrary message adversary, with
-process-time graphs and the minimum topology. The local `paper.pdf` is v3 (2024), *Topological
+process-time graphs and the minimum topology. The current arXiv version is v3 (2024), *Topological
 Characterization of Consensus in Distributed Systems*. v3 generalizes v1 to a generic model with
 benign faults. We formalized both. The README's labels concern v1. Errors that appear only in v3 are
 listed separately below.

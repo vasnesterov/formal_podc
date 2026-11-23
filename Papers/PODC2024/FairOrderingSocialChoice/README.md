@@ -3,7 +3,7 @@
 Geoffrey Ramseyer, Ashish Goel. *Brief Announcement: Fair Ordering via Streaming Social Choice Theory.* PODC 2024.
 DOI [10.1145/3662158.3662772](https://doi.org/10.1145/3662158.3662772). Formalized version: the full version, arXiv
 [2304.02730](https://arxiv.org/abs/2304.02730) v4 ("Fair Ordering in Replicated Systems via Streaming Social
-Choice"), which has the proofs (Appendices A–E, K); numbering follows it. Copy of the paper: [paper.pdf](paper.pdf).
+Choice"), which has the proofs (Appendices A–E, K); numbering follows it.
 
 **Verdict: 🛠️ Hard fix.** The headline results hold: Ranked Pairs is `(γ, f/n)`-minimally-batch-order-fair for
 every `γ` at once (Theorem 4.1), and the streaming Algorithm 3 is consistent with Ranked Pairs and monotonic

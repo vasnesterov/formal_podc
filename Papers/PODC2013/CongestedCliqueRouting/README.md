@@ -3,7 +3,6 @@
 Christoph Lenzen. *Optimal Deterministic Routing and Sorting on the Congested Clique.* PODC 2013.
 DOI [10.1145/2484239.2501983](https://doi.org/10.1145/2484239.2501983). Formalized version: arXiv
 [1207.1852](https://arxiv.org/abs/1207.1852) v4 (10 May 2013, the PODC version); numbering follows it.
-Copy of the paper: [paper.pdf](paper.pdf).
 
 **Verdict: 🛠️ Hard fix.** Both main results hold for every `n`: routing (Theorem 3.7, 16 rounds) and sorting
 (Theorem 4.5, 37 rounds); we prove them with packets of a constant number of `O(log n)`-bit items, in 15 and 32 rounds.

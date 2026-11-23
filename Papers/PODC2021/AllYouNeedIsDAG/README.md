@@ -2,8 +2,7 @@
 
 Idit Keidar, Eleftherios Kokoris-Kogias, Oded Naor, Alexander Spiegelman. *All You Need is DAG.*
 PODC 2021. DOI [10.1145/3465084.3467905](https://doi.org/10.1145/3465084.3467905). Formalized
-version: arXiv [2102.08325](https://arxiv.org/abs/2102.08325) v2. Copy of the paper:
-[paper.pdf](paper.pdf).
+version: arXiv [2102.08325](https://arxiv.org/abs/2102.08325) v2.
 
 **Verdict: 🛠️ Hard fix.** Integrity, total order, agreement, validity and the expected number of waves until a commit
 all hold (agreement and validity given infinitely many good waves, which occur with probability 1), but the probability

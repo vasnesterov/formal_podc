@@ -3,7 +3,6 @@
 Christoph Lenzen, Julian Loss. *Early-Stabilizing Counting.* PODC 2026. DOI
 [10.1145/3796701.3815925](https://doi.org/10.1145/3796701.3815925). Formalized version: arXiv
 [2605.18171](https://arxiv.org/abs/2605.18171) v1; numbering follows it.
-Copy of the paper: [paper.pdf](paper.pdf).
 
 **Verdict: 🔧 Easy fix.** With one constant corrected in Algorithm 1, Theorem 5.7 and Corollary 5.8 are verified
 end to end: a deterministic self-stabilising `C`-counter tolerating `f < n/3` Byzantine faults that stabilises in

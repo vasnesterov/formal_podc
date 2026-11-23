@@ -3,7 +3,6 @@
 Nicolas Bousquet, Laurent Feuilloley, Sébastien Zeitoun. *Brief Announcement: Global certification via perfect
 hashing.* PODC 2024. DOI [10.1145/3662158.3662781](https://doi.org/10.1145/3662158.3662781). Formalized version:
 HAL [hal-04467834v2](https://hal.science/hal-04467834v2) (same text as the proceedings brief announcement).
-Copy of the paper: [paper.pdf](paper.pdf).
 
 **Verdict: ✏️ Slip.** Theorem 4 (homomorphism to `H` with `O(n log n' + log log M)` bits) and Theorem 3 (bipartiteness with
 `O(n + log log M)` bits) are proved, with explicit constant 10, uniformly in `H` and `M`, so Conjecture 1 of

@@ -2,7 +2,7 @@
 
 Christoph Lenzen, Sahar Sheikholeslami. *A Recursive Early-Stopping Phase King Protocol.* PODC 2022.
 DOI [10.1145/3519270.3538425](https://doi.org/10.1145/3519270.3538425). Formalized version: the
-proceedings version (no arXiv version exists). Copy of the paper: [paper.pdf](paper.pdf).
+proceedings version (no arXiv version exists).
 
 **Verdict: ❌ Intent lost.** Theorem 1.2, the `O(n²)`-bit recursive algorithm that gives the paper its title and its
 claim to be first, is not established: the proof does not cover correct nodes that return while others continue,

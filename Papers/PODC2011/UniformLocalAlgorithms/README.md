@@ -4,7 +4,6 @@ Amos Korman, Jean-Sébastien Sereni, Laurent Viennot. *Toward More Localized Loc
 Assumptions Concerning Global Knowledge.* PODC 2011. DOI
 [10.1145/1993806.1993814](https://doi.org/10.1145/1993806.1993814). Formalized version: arXiv
 [1512.03306](https://arxiv.org/abs/1512.03306) v1 (journal version, Distributed Computing); numbering follows it.
-Copy of the paper: [paper.pdf](paper.pdf).
 
 **Verdict: ⚠️ Weakened.** The main transformers hold after local repairs: Theorem 1, Theorem 2 (randomized: weak
 Monte-Carlo to Las Vegas), Theorem 3 (deterministic case) and Theorem 4, and uniform maximal matching survives with

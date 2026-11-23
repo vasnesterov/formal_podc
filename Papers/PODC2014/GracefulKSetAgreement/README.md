@@ -5,7 +5,7 @@ degrading consensus and k-set agreement under dynamic link failures.* PODC 2014.
 [10.1145/2611462.2611506](https://doi.org/10.1145/2611462.2611506). Formalized version: the full version, Biely,
 Robinson, Schmid, Schwarz, Winkler, *Gracefully Degrading Consensus and k-Set Agreement in Directed Dynamic
 Networks*, arXiv [1501.02716](https://arxiv.org/abs/1501.02716) v1; numbering follows it. Its Sections 6–7 are the
-PODC'14 announcement, Sections 4–5 the SIROCCO'12 consensus part. Copy of the paper: [paper.pdf](paper.pdf).
+PODC'14 announcement, Sections 4–5 the SIROCCO'12 consensus part.
 
 **Verdict: ❌ Intent lost.** The paper's central algorithm is wrong. Algorithm 4, the "first gracefully degrading
 consensus algorithm", violates agreement: with `k = 1` (consensus) there are runs under `VSRC(n, 3D + H) + MAJINF(1)` in

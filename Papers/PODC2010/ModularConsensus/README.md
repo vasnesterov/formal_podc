@@ -3,7 +3,7 @@
 James Aspnes. *A modular approach to shared-memory consensus, with applications to the probabilistic-write model.*
 PODC 2010. DOI [10.1145/1835698.1835802](https://doi.org/10.1145/1835698.1835802). Formalized version: the
 author's full version of May 14, 2011 (18 pp., with proofs; no arXiv version); numbering follows it. The author's
-erratum (ratifiers are Gafni's adopt-commit objects) only fixes credit. Copy of the paper: [paper.pdf](paper.pdf).
+erratum (ratifiers are Gafni's adopt-commit objects) only fixes credit.
 
 **Verdict: ✏️ Slip.** The only mistakes are two slips in intermediate sentences: the composition lemmas (Lemmas 1–3,
 Theorem 4), the safety of the conciliator/adopt-commit consensus construction, the multi-valued adopt-commit

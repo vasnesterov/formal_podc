@@ -5,7 +5,6 @@ Synchronous Agreement Systems.* PODC 2020. DOI
 [10.1145/3382734.3405731](https://doi.org/10.1145/3382734.3405731). Formalized version: the PODC
 proceedings version (no arXiv version; the online appendix with the full proofs was not available to
 us). Numbering follows it.
-Copy of the paper: [paper.pdf](paper.pdf).
 
 **Verdict: 🔧 Easy fix.** Under strong non-equivocation interactive consistency (IC) takes 1 round for any `n`, `t`, and
 under weak non-equivocation it takes exactly `t + 1` rounds and `n > 2t` processes, for `n ≥ 4`. Local conditions repair

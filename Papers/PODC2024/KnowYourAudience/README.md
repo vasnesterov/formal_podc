@@ -3,8 +3,7 @@
 Bernadette Charron-Bost, Patrick Lambein-Monette. *Brief Announcement: Know Your Audience.* PODC 2024. DOI
 [10.1145/3662158.3662784](https://doi.org/10.1145/3662158.3662784). Formalized version: the full version *Know your
 audience: Communication model and computability in anonymous networks*, arXiv
-[2311.17728](https://arxiv.org/abs/2311.17728) v1 (23 pp.); numbering follows it. Copy of the paper:
-[paper.pdf](paper.pdf).
+[2311.17728](https://arxiv.org/abs/2311.17728) v1 (23 pp.); numbering follows it.
 
 **Verdict: 🔧 Easy fix.** Theorem 4.1 says that, with output port awareness, symmetric communications or outdegree
 awareness, a function is computable in static strongly connected anonymous networks iff it is frequency-based. The

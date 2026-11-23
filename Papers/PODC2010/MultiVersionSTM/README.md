@@ -3,7 +3,7 @@
 Dmitri Perelman, Rui Fan, Idit Keidar. *On Maintaining Multiple Versions in STM.* PODC 2010. DOI
 [10.1145/1835698.1835704](https://doi.org/10.1145/1835698.1835704). Formalized version: the full
 version, Technion CCIT Report #765 (May 2010, 20 pp.), which has the same numbering and adds the proof
-of Invariant 1 (Appendix A). Copy of the paper: [paper.pdf](paper.pdf).
+of Invariant 1 (Appendix A).
 
 **Verdict: 🛠️ Hard fix.** Theorems 1–3 hold once repaired. Theorem 1 (no MV-permissive STM is
 online space optimal) needed a new construction of the competing STM, and Theorem 2 (no weak

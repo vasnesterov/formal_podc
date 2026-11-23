@@ -3,7 +3,6 @@
 Matteo Monti, Martina Camaioni, Pierre-Louis Roman. *Fast Byzantine Total Order Broadcast.* PODC 2026.
 DOI [10.1145/3796701.3815946](https://doi.org/10.1145/3796701.3815946). Formalized version: arXiv
 [2412.14061](https://arxiv.org/abs/2412.14061) v2 (full version with appendices); numbering follows it.
-Copy of the paper: [paper.pdf](paper.pdf).
 
 **Verdict: 🔧 Easy fix.** The safety results hold in the paper's model (`n = 5f + 1`), with the underlying
 consensus as a black box: Theorems 2–4 for Blink, and for Flutter Theorems 6–7 and the safety core of Agreement

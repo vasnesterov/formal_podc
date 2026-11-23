@@ -4,7 +4,6 @@ Danny Dolev, Michael Erdmann, Neil Lutz, Michael Schapira, Adva Zair. *Stateless
 PODC 2017. DOI [10.1145/3087801.3087854](https://doi.org/10.1145/3087801.3087854). Formalized
 version: arXiv [1611.10068](https://arxiv.org/abs/1611.10068) v1 (the only version); numbering
 follows it.
-Copy of the paper: [paper.pdf](paper.pdf).
 
 **Verdict: 🔧 Easy fix.** Theorem 3.1 (two stable labelings rule out label `(n−1)`-stabilization), its tightness
 example, Propositions 2.1–2.3, Theorem 5.10, Theorem 6.2 and Corollaries 6.3–6.4 hold after local repairs to their

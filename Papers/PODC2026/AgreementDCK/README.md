@@ -3,7 +3,6 @@
 Or David, Yoram Moses. *Brief Announcement: What is Agreement About if not Common Knowledge?*
 PODC 2026. DOI [10.1145/3796701.3815934](https://doi.org/10.1145/3796701.3815934). Formalized version:
 the 4-page proceedings brief announcement (we found no full version on arXiv); numbering follows it.
-Copy of the paper: [paper.pdf](paper.pdf).
 
 **Verdict: 🔧 Easy fix.** The paper gives no proofs; we supplied them, and knowledge of preconditions
 (Thm 1.2), necessity of dynamic common knowledge (Thm 1.5, Cor 1.6) and sufficiency (Thm 1.7) all hold in the

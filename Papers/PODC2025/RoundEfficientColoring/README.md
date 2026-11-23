@@ -3,7 +3,6 @@
 Yi-Jun Chang, Gopinath Mishra, Hung Thuan Nguyen, Farrel D. Salim. *Round and Communication Efficient
 Graph Coloring.* PODC 2025. DOI [10.1145/3732772.3733508](https://doi.org/10.1145/3732772.3733508).
 Formalized version: arXiv [2412.12589](https://arxiv.org/abs/2412.12589) v2 (9 May 2025); numbering follows it.
-Copy of the paper: [paper.pdf](paper.pdf).
 
 **Verdict: ✏️ Slip.** The edge-colouring results we checked hold: Theorem 2, the deterministic `(2Δ−1)`-edge colouring
 with `O(n)` bits and `O(1)` rounds, which we even get in a single round; Theorem 3, `2Δ` colours without communication;

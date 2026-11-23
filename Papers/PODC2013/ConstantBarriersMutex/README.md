@@ -3,7 +3,6 @@
 Hagit Attiya, Danny Hendler, Smadar Levy. *An O(1)-Barriers Optimal RMRs Mutual Exclusion Algorithm.*
 PODC 2013. DOI [10.1145/2484239.2484255](https://doi.org/10.1145/2484239.2484255). Formalized version: the
 authors' extended abstract (11 pages, from Hendler's web page; no arXiv or full version available).
-Copy of the paper: [paper.pdf](paper.pdf).
 
 **Verdict: 🛠️ Hard fix.** Theorem 1, the CAS version, holds in full under TSO: Algorithm 1 satisfies mutual
 exclusion, starvation freedom and (log n + 3)-bounded waiting (even log n + 2), and every passage costs at

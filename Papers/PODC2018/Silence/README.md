@@ -4,7 +4,6 @@ Guy Goren, Yoram Moses. *Silence.* PODC 2018. DOI
 [10.1145/3212734.3212768](https://doi.org/10.1145/3212734.3212768). Formalized version: arXiv
 [1805.07954](https://arxiv.org/abs/1805.07954) v1 (the only version, with Appendices A–D); numbering
 follows it.
-Copy of the paper: [paper.pdf](paper.pdf).
 
 **Verdict: 🛠️ Hard fix.** The Silent Choir Theorem, the lower bounds of Theorem 3 and the
 three matching AC protocols (STEALTH, D2, D1f1) hold, and so do the Appendix D bounds and protocol. The protocol proofs

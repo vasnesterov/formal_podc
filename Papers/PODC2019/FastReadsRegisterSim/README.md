@@ -5,7 +5,7 @@ Multi-Valued Register Simulations.* PODC 2019. DOI
 [10.1145/3293611.3331580](https://doi.org/10.1145/3293611.3331580). Formalized version: the 3-page
 brief announcement (author copy from NSF-PAR, retrieved via web.archive; no arXiv or full version), whose
 proofs are condensed; numbering follows it. The gaps in Section 3 below are of the kind expected from such
-compression; the Lemma 4.2 gap is not (its one-line justification is false). Copy of the paper: [paper.pdf](paper.pdf).
+compression; the Lemma 4.2 gap is not (its one-line justification is false).
 
 **Verdict: 🛠️ Hard fix.** All results hold: Theorem 3.1 (`log₂ k` reads are needed), Theorem 3.2 and
 Corollary 3.5 (a safe/regular simulation whose reads take `log₂ k` reads needs writes of `log₂ k` base writes),

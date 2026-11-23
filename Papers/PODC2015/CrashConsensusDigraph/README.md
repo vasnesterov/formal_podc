@@ -4,7 +4,6 @@ Lewis Tseng, Nitin H. Vaidya. *Fault-Tolerant Consensus in Directed Graphs.* POD
 [10.1145/2767386.2767399](https://doi.org/10.1145/2767386.2767399). Formalized version: arXiv
 [1412.8532](https://arxiv.org/abs/1412.8532) v2 (*Crash-Tolerant Consensus in Directed Graphs*, same
 authors); numbering follows it.
-Copy of the paper: [paper.pdf](paper.pdf).
 
 **Verdict: 🔧 Easy fix.** The tight conditions hold. Synchronous crash consensus with at most `f` crashes is solvable on a
 digraph iff every reduced graph `G_F` (`|F| ≤ f`) has a node reaching all of it (Theorems 1–4, binary and multi-valued),

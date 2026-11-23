@@ -3,7 +3,6 @@
 Siddhartha Jayanti. *On Interplanetary and Relativistic Distributed Computing.* PODC 2025. DOI
 [10.1145/3732772.3733563](https://doi.org/10.1145/3732772.3733563). Formalized version: the proceedings
 version (no arXiv version exists); numbering follows it.
-Copy of the paper: [paper.pdf](paper.pdf).
 
 **Verdict: 🔧 Easy fix.** The Central Theorem (Theorem 6.7) and the Equivalence Theorem (Theorem 6.8) are saved by
 local changes: finite executions in two definitions, a rule for ties in frames, and a citation in place of one wrong

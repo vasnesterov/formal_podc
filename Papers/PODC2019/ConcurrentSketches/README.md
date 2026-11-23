@@ -7,7 +7,7 @@ Serviansky. *Fast Concurrent Data Sketches.* PODC 2019 (brief announcement). DOI
 publication itself is a two-page brief announcement; Lemma 1 and Theorem 1 are stated identically in
 v1 (Feb. 2019, proofs in its Appendix A), v2 and the journal version. v2 defers its proofs to "the
 full paper"; the proofs we checked are those of the journal version (ACM TOPC 9(2), 2022), Sections
-6–7. See `differencies.md` for version differences. Copy of the paper: [paper.pdf](paper.pdf).
+6–7. See `differencies.md` for version differences.
 
 **Verdict: 🛠️ Hard fix.** Lemma 1 and Theorem 1 hold: the generic algorithms are strongly linearisable with respect
 to `SeqSketch_{Nb}` and `SeqSketch_{2Nb}`, for every composable sketch, provided the threads' initial hint is the

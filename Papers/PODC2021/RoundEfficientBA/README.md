@@ -3,7 +3,6 @@
 Matthias Fitzi, Chen-Da Liu-Zhang, Julian Loss. *A New Way to Achieve Round-Efficient Byzantine
 Agreement.* PODC 2021. DOI [10.1145/3465084.3467907](https://doi.org/10.1145/3465084.3467907).
 Formalized version: the 8-page proceedings version (no arXiv version; the IACR ePrint full version 2021/814 was not accessible to us); numbering follows the proceedings.
-Copy of the paper: [paper.pdf](paper.pdf).
 
 **Verdict: ⚠️ Weakened.** Of the paper's two equal results, the `(κ+1)`-round BA for `t < n/3` is wrong as printed
 for every `n ≥ 3t + 2` with `t ≥ 1`, but is saved by one constant: with the threshold `t + 1` instead of `n - 2t`

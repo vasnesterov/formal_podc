@@ -4,7 +4,6 @@ Sebastian Brandt, Juho Hirvonen, Janne H. Korhonen, Tuomo Lempiäinen, Patric R.
 Christopher Purcell, Joel Rybicki, Jukka Suomela, Przemysław Uznański. *LCL Problems on Grids.*
 PODC 2017. DOI [10.1145/3087801.3087833](https://doi.org/10.1145/3087801.3087833). Formalized
 version: arXiv [1702.05456](https://arxiv.org/abs/1702.05456) v2; numbering follows it.
-Copy of the paper: [paper.pdf](paper.pdf).
 
 **Verdict: ✏️ Slip.** In what we checked there are only slips: the 3-colouring lower bound (Theorem 9, with
 `n ≤ 8T + 8` for every odd `n`) holds, and so do its ingredients, Theorem 10 (`q`-sum coordination is global) and

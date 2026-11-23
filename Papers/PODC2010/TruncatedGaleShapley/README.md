@@ -4,7 +4,7 @@ Patrik Floréen, Petteri Kaski, Valentin Polishchuk, Jukka Suomela. *Brief annou
 matchings in constant time.* PODC 2010, pp. 281–282. DOI
 [10.1145/1835698.1835765](https://doi.org/10.1145/1835698.1835765). Formalized version: the full paper
 *Almost Stable Matchings in Constant Time*, arXiv [0812.4893](https://arxiv.org/abs/0812.4893) v1;
-numbering follows it. Copy of the paper: [paper.pdf](paper.pdf).
+numbering follows it.
 
 **Verdict: 🔧 Easy fix.** All three theorems hold with the paper's constants: truncated Gale–Shapley
 gives an `ε`-stable matching in `T ≤ 4 + 2Δ²/ε` rounds (also with ties), a `(2+ε)`-approximate

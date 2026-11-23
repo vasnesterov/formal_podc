@@ -4,7 +4,6 @@ Emmanuel Godard, Damien Imbs, Michel Raynal, Gadi Taubenfeld. *From Bezout's Ide
 Space-Optimal Election in Anonymous Memory Systems.* PODC 2020. DOI
 [10.1145/3382734.3405727](https://doi.org/10.1145/3382734.3405727). Formalized version: the
 proceedings text (HAL hal-03148627); there is no arXiv version.
-Copy of the paper: [paper.pdf](paper.pdf).
 
 **Verdict: 🛠️ Hard fix.** All results are proved: Theorems 1, 2 and 4, and Corollaries 1–3 as iff
 characterizations. But the termination proofs of Algorithms 1 and 2 and the safety proof of Algorithm 2 are

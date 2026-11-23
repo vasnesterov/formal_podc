@@ -2,8 +2,7 @@
 
 Danny Hendler, Vitaly Khait. *Complexity Tradeoffs for Read and Update Operations.* PODC 2014. DOI
 [10.1145/2611462.2611472](https://doi.org/10.1145/2611462.2611472). Formalized version: the authors'
-copy with complete proofs (no arXiv version); numbering follows it. Copy of the paper:
-[paper.pdf](paper.pdf).
+copy with complete proofs (no arXiv version); numbering follows it.
 
 **Verdict: 🛠️ Hard fix.** All the abstract's results hold: the counter/snapshot tradeoff (Theorems 1–2,
 Corollary 1), the max-register tradeoff (Theorems 3–4) and the tree max register (Theorems 5–6). But the

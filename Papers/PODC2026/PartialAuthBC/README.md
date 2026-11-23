@@ -3,7 +3,6 @@
 Christoph Lenzen, Julian Loss, Kecheng Shi, Benedikt Wagner. *Byzantine Consensus in the Partially Authenticated
 Setting.* PODC 2026. DOI [10.1145/3796701.3815929](https://doi.org/10.1145/3796701.3815929). Formalized version:
 the proceedings version (pp. 282–292); numbering follows it. The full version (ePrint 2026/470) was not used.
-Copy of the paper: [paper.pdf](paper.pdf).
 
 **Verdict: 🔧 Easy fix.** The main positive result holds: the gradecast Π_GC works against any number of
 corruptions and has the special grade-1 property (Theorem 3.9, Lemma 3.10), the broadcast Π_BC for a registered

@@ -4,7 +4,6 @@ Andrei Constantinescu, Marc Dufay, Anton Paramonov, Roger Wattenhofer. *From Few
 Adaptive Byzantine Agreement.* PODC 2026. DOI
 [10.1145/3796701.3815964](https://doi.org/10.1145/3796701.3815964). Formalized version: arXiv
 [2505.19989](https://arxiv.org/abs/2505.19989) v3 (17 Jun 2026); numbering follows it.
-Copy of the paper: [paper.pdf](paper.pdf).
 
 **Verdict: 🔧 Easy fix.** **Theorem 3.1** (synchronous BA, `t < n/2`, `O(n·f)` messages, `O(f)` rounds) holds for
 the paper's protocol `SyncBA` against a static adversary, with the quadratic fallback (Momose–Ren) taken as a black

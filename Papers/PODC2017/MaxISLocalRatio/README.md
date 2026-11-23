@@ -4,7 +4,7 @@ Reuven Bar-Yehuda, Keren Censor-Hillel, Mohsen Ghaffari, Gregory Schwartzman. *D
 of Maximum Independent Set and Maximum Matching.* PODC 2017. DOI
 [10.1145/3087801.3087806](https://doi.org/10.1145/3087801.3087806). Formalized version: arXiv
 [1708.00276](https://arxiv.org/abs/1708.00276) v1; numbering follows it. Scope: Section 2 (deterministic
-parts). Copy of the paper: [paper.pdf](paper.pdf).
+parts).
 
 **Verdict: ✏️ Slip.** The local-ratio theorem (Thm 2.1), Lemma 2.2, the `Δ`-approximation of
 the sequential meta-algorithm (Algorithm 1) for *every* choice of independent sets, the colouring-based

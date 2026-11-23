@@ -3,7 +3,6 @@
 Hengfeng Wei, Yu Huang, Jian Lu. *Brief Announcement: Specification and Implementation of
 Replicated List: The Jupiter Protocol Revisited.* PODC 2018. Formalized version: full version,
 arXiv [1708.04754](https://arxiv.org/abs/1708.04754) v4; numbering follows it.
-Copy of the paper: [paper.pdf](paper.pdf).
 
 **Verdict: 🛠️ Hard fix.** The main results hold: once clients send in-range positions, Jupiter and CJupiter
 behave identically (Theorem 12), are convergent (Theorem 11) and satisfy the weak list specification
